@@ -151,6 +151,9 @@ package: ## Package api + worker Lambda zips
 	chmod +x $(ROOT)/infra/lambda/package.sh
 	$(ROOT)/infra/lambda/package.sh api
 	$(ROOT)/infra/lambda/package.sh worker
+	@test -f $(ROOT)/infra/lambda/api.zip && test -f $(ROOT)/infra/lambda/worker.zip \
+		|| (echo "package: expected infra/lambda/{api,worker}.zip"; exit 1)
+	@ls -lh $(ROOT)/infra/lambda/api.zip $(ROOT)/infra/lambda/worker.zip
 
 .PHONY: package-api
 package-api: ## Package API Lambda zip only
