@@ -11,7 +11,7 @@ Own AWS IaC under `infra/terraform`. Follow skills `terraform-change`, `lambda-s
 
 - Modules: `infra/terraform/modules/{network,data,api,edge,messaging,observability,secrets,ci,…}`
 - Stacks: `infra/terraform/stacks/{staging,prod}` (thin wiring only)
-- Lambda packaging: `infra/lambda/package.sh`, SnapStart priming in apps
+- Lambda packaging: `make package` (wraps `infra/lambda/package.sh`), SnapStart priming in apps
 - Region: `ap-south-1`
 
 ## Hard rules

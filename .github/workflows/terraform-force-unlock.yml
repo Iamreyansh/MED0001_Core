@@ -22,19 +22,30 @@ permissions:
 jobs:
   unlock:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.10.5"
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Require AWS_DEPLOY_ROLE_ARN
+        env:
+          ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -z "$ROLE" ]; then
+            echo "::error::vars.AWS_DEPLOY_ROLE_ARN is empty"
+            exit 1
+          fi
+      - name: Validate lock_id
+        run: |
+          LOCK_ID='${{ inputs.lock_id }}'
+          if [ -z "$LOCK_ID" ]; then
+            echo "::error::lock_id is required"
+            exit 1
+          fi
+          echo "Unlock requested by ${{ github.actor }}"
+          echo "environment=${{ inputs.environment }}"
+          echo "lock_id=${LOCK_ID}"
+      - uses: ./.github/actions/setup-terraform-aws
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ap-south-1
       - name: Force unlock
-        working-directory: infra/terraform/stacks/${{ inputs.environment }}
-        run: |
-          echo "Unlock requested by ${{ github.actor }} for ${{ inputs.environment }} lock_id=${{ inputs.lock_id }}"
-          terraform init
-          terraform force-unlock -force "${{ inputs.lock_id }}"
+        run: make tf-unlock ENV=${{ inputs.environment }} LOCK_ID=${{ inputs.lock_id }}

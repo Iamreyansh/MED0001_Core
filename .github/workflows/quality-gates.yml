@@ -3,32 +3,49 @@ name: quality-gates
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
   pull-requests: write
 
+concurrency:
+  group: qg-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   java:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: gradle
+      - uses: ./.github/actions/setup-java
       - name: Spotless, tests, JaCoCo 100%, SpotBugs, ArchUnit
-        run: ./gradlew check -x dependencyCheckAnalyze --no-daemon
-      - name: OWASP dependency check
-        run: ./gradlew dependencyCheckAnalyze --no-daemon
+        run: make check
+      - name: OWASP dependency check (advisory)
+        id: owasp
         continue-on-error: true
-      - name: Upload reports
+        run: make dependency-check
+      - name: OWASP advisory summary
+        if: always() && steps.owasp.outcome != 'skipped'
+        run: |
+          {
+            echo "## OWASP dependency-check (advisory)"
+            if [ "${{ steps.owasp.outcome }}" = "success" ]; then
+              echo "Passed (CVSS fail threshold 9.0)."
+            else
+              echo "**Warning:** dependency-check failed or found critical findings."
+              echo "This step is advisory and does **not** block merge; inspect the uploaded report."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload quality reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: quality-reports
+          retention-days: 14
+          if-no-files-found: ignore
           path: |
             **/build/reports/jacoco/**
             **/build/reports/spotbugs/**
@@ -36,6 +53,7 @@ jobs:
 
   gitleaks:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,8 +62,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  scripts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n scripts
+        run: make scripts-syntax
+
   terraform:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -54,26 +81,53 @@ jobs:
           filters: |
             infra:
               - 'infra/**'
+              - 'scripts/deploy-stack.sh'
+              - 'scripts/ci/**'
+              - 'Makefile'
       - uses: hashicorp/setup-terraform@v3
-        if: steps.filter.outputs.infra == 'true'
         with:
           terraform_version: "1.10.5"
-      - name: Fmt + validate
-        if: steps.filter.outputs.infra == 'true'
+          terraform_wrapper: false
+      - name: Fmt + validate (always)
         run: |
-          terraform fmt -check -recursive infra/terraform
-          (cd infra/terraform/stacks/staging && terraform init -backend=false && terraform validate)
-          (cd infra/terraform/stacks/prod && terraform init -backend=false && terraform validate)
+          make tf-fmt-check
+          make tf-validate
+      - name: Require AWS deploy role when infra changed
+        if: steps.filter.outputs.infra == 'true'
+        env:
+          ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -z "$ROLE" ]; then
+            echo "::error::infra/deploy paths changed but vars.AWS_DEPLOY_ROLE_ARN is empty."
+            echo "Set the repository variable to the staging deploy_role_arn output (see docs/runbooks/github-setup.md)."
+            exit 1
+          fi
+          echo "AWS_DEPLOY_ROLE_ARN is set; will plan staging + prod."
       - name: Configure AWS OIDC
-        if: steps.filter.outputs.infra == 'true' && vars.AWS_DEPLOY_ROLE_ARN != ''
+        if: steps.filter.outputs.infra == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-south-1
       - name: Terraform plan staging
-        if: steps.filter.outputs.infra == 'true' && vars.AWS_DEPLOY_ROLE_ARN != ''
-        working-directory: infra/terraform/stacks/staging
+        if: steps.filter.outputs.infra == 'true'
         run: |
-          rm -rf .terraform
-          terraform init
-          terraform plan -no-color
+          make tf-plan ENV=staging TF_ARGS="-no-color -out=tfplan-staging"
+          terraform -chdir=infra/terraform/stacks/staging show -no-color tfplan-staging \
+            > "$GITHUB_WORKSPACE/tfplan-staging.txt"
+      - name: Terraform plan prod
+        if: steps.filter.outputs.infra == 'true'
+        run: |
+          make tf-plan ENV=prod TF_ARGS="-no-color -out=tfplan-prod"
+          terraform -chdir=infra/terraform/stacks/prod show -no-color tfplan-prod \
+            > "$GITHUB_WORKSPACE/tfplan-prod.txt"
+      - name: Upload terraform plans
+        if: steps.filter.outputs.infra == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plans
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            tfplan-staging.txt
+            tfplan-prod.txt

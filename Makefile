@@ -115,6 +115,10 @@ check: ## Full quality gates (JaCoCo 100%, Spotless, SpotBugs, ArchUnit)
 check-all: ## check + OWASP dependencyCheckAnalyze
 	$(GRADLE) check --no-daemon
 
+.PHONY: dependency-check
+dependency-check: ## OWASP dependencyCheckAnalyze only
+	$(GRADLE) dependencyCheckAnalyze --no-daemon
+
 .PHONY: format
 format: ## Apply Spotless formatting
 	$(GRADLE) spotlessApply --no-daemon
@@ -160,6 +164,8 @@ package-worker: ## Package worker Lambda zip only
 
 ##@ Terraform (local validate; apply via CI)
 
+TF_ARGS ?=
+
 .PHONY: tf-fmt
 tf-fmt: ## terraform fmt -recursive
 	terraform fmt -recursive $(ROOT)/infra/terraform
@@ -179,7 +185,32 @@ tf-validate: ## Validate staging + prod stacks (no backend)
 .PHONY: tf-plan
 tf-plan: ## Plan stack ENV=staging|prod (needs AWS creds + remote state)
 	@test "$(ENV)" = "staging" -o "$(ENV)" = "prod" || (echo "ENV must be staging or prod"; exit 1)
-	cd $(ROOT)/infra/terraform/stacks/$(ENV) && terraform init && terraform plan
+	cd $(ROOT)/infra/terraform/stacks/$(ENV) && rm -rf .terraform && terraform init -input=false && terraform plan -input=false $(TF_ARGS)
+
+.PHONY: tf-unlock
+tf-unlock: ## Force-unlock LOCK_ID=... ENV=staging|prod
+	@test "$(ENV)" = "staging" -o "$(ENV)" = "prod" || (echo "ENV must be staging or prod"; exit 1)
+	@test -n "$(LOCK_ID)" || (echo "LOCK_ID required"; exit 1)
+	cd $(ROOT)/infra/terraform/stacks/$(ENV) && terraform init -input=false && terraform force-unlock -force "$(LOCK_ID)"
+
+.PHONY: deploy
+deploy: ## Upload lambda zips + terraform apply + publish live aliases ENV=staging|prod (CI)
+	@test "$(ENV)" = "staging" -o "$(ENV)" = "prod" || (echo "ENV must be staging or prod"; exit 1)
+	chmod +x $(ROOT)/scripts/deploy-stack.sh $(ROOT)/scripts/ci/publish-lambda.sh
+	$(ROOT)/scripts/deploy-stack.sh $(ENV)
+
+.PHONY: smoke-remote
+smoke-remote: ## Poll HEALTH_URL until 200 + success/UP (deploy smoke)
+	@test -n "$(HEALTH_URL)" || (echo "HEALTH_URL required"; exit 1)
+	chmod +x $(ROOT)/scripts/smoke-remote.sh
+	$(ROOT)/scripts/smoke-remote.sh "$(HEALTH_URL)"
+
+.PHONY: scripts-syntax
+scripts-syntax: ## bash -n on scripts/*.sh and scripts/ci/*.sh
+	@for f in $(ROOT)/scripts/*.sh $(ROOT)/scripts/ci/*.sh; do \
+		echo "bash -n $$f"; bash -n "$$f"; \
+	done
+	@echo "Script syntax OK"
 
 ##@ Bootstrap / verify
 

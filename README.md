@@ -75,6 +75,7 @@ Overrides: `PROFILE=podman|local`, `API_PORT=8080`.
 | `make test` | All module tests |
 | `make check` | JaCoCo **100%**, Spotless, SpotBugs, ArchUnit |
 | `make check-all` | `check` + OWASP dependency-check |
+| `make dependency-check` | OWASP dependency-check only |
 | `make format` / `make format-check` | Spotless apply / verify |
 | `make coverage` | Tests + JaCoCo verification |
 | `make build` / `make jar` | Compile / boot jars |
@@ -95,7 +96,11 @@ State and locks live only in S3 (`s3://terraform-locks-105927215604/MED0001/`). 
 |--------|-------------|
 | `make tf-fmt` / `make tf-fmt-check` | Format / check |
 | `make tf-validate` | Validate staging + prod (no backend; cleans local `.terraform`) |
-| `make tf-plan ENV=staging` | Plan against remote state (needs AWS creds) |
+| `make tf-plan ENV=staging` | Plan against remote state (needs AWS creds; `TF_ARGS=-no-color` in CI) |
+| `make tf-unlock ENV=… LOCK_ID=…` | Force-unlock stuck state lock |
+| `make deploy ENV=staging\|prod` | Upload zips + terraform apply + publish alias `live` (CI) |
+| `make smoke-remote HEALTH_URL=…` | Poll until HTTP 200 + `success`/`UP` |
+| `make scripts-syntax` | `bash -n` on deploy/CI shell scripts |
 
 ### Bootstrap
 
@@ -136,13 +141,17 @@ docs/requirements/        # product epics/stories
 
 ## CI / CD
 
+Workflows call the same Makefile targets as local (`make check`, `make package`, `make tf-*`, `make deploy`, `make smoke-remote`).
+
 | Workflow | Trigger |
 |----------|---------|
-| `quality-gates.yml` | Pull request → `main` |
-| `deploy-main.yml` | Merge to `main` → staging → prod → GitHub Release |
+| `quality-gates.yml` | PR → `main` (java, gitleaks, scripts, terraform) |
+| `deploy-main.yml` | Merge to `main` → staging → prod → Release (zips attached) |
 | `terraform-force-unlock.yml` | Manual unlock of stuck TF lock |
 
-Repo variable: `AWS_DEPLOY_ROLE_ARN` (OIDC). See [`docs/runbooks/github-setup.md`](docs/runbooks/github-setup.md).
+Deploy publishes Lambda **versions** and moves alias **`live`** (API Gateway does not use `$LATEST`). Smoke requires HTTP 200 and `{"success":true,"data":{"status":"UP"}}`.
+
+Repo variable: `AWS_DEPLOY_ROLE_ARN` (OIDC). Setup: [`docs/runbooks/github-setup.md`](docs/runbooks/github-setup.md). Pipeline details: [`docs/runbooks/ci-cd.md`](docs/runbooks/ci-cd.md).
 
 ---
 

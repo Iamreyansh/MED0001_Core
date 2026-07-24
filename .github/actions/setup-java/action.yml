@@ -1,0 +1,11 @@
+name: Setup Java 21
+description: Temurin 21 + Gradle cache for MED0001_Core
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: "21"
+        cache: gradle

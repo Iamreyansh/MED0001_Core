@@ -37,7 +37,7 @@ Implement **one** story end-to-end. Stay inside the mapped domain + `db/migratio
 ## Done when
 
 - Story endpoints, auth, error codes, and AC tests match the story.
-- `make check` (or `./gradlew check -x dependencyCheckAnalyze`) green.
+- `make check` green.
 - No unrelated file churn.
 
 ## Handoff
