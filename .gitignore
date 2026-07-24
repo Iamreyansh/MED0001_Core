@@ -33,3 +33,5 @@ crash.*.log
 *.log
 .cursor/cache/
 .run/
+infra/lambda/api.zip
+infra/lambda/worker.zip

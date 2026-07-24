@@ -15,6 +15,14 @@ variable "name" { type = string }
 variable "subnet_ids" { type = list(string) }
 variable "security_group_id" { type = string }
 variable "kms_key_arn" { type = string }
+variable "skip_final_snapshot" {
+  type    = bool
+  default = true
+}
+variable "apply_immediately" {
+  type    = bool
+  default = true
+}
 
 resource "random_password" "db" {
   length  = 32
@@ -39,8 +47,8 @@ resource "aws_rds_cluster" "this" {
   storage_encrypted       = true
   kms_key_id              = var.kms_key_arn
   backup_retention_period = 7
-  skip_final_snapshot     = true
-  apply_immediately       = true
+  skip_final_snapshot     = var.skip_final_snapshot
+  apply_immediately       = var.apply_immediately
   serverlessv2_scaling_configuration {
     min_capacity = 0.5
     max_capacity = 4
@@ -83,7 +91,8 @@ resource "aws_db_proxy_target" "this" {
 }
 
 resource "aws_secretsmanager_secret" "db" {
-  name = "${var.name}/db"
+  name       = "${var.name}/db"
+  kms_key_id = var.kms_key_arn
 }
 
 resource "aws_secretsmanager_secret_version" "db" {
@@ -114,11 +123,18 @@ resource "aws_iam_role_policy" "proxy" {
   role = aws_iam_role.proxy.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = [aws_secretsmanager_secret.db.arn]
-    }]
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [aws_secretsmanager_secret.db.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = [var.kms_key_arn]
+      }
+    ]
   })
 }
 

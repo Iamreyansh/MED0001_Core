@@ -21,6 +21,10 @@ variable "uploads_bucket" { type = string }
 variable "db_proxy_endpoint" { type = string }
 variable "redis_endpoint" { type = string }
 variable "environment" { type = string }
+variable "kms_key_arn" {
+  type    = string
+  default = ""
+}
 variable "provisioned_concurrency" {
   type    = number
   default = 0
@@ -76,6 +80,11 @@ resource "aws_iam_role_policy" "app" {
         Effect   = "Allow"
         Action   = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
         Resource = [var.domain_events_queue_arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource = [var.kms_key_arn]
       }
     ]
   })
@@ -101,7 +110,6 @@ resource "aws_lambda_function" "api" {
       AWS_LWA_ASYNC_INIT            = "true"
       AWS_LWA_PORT                  = "8080"
       PORT                          = "8080"
-      MAIN_CLASS                    = "com.nammamedmate.api.ApiApplication"
       JAVA_TOOL_OPTIONS             = "-XX:+TieredCompilation -XX:TieredStopAtLevel=1"
       SPRING_PROFILES_ACTIVE        = var.environment
       SPRING_DATASOURCE_URL         = "jdbc:postgresql://${var.db_proxy_endpoint}:5432/medmate?sslmode=require"
@@ -140,23 +148,18 @@ resource "aws_lambda_provisioned_concurrency_config" "api" {
 resource "aws_lambda_function" "worker" {
   function_name = "${var.name}-worker"
   role          = aws_iam_role.lambda.arn
-  # LWA treats handler as the startup script path (not a Java method).
-  handler       = "run.sh"
+  # Standard Lambda Java handler (shaded uber jar). No LWA — the worker is SQS-driven, not HTTP.
+  handler       = "com.nammamedmate.worker.SqsEventHandler::handleRequest"
   runtime       = "java21"
   architectures = ["arm64"]
   memory_size   = 1024
   timeout       = 60
   s3_bucket     = var.artifacts_bucket
   s3_key        = var.worker_s3_key
-  layers        = [local.lwa_layer_arn]
   publish       = true
 
   environment {
     variables = {
-      AWS_LAMBDA_EXEC_WRAPPER       = "/opt/bootstrap"
-      AWS_LWA_PORT                  = "8080"
-      PORT                          = "8080"
-      MAIN_CLASS                    = "com.nammamedmate.worker.WorkerApplication"
       JAVA_TOOL_OPTIONS             = "-XX:+TieredCompilation -XX:TieredStopAtLevel=1"
       SPRING_PROFILES_ACTIVE        = var.environment
       MEDMATE_SQS_DOMAIN_EVENTS_URL = var.domain_events_queue_url

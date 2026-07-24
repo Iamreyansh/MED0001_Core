@@ -35,6 +35,7 @@ locals {
 resource "aws_kms_key" "this" {
   description             = "MED0001 staging"
   deletion_window_in_days = 7
+  enable_key_rotation     = true
 }
 
 resource "aws_s3_bucket" "artifacts" {
@@ -44,6 +45,24 @@ resource "aws_s3_bucket" "artifacts" {
 resource "aws_s3_bucket_versioning" "artifacts" {
   bucket = aws_s3_bucket.artifacts.id
   versioning_configuration { status = "Enabled" }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.this.arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "artifacts" {
+  bucket                  = aws_s3_bucket.artifacts.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 module "network" {
@@ -67,8 +86,9 @@ module "messaging" {
 }
 
 module "secrets" {
-  source = "../../modules/secrets"
-  name   = local.name
+  source      = "../../modules/secrets"
+  name        = local.name
+  kms_key_arn = aws_kms_key.this.arn
 }
 
 module "api" {
@@ -87,6 +107,7 @@ module "api" {
   uploads_bucket          = module.data.uploads_bucket
   db_proxy_endpoint       = module.data.db_proxy_endpoint
   redis_endpoint          = module.data.redis_primary_endpoint
+  kms_key_arn             = aws_kms_key.this.arn
   provisioned_concurrency = 0
 }
 
@@ -107,6 +128,8 @@ module "observability" {
   dlq_arn              = module.messaging.dlq_arn
 }
 
+# Requires scripts/bootstrap-github-aws.sh to have been run first (GitHub OIDC provider
+# + med0001-gha-deploy role); the data sources below resolve pre-existing resources.
 module "ci" {
   source           = "../../modules/ci"
   name             = local.name
@@ -114,15 +137,6 @@ module "ci" {
   github_repo      = "MED0001_Core"
   artifacts_bucket = aws_s3_bucket.artifacts.bucket
   state_bucket     = "terraform-locks-105927215604"
-}
-
-# EventBridge example schedule in IST (settlement placeholder)
-resource "aws_cloudwatch_event_rule" "weekly_settlement" {
-  name                = "${local.name}-weekly-settlement"
-  description         = "Weekly settlement trigger (Asia/Kolkata)"
-  schedule_expression = "cron(0 0 ? * MON *)"
-  # Note: EventBridge cron is UTC. Document mapping: Mon 00:00 UTC ≈ Mon 05:30 IST.
-  # Prefer Scheduler with timezone when enabling finance jobs (EPIC-012).
 }
 
 output "deploy_role_arn" { value = module.ci.deploy_role_arn }

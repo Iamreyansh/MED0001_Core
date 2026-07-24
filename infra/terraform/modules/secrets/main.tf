@@ -12,6 +12,10 @@ terraform {
 }
 
 variable "name" { type = string }
+variable "kms_key_arn" {
+  type    = string
+  default = ""
+}
 
 resource "tls_private_key" "jwt" {
   algorithm = "RSA"
@@ -19,7 +23,8 @@ resource "tls_private_key" "jwt" {
 }
 
 resource "aws_secretsmanager_secret" "jwt" {
-  name = "${var.name}/jwt-rs256"
+  name       = "${var.name}/jwt-rs256"
+  kms_key_id = var.kms_key_arn
 }
 
 resource "aws_secretsmanager_secret_version" "jwt" {

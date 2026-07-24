@@ -47,6 +47,24 @@ resource "aws_s3_bucket_versioning" "artifacts" {
   versioning_configuration { status = "Enabled" }
 }
 
+resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.this.arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "artifacts" {
+  bucket                  = aws_s3_bucket.artifacts.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 module "network" {
   source = "../../modules/network"
   name   = local.name
@@ -55,11 +73,13 @@ module "network" {
 }
 
 module "data" {
-  source            = "../../modules/data"
-  name              = local.name
-  subnet_ids        = module.network.private_subnet_ids
-  security_group_id = module.network.data_security_group_id
-  kms_key_arn       = aws_kms_key.this.arn
+  source              = "../../modules/data"
+  name                = local.name
+  subnet_ids          = module.network.private_subnet_ids
+  security_group_id   = module.network.data_security_group_id
+  kms_key_arn         = aws_kms_key.this.arn
+  skip_final_snapshot = false
+  apply_immediately   = false
 }
 
 module "messaging" {
@@ -68,8 +88,9 @@ module "messaging" {
 }
 
 module "secrets" {
-  source = "../../modules/secrets"
-  name   = local.name
+  source      = "../../modules/secrets"
+  name        = local.name
+  kms_key_arn = aws_kms_key.this.arn
 }
 
 module "api" {
@@ -88,6 +109,7 @@ module "api" {
   uploads_bucket          = module.data.uploads_bucket
   db_proxy_endpoint       = module.data.db_proxy_endpoint
   redis_endpoint          = module.data.redis_primary_endpoint
+  kms_key_arn             = aws_kms_key.this.arn
   provisioned_concurrency = 1
 }
 
