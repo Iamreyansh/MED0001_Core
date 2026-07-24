@@ -92,6 +92,9 @@ resource "aws_security_group" "lambda" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = { Name = "${var.name}-lambda-sg" }
+  # ponytail: AWS SG descriptions are immutable; any change forces destroy-recreate which
+  # requires ec2:DetachNetworkInterface not held by the deploy role. Ignore forever.
+  lifecycle { ignore_changes = [description] }
 }
 
 resource "aws_security_group" "data" {
@@ -124,6 +127,7 @@ resource "aws_security_group" "data" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = { Name = "${var.name}-data-sg" }
+  lifecycle { ignore_changes = [description] }
 }
 
 output "vpc_id" { value = aws_vpc.this.id }
