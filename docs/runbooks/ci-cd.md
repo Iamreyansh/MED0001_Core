@@ -72,5 +72,13 @@ Terraform often no-ops code when the S3 key is unchanged (no `source_code_hash` 
 
 | Path | Purpose |
 |------|---------|
-| `.github/actions/setup-java` | Temurin 21 + Gradle cache |
+| `.github/actions/setup-java` | Temurin 21 + `gradle/actions/setup-gradle` User Home cache |
 | `.github/actions/setup-terraform-aws` | Terraform 1.10.5 + OIDC assume role (`ap-south-1`) |
+
+## Gradle cache (CI)
+
+- Restored/saved via `gradle/actions/setup-gradle` (dependency jars + Gradle build cache under `~/.gradle`).
+- Cache **key** hashes Gradle build files, `gradle/libs.versions.toml`, and the wrapper properties.
+- **Dep update?** Change a version in the catalog / `*.gradle*` → new key → cache miss → download new artifacts. Unchanged deps still hit cache.
+- PRs are **read-only** on the cache; `main` / deploy jobs **write** so one bad PR cannot poison the shared cache.
+- `gradle.properties` enables `org.gradle.caching` + `org.gradle.parallel`. CI sets `CI=true` so Makefile skips `--no-daemon`.

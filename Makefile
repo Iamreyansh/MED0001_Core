@@ -7,6 +7,12 @@ SHELL := /bin/bash
 ROOT        := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMPOSE     := podman compose -f $(ROOT)/docker-compose.yml
 GRADLE      := $(ROOT)/gradlew
+# Local: --no-daemon (no leftover JVM). CI=true (GitHub Actions): allow daemon + cache reuse.
+ifeq ($(CI),true)
+GRADLE_FLAGS ?=
+else
+GRADLE_FLAGS ?= --no-daemon
+endif
 PROFILE     ?= podman
 API_PORT    ?= 8080
 HEALTH_URL  := http://localhost:$(API_PORT)/api/v1/health
@@ -105,43 +111,43 @@ run: start ## Alias for start (foreground)
 
 .PHONY: test
 test: ## Unit/integration tests (all modules)
-	$(GRADLE) test --no-daemon
+	$(GRADLE) test $(GRADLE_FLAGS)
 
 .PHONY: check
 check: ## Full quality gates (JaCoCo 100%, Spotless, SpotBugs, ArchUnit)
-	$(GRADLE) check -x dependencyCheckAnalyze --no-daemon
+	$(GRADLE) check -x dependencyCheckAnalyze $(GRADLE_FLAGS)
 
 .PHONY: check-all
 check-all: ## check + OWASP dependencyCheckAnalyze
-	$(GRADLE) check --no-daemon
+	$(GRADLE) check $(GRADLE_FLAGS)
 
 .PHONY: dependency-check
 dependency-check: ## OWASP dependencyCheckAnalyze only
-	$(GRADLE) dependencyCheckAnalyze --no-daemon
+	$(GRADLE) dependencyCheckAnalyze $(GRADLE_FLAGS)
 
 .PHONY: format
 format: ## Apply Spotless formatting
-	$(GRADLE) spotlessApply --no-daemon
+	$(GRADLE) spotlessApply $(GRADLE_FLAGS)
 
 .PHONY: format-check
 format-check: ## Verify Spotless (no writes)
-	$(GRADLE) spotlessCheck --no-daemon
+	$(GRADLE) spotlessCheck $(GRADLE_FLAGS)
 
 .PHONY: coverage
 coverage: ## Run tests + JaCoCo verification (100%)
-	$(GRADLE) test jacocoTestCoverageVerification --no-daemon
+	$(GRADLE) test jacocoTestCoverageVerification $(GRADLE_FLAGS)
 
 .PHONY: build
 build: ## Compile all modules
-	$(GRADLE) build -x test --no-daemon
+	$(GRADLE) build -x test $(GRADLE_FLAGS)
 
 .PHONY: jar
 jar: ## Build API + worker boot jars
-	$(GRADLE) :apps:api:bootJar :apps:worker:bootJar -x test --no-daemon
+	$(GRADLE) :apps:api:bootJar :apps:worker:bootJar -x test $(GRADLE_FLAGS)
 
 .PHONY: clean
 clean: ## Clean Gradle + local run artifacts
-	$(GRADLE) clean --no-daemon
+	$(GRADLE) clean $(GRADLE_FLAGS)
 	rm -rf $(ROOT)/.run $(ROOT)/infra/lambda/*.zip $(ROOT)/infra/lambda/build
 
 ##@ Lambda

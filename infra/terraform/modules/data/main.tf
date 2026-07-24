@@ -30,7 +30,7 @@ resource "aws_rds_cluster" "this" {
   cluster_identifier      = "${var.name}-aurora"
   engine                  = "aurora-postgresql"
   engine_mode             = "provisioned"
-  engine_version          = "16.6"
+  engine_version          = "16.14"
   database_name           = "medmate"
   master_username         = "medmate"
   master_password         = random_password.db.result
