@@ -42,6 +42,7 @@ dependencies {
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
     implementation("software.amazon.awssdk:s3:2.31.20")
     implementation("software.amazon.awssdk:sqs:2.31.20")
+    implementation("software.amazon.awssdk:secretsmanager:2.31.20")
 
     testImplementation(project(":testing"))
     testImplementation("org.springframework.security:spring-security-test")

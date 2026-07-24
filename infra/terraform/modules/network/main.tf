@@ -96,13 +96,20 @@ resource "aws_security_group" "lambda" {
 
 resource "aws_security_group" "data" {
   name        = "${var.name}-data"
-  description = "Aurora and Redis"
+  description = "Aurora, RDS Proxy, and Redis"
   vpc_id      = aws_vpc.this.id
   ingress {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.lambda.id]
+  }
+  # RDS Proxy + Aurora share this SG; proxy→DB needs self-ingress.
+  ingress {
+    from_port = 5432
+    to_port   = 5432
+    protocol  = "tcp"
+    self      = true
   }
   ingress {
     from_port       = 6379

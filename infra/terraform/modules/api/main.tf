@@ -84,7 +84,8 @@ resource "aws_iam_role_policy" "app" {
 resource "aws_lambda_function" "api" {
   function_name = "${var.name}-api"
   role          = aws_iam_role.lambda.arn
-  handler       = "com.nammamedmate.api.ApiApplication::main"
+  # LWA treats handler as the startup script path (not a Java method).
+  handler       = "run.sh"
   runtime       = "java21"
   architectures = ["arm64"]
   memory_size   = 1024
@@ -103,8 +104,9 @@ resource "aws_lambda_function" "api" {
       MAIN_CLASS                    = "com.nammamedmate.api.ApiApplication"
       JAVA_TOOL_OPTIONS             = "-XX:+TieredCompilation -XX:TieredStopAtLevel=1"
       SPRING_PROFILES_ACTIVE        = var.environment
-      SPRING_DATASOURCE_URL         = "jdbc:postgresql://${var.db_proxy_endpoint}:5432/medmate"
+      SPRING_DATASOURCE_URL         = "jdbc:postgresql://${var.db_proxy_endpoint}:5432/medmate?sslmode=require"
       SPRING_DATA_REDIS_HOST        = var.redis_endpoint
+      SPRING_DATA_REDIS_SSL_ENABLED = "true"
       MEDMATE_S3_BUCKET             = var.uploads_bucket
       MEDMATE_SQS_DOMAIN_EVENTS_URL = var.domain_events_queue_url
       MEDMATE_SECRETS_DB_ARN        = var.db_secret_arn
@@ -138,7 +140,8 @@ resource "aws_lambda_provisioned_concurrency_config" "api" {
 resource "aws_lambda_function" "worker" {
   function_name = "${var.name}-worker"
   role          = aws_iam_role.lambda.arn
-  handler       = "com.nammamedmate.worker.WorkerApplication::main"
+  # LWA treats handler as the startup script path (not a Java method).
+  handler       = "run.sh"
   runtime       = "java21"
   architectures = ["arm64"]
   memory_size   = 1024

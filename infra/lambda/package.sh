@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Package Spring Boot fat jar + LWA run.sh into infra/lambda/{api|worker}.zip
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 APP="${1:-api}"
@@ -7,10 +8,15 @@ cd "$ROOT"
 JAR="$(ls -1 "$ROOT/apps/${APP}/build/libs/med0001-${APP}.jar" | head -1)"
 OUT="$ROOT/infra/lambda/build/${APP}"
 ZIP="$ROOT/infra/lambda/${APP}.zip"
+RUN_SH="$ROOT/infra/lambda/run.sh"
+
 rm -rf "$OUT"
 mkdir -p "$OUT"
-# Lambda Web Adapter + Java: fat jar at root as function artifact
-cp "$JAR" "$OUT/${APP}.jar"
+cp "$JAR" "$OUT/app.jar"
+cp "$RUN_SH" "$OUT/run.sh"
+chmod 755 "$OUT/run.sh"
 rm -f "$ZIP"
-(cd "$OUT" && zip -qr "$ZIP" "${APP}.jar")
-echo "Wrote $ZIP"
+# -X stores unix permissions so Lambda can execute run.sh
+(cd "$OUT" && zip -Xqr "$ZIP" run.sh app.jar)
+echo "Wrote $ZIP ($(unzip -l "$ZIP" | awk 'END{print $1,$2,$3,$4}'))"
+unzip -l "$ZIP"
