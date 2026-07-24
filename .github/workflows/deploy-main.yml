@@ -1,0 +1,128 @@
+name: deploy-main
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      - run: ./gradlew check -x dependencyCheckAnalyze --no-daemon
+      - name: Package Lambdas
+        run: |
+          chmod +x infra/lambda/package.sh
+          infra/lambda/package.sh api
+          infra/lambda/package.sh worker
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lambda-zips
+          path: |
+            infra/lambda/api.zip
+            infra/lambda/worker.zip
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: lambda-zips
+          path: infra/lambda
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+      - name: Upload artifacts + apply staging
+        working-directory: infra/terraform/stacks/staging
+        run: |
+          terraform init
+          # Phase 1: create artifacts bucket (and deps without lambda if needed)
+          terraform apply -auto-approve -target=aws_s3_bucket.artifacts -target=aws_s3_bucket_versioning.artifacts
+          ARTIFACTS_BUCKET=$(terraform output -raw artifacts_bucket 2>/dev/null || true)
+          if [ -z "$ARTIFACTS_BUCKET" ]; then
+            ARTIFACTS_BUCKET="med0001-staging-artifacts-105927215604"
+          fi
+          aws s3 cp ../../lambda/api.zip "s3://${ARTIFACTS_BUCKET}/lambda/api.zip"
+          aws s3 cp ../../lambda/worker.zip "s3://${ARTIFACTS_BUCKET}/lambda/worker.zip"
+          terraform apply -auto-approve
+          aws lambda update-function-code --function-name med0001-staging-api --s3-bucket "$ARTIFACTS_BUCKET" --s3-key lambda/api.zip || true
+          aws lambda update-function-code --function-name med0001-staging-worker --s3-bucket "$ARTIFACTS_BUCKET" --s3-key lambda/worker.zip || true
+      - name: Smoke staging
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            code=$(curl -s -o /tmp/health.json -w "%{http_code}" https://staging-core.api.nammamedmate.com/api/v1/health || true)
+            if [ "$code" = "200" ]; then cat /tmp/health.json; exit 0; fi
+            sleep 15
+          done
+          echo "Staging health check failed"; cat /tmp/health.json || true; exit 1
+
+  deploy-prod:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: lambda-zips
+          path: infra/lambda
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+      - name: Apply prod + publish
+        working-directory: infra/terraform/stacks/prod
+        run: |
+          terraform init
+          terraform apply -auto-approve -target=aws_s3_bucket.artifacts -target=aws_s3_bucket_versioning.artifacts
+          ARTIFACTS_BUCKET=$(terraform output -raw artifacts_bucket 2>/dev/null || echo "med0001-prod-artifacts-105927215604")
+          aws s3 cp ../../lambda/api.zip "s3://${ARTIFACTS_BUCKET}/lambda/api.zip"
+          aws s3 cp ../../lambda/worker.zip "s3://${ARTIFACTS_BUCKET}/lambda/worker.zip"
+          terraform apply -auto-approve
+          aws lambda update-function-code --function-name med0001-prod-api --s3-bucket "$ARTIFACTS_BUCKET" --s3-key lambda/api.zip || true
+          aws lambda update-function-code --function-name med0001-prod-worker --s3-bucket "$ARTIFACTS_BUCKET" --s3-key lambda/worker.zip || true
+      - name: Smoke prod
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            code=$(curl -s -o /tmp/health.json -w "%{http_code}" https://core.api.nammamedmate.com/api/v1/health || true)
+            if [ "$code" = "200" ]; then cat /tmp/health.json; exit 0; fi
+            sleep 15
+          done
+          echo "Prod health check failed"; cat /tmp/health.json || true; exit 1
+
+  release:
+    needs: deploy-prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v$(date -u +%Y.%m.%d).${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" --generate-notes --title "$TAG" --target main

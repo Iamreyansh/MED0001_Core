@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: med0001-worker
+
+medmate:
+  sqs:
+    queue-url: ""

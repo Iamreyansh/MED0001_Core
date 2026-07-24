@@ -1,0 +1,15 @@
+---
+description: Hexagonal Java/Spring module standards
+globs: "**/*.{java,kts}"
+alwaysApply: false
+---
+
+# Java / Spring standards
+
+- Domain packages: `domain/`, `application/`, `adapter/in/{web,messaging}/`, `adapter/out/{persistence,client,messaging}/`.
+- Controllers stay in `adapter.in.web` (never name package `api` inside domains — clashes with `apps/api`).
+- `domains/*` may depend only on `platform/*`. No domain→domain compile deps; use outbox events.
+- `platform/*` must never depend on `domains/*`.
+- Prefer package-private domain types. No business logic in `apps/*`.
+- Validate at trust boundaries (`adapter.in.*`); keep `@Transactional` on application services, not controllers.
+- Map epic → module via `docs/architecture/MODULE_MAP.md` before adding packages.

@@ -1,0 +1,14 @@
+---
+description: Outbox, idempotency, retries, async boundaries
+alwaysApply: true
+---
+
+# Reliability
+
+- Persist domain events via transactional outbox (`platform/messaging`, `outbox_message`); worker publishes to SQS.
+- Support `Idempotency-Key` on mutating payment-like endpoints.
+- No sync fan-out of external side effects in the request path when an async boundary exists.
+- New queues need a DLQ + alarm path (see agent `reliability-sre`).
+- Uploads: S3 presigned PUT/GET only (max 10 MB product rule). Never proxy large multipart through Lambda/API Gateway.
+- Schedules: EventBridge in `Asia/Kolkata`; store timestamps in UTC.
+- Platform SLO targets live in EPIC-020 (`docs/requirements/EPIC-020-observability-self-healing/EPIC.md`).

@@ -1,0 +1,17 @@
+---
+description: API envelope, errors, pagination, OpenAPI
+globs: "**/adapter/in/web/**/*.java"
+alwaysApply: false
+---
+
+# API contracts
+
+Source of truth for globals: `docs/requirements/INDEX.md`.
+
+- Base path `/api/v1`. Auth: `Authorization: Bearer <JWT>` unless the story marks the endpoint public.
+- Success: `{ "success": true, "data": ..., "meta": ... }` via `ApiResponse<T>` from `platform/kernel`.
+- Error: `{ "success": false, "error": { "code": "UPPER_SNAKE", "message": "..." } }` via `ApiError`. Codes must match the story table.
+- Pagination query: `page`, `limit` (default 20, max 100), `sort`, `order` (`asc`|`desc`). Meta: `page`, `limit`, `total`, `has_next` (`PaginationMeta`).
+- Payment-like mutators: support `Idempotency-Key` when the story requires it.
+- Webhooks under `/api/v1/webhooks/**` must use the raw-body filter for HMAC.
+- Document endpoints with springdoc when implementing stories.

@@ -1,0 +1,45 @@
+# AGENTS
+
+Namma MedMate Core (`MED0001_Core`) — Java 21 / Spring Boot modular monolith.
+
+## Contracts
+
+- Read `docs/requirements/INDEX.md` and `docs/architecture/MODULE_MAP.md` before coding.
+- Ponytail rule (`.cursor/rules/ponytail.mdc`) + **100% JaCoCo** are both mandatory.
+- Never implement outside the story scope you were given.
+- Never commit Terraform state, locks, or `.terraform/` — only `s3://terraform-locks-105927215604/MED0001/`.
+
+## Layout
+
+- `apps/api`, `apps/worker` — composition roots
+- `platform/*` — technical shared (no business rules)
+- `domains/*` — epic shells / business modules
+- `db/migration` — sole schema history
+- `infra/terraform` — modules + stacks
+- Day-to-day: `Makefile` + Podman (`make help`)
+
+## When to use what (`.cursor/`)
+
+| Need | Use |
+|------|-----|
+| Implement one STORY | Command `/implement-story` → skill `implement-story` → agent `epic-implementer` |
+| Pre-merge review | Command `/review-story` → agents `api-contract-guardian`, `security-reviewer`, `test-engineer` (+ `reliability-sre` if async/payments) |
+| Local smoke / gates | Command `/bootstrap-verify` (`make bootstrap-verify`, then `make start-bg` / `make health`) |
+| Schema change | Skill `add-flyway-migration` |
+| Terraform edit | Skill `terraform-change` → agent `infra-terraform` → `/tf-plan` |
+| Stuck state lock | `/tf-unlock` → skill `terraform-force-unlock` |
+| Lambda package / SnapStart | Skill `lambda-snapstart` |
+| Security checklist | Skill `security-review-medmate` → agent `security-reviewer` |
+| Ship to prod | Command `/ship-main` |
+
+## Commands
+
+See `.cursor/commands/` (`bootstrap-verify`, `implement-story`, `review-story`, `tf-plan`, `tf-unlock`, `ship-main`).
+
+## Agents
+
+See `.cursor/agents/` (`epic-implementer`, `api-contract-guardian`, `test-engineer`, `security-reviewer`, `infra-terraform`, `reliability-sre`).
+
+## Skills
+
+See `.cursor/skills/` (`implement-story`, `add-flyway-migration`, `terraform-change`, `terraform-force-unlock`, `lambda-snapstart`, `security-review-medmate`).

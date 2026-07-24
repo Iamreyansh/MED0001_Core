@@ -1,0 +1,15 @@
+---
+description: Namma MedMate Core product conventions and module map
+alwaysApply: true
+---
+
+# Project core
+
+- Product: Namma MedMate backend (`MED0001_Core`). Requirements live in `docs/requirements/INDEX.md`.
+- Base path `/api/v1`. Success/error envelopes from INDEX. UUID v4 IDs. ISO-8601 UTC timestamps. Soft delete via `deleted_at`. Money in paise via `platform/kernel` `Money`.
+- Layout: `apps/` composition roots, `platform/` technical shared, `domains/` epic-aligned, `db/migration/` sole Flyway tree.
+- Before adding files, read `docs/architecture/MODULE_MAP.md`.
+- Day-to-day: root `Makefile` + Podman (`make help`, `make up`, `make check`).
+- Never invent a new top-level module. Never commit Terraform state/locks (S3 only).
+- Ponytail applies for simplicity; 100% JaCoCo and security are explicit requirements — do not skip tests or trust-boundary validation.
+- Agent/skill/command index: `AGENTS.md`.

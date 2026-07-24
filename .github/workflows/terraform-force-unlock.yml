@@ -1,0 +1,40 @@
+name: terraform-force-unlock
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: staging or prod
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+      lock_id:
+        description: Terraform lock ID from CI logs
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  unlock:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+      - name: Force unlock
+        working-directory: infra/terraform/stacks/${{ inputs.environment }}
+        run: |
+          echo "Unlock requested by ${{ github.actor }} for ${{ inputs.environment }} lock_id=${{ inputs.lock_id }}"
+          terraform init
+          terraform force-unlock -force "${{ inputs.lock_id }}"
