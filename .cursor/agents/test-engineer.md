@@ -22,17 +22,19 @@ Translate story acceptance criteria into the smallest tests that still hit branc
 ## Do
 
 1. Map each Given/When/Then (or AC-00N) to a test method; name so the AC id is obvious.
-2. Prefer unit tests on domain/application; use Testcontainers only when persistence/messaging behavior is the point.
+2. Prefer unit tests on domain/application; use Testcontainers only when persistence/messaging/HTTP stack behavior is the point.
 3. Cover error branches and auth denials from the story error tables — not only happy path.
 4. Keep production coverage at **100% line + branch**.
 5. Allowed JaCoCo excludes only: `*Application`, `*Config`/`*Configuration`, `*Priming`, `package-info`.
+6. For endpoints that need DB/Redis/security end-to-end, add or update an `*IT` under `apps/api/src/integrationTest` (extends `AbstractApiIT`).
 
 ## Commands
 
 ```bash
-make test          # unit/integration
-make coverage      # tests + jacocoTestCoverageVerification
-make check         # full gates (Spotless, SpotBugs, ArchUnit, JaCoCo)
+make test              # unit tests
+make integration-test  # Testcontainers ITs
+make coverage          # unit + IT + jacocoTestCoverageVerification
+make check             # full gates (Spotless, SpotBugs, ArchUnit, JaCoCo, ITs)
 ```
 
 ## Do not

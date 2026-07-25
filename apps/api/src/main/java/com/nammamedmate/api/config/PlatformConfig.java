@@ -1,6 +1,7 @@
 package com.nammamedmate.api.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nammamedmate.auth.adapter.out.ratelimit.RedisRateLimiter;
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.kernel.storage.PresignedUrlService;
@@ -18,11 +19,13 @@ import java.security.KeyPairGenerator;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Configuration
 public class PlatformConfig {
@@ -33,7 +36,12 @@ public class PlatformConfig {
   }
 
   @Bean
-  RateLimiter rateLimiter(Clock clock) {
+  @ConditionalOnMissingBean(RateLimiter.class)
+  RateLimiter rateLimiter(Clock clock, ObjectProvider<StringRedisTemplate> redis) {
+    StringRedisTemplate template = redis.getIfAvailable();
+    if (template != null) {
+      return new RedisRateLimiter(template);
+    }
     return new InMemoryRateLimiter(clock);
   }
 

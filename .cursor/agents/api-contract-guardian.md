@@ -32,6 +32,7 @@ Compare `adapter.in.web` controllers (and related DTOs/security) to the story’
 | Idempotency | `Idempotency-Key` on payment-like mutating endpoints when story requires |
 | Webhooks | Under `/api/v1/webhooks/**` with raw-body HMAC filter |
 | Docs | springdoc annotations present when implementing the story |
+| Bruno | Matching `bruno/**/*.bru` exists; method/path/body/auth match; scripts + envelope tests present (rule `bruno-api.mdc`) |
 
 ## Output format
 
@@ -49,8 +50,8 @@ Verdict: PASS | FAIL
 
 ## Severity
 
-- **BLOCK**: missing endpoint, wrong auth, wrong error code/status, broken envelope, pagination contract mismatch
-- **WARN**: docs/springdoc gap, naming drift that still works, unused optional fields
+- **BLOCK**: missing endpoint, wrong auth, wrong error code/status, broken envelope, pagination contract mismatch, missing/stale Bruno request for a shipped endpoint
+- **WARN**: docs/springdoc gap, naming drift that still works, unused optional fields, Bruno scripts incomplete but request exists
 
 ## Done when
 

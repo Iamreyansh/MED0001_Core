@@ -107,11 +107,15 @@ run: start ## Alias for start (foreground)
 ##@ Quality / build
 
 .PHONY: test
-test: ## Unit/integration tests (all modules)
+test: ## Unit tests (all modules)
 	$(GRADLE) test $(GRADLE_FLAGS)
 
+.PHONY: integration-test
+integration-test: ## Integration tests (Testcontainers; apps with integrationTest source set)
+	$(GRADLE) integrationTest $(GRADLE_FLAGS)
+
 .PHONY: check
-check: ## Full quality gates (JaCoCo 100%, Spotless, SpotBugs, ArchUnit)
+check: ## Full quality gates (unit + IT, JaCoCo 100%, Spotless, SpotBugs, ArchUnit)
 	$(GRADLE) check -x dependencyCheckAnalyze $(GRADLE_FLAGS)
 
 .PHONY: check-all
@@ -131,8 +135,8 @@ format-check: ## Verify Spotless (no writes)
 	$(GRADLE) spotlessCheck $(GRADLE_FLAGS)
 
 .PHONY: coverage
-coverage: ## Run tests + JaCoCo verification (100%)
-	$(GRADLE) test jacocoTestCoverageVerification $(GRADLE_FLAGS)
+coverage: ## Unit + integration tests + JaCoCo verification (100%)
+	$(GRADLE) test integrationTest jacocoTestCoverageVerification $(GRADLE_FLAGS)
 
 .PHONY: build
 build: ## Compile all modules

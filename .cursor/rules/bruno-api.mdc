@@ -1,0 +1,46 @@
+---
+description: Keep git-tracked Bruno API collection in sync with every endpoint change
+globs: "**/adapter/in/web/**/*.java"
+alwaysApply: false
+---
+
+# Bruno API collection
+
+Source of truth for interactive API requests: `bruno/` (plain-text `.bru` files, committed to git). Never use Postman exports or ignore Bruno under `.gitignore`.
+
+## When to update (mandatory)
+
+After **creating or changing** any HTTP endpoint (`@RestController` / `@*Mapping` under `adapter/in/web`):
+
+1. Add or update the matching `.bru` request under `bruno/`.
+2. Keep folder layout aligned with the URL after `/api/v1/`  
+   (e.g. `POST /api/v1/auth/customer/send-otp` → `bruno/auth/customer/send-otp.bru`).
+3. Update request method, URL (`{{baseUrl}}/api/v1/...`), headers, body (snake_case JSON), auth, and docs to match the controller + DTOs + story error codes.
+4. Delete obsolete `.bru` files when an endpoint is removed or renamed.
+5. Do this in the **same change** as the Java endpoint — not a follow-up.
+
+## Required scripts (automate internally)
+
+Every request `.bru` must include:
+
+| Block | Purpose |
+|-------|---------|
+| `script:pre-request` | Resolve vars (IDs, tokens, magic OTP phone); set auth/`Idempotency-Key` when needed |
+| `script:post-response` | Persist useful fields to env (`bru.setEnvVar`) for downstream requests |
+| `tests` | Assert status + `ApiResponse` / `ApiError` envelope (`success`, `data` or `error.code`) |
+
+Collection defaults live in `bruno/collection.bru` (shared headers / envelope helpers). Prefer inheriting auth (`auth: inherit`) and only override per request.
+
+Auth token flow: login/OTP verify requests write `accessToken` / `refreshToken` / `sessionId`; protected requests read `Authorization: Bearer {{accessToken}}`.
+
+Public endpoints: `auth: none`. Protected: bearer from env. Webhooks: no bearer; document HMAC headers in scripts/docs.
+
+## Environments
+
+- `bruno/environments/Local.bru` — `baseUrl: http://localhost:8080` plus shared vars.
+- Mark secrets with `vars:secret` (`accessToken`, `refreshToken`, etc.). Never commit real production secrets.
+- Add new env files only when a story needs them; keep placeholders empty for tokens.
+
+## Done check
+
+Endpoint PR/story is incomplete until `bruno/` reflects the contract and scripts chain the happy path without manual copy-paste.
