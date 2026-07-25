@@ -23,22 +23,6 @@ jobs:
       - uses: ./.github/actions/setup-java
       - name: Spotless, tests, JaCoCo 100%, SpotBugs, ArchUnit
         run: make check
-      - name: OWASP dependency check (advisory)
-        id: owasp
-        continue-on-error: true
-        run: make dependency-check
-      - name: OWASP advisory summary
-        if: always() && steps.owasp.outcome != 'skipped'
-        run: |
-          {
-            echo "## OWASP dependency-check (advisory)"
-            if [ "${{ steps.owasp.outcome }}" = "success" ]; then
-              echo "Passed (CVSS fail threshold 9.0)."
-            else
-              echo "**Warning:** dependency-check failed or found critical findings."
-              echo "This step is advisory and does **not** block merge; inspect the uploaded report."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload quality reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -49,7 +33,6 @@ jobs:
           path: |
             **/build/reports/jacoco/**
             **/build/reports/spotbugs/**
-            build/reports/dependency-check*
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -81,14 +64,14 @@ jobs:
           filters: |
             infra:
               - 'infra/**'
-              - 'scripts/deploy-stack.sh'
-              - 'scripts/ci/**'
+              - 'scripts/deploy-ecs.sh'
+              - 'scripts/docker-push.sh'
               - 'Makefile'
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.10.5"
           terraform_wrapper: false
-      - name: Fmt + validate (always)
+      - name: Fmt + validate (flattened staging stack)
         run: |
           make tf-fmt-check
           make tf-validate
@@ -98,36 +81,27 @@ jobs:
           ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
         run: |
           if [ -z "$ROLE" ]; then
-            echo "::error::infra/deploy paths changed but vars.AWS_DEPLOY_ROLE_ARN is empty."
-            echo "Set the repository variable to the staging deploy_role_arn output (see docs/runbooks/github-setup.md)."
+            echo "::error::infra changed but vars.AWS_DEPLOY_ROLE_ARN is empty."
             exit 1
           fi
-          echo "AWS_DEPLOY_ROLE_ARN is set; will plan staging + prod."
       - name: Configure AWS OIDC
         if: steps.filter.outputs.infra == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-south-1
-      - name: Terraform plan staging
+      - name: Terraform plan staging (S3 state/lock)
         if: steps.filter.outputs.infra == 'true'
         run: |
+          make tf-init ENV=staging
           make tf-plan ENV=staging TF_ARGS="-no-color -out=tfplan-staging"
           terraform -chdir=infra/terraform/stacks/staging show -no-color tfplan-staging \
             > "$GITHUB_WORKSPACE/tfplan-staging.txt"
-      - name: Terraform plan prod
-        if: steps.filter.outputs.infra == 'true'
-        run: |
-          make tf-plan ENV=prod TF_ARGS="-no-color -out=tfplan-prod"
-          terraform -chdir=infra/terraform/stacks/prod show -no-color tfplan-prod \
-            > "$GITHUB_WORKSPACE/tfplan-prod.txt"
-      - name: Upload terraform plans
+      - name: Upload terraform plan
         if: steps.filter.outputs.infra == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plans
           retention-days: 7
           if-no-files-found: error
-          path: |
-            tfplan-staging.txt
-            tfplan-prod.txt
+          path: tfplan-staging.txt

@@ -1,7 +1,15 @@
 spring:
   application:
     name: med0001-worker
+  main:
+    web-application-type: none
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
 medmate:
   sqs:
-    queue-url: ""
+    queue-url: ${MEDMATE_SQS_DOMAIN_EVENTS_URL:}
+
+logging:
+  pattern:
+    level: "%5p [requestId=%X{requestId}]"

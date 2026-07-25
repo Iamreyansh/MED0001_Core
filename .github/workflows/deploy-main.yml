@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
   id-token: write
 
 concurrency:
@@ -15,7 +15,6 @@ concurrency:
 env:
   AWS_REGION: ap-south-1
   STAGING_HEALTH_URL: https://staging-core.api.nammamedmate.com/api/v1/health
-  PROD_HEALTH_URL: https://core.api.nammamedmate.com/api/v1/health
 
 jobs:
   guard:
@@ -27,11 +26,9 @@ jobs:
           ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
         run: |
           if [ -z "$ROLE" ]; then
-            echo "::error::vars.AWS_DEPLOY_ROLE_ARN is empty; cannot deploy."
-            echo "See docs/runbooks/github-setup.md"
+            echo "::error::vars.AWS_DEPLOY_ROLE_ARN is empty"
             exit 1
           fi
-          echo "Deploy role configured."
 
   build:
     needs: guard
@@ -42,81 +39,62 @@ jobs:
       - uses: ./.github/actions/setup-java
       - name: Quality gates
         run: make check
-      - name: Package Lambdas
-        run: make package
+      - name: Boot jars
+        run: make jar
       - uses: actions/upload-artifact@v4
         with:
-          name: lambda-zips
-          retention-days: 7
+          name: boot-jars
+          retention-days: 3
           if-no-files-found: error
           path: |
-            infra/lambda/api.zip
-            infra/lambda/worker.zip
+            apps/api/build/libs/med0001-api.jar
+            apps/worker/build/libs/med0001-worker.jar
 
   deploy-staging:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     environment: staging
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: lambda-zips
-          path: infra/lambda
+          name: boot-jars
+          path: jars
+      - name: Place jars for Docker context
+        run: |
+          mkdir -p apps/api/build/libs apps/worker/build/libs
+          cp jars/med0001-api.jar apps/api/build/libs/
+          cp jars/med0001-worker.jar apps/worker/build/libs/
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
       - uses: ./.github/actions/setup-terraform-aws
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-      - name: Deploy staging
-        run: make deploy ENV=staging
+      - name: Login ECR + push SHA images
+        run: |
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$REGISTRY"
+          API_REPO="${REGISTRY}/med0001-staging-api"
+          WORKER_REPO="${REGISTRY}/med0001-staging-worker"
+          docker buildx build --platform linux/arm64 -f apps/api/Dockerfile \
+            -t "${API_REPO}:${GITHUB_SHA}" -t "${API_REPO}:staging" --push .
+          docker buildx build --platform linux/arm64 -f apps/worker/Dockerfile \
+            -t "${WORKER_REPO}:${GITHUB_SHA}" -t "${WORKER_REPO}:staging" --push .
+      - name: Terraform apply staging (S3 state + lockfile)
+        env:
+          TF_VAR_image_tag: ${{ github.sha }}
+        run: |
+          make tf-init ENV=staging
+          make tf-apply ENV=staging TF_ARGS="-auto-approve -input=false"
+      - name: Rolling ECS deploy + wait stable
+        run: |
+          chmod +x scripts/deploy-ecs.sh
+          scripts/deploy-ecs.sh staging
       - name: Smoke staging
         run: make smoke-remote HEALTH_URL=${{ env.STAGING_HEALTH_URL }}
-
-  deploy-prod:
-    needs: deploy-staging
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    environment: prod
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: lambda-zips
-          path: infra/lambda
-      - uses: ./.github/actions/setup-terraform-aws
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-      - name: Deploy prod
-        run: make deploy ENV=prod
-      - name: Smoke prod
-        run: make smoke-remote HEALTH_URL=${{ env.PROD_HEALTH_URL }}
-
-  release:
-    needs: deploy-prod
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/download-artifact@v4
-        with:
-          name: lambda-zips
-          path: infra/lambda
-      - name: Create GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="v$(date -u +%Y.%m.%d).${GITHUB_RUN_NUMBER}"
-          SHA_SHORT="$(git rev-parse --short HEAD)"
-          NOTES="Deploy of ${GITHUB_SHA} (${SHA_SHORT}) via deploy-main.
-
-          - Staging smoke: ${STAGING_HEALTH_URL}
-          - Prod smoke: ${PROD_HEALTH_URL}
-          - Lambdas published to alias live (not \$LATEST)"
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --target "$GITHUB_SHA" \
-            --notes "$NOTES" \
-            infra/lambda/api.zip \
-            infra/lambda/worker.zip
+          ATTEMPTS: "24"
+          SLEEP_SECS: "15"

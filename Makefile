@@ -7,7 +7,7 @@ SHELL := /bin/bash
 ROOT        := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMPOSE     := podman compose -f $(ROOT)/docker-compose.yml
 GRADLE      := $(ROOT)/gradlew
-# Local: --no-daemon (no leftover JVM). CI=true (GitHub Actions): allow daemon + cache reuse.
+# Local: --no-daemon (no leftover JVM). CI=true: allow daemon + cache reuse.
 ifeq ($(CI),true)
 GRADLE_FLAGS ?=
 else
@@ -16,9 +16,6 @@ endif
 PROFILE     ?= podman
 API_PORT    ?= 8080
 HEALTH_URL  := http://localhost:$(API_PORT)/api/v1/health
-TF_STAGING  := $(ROOT)/infra/terraform/stacks/staging
-TF_PROD     := $(ROOT)/infra/terraform/stacks/prod
-ENV         ?= staging
 
 .PHONY: help
 help: ## Show available targets
@@ -148,65 +145,7 @@ jar: ## Build API + worker boot jars
 .PHONY: clean
 clean: ## Clean Gradle + local run artifacts
 	$(GRADLE) clean $(GRADLE_FLAGS)
-	rm -rf $(ROOT)/.run $(ROOT)/infra/lambda/*.zip $(ROOT)/infra/lambda/build
-
-##@ Lambda
-
-.PHONY: package
-package: ## Package api + worker Lambda zips
-	chmod +x $(ROOT)/infra/lambda/package.sh
-	$(ROOT)/infra/lambda/package.sh api
-	$(ROOT)/infra/lambda/package.sh worker
-	@test -f $(ROOT)/infra/lambda/api.zip && test -f $(ROOT)/infra/lambda/worker.zip \
-		|| (echo "package: expected infra/lambda/{api,worker}.zip"; exit 1)
-	@ls -lh $(ROOT)/infra/lambda/api.zip $(ROOT)/infra/lambda/worker.zip
-
-.PHONY: package-api
-package-api: ## Package API Lambda zip only
-	chmod +x $(ROOT)/infra/lambda/package.sh
-	$(ROOT)/infra/lambda/package.sh api
-
-.PHONY: package-worker
-package-worker: ## Package worker Lambda zip only
-	chmod +x $(ROOT)/infra/lambda/package.sh
-	$(ROOT)/infra/lambda/package.sh worker
-
-##@ Terraform (local validate; apply via CI)
-
-TF_ARGS ?=
-
-.PHONY: tf-fmt
-tf-fmt: ## terraform fmt -recursive
-	terraform fmt -recursive $(ROOT)/infra/terraform
-
-.PHONY: tf-fmt-check
-tf-fmt-check: ## terraform fmt -check
-	terraform fmt -check -recursive $(ROOT)/infra/terraform
-
-.PHONY: tf-validate
-tf-validate: ## Validate staging + prod stacks (no backend)
-	@cd $(TF_STAGING) && terraform init -backend=false -input=false >/dev/null && terraform validate
-	@cd $(TF_PROD) && terraform init -backend=false -input=false >/dev/null && terraform validate
-	@rm -rf $(TF_STAGING)/.terraform $(TF_PROD)/.terraform \
-		$(TF_STAGING)/.terraform.lock.hcl $(TF_PROD)/.terraform.lock.hcl
-	@echo "Terraform validate OK (local artifacts removed)"
-
-.PHONY: tf-plan
-tf-plan: ## Plan stack ENV=staging|prod (needs AWS creds + remote state)
-	@test "$(ENV)" = "staging" -o "$(ENV)" = "prod" || (echo "ENV must be staging or prod"; exit 1)
-	cd $(ROOT)/infra/terraform/stacks/$(ENV) && rm -rf .terraform && terraform init -input=false && terraform plan -input=false $(TF_ARGS)
-
-.PHONY: tf-unlock
-tf-unlock: ## Force-unlock LOCK_ID=... ENV=staging|prod
-	@test "$(ENV)" = "staging" -o "$(ENV)" = "prod" || (echo "ENV must be staging or prod"; exit 1)
-	@test -n "$(LOCK_ID)" || (echo "LOCK_ID required"; exit 1)
-	cd $(ROOT)/infra/terraform/stacks/$(ENV) && terraform init -input=false && terraform force-unlock -force "$(LOCK_ID)"
-
-.PHONY: deploy
-deploy: ## Upload lambda zips + terraform apply + publish live aliases ENV=staging|prod (CI)
-	@test "$(ENV)" = "staging" -o "$(ENV)" = "prod" || (echo "ENV must be staging or prod"; exit 1)
-	chmod +x $(ROOT)/scripts/deploy-stack.sh $(ROOT)/scripts/ci/publish-lambda.sh
-	$(ROOT)/scripts/deploy-stack.sh $(ENV)
+	rm -rf $(ROOT)/.run
 
 .PHONY: smoke-remote
 smoke-remote: ## Poll HEALTH_URL until 200 + success/UP (deploy smoke)
@@ -215,13 +154,19 @@ smoke-remote: ## Poll HEALTH_URL until 200 + success/UP (deploy smoke)
 	$(ROOT)/scripts/smoke-remote.sh "$(HEALTH_URL)"
 
 .PHONY: scripts-syntax
-scripts-syntax: ## bash -n on scripts/*.sh and scripts/ci/*.sh
-	@for f in $(ROOT)/scripts/*.sh $(ROOT)/scripts/ci/*.sh; do \
+scripts-syntax: ## bash -n on scripts/*.sh
+	@for f in $(ROOT)/scripts/*.sh; do \
 		echo "bash -n $$f"; bash -n "$$f"; \
 	done
 	@echo "Script syntax OK"
 
 ##@ Bootstrap / verify
+
+.PHONY: hooks-install
+hooks-install: ## Point git at .githooks (block main commits; make check on push)
+	@chmod +x $(ROOT)/.githooks/pre-commit $(ROOT)/.githooks/pre-push
+	git -C $(ROOT) config core.hooksPath .githooks
+	@echo "Git hooks installed (core.hooksPath=.githooks)"
 
 .PHONY: bootstrap-verify
 bootstrap-verify: format check deps-up ## Format + check + bring up deps (local smoke prep)
@@ -237,3 +182,58 @@ up: smoke ## Alias: full local smoke (deps + API + health)
 
 .PHONY: down
 down: stop deps-down ## Stop API and dependencies
+
+##@ Terraform (state in S3 only)
+
+TF_STACK := $(ROOT)/infra/terraform/stacks/$(ENV)
+ENV ?= staging
+# AWS CLI "login" creds are not visible to Terraform — export env vars first.
+TF := eval "$$(aws configure export-credentials --format env 2>/dev/null)" && terraform
+
+.PHONY: tf-fmt
+tf-fmt: ## terraform fmt -recursive
+	terraform fmt -recursive $(ROOT)/infra/terraform
+
+.PHONY: tf-fmt-check
+tf-fmt-check: ## terraform fmt -check
+	terraform fmt -check -recursive $(ROOT)/infra/terraform
+
+.PHONY: tf-validate
+tf-validate: ## init -backend=false + validate (no AWS, no local state)
+	@for s in staging; do \
+		echo "==> validate $$s"; \
+		terraform -chdir=$(ROOT)/infra/terraform/stacks/$$s init -backend=false -input=false; \
+		terraform -chdir=$(ROOT)/infra/terraform/stacks/$$s validate; \
+	done
+
+.PHONY: tf-init
+tf-init: ## Init with S3 backend (locks in S3 under MED0001/)
+	@$(TF) -chdir=$(TF_STACK) init -input=false
+
+.PHONY: tf-plan
+tf-plan: ## Plan against S3 state (ENV=staging)
+	@$(TF) -chdir=$(TF_STACK) plan -input=false $(TF_ARGS)
+
+.PHONY: tf-apply
+tf-apply: ## Apply staging (ENV=staging). Creates real AWS spend.
+	@$(TF) -chdir=$(TF_STACK) apply -input=false $(TF_ARGS)
+
+.PHONY: docker-build
+docker-build: jar ## Build local images (podman/docker; host arch)
+	@if command -v podman >/dev/null 2>&1; then \
+		podman build -f $(ROOT)/apps/api/Dockerfile -t med0001-api:local $(ROOT); \
+		podman build -f $(ROOT)/apps/worker/Dockerfile -t med0001-worker:local $(ROOT); \
+	else \
+		docker build -f $(ROOT)/apps/api/Dockerfile -t med0001-api:local $(ROOT); \
+		docker build -f $(ROOT)/apps/worker/Dockerfile -t med0001-worker:local $(ROOT); \
+	fi
+
+.PHONY: docker-push
+docker-push: ## Build jars + push images to ECR (ENV=staging)
+	chmod +x $(ROOT)/scripts/docker-push.sh
+	$(ROOT)/scripts/docker-push.sh $(ENV)
+
+.PHONY: deploy-ecs
+deploy-ecs: ## Force ECS rolling deploy (ENV=staging)
+	chmod +x $(ROOT)/scripts/deploy-ecs.sh
+	$(ROOT)/scripts/deploy-ecs.sh $(ENV)

@@ -8,17 +8,6 @@ build/
 .gradle/
 **/bin/
 
-# Terraform — state and locks live only in S3
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tflock
-.terraform.lock.hcl
-crash.log
-crash.*.log
-*.tfvars
-!*.tfvars.example
-
 # Secrets / local env
 .env
 .env.*
@@ -33,5 +22,17 @@ crash.*.log
 *.log
 .cursor/cache/
 .run/
-infra/lambda/api.zip
-infra/lambda/worker.zip
+
+# Terraform — state/locks live in s3://terraform-locks-105927215604/MED0001 only
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+tfplan*
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

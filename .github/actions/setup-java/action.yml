@@ -1,5 +1,5 @@
 name: Setup Java 21
-description: Temurin 21 + Gradle User Home cache (deps + build cache)
+description: Temurin 21 + Gradle User Home cache
 
 runs:
   using: composite
@@ -8,9 +8,6 @@ runs:
       with:
         distribution: temurin
         java-version: "21"
-    # Caches ~/.gradle (deps + build cache). Key hashes Gradle files / version catalog /
-    # wrapper — bump a dep in libs.versions.toml or *.gradle* → new key → miss → re-download.
-    # PRs only read cache; main/deploy writes so the shared cache stays authoritative.
     - uses: gradle/actions/setup-gradle@v4
       with:
         cache-read-only: ${{ github.event_name == 'pull_request' }}

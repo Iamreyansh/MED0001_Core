@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Block commits on protected branches — work on a feature branch instead.
+set -euo pipefail
+
+branch="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
+case "$branch" in
+  main|master)
+    echo "error: commits on '$branch' are blocked."
+    echo "Create a feature branch: git switch -c <name>"
+    exit 1
+    ;;
+esac

@@ -15,8 +15,8 @@ import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
 
 /**
- * For staging/prod: load DB + JWT material from Secrets Manager ARNs already set on the Lambda.
- * Avoids stuffing PEMs into the 4KB Lambda environment limit.
+ * For staging/prod: load DB + JWT material from Secrets Manager ARNs set on the ECS task. Avoids
+ * stuffing PEMs into task environment variables.
  */
 public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
 
@@ -66,6 +66,18 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
     for (String p : environment.getActiveProfiles()) {
       if (DEPLOYED.contains(p)) {
         return true;
+      }
+    }
+    // EPP may run before profiles are copied into getActiveProfiles(); also honor the property/env.
+    String raw = environment.getProperty("spring.profiles.active");
+    if (raw == null || raw.isBlank()) {
+      raw = environment.getProperty("SPRING_PROFILES_ACTIVE");
+    }
+    if (raw != null) {
+      for (String p : raw.split(",")) {
+        if (DEPLOYED.contains(p.trim())) {
+          return true;
+        }
       }
     }
     return false;
