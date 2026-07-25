@@ -5,4 +5,5 @@ title = "med0001 gitleaks"
 [allowlist]
 paths = [
   '''infra/terraform/stacks/staging/secrets\.tf''',
+  '''infra/terraform/stacks/prod/secrets\.tf''',
 ]

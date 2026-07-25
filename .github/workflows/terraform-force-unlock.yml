@@ -23,7 +23,8 @@ jobs:
   unlock:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: ${{ inputs.environment }}
+    # GitHub Environment names: staging | production (stack dir remains prod)
+    environment: ${{ inputs.environment == 'prod' && 'production' || inputs.environment }}
     steps:
       - uses: actions/checkout@v4
       - name: Require AWS_DEPLOY_ROLE_ARN

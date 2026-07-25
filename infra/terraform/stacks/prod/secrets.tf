@@ -1,0 +1,17 @@
+resource "tls_private_key" "jwt" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "aws_secretsmanager_secret" "jwt" {
+  name       = "${local.name}/jwt-rs256"
+  kms_key_id = aws_kms_key.this.arn
+}
+
+resource "aws_secretsmanager_secret_version" "jwt" {
+  secret_id = aws_secretsmanager_secret.jwt.id
+  secret_string = jsonencode({
+    private_key_pem = tls_private_key.jwt.private_key_pem_pkcs8
+    public_key_pem  = tls_private_key.jwt.public_key_pem
+  })
+}

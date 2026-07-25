@@ -1,5 +1,5 @@
 ---
-description: Terraform and AWS Lambda conventions for MED0001
+description: Terraform and AWS conventions for MED0001
 globs: "infra/terraform/**/*"
 alwaysApply: false
 ---
@@ -7,9 +7,9 @@ alwaysApply: false
 # Terraform / AWS
 
 - Region: `ap-south-1`.
-- Edit `infra/terraform/modules/*`; keep `stacks/{staging,prod}` thin.
-- State + locks: `s3://terraform-locks-105927215604/MED0001/{env}/` with `use_lockfile = true`. Never commit `.terraform/`, `*.tfstate*`, `*.tflock`, `.terraform.lock.hcl`.
-- Lambda: arm64, Java 21, SnapStart on published versions, alias `live`, optional provisioned concurrency. Never `$LATEST` in prod.
-- Auth to AWS in CI: GitHub OIDC only — no long-lived access keys.
+- Flattened stacks only: `infra/terraform/stacks/{staging,prod}/*.tf` (no `modules/`).
+- State + locks: `s3://terraform-locks-105927215604/MED0001/{env}/terraform.tfstate` with `use_lockfile = true`. Never commit `.terraform/` or `*.tfstate*`. Commit `.terraform.lock.hcl`.
+- Compute: ECS Fargate arm64 (API + SQS worker). Staging hostname `staging-core.api…`; prod `core.api…`.
+- Auth to AWS in CI: GitHub OIDC only — no long-lived access keys. Role `med0001-gha-deploy`.
 - Local: `make tf-fmt`, `make tf-validate`, optional `make tf-plan ENV=staging|prod`.
 - Stuck lock: `/tf-unlock` / skill `terraform-force-unlock` — do not delete lock objects by hand unless instructed.
