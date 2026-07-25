@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 concurrency:
@@ -101,3 +101,27 @@ jobs:
         env:
           ATTEMPTS: "24"
           SLEEP_SECS: "15"
+
+  tag-release:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create release tag from SHA
+        env:
+          FULL_SHA: ${{ github.sha }}
+        run: |
+          SHORT="$(echo "$FULL_SHA" | cut -c1-7)"
+          TAG="release-${SHORT}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} already exists — skip"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$FULL_SHA" -m "Promote staging ${FULL_SHA} (run ${{ github.run_id }})"
+          git push origin "refs/tags/${TAG}"
+          echo "Created ${TAG} → ${FULL_SHA}"

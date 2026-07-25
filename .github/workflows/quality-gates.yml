@@ -71,7 +71,7 @@ jobs:
         with:
           terraform_version: "1.10.5"
           terraform_wrapper: false
-      - name: Fmt + validate (flattened staging stack)
+      - name: Fmt + validate (flattened staging + prod stacks)
         run: |
           make tf-fmt-check
           make tf-validate
@@ -90,13 +90,17 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-south-1
-      - name: Terraform plan staging (S3 state/lock)
+      - name: Terraform plan staging + prod (S3 state/lock)
         if: steps.filter.outputs.infra == 'true'
         run: |
           make tf-init ENV=staging
           make tf-plan ENV=staging TF_ARGS="-no-color -out=tfplan-staging"
           terraform -chdir=infra/terraform/stacks/staging show -no-color tfplan-staging \
             > "$GITHUB_WORKSPACE/tfplan-staging.txt"
+          make tf-init ENV=prod
+          make tf-plan ENV=prod TF_ARGS="-no-color -out=tfplan-prod"
+          terraform -chdir=infra/terraform/stacks/prod show -no-color tfplan-prod \
+            > "$GITHUB_WORKSPACE/tfplan-prod.txt"
       - name: Upload terraform plan
         if: steps.filter.outputs.infra == 'true'
         uses: actions/upload-artifact@v4
@@ -104,4 +108,6 @@ jobs:
           name: terraform-plans
           retention-days: 7
           if-no-files-found: error
-          path: tfplan-staging.txt
+          path: |
+            tfplan-staging.txt
+            tfplan-prod.txt

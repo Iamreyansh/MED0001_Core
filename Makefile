@@ -200,7 +200,7 @@ tf-fmt-check: ## terraform fmt -check
 
 .PHONY: tf-validate
 tf-validate: ## init -backend=false + validate (no AWS, no local state)
-	@for s in staging; do \
+	@for s in staging prod; do \
 		echo "==> validate $$s"; \
 		terraform -chdir=$(ROOT)/infra/terraform/stacks/$$s init -backend=false -input=false; \
 		terraform -chdir=$(ROOT)/infra/terraform/stacks/$$s validate; \
@@ -211,12 +211,18 @@ tf-init: ## Init with S3 backend (locks in S3 under MED0001/)
 	@$(TF) -chdir=$(TF_STACK) init -input=false
 
 .PHONY: tf-plan
-tf-plan: ## Plan against S3 state (ENV=staging)
+tf-plan: ## Plan against S3 state (ENV=staging|prod)
 	@$(TF) -chdir=$(TF_STACK) plan -input=false $(TF_ARGS)
 
 .PHONY: tf-apply
-tf-apply: ## Apply staging (ENV=staging). Creates real AWS spend.
+tf-apply: ## Apply stack (ENV=staging|prod). Creates real AWS spend.
 	@$(TF) -chdir=$(TF_STACK) apply -input=false $(TF_ARGS)
+
+.PHONY: tf-unlock
+tf-unlock: ## Force-unlock LOCK_ID=… ENV=staging|prod
+	@test "$(ENV)" = "staging" -o "$(ENV)" = "prod" || (echo "ENV must be staging or prod"; exit 1)
+	@test -n "$(LOCK_ID)" || (echo "LOCK_ID required"; exit 1)
+	@$(TF) -chdir=$(TF_STACK) force-unlock -force "$(LOCK_ID)"
 
 .PHONY: docker-build
 docker-build: jar ## Build local images (podman/docker; host arch)
@@ -234,6 +240,6 @@ docker-push: ## Build jars + push images to ECR (ENV=staging)
 	$(ROOT)/scripts/docker-push.sh $(ENV)
 
 .PHONY: deploy-ecs
-deploy-ecs: ## Force ECS rolling deploy (ENV=staging)
+deploy-ecs: ## Force ECS rolling deploy (ENV=staging|prod)
 	chmod +x $(ROOT)/scripts/deploy-ecs.sh
 	$(ROOT)/scripts/deploy-ecs.sh $(ENV)

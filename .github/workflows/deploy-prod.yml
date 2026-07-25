@@ -1,0 +1,86 @@
+name: deploy-prod
+
+on:
+  push:
+    tags: ['release-*']
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  PROD_HEALTH_URL: https://core.api.nammamedmate.com/api/v1/health
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require AWS_DEPLOY_ROLE_ARN
+        env:
+          ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -z "$ROLE" ]; then
+            echo "::error::vars.AWS_DEPLOY_ROLE_ARN is empty"
+            exit 1
+          fi
+
+  deploy-production:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-terraform-aws
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      - name: Install crane
+        run: |
+          curl -fsSL "https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin crane
+          crane version
+      - name: Ensure prod ECR then promote staging digests
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          FULL_SHA="$(git rev-parse HEAD)"
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          STAGING_API="${REGISTRY}/med0001-staging-api"
+          STAGING_WORKER="${REGISTRY}/med0001-staging-worker"
+          PROD_API="${REGISTRY}/med0001-prod-api"
+          PROD_WORKER="${REGISTRY}/med0001-prod-worker"
+
+          make tf-init ENV=prod
+          # Greenfield: create ECR repos before copy; no-op on subsequent deploys.
+          terraform -chdir=infra/terraform/stacks/prod apply -input=false -auto-approve \
+            -target=aws_ecr_repository.api -target=aws_ecr_repository.worker
+
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | crane auth login "$REGISTRY" -u AWS --password-stdin
+
+          crane copy "${STAGING_API}:${FULL_SHA}" "${PROD_API}:${TAG}"
+          crane copy "${STAGING_API}:${FULL_SHA}" "${PROD_API}:prod"
+          crane copy "${STAGING_WORKER}:${FULL_SHA}" "${PROD_WORKER}:${TAG}"
+          crane copy "${STAGING_WORKER}:${FULL_SHA}" "${PROD_WORKER}:prod"
+          echo "Promoted ${FULL_SHA} → ${TAG} (and :prod)"
+      - name: Terraform apply prod
+        env:
+          TF_VAR_image_tag: ${{ github.ref_name }}
+        run: |
+          make tf-apply ENV=prod TF_ARGS="-auto-approve -input=false"
+      - name: Rolling ECS deploy + wait stable
+        run: |
+          chmod +x scripts/deploy-ecs.sh
+          scripts/deploy-ecs.sh prod
+      - name: Smoke prod
+        run: make smoke-remote HEALTH_URL=${{ env.PROD_HEALTH_URL }}
+        env:
+          ATTEMPTS: "36"
+          SLEEP_SECS: "15"

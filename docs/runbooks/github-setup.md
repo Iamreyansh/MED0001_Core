@@ -14,7 +14,7 @@ What it configures:
 | OIDC provider | `token.actions.githubusercontent.com` |
 | IAM role | `arn:aws:iam::105927215604:role/med0001-gha-deploy` |
 | Repo variable | `AWS_DEPLOY_ROLE_ARN` |
-| Environments | `staging`, `prod` (needs **repo admin** on `gh`) |
+| Environments | `staging`, `production` (needs **repo admin** on `gh`; else first workflow run creates them) |
 
 ## OIDC subject claim (important)
 

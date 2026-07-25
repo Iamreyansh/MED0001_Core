@@ -106,7 +106,7 @@ aws iam put-role-policy --role-name "$ROLE_NAME" --policy-name med0001-gha-terra
 echo "==> Set GitHub repo variable AWS_DEPLOY_ROLE_ARN"
 gh variable set AWS_DEPLOY_ROLE_ARN --repo "$REPO_SLUG" --body "$ROLE_ARN"
 
-for ENV in staging; do
+for ENV in staging production; do
   gh api --method PUT "repos/${REPO_SLUG}/environments/${ENV}" >/dev/null || true
 done
 
