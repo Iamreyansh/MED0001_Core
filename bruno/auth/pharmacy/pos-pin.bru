@@ -1,0 +1,64 @@
+meta {
+  name: pos-pin
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/pharmacy/pos-pin
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pharmacy_id": "{{pharmacyId}}",
+    "staff_id": "{{staffId}}",
+    "pin": "{{posPin}}"
+  }
+}
+
+script:pre-request {
+  const pharmacyId = bru.getEnvVar("pharmacyId");
+  if (!pharmacyId) console.warn("pharmacyId not set — run login first");
+  const staffId = bru.getEnvVar("staffId");
+  if (!staffId) console.warn("staffId not set — run login first");
+  const pin = bru.getEnvVar("posPin");
+  if (!pin) console.warn("posPin not set — set vars:secret posPin in environment");
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("posAccessToken", body.data.access_token);
+    console.log("posAccessToken saved");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with POS token", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.token_type).to.equal("Bearer");
+    expect(body.data.token_scope).to.equal("pos");
+    expect(body.data.access_token_expires_in).to.equal(14400);
+    expect(body.data.staff).to.be.an("object");
+    expect(body.data.pharmacy).to.be.an("object");
+  });
+}
+
+docs {
+  POST /api/v1/auth/pharmacy/pos-pin
+  Public. 4-digit PIN login for POS terminals. Issues short-lived POS-scoped token (14400s).
+  Writes: posAccessToken.
+  Errors: 400 VALIDATION_ERROR, 401 INVALID_PIN, 403 POS_PIN_NOT_SET|ACCOUNT_LOCKED|STAFF_NOT_ASSIGNED, 404 STAFF_NOT_FOUND.
+}

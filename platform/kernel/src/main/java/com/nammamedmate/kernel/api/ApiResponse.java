@@ -1,6 +1,7 @@
 package com.nammamedmate.kernel.api;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiResponse<T>(boolean success, T data, PaginationMeta meta, ApiError error) {
@@ -19,5 +20,11 @@ public record ApiResponse<T>(boolean success, T data, PaginationMeta meta, ApiEr
 
   public static <T> ApiResponse<T> fail(String code, String message, Integer retryAfterSeconds) {
     return new ApiResponse<>(false, null, null, new ApiError(code, message, retryAfterSeconds));
+  }
+
+  public static <T> ApiResponse<T> fail(
+      String code, String message, Integer retryAfterSeconds, Map<String, Object> details) {
+    return new ApiResponse<>(
+        false, null, null, new ApiError(code, message, retryAfterSeconds, details));
   }
 }

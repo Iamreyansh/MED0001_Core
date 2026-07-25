@@ -1,0 +1,14 @@
+meta {
+  name: pharmacy
+}
+
+auth {
+  mode: none
+}
+
+docs {
+  Pharmacy Staff Authentication (EPIC-001 / STORY-002).
+  - login: POST /api/v1/auth/pharmacy/login (public)
+  - switch-pharmacy: POST /api/v1/auth/pharmacy/switch-pharmacy (Bearer pharmacy_owner|pharmacy_staff)
+  - pos-pin: POST /api/v1/auth/pharmacy/pos-pin (public)
+}

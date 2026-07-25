@@ -123,11 +123,58 @@ class JpaStoresTest {
     AuthSessionJpaRepository repo = mock(AuthSessionJpaRepository.class);
     JpaAuthSessionStore store = new JpaAuthSessionStore(repo);
     UUID id = Ids.newId();
+    UUID pharmacyId = Ids.newId();
     Instant now = Instant.parse("2026-07-25T08:00:00Z");
     AuthSessionRecord record =
         new AuthSessionRecord(
             id,
             Ids.newId(),
+            "pharmacy_staff",
+            "hash",
+            "full",
+            "{}",
+            "1.1.1.1",
+            "ua",
+            now,
+            now,
+            now.plusSeconds(10),
+            pharmacyId);
+
+    store.save(record);
+    verify(repo).save(any(AuthSessionEntity.class));
+
+    AuthSessionEntity entity =
+        new AuthSessionEntity(
+            id,
+            record.userId(),
+            "pharmacy_staff",
+            "hash",
+            "full",
+            "{}",
+            "1.1.1.1",
+            "ua",
+            now,
+            now,
+            now.plusSeconds(10),
+            pharmacyId);
+    assertThat(entity.getId()).isEqualTo(id);
+    assertThat(entity.getUserId()).isEqualTo(record.userId());
+    assertThat(entity.getUserType()).isEqualTo("pharmacy_staff");
+    assertThat(entity.getRefreshTokenHash()).isEqualTo("hash");
+    assertThat(entity.getTokenScope()).isEqualTo("full");
+    assertThat(entity.getDeviceInfoJson()).isEqualTo("{}");
+    assertThat(entity.getIpAddress()).isEqualTo("1.1.1.1");
+    assertThat(entity.getUserAgent()).isEqualTo("ua");
+    assertThat(entity.getCreatedAt()).isEqualTo(now);
+    assertThat(entity.getLastActiveAt()).isEqualTo(now);
+    assertThat(entity.getExpiresAt()).isEqualTo(now.plusSeconds(10));
+    assertThat(entity.getPharmacyId()).isEqualTo(pharmacyId);
+
+    // customer session with null pharmacyId
+    AuthSessionRecord customerRecord =
+        new AuthSessionRecord(
+            id,
+            record.userId(),
             "customer",
             "hash",
             "full",
@@ -136,12 +183,10 @@ class JpaStoresTest {
             "ua",
             now,
             now,
-            now.plusSeconds(10));
-
-    store.save(record);
-    verify(repo).save(any(AuthSessionEntity.class));
-
-    AuthSessionEntity entity =
+            now.plusSeconds(10),
+            null);
+    store.save(customerRecord);
+    AuthSessionEntity noPharmacy =
         new AuthSessionEntity(
             id,
             record.userId(),
@@ -153,17 +198,8 @@ class JpaStoresTest {
             "ua",
             now,
             now,
-            now.plusSeconds(10));
-    assertThat(entity.getId()).isEqualTo(id);
-    assertThat(entity.getUserId()).isEqualTo(record.userId());
-    assertThat(entity.getUserType()).isEqualTo("customer");
-    assertThat(entity.getRefreshTokenHash()).isEqualTo("hash");
-    assertThat(entity.getTokenScope()).isEqualTo("full");
-    assertThat(entity.getDeviceInfoJson()).isEqualTo("{}");
-    assertThat(entity.getIpAddress()).isEqualTo("1.1.1.1");
-    assertThat(entity.getUserAgent()).isEqualTo("ua");
-    assertThat(entity.getCreatedAt()).isEqualTo(now);
-    assertThat(entity.getLastActiveAt()).isEqualTo(now);
-    assertThat(entity.getExpiresAt()).isEqualTo(now.plusSeconds(10));
+            now.plusSeconds(10),
+            null);
+    assertThat(noPharmacy.getPharmacyId()).isNull();
   }
 }

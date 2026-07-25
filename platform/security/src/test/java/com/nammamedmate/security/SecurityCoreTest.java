@@ -66,6 +66,20 @@ class SecurityCoreTest {
   }
 
   @Test
+  void issueWithCustomTtl() {
+    JwtClaims claims =
+        new JwtClaims(
+            UUID.randomUUID(),
+            AuthRole.PHARMACY_STAFF,
+            UUID.randomUUID(),
+            TokenScope.POS,
+            "jti-pos");
+    String token = jwtService.issueAccessToken(claims, 14400L);
+    JwtClaims parsed = jwtService.parseAndValidate(token);
+    assertThat(parsed.tokenScope()).isEqualTo(TokenScope.POS);
+  }
+
+  @Test
   void issueWithoutPharmacyAndRevocationEdgeCases() {
     JwtClaims claims =
         new JwtClaims(UUID.randomUUID(), AuthRole.CUSTOMER, null, TokenScope.FULL, "jti-2");
@@ -143,6 +157,144 @@ class SecurityCoreTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> RsaKeyLoader.loadPublicKeyPem("bad"))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void posTokenRestrictionFilter() throws Exception {
+    JwtClaims posClaims =
+        new JwtClaims(
+            UUID.randomUUID(), AuthRole.PHARMACY_STAFF, UUID.randomUUID(), TokenScope.POS, "jti-p");
+    String posToken = jwtService.issueAccessToken(posClaims, 14400L);
+
+    JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService);
+    PosTokenRestrictionFilter posFilter = new PosTokenRestrictionFilter();
+
+    // POS token on non-POS path → 403
+    MockHttpServletRequest req1 = new MockHttpServletRequest("POST", "/api/v1/some/endpoint");
+    req1.addHeader("Authorization", "Bearer " + posToken);
+    MockHttpServletResponse res1 = new MockHttpServletResponse();
+    jwtFilter.doFilter(req1, res1, new MockFilterChain());
+    MockHttpServletRequest req1b = new MockHttpServletRequest("POST", "/api/v1/some/endpoint");
+    req1b.addHeader("Authorization", "Bearer " + posToken);
+    jwtFilter.doFilter(req1b, res1, new MockFilterChain());
+    posFilter.doFilter(req1b, res1, new MockFilterChain());
+    assertThat(res1.getStatus()).isEqualTo(403);
+    assertThat(res1.getContentAsString()).contains("POS_TOKEN_RESTRICTED");
+
+    // POS token on /api/v1/pos/ path → passes
+    SecurityContextHolder.clearContext();
+    MockHttpServletRequest req2 = new MockHttpServletRequest("POST", "/api/v1/pos/sale");
+    req2.addHeader("Authorization", "Bearer " + posToken);
+    MockHttpServletResponse res2 = new MockHttpServletResponse();
+    jwtFilter.doFilter(req2, res2, new MockFilterChain());
+    posFilter.doFilter(req2, res2, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+    assertThat(res2.getStatus()).isEqualTo(200);
+
+    // FULL token on non-POS path → passes
+    SecurityContextHolder.clearContext();
+    JwtClaims fullClaims =
+        new JwtClaims(
+            UUID.randomUUID(),
+            AuthRole.PHARMACY_OWNER,
+            UUID.randomUUID(),
+            TokenScope.FULL,
+            "jti-f");
+    String fullToken = jwtService.issueAccessToken(fullClaims);
+    MockHttpServletRequest req3 = new MockHttpServletRequest("GET", "/api/v1/some/data");
+    req3.addHeader("Authorization", "Bearer " + fullToken);
+    MockHttpServletResponse res3 = new MockHttpServletResponse();
+    jwtFilter.doFilter(req3, res3, new MockFilterChain());
+    posFilter.doFilter(req3, res3, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+    assertThat(res3.getStatus()).isEqualTo(200);
+
+    // No auth on non-POS path → passes filter
+    SecurityContextHolder.clearContext();
+    MockHttpServletRequest req4 = new MockHttpServletRequest("GET", "/api/v1/health");
+    MockHttpServletResponse res4 = new MockHttpServletResponse();
+    posFilter.doFilter(req4, res4, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+    assertThat(res4.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void posTokenPermitsWhitelistedPaths() throws Exception {
+    JwtClaims posClaims =
+        new JwtClaims(
+            UUID.randomUUID(),
+            AuthRole.PHARMACY_STAFF,
+            UUID.randomUUID(),
+            TokenScope.POS,
+            "jti-wl");
+    String posToken = jwtService.issueAccessToken(posClaims, 14400L);
+    JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService);
+    PosTokenRestrictionFilter posFilter = new PosTokenRestrictionFilter();
+
+    String[] allowed = {"/api/v1/pos/sale", "/actuator/health", "/api/v1/health"};
+    for (String path : allowed) {
+      SecurityContextHolder.clearContext();
+      MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
+      req.addHeader("Authorization", "Bearer " + posToken);
+      MockHttpServletResponse res = new MockHttpServletResponse();
+      jwtFilter.doFilter(req, res, new MockFilterChain());
+      posFilter.doFilter(req, res, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+      assertThat(res.getStatus()).as("Expected 200 for allowed path: " + path).isEqualTo(200);
+    }
+
+    String[] blocked = {
+      "/actuator/metrics",
+      "/actuator/info",
+      "/api/v1/auth/pharmacy/login",
+      "/api/v1/webhooks/razorpay",
+      "/v3/api-docs/openapi",
+      "/swagger-ui/index.html"
+    };
+    for (String path : blocked) {
+      SecurityContextHolder.clearContext();
+      MockHttpServletRequest req = new MockHttpServletRequest("GET", path);
+      req.addHeader("Authorization", "Bearer " + posToken);
+      MockHttpServletResponse res = new MockHttpServletResponse();
+      jwtFilter.doFilter(req, res, new MockFilterChain());
+      posFilter.doFilter(req, res, new MockFilterChain());
+      assertThat(res.getStatus()).as("Expected 403 for blocked path: " + path).isEqualTo(403);
+      assertThat(res.getContentAsString()).contains("POS_TOKEN_RESTRICTED");
+    }
+
+    assertThat(PosTokenRestrictionFilter.isAllowedForPos(null)).isFalse();
+  }
+
+  @Test
+  void apiAuthHandlersWriteEnvelope() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse unauthorized = new MockHttpServletResponse();
+    new ApiAuthenticationEntryPoint()
+        .commence(
+            request,
+            unauthorized,
+            new org.springframework.security.authentication.BadCredentialsException("nope"));
+    assertThat(unauthorized.getStatus()).isEqualTo(401);
+    assertThat(unauthorized.getContentAsString()).contains("UNAUTHORIZED");
+
+    MockHttpServletResponse forbidden = new MockHttpServletResponse();
+    new ApiAccessDeniedHandler()
+        .handle(
+            request,
+            forbidden,
+            new org.springframework.security.access.AccessDeniedException("nope"));
+    assertThat(forbidden.getStatus()).isEqualTo(403);
+    assertThat(forbidden.getContentAsString()).contains("FORBIDDEN");
+  }
+
+  @Test
+  void posFilterPassesWhenPrincipalIsNotMedmate() throws Exception {
+    // auth != null but getPrincipal() is not MedmatePrincipal → filter passes through
+    PosTokenRestrictionFilter posFilter = new PosTokenRestrictionFilter();
+    var auth = new UsernamePasswordAuthenticationToken("user", null);
+    SecurityContextHolder.getContext().setAuthentication(auth);
+
+    MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/v1/some/data");
+    MockHttpServletResponse res = new MockHttpServletResponse();
+    posFilter.doFilter(req, res, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+    assertThat(res.getStatus()).isEqualTo(200);
+    SecurityContextHolder.clearContext();
   }
 
   @Test

@@ -25,10 +25,21 @@ class GlobalExceptionHandlerTest {
     assertThat(limited.getBody()).isNotNull();
     assertThat(limited.getBody().error()).isNotNull();
     assertThat(limited.getBody().error().retryAfterSeconds()).isEqualTo(30);
+    assertThat(limited.getBody().error().details()).isNull();
     assertThat(handler.handleIllegalArgument(new IllegalArgumentException("bad")).getStatusCode())
         .isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(handler.handleGeneric(new RuntimeException("boom")).getStatusCode())
         .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+
+    var withDetails =
+        handler.handleApp(
+            new AppException(
+                "ACCOUNT_LOCKED",
+                "locked",
+                403,
+                null,
+                java.util.Map.of("unlock_at", "2026-07-25T09:00:00Z")));
+    assertThat(withDetails.getBody().error().details()).containsKey("unlock_at");
   }
 
   @Test

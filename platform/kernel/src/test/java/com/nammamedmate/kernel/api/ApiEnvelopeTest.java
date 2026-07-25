@@ -21,10 +21,16 @@ class ApiEnvelopeTest {
     assertThat(fail.success()).isFalse();
     assertThat(fail.error().code()).isEqualTo("E");
     assertThat(fail.error().retryAfterSeconds()).isNull();
+    assertThat(fail.error().details()).isNull();
 
     ApiResponse<Void> limited = ApiResponse.fail("OTP_RATE_LIMITED", "wait", 42);
     assertThat(limited.error().retryAfterSeconds()).isEqualTo(42);
     assertThat(new ApiError("X", "y").retryAfterSeconds()).isNull();
+
+    java.util.Map<String, Object> details = java.util.Map.of("unlock_at", "2026-07-25T09:00:00Z");
+    ApiResponse<Void> withDetails = ApiResponse.fail("ACCOUNT_LOCKED", "locked", null, details);
+    assertThat(withDetails.error().details()).containsKey("unlock_at");
+    assertThat(new ApiError("X", "y", 5).details()).isNull();
   }
 
   @Test
