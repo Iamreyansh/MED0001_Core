@@ -27,7 +27,8 @@ public class JpaAuthSessionStore implements AuthSessionStore {
             session.userAgent(),
             session.createdAt(),
             session.lastActiveAt(),
-            session.expiresAt());
+            session.expiresAt(),
+            session.pharmacyId());
     repository.save(entity);
     return session;
   }

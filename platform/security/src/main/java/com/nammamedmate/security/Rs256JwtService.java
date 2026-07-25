@@ -32,6 +32,10 @@ public final class Rs256JwtService {
   }
 
   public String issueAccessToken(JwtClaims claims) {
+    return issueAccessToken(claims, accessTtlSeconds);
+  }
+
+  public String issueAccessToken(JwtClaims claims, long ttlSeconds) {
     Objects.requireNonNull(claims);
     Instant now = clock.instant();
     var builder =
@@ -41,7 +45,7 @@ public final class Rs256JwtService {
             .claim("role", claims.role().value())
             .claim("token_scope", claims.tokenScope().value())
             .issuedAt(Date.from(now))
-            .expiration(Date.from(now.plusSeconds(accessTtlSeconds)))
+            .expiration(Date.from(now.plusSeconds(ttlSeconds)))
             .signWith(privateKey);
     if (claims.pharmacyId() != null) {
       builder.claim("pharmacy_id", claims.pharmacyId().toString());

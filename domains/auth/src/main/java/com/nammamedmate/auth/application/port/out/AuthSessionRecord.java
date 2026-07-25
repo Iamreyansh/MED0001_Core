@@ -14,4 +14,5 @@ public record AuthSessionRecord(
     String userAgent,
     Instant createdAt,
     Instant lastActiveAt,
-    Instant expiresAt) {}
+    Instant expiresAt,
+    UUID pharmacyId) {}

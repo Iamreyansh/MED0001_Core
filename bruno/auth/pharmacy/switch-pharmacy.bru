@@ -1,0 +1,66 @@
+meta {
+  name: switch-pharmacy
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/pharmacy/switch-pharmacy
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{pharmacyAccessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pharmacy_id": "{{pharmacyId}}"
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("pharmacyAccessToken");
+  if (!token) {
+    console.warn("pharmacyAccessToken not set — run login first");
+  }
+  const pharmacyId = bru.getEnvVar("pharmacyId");
+  if (!pharmacyId) {
+    console.warn("pharmacyId not set — run login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("pharmacyAccessToken", body.data.access_token);
+    console.log(`switched pharmacy, new accessToken saved`);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with new access token", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.token_type).to.equal("Bearer");
+    expect(body.data.active_pharmacy).to.be.an("object");
+    expect(body.data.role_in_pharmacy).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/auth/pharmacy/switch-pharmacy
+  Bearer pharmacy_owner|pharmacy_staff. Switches active pharmacy context.
+  Writes: pharmacyAccessToken (new).
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN|POS_TOKEN_RESTRICTED, 404 PHARMACY_NOT_FOUND.
+}

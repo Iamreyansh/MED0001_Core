@@ -193,7 +193,8 @@ public class VerifyOtpService {
             command.userAgent(),
             now,
             now,
-            refreshExpires));
+            refreshExpires,
+            null));
 
     String accessToken =
         jwtService.issueAccessToken(

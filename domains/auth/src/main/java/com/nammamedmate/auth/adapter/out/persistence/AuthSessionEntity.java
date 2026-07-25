@@ -23,6 +23,9 @@ public class AuthSessionEntity {
   @Column(name = "user_type", nullable = false, length = 20)
   private String userType;
 
+  @Column(name = "pharmacy_id")
+  private UUID pharmacyId;
+
   @Column(name = "refresh_token_hash", nullable = false, length = 64, unique = true)
   private String refreshTokenHash;
 
@@ -62,10 +65,12 @@ public class AuthSessionEntity {
       String userAgent,
       Instant createdAt,
       Instant lastActiveAt,
-      Instant expiresAt) {
+      Instant expiresAt,
+      UUID pharmacyId) {
     this.id = id;
     this.userId = userId;
     this.userType = userType;
+    this.pharmacyId = pharmacyId;
     this.refreshTokenHash = refreshTokenHash;
     this.tokenScope = tokenScope;
     this.deviceInfoJson = deviceInfoJson;
@@ -86,6 +91,10 @@ public class AuthSessionEntity {
 
   public String getUserType() {
     return userType;
+  }
+
+  public UUID getPharmacyId() {
+    return pharmacyId;
   }
 
   public String getRefreshTokenHash() {

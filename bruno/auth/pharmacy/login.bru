@@ -1,0 +1,68 @@
+meta {
+  name: login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/pharmacy/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "identifier": "{{pharmacyStaffEmail}}",
+    "password": "{{pharmacyStaffPassword}}"
+  }
+}
+
+script:pre-request {
+  const email = bru.getEnvVar("pharmacyStaffEmail") || "priya@test-pharmacy.in";
+  bru.setEnvVar("pharmacyStaffEmail", email);
+  const pass = bru.getEnvVar("pharmacyStaffPassword") || "Passw0rd!";
+  bru.setEnvVar("pharmacyStaffPassword", pass);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("pharmacyAccessToken", body.data.access_token);
+    bru.setEnvVar("pharmacyRefreshToken", body.data.refresh_token);
+    if (body.data.active_pharmacy) {
+      bru.setEnvVar("pharmacyId", body.data.active_pharmacy.id);
+    }
+    if (body.data.staff) {
+      bru.setEnvVar("staffId", body.data.staff.id);
+    }
+    console.log(`pharmacyAccessToken saved, pharmacyId=${body.data.active_pharmacy && body.data.active_pharmacy.id}`);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with tokens", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.refresh_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.token_type).to.equal("Bearer");
+    expect(body.data.active_pharmacy).to.be.an("object");
+    expect(body.data.staff).to.be.an("object");
+    expect(body.data.pharmacies).to.be.an("array");
+  });
+}
+
+docs {
+  POST /api/v1/auth/pharmacy/login
+  Public. Email or +91 phone + password.
+  Writes: pharmacyAccessToken, pharmacyRefreshToken, pharmacyId, staffId.
+  Errors: 400 VALIDATION_ERROR, 401 INVALID_CREDENTIALS, 403 ACCOUNT_LOCKED|ACCOUNT_SUSPENDED, 404 STAFF_NOT_FOUND.
+}
