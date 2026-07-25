@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Enforce Conventional Commits: type(module): message
+# e.g. feat(auth): add otp rate limiting
+set -euo pipefail
+
+msg_file="$1"
+subject="$(sed -n '1p' "$msg_file")"
+second="$(sed -n '2p' "$msg_file")"
+
+# Skip machine-generated messages we don't author by hand.
+case "$subject" in
+  "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"amend! "*|"#"*|"") exit 0 ;;
+esac
+
+fail() {
+  echo "error: commit message: $1" >&2
+  echo "  subject: $subject" >&2
+  echo >&2
+  echo "Expected format:" >&2
+  echo "  <type>(<module>): <message>" >&2
+  echo "  <blank line>" >&2
+  echo "  <optional body>" >&2
+  echo >&2
+  echo "Types: feat | fix | docs | style | refactor | perf | test | build | ci | chore | revert" >&2
+  echo "Module: domain/app/platform short name (auth, payment, api, worker, infra, ci, …)" >&2
+  echo >&2
+  echo "Examples:" >&2
+  echo "  feat(auth): add otp rate limiting" >&2
+  echo "  fix(payment): retry razorpay webhook on 5xx" >&2
+  echo "  chore(infra): flatten terraform staging stack" >&2
+  echo "  ci(api): fix deploy-main jar artifact paths" >&2
+  echo >&2
+  echo "  feat(worker): poll sqs with backoff" >&2
+  echo >&2
+  echo "  Why: avoid hot loops when the queue is empty." >&2
+  echo "  How: exponential backoff capped at 20s." >&2
+  exit 1
+}
+
+# Strip an optional trailing PR reference like " (#123)" before checks.
+check="${subject% (#*[0-9])}"
+
+# type(module): message  — optional ! for breaking change after scope
+pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)\([a-z][a-z0-9_-]*\)!?: .+'
+
+[[ ${#subject} -le 72 ]] || fail "subject exceeds 72 chars (${#subject})."
+[[ "$check" =~ $pattern ]] || fail "must match type(module): message"
+[[ -z "$second" ]] || fail "leave a blank line between subject and body."
