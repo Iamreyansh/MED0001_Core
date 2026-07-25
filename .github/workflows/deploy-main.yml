@@ -60,12 +60,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: boot-jars
-          path: jars
-      - name: Place jars for Docker context
+          path: .
+      - name: Verify boot jars
         run: |
-          mkdir -p apps/api/build/libs apps/worker/build/libs
-          cp jars/med0001-api.jar apps/api/build/libs/
-          cp jars/med0001-worker.jar apps/worker/build/libs/
+          test -f apps/api/build/libs/med0001-api.jar
+          test -f apps/worker/build/libs/med0001-worker.jar
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: ./.github/actions/setup-terraform-aws
