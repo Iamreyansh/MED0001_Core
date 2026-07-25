@@ -37,9 +37,11 @@ Public endpoints: `auth: none`. Protected: bearer from env. Webhooks: no bearer;
 
 ## Environments
 
-- `bruno/environments/Local.bru` — `baseUrl: http://localhost:8080` plus shared vars.
+- `bruno/environments/Local.bru` — `baseUrl: http://localhost:8080`
+- `bruno/environments/Staging.bru` — `baseUrl: https://staging-core.api.nammamedmate.com`
+- `bruno/environments/Prod.bru` — `baseUrl: https://core.api.nammamedmate.com`
 - Mark secrets with `vars:secret` (`accessToken`, `refreshToken`, etc.). Never commit real production secrets.
-- Add new env files only when a story needs them; keep placeholders empty for tokens.
+- Keep placeholders empty for tokens and credentials; fill only in the Bruno UI (not in git).
 
 ## Done check
 
