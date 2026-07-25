@@ -69,7 +69,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn]
+        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.mfa.arn]
       },
       {
         Effect   = "Allow"
@@ -116,7 +116,7 @@ resource "aws_iam_role_policy" "ecs_task" {
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn]
+        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.mfa.arn]
       },
       {
         Effect   = "Allow"
@@ -196,6 +196,7 @@ locals {
     { name = "MEDMATE_SQS_DOMAIN_EVENTS_URL", value = aws_sqs_queue.domain_events.url },
     { name = "MEDMATE_SECRETS_DB_ARN", value = aws_secretsmanager_secret.db.arn },
     { name = "MEDMATE_SECRETS_JWT_ARN", value = aws_secretsmanager_secret.jwt.arn },
+    { name = "MEDMATE_SECRETS_MFA_ARN", value = aws_secretsmanager_secret.mfa.arn },
     { name = "AWS_REGION", value = data.aws_region.current.region },
     { name = "JAVA_TOOL_OPTIONS", value = "-XX:MaxRAMPercentage=75.0" }
   ]

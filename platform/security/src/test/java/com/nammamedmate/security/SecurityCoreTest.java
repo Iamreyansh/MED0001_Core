@@ -105,6 +105,27 @@ class SecurityCoreTest {
   }
 
   @Test
+  void tryRevokeIsAtomicAndRejectsReuse() {
+    InMemoryTokenRevocationStore store = new InMemoryTokenRevocationStore();
+    assertThat(store.tryRevoke(null, 10)).isFalse();
+    assertThat(store.tryRevoke(" ", 10)).isFalse();
+    assertThat(store.tryRevoke("jti", 0)).isFalse();
+    assertThat(store.tryRevoke("jti", 10)).isTrue();
+    assertThat(store.tryRevoke("jti", 10)).isFalse();
+    assertThat(store.isRevoked("jti")).isTrue();
+  }
+
+  @Test
+  void tryRevokeReclaimsExpiredEntry() {
+    MutableClock mutable = new MutableClock(Instant.now());
+    InMemoryTokenRevocationStore store = new InMemoryTokenRevocationStore(mutable);
+    assertThat(store.tryRevoke("expired", 1)).isTrue();
+    mutable.advanceSeconds(2);
+    assertThat(store.tryRevoke("expired", 5)).isTrue();
+    assertThat(store.isRevoked("expired")).isTrue();
+  }
+
+  @Test
   void pharmacyContextAndFilter() throws Exception {
     assertThat(PharmacyContext.currentPharmacyId()).isEmpty();
     UUID pharmacy = UUID.randomUUID();
@@ -293,6 +314,104 @@ class SecurityCoreTest {
     MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/v1/some/data");
     MockHttpServletResponse res = new MockHttpServletResponse();
     posFilter.doFilter(req, res, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+    assertThat(res.getStatus()).isEqualTo(200);
+    SecurityContextHolder.clearContext();
+  }
+
+  @Test
+  void aesGcmCipherRoundTripAndErrors() {
+    byte[] key = new byte[32];
+    AesGcmCipher cipher = new AesGcmCipher(key);
+    String encrypted = cipher.encrypt("admin-totp-secret");
+    assertThat(cipher.decrypt(encrypted)).isEqualTo("admin-totp-secret");
+
+    AesGcmCipher fromB64 =
+        AesGcmCipher.fromBase64Key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+    assertThat(fromB64.decrypt(fromB64.encrypt("x"))).isEqualTo("x");
+
+    assertThatThrownBy(() -> new AesGcmCipher(new byte[16]))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("32 bytes");
+
+    assertThatThrownBy(() -> cipher.decrypt("dGVzdA=="))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("AES-GCM decrypt failed");
+
+    AesGcmCipher failing =
+        new AesGcmCipher(
+            key,
+            new java.security.SecureRandom(),
+            () -> {
+              throw new java.security.GeneralSecurityException("test");
+            });
+    assertThatThrownBy(() -> failing.encrypt("x"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("AES-GCM encrypt failed");
+  }
+
+  @Test
+  void mfaChallengeRestrictionFilter() throws Exception {
+    JwtClaims challengeClaims =
+        new JwtClaims(
+            UUID.randomUUID(), AuthRole.ADMIN_SUPER, null, TokenScope.MFA_CHALLENGE, "jti-mfa");
+    String challengeToken = jwtService.issueAccessToken(challengeClaims, 300L);
+
+    JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService);
+    MfaChallengeRestrictionFilter mfaFilter = new MfaChallengeRestrictionFilter();
+
+    MockHttpServletRequest blocked =
+        new MockHttpServletRequest("GET", "/api/v1/auth/admin/setup-mfa");
+    blocked.addHeader("Authorization", "Bearer " + challengeToken);
+    MockHttpServletResponse blockedRes = new MockHttpServletResponse();
+    jwtFilter.doFilter(blocked, blockedRes, new MockFilterChain());
+    mfaFilter.doFilter(blocked, blockedRes, new MockFilterChain());
+    assertThat(blockedRes.getStatus()).isEqualTo(401);
+    assertThat(blockedRes.getContentAsString()).contains("CHALLENGE_TOKEN_INVALID");
+
+    String[] allowed = {"/api/v1/auth/admin/verify-mfa", "/api/v1/health", "/actuator/health"};
+    for (String path : allowed) {
+      SecurityContextHolder.clearContext();
+      MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
+      req.addHeader("Authorization", "Bearer " + challengeToken);
+      MockHttpServletResponse res = new MockHttpServletResponse();
+      jwtFilter.doFilter(req, res, new MockFilterChain());
+      mfaFilter.doFilter(req, res, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+      assertThat(res.getStatus()).as("allowed for " + path).isEqualTo(200);
+    }
+
+    // FULL token on setup-mfa path → passes MFA filter
+    SecurityContextHolder.clearContext();
+    JwtClaims fullClaims =
+        new JwtClaims(
+            UUID.randomUUID(), AuthRole.ADMIN_OPERATIONS, null, TokenScope.FULL, "jti-full-mfa");
+    String fullToken = jwtService.issueAccessToken(fullClaims);
+    MockHttpServletRequest fullReq =
+        new MockHttpServletRequest("POST", "/api/v1/auth/admin/setup-mfa");
+    fullReq.addHeader("Authorization", "Bearer " + fullToken);
+    MockHttpServletResponse fullRes = new MockHttpServletResponse();
+    jwtFilter.doFilter(fullReq, fullRes, new MockFilterChain());
+    mfaFilter.doFilter(fullReq, fullRes, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+    assertThat(fullRes.getStatus()).isEqualTo(200);
+
+    assertThat(MfaChallengeRestrictionFilter.isAllowedForMfaChallenge(null)).isFalse();
+
+    SecurityContextHolder.clearContext();
+    MockHttpServletRequest noAuth = new MockHttpServletRequest("GET", "/api/v1/some/data");
+    MockHttpServletResponse noAuthRes = new MockHttpServletResponse();
+    mfaFilter.doFilter(
+        noAuth, noAuthRes, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
+    assertThat(noAuthRes.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void mfaFilterPassesWhenPrincipalIsNotMedmate() throws Exception {
+    MfaChallengeRestrictionFilter mfaFilter = new MfaChallengeRestrictionFilter();
+    var auth = new UsernamePasswordAuthenticationToken("user", null);
+    SecurityContextHolder.getContext().setAuthentication(auth);
+
+    MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/v1/some/data");
+    MockHttpServletResponse res = new MockHttpServletResponse();
+    mfaFilter.doFilter(req, res, (rq, rs) -> ((MockHttpServletResponse) rs).setStatus(200));
     assertThat(res.getStatus()).isEqualTo(200);
     SecurityContextHolder.clearContext();
   }

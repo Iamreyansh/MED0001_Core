@@ -43,6 +43,9 @@ medmate:
   jwt:
     private-key-pem: ""
     public-key-pem: ""
+  mfa:
+    # 32 zero bytes, Base64 — local/dev/IT only. Staging/prod reject this and require Secrets Manager.
+    encryption-key-base64: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 
 springdoc:
   api-docs:

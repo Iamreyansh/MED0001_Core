@@ -1,0 +1,76 @@
+meta {
+  name: login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/admin/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{adminEmail}}",
+    "password": "{{adminPassword}}"
+  }
+}
+
+script:pre-request {
+  const email = bru.getEnvVar("adminEmail") || "ops@namma-medmate.in";
+  bru.setEnvVar("adminEmail", email);
+  const pass = bru.getEnvVar("adminPassword") || "Passw0rd!";
+  bru.setEnvVar("adminPassword", pass);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.mfa_required) {
+      bru.setEnvVar("mfaChallengeToken", body.data.mfa_challenge_token);
+      bru.setEnvVar("adminId", body.data.admin_id);
+      console.log("mfaChallengeToken saved");
+    } else {
+      bru.setEnvVar("adminAccessToken", body.data.access_token);
+      bru.setEnvVar("adminRefreshToken", body.data.refresh_token);
+      if (body.data.admin) {
+        bru.setEnvVar("adminId", body.data.admin.id);
+      }
+      console.log("adminAccessToken saved");
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("object");
+    if (body.data.mfa_required) {
+      expect(body.data.mfa_challenge_token).to.be.a("string").that.is.not.empty;
+      expect(body.data.mfa_challenge_expires_in).to.equal(300);
+    } else {
+      expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+      expect(body.data.refresh_token).to.be.a("string").that.is.not.empty;
+      expect(body.data.token_type).to.equal("Bearer");
+      expect(body.data.mfa_required).to.equal(false);
+    }
+  });
+}
+
+docs {
+  POST /api/v1/auth/admin/login
+  Public. Email + password first factor.
+  MFA path writes: mfaChallengeToken, adminId
+  Non-MFA path writes: adminAccessToken, adminRefreshToken, adminId
+  Errors: 400 VALIDATION_ERROR, 401 INVALID_CREDENTIALS, 403 ACCOUNT_LOCKED|ACCOUNT_SUSPENDED|MFA_ENROLLMENT_REQUIRED, 404 ADMIN_NOT_FOUND, 429 IP_RATE_LIMITED
+}

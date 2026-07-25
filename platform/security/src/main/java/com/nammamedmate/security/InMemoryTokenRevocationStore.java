@@ -40,4 +40,20 @@ public final class InMemoryTokenRevocationStore implements TokenRevocationStore 
     }
     revokedUntil.put(jti, clock.millis() + ttlSeconds * 1000L);
   }
+
+  @Override
+  public boolean tryRevoke(String jti, long ttlSeconds) {
+    if (jti == null || jti.isBlank() || ttlSeconds < 1) {
+      return false;
+    }
+    long until = clock.millis() + ttlSeconds * 1000L;
+    Long previous = revokedUntil.putIfAbsent(jti, until);
+    if (previous == null) {
+      return true;
+    }
+    if (previous < clock.millis()) {
+      return revokedUntil.replace(jti, previous, until);
+    }
+    return false;
+  }
 }

@@ -1,0 +1,71 @@
+meta {
+  name: verify-mfa
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/admin/verify-mfa
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{mfaChallengeToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "mfa_challenge_token": "{{mfaChallengeToken}}",
+    "code": "{{mfaCode}}"
+  }
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("mfaChallengeToken") || "";
+  bru.setEnvVar("mfaChallengeToken", token);
+  const code = bru.getEnvVar("mfaCode") || "000000";
+  bru.setEnvVar("mfaCode", code);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("adminAccessToken", body.data.access_token);
+    bru.setEnvVar("adminRefreshToken", body.data.refresh_token);
+    if (body.data.admin) {
+      bru.setEnvVar("adminId", body.data.admin.id);
+    }
+    console.log("adminAccessToken saved after MFA");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with tokens", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.refresh_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.token_type).to.equal("Bearer");
+    expect(body.data.access_token_expires_in).to.equal(900);
+    expect(body.data.refresh_token_expires_in).to.equal(28800);
+    expect(body.data).to.have.property("used_backup_code");
+    expect(body.data.admin).to.be.an("object");
+    expect(body.data.admin).to.have.property("backup_codes_remaining");
+  });
+}
+
+docs {
+  POST /api/v1/auth/admin/verify-mfa
+  Bearer mfa_challenge scope. Body carries the same mfa_challenge_token + 6-digit TOTP or XXXX-XXXX backup code.
+  Writes: adminAccessToken, adminRefreshToken, adminId
+  Errors: 400 VALIDATION_ERROR|INVALID_MFA_CODE|INVALID_BACKUP_CODE, 401 CHALLENGE_TOKEN_EXPIRED|CHALLENGE_TOKEN_INVALID, 403 ACCOUNT_LOCKED, 429 IP_RATE_LIMITED
+}

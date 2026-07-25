@@ -15,8 +15,8 @@ import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
 
 /**
- * For staging/prod: load DB + JWT material from Secrets Manager ARNs set on the ECS task. Avoids
- * stuffing PEMs into task environment variables.
+ * For staging/prod: load DB + JWT + MFA material from Secrets Manager ARNs set on the ECS task.
+ * Avoids stuffing PEMs / keys into task environment variables.
  */
 public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
 
@@ -53,6 +53,11 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
         JsonNode jwt = MAPPER.readTree(getSecret(client, jwtArn));
         props.put("medmate.jwt.private-key-pem", text(jwt, "private_key_pem"));
         props.put("medmate.jwt.public-key-pem", text(jwt, "public_key_pem"));
+      }
+      String mfaArn = environment.getProperty("MEDMATE_SECRETS_MFA_ARN");
+      if (mfaArn != null && !mfaArn.isBlank()) {
+        JsonNode mfa = MAPPER.readTree(getSecret(client, mfaArn));
+        props.put("medmate.mfa.encryption-key-base64", text(mfa, "encryption_key_base64"));
       }
     } catch (Exception e) {
       throw new IllegalStateException("Failed to load secrets for deployed profile", e);
