@@ -182,7 +182,7 @@ public class VerifyOtpService {
     String refreshToken = opaqueRefreshToken();
     Instant refreshExpires = now.plus(REFRESH_TTL_SECONDS, ChronoUnit.SECONDS);
     authSessionStore.save(
-        new AuthSessionRecord(
+        AuthSessionRecord.active(
             Ids.newId(),
             customer.id(),
             "customer",

@@ -31,6 +31,18 @@ class GlobalExceptionHandlerTest {
     assertThat(handler.handleGeneric(new RuntimeException("boom")).getStatusCode())
         .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
 
+    var typeMismatch =
+        handler.handleTypeMismatch(
+            new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException(
+                "not-a-uuid",
+                java.util.UUID.class,
+                "sessionId",
+                mock(MethodParameter.class),
+                new IllegalArgumentException("bad uuid")));
+    assertThat(typeMismatch.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(typeMismatch.getBody().error().code()).isEqualTo("VALIDATION_ERROR");
+    assertThat(typeMismatch.getBody().error().message()).contains("sessionId");
+
     var withDetails =
         handler.handleApp(
             new AppException(

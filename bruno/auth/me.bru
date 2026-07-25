@@ -1,0 +1,45 @@
+meta {
+  name: me
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/auth/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("meUserId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("profile envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string").that.is.not.empty;
+    expect(body.data.role).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  GET /api/v1/auth/me — current user profile from JWT role (customer / pharmacy_* / admin_*). MFA-challenge and POS-scoped tokens remain blocked by existing filters.
+}

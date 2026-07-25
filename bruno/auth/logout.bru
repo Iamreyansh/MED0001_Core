@@ -1,0 +1,54 @@
+meta {
+  name: logout
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/logout
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "refresh_token": "{{refreshToken}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken") || !bru.getEnvVar("refreshToken")) {
+    throw new Error("accessToken/refreshToken missing — login then optionally refresh first");
+  }
+}
+
+script:post-response {
+  // Session for this refresh token is soft-revoked; clear refreshToken so callers re-login.
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("refreshToken", "");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("session terminated message", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.message).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  POST /api/v1/auth/logout — soft-revoke the session for the given refresh_token; revokes current access jti in Redis.
+}

@@ -1,0 +1,60 @@
+meta {
+  name: refresh
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/refresh
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "refresh_token": "{{refreshToken}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("refreshToken")) {
+    throw new Error("refreshToken missing — run auth/customer/verify-otp (or pharmacy/admin login) first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data)) {
+    return;
+  }
+  const data = body.data;
+  if (data.access_token) {
+    bru.setEnvVar("accessToken", data.access_token);
+  }
+  if (data.refresh_token) {
+    bru.setEnvVar("refreshToken", data.refresh_token);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("rotated token pair", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.refresh_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.token_type).to.equal("Bearer");
+    expect(body.data.access_token_expires_in).to.equal(900);
+  });
+}
+
+docs {
+  POST /api/v1/auth/refresh — rotate refresh token; public (refresh_token is the credential). Writes new accessToken/refreshToken.
+}

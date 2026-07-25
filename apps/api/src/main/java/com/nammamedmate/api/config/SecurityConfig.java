@@ -41,7 +41,8 @@ public class SecurityConfig {
                         "/api/v1/auth/customer/verify-otp",
                         "/api/v1/auth/pharmacy/login",
                         "/api/v1/auth/pharmacy/pos-pin",
-                        "/api/v1/auth/admin/login")
+                        "/api/v1/auth/admin/login",
+                        "/api/v1/auth/refresh")
                     .permitAll()
                     .requestMatchers("/api/v1/webhooks/**")
                     .permitAll()

@@ -491,6 +491,42 @@ class PharmacyLoginServiceTest {
       saved.add(s);
       return s;
     }
+
+    @Override
+    public Optional<AuthSessionRecord> findByRefreshTokenHash(String refreshTokenHash) {
+      return Optional.empty();
+    }
+
+    @Override
+    public Optional<AuthSessionRecord> findById(UUID id) {
+      return Optional.empty();
+    }
+
+    @Override
+    public int markRotatedIfActive(UUID id, Instant rotatedAt) {
+      return 0;
+    }
+
+    @Override
+    public int revokeIfActive(UUID id, Instant revokedAt) {
+      return 0;
+    }
+
+    @Override
+    public int revokeAllForUser(UUID userId, Instant revokedAt) {
+      return 0;
+    }
+
+    @Override
+    public List<AuthSessionRecord> listActiveByUserId(
+        UUID userId, Instant now, int page, int limit) {
+      return List.of();
+    }
+
+    @Override
+    public long countActiveByUserId(UUID userId, Instant now) {
+      return 0;
+    }
   }
 
   private static final class FakeAuditStore implements LoginAuditStore {

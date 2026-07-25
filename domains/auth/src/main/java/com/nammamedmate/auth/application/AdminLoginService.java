@@ -208,10 +208,10 @@ public class AdminLoginService {
     String refreshToken = opaqueToken();
     Instant refreshExpires = now.plus(REFRESH_TTL_SECONDS, ChronoUnit.SECONDS);
     sessionStore.save(
-        new AuthSessionRecord(
+        AuthSessionRecord.active(
             Ids.newId(),
             admin.id(),
-            "admin",
+            "admin_staff",
             sha256Hex(refreshToken),
             "full",
             null,

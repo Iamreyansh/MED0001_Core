@@ -2,6 +2,7 @@ package com.nammamedmate.auth.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -126,7 +127,7 @@ class JpaStoresTest {
     UUID pharmacyId = Ids.newId();
     Instant now = Instant.parse("2026-07-25T08:00:00Z");
     AuthSessionRecord record =
-        new AuthSessionRecord(
+        AuthSessionRecord.active(
             id,
             Ids.newId(),
             "pharmacy_staff",
@@ -156,7 +157,11 @@ class JpaStoresTest {
             now,
             now,
             now.plusSeconds(10),
-            pharmacyId);
+            pharmacyId,
+            "IN",
+            "Bengaluru",
+            null,
+            null);
     assertThat(entity.getId()).isEqualTo(id);
     assertThat(entity.getUserId()).isEqualTo(record.userId());
     assertThat(entity.getUserType()).isEqualTo("pharmacy_staff");
@@ -169,10 +174,14 @@ class JpaStoresTest {
     assertThat(entity.getLastActiveAt()).isEqualTo(now);
     assertThat(entity.getExpiresAt()).isEqualTo(now.plusSeconds(10));
     assertThat(entity.getPharmacyId()).isEqualTo(pharmacyId);
+    assertThat(entity.getCountry()).isEqualTo("IN");
+    assertThat(entity.getCity()).isEqualTo("Bengaluru");
+    assertThat(entity.getRotatedAt()).isNull();
+    assertThat(entity.getRevokedAt()).isNull();
 
     // customer session with null pharmacyId
     AuthSessionRecord customerRecord =
-        new AuthSessionRecord(
+        AuthSessionRecord.active(
             id,
             record.userId(),
             "customer",
@@ -199,7 +208,66 @@ class JpaStoresTest {
             now,
             now,
             now.plusSeconds(10),
+            null,
+            null,
+            null,
+            null,
             null);
     assertThat(noPharmacy.getPharmacyId()).isNull();
+  }
+
+  @Test
+  void authSessionStoreQueriesAndMutations() {
+    AuthSessionJpaRepository repo = mock(AuthSessionJpaRepository.class);
+    JpaAuthSessionStore store = new JpaAuthSessionStore(repo);
+    UUID id = Ids.newId();
+    UUID userId = Ids.newId();
+    Instant now = Instant.parse("2026-07-26T02:00:00Z");
+    AuthSessionEntity entity =
+        new AuthSessionEntity(
+            id,
+            userId,
+            "customer",
+            "hash",
+            "full",
+            "{}",
+            "1.1.1.1",
+            "ua",
+            now,
+            now,
+            now.plusSeconds(100),
+            null,
+            null,
+            null,
+            null,
+            null);
+    when(repo.findByRefreshTokenHash("hash")).thenReturn(Optional.of(entity));
+    when(repo.findById(id)).thenReturn(Optional.of(entity));
+    when(repo.markRotatedIfActive(id, now)).thenReturn(1);
+    when(repo.revokeIfActive(id, now)).thenReturn(1);
+    when(repo.revokeAllForUser(userId, now)).thenReturn(2);
+    when(repo.listActive(eq(userId), eq(now), any())).thenReturn(List.of(entity));
+    when(repo.countActive(userId, now)).thenReturn(1L);
+
+    assertThat(store.findByRefreshTokenHash("hash")).isPresent();
+    assertThat(store.findById(id)).isPresent();
+    assertThat(store.markRotatedIfActive(id, now)).isEqualTo(1);
+    assertThat(store.revokeIfActive(id, now)).isEqualTo(1);
+    assertThat(store.revokeAllForUser(userId, now)).isEqualTo(2);
+    assertThat(store.listActiveByUserId(userId, now, 1, 20)).hasSize(1);
+    assertThat(store.countActiveByUserId(userId, now)).isEqualTo(1);
+  }
+
+  @Test
+  void customerStoreFindById() {
+    CustomerJpaRepository repo = mock(CustomerJpaRepository.class);
+    JpaCustomerStore store = new JpaCustomerStore(repo);
+    UUID id = Ids.newId();
+    Instant now = Instant.parse("2026-07-26T02:00:00Z");
+    CustomerEntity entity =
+        new CustomerEntity(
+            id, "+919800000099", null, "N", null, null, null, null, null, 0, 0, now, now, null);
+    when(repo.findByIdAndDeletedAtIsNull(id)).thenReturn(Optional.of(entity));
+    assertThat(store.findById(id)).isPresent();
   }
 }

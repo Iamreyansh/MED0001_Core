@@ -43,6 +43,12 @@ public class AuthSessionEntity {
   @Column(name = "user_agent")
   private String userAgent;
 
+  @Column(name = "country", length = 2, columnDefinition = "bpchar(2)")
+  private String country;
+
+  @Column(name = "city", length = 100)
+  private String city;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -51,6 +57,12 @@ public class AuthSessionEntity {
 
   @Column(name = "expires_at", nullable = false)
   private Instant expiresAt;
+
+  @Column(name = "rotated_at")
+  private Instant rotatedAt;
+
+  @Column(name = "revoked_at")
+  private Instant revokedAt;
 
   protected AuthSessionEntity() {}
 
@@ -66,7 +78,11 @@ public class AuthSessionEntity {
       Instant createdAt,
       Instant lastActiveAt,
       Instant expiresAt,
-      UUID pharmacyId) {
+      UUID pharmacyId,
+      String country,
+      String city,
+      Instant rotatedAt,
+      Instant revokedAt) {
     this.id = id;
     this.userId = userId;
     this.userType = userType;
@@ -76,9 +92,13 @@ public class AuthSessionEntity {
     this.deviceInfoJson = deviceInfoJson;
     this.ipAddress = ipAddress;
     this.userAgent = userAgent;
+    this.country = country;
+    this.city = city;
     this.createdAt = createdAt;
     this.lastActiveAt = lastActiveAt;
     this.expiresAt = expiresAt;
+    this.rotatedAt = rotatedAt;
+    this.revokedAt = revokedAt;
   }
 
   public UUID getId() {
@@ -117,6 +137,14 @@ public class AuthSessionEntity {
     return userAgent;
   }
 
+  public String getCountry() {
+    return country;
+  }
+
+  public String getCity() {
+    return city;
+  }
+
   public Instant getCreatedAt() {
     return createdAt;
   }
@@ -127,5 +155,13 @@ public class AuthSessionEntity {
 
   public Instant getExpiresAt() {
     return expiresAt;
+  }
+
+  public Instant getRotatedAt() {
+    return rotatedAt;
+  }
+
+  public Instant getRevokedAt() {
+    return revokedAt;
   }
 }
