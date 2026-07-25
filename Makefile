@@ -164,7 +164,7 @@ scripts-syntax: ## bash -n on scripts/*.sh
 
 .PHONY: hooks-install
 hooks-install: ## Point git at .githooks (block main commits; make check on push)
-	@chmod +x $(ROOT)/.githooks/pre-commit $(ROOT)/.githooks/pre-push
+	@chmod +x $(ROOT)/.githooks/pre-commit $(ROOT)/.githooks/commit-msg $(ROOT)/.githooks/pre-push
 	git -C $(ROOT) config core.hooksPath .githooks
 	@echo "Git hooks installed (core.hooksPath=.githooks)"
 
