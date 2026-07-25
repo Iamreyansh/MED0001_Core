@@ -18,10 +18,10 @@ main push
     guard         require AWS_DEPLOY_ROLE_ARN
     build         make check + make jar → boot-jars artifact
     staging       push SHA images → tf apply → ECS roll → smoke
-    tag-release   annotated tag release-<sha7> (idempotent; does not deploy prod)
+    tag-release   annotated semver tag vMAJOR.MINOR.PATCH (patch bump; does not deploy prod)
 
 manual
-  deploy-prod     workflow_dispatch with tag=release-<sha7>
+  deploy-prod     workflow_dispatch with tag=vX.Y.Z
     promote       crane-copy staging digests → prod ECR (:tag + :prod)
     apply         TF_VAR_image_tag=<tag> → tf apply prod
     roll          ECS services-stable
@@ -31,14 +31,16 @@ manual
 | Workflow | Trigger |
 |----------|---------|
 | `quality-gates.yml` | PR to `main`, or `workflow_dispatch` |
-| `deploy-main.yml` | Push to `main` → staging → release tag |
-| `deploy-prod.yml` | Manual `workflow_dispatch` only (`tag` input) |
+| `deploy-main.yml` | Push to `main` → staging → semver tag |
+| `deploy-prod.yml` | Manual `workflow_dispatch` only (`tag` = `vX.Y.Z`) |
 | `terraform-force-unlock.yml` | Manual unlock |
+
+Version tags: first successful staging is `v0.1.0`, then each new SHA bumps **patch** (`v0.1.1`, …). Re-running the same SHA is idempotent (no new tag).
 
 Promote to prod:
 
 ```bash
-gh workflow run deploy-prod.yml -f tag=release-<sha7>
+gh workflow run deploy-prod.yml -f tag=v0.1.0
 ```
 
 Repo variable: `AWS_DEPLOY_ROLE_ARN` (OIDC). Environments: `staging`, `production`.
@@ -66,7 +68,7 @@ Repo variable: `AWS_DEPLOY_ROLE_ARN` (OIDC). Environments: `staging`, `productio
 ## Deploy semantics
 
 - **Staging** builds and pushes ARM64 images tagged with the full `GITHUB_SHA`.
-- **Prod** never rebuilds: `crane copy` promotes the exact staging digests to `med0001-prod-{api,worker}:release-<sha7>`.
+- **Prod** never rebuilds: `crane copy` promotes the exact staging digests to `med0001-prod-{api,worker}:vX.Y.Z`.
 - API ECS: `desired_count=1`, max 200% / min 100% healthy, `health_check_grace_period_seconds=120`.
 
 ## Failure playbook
