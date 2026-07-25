@@ -25,4 +25,4 @@
 | EPIC-022 | `domains/integration` | `com.nammamedmate.integration` |
 
 Platform (not epics): `platform/kernel`, `security`, `persistence`, `messaging`, `observability`.
-Apps: `apps/api` (HTTP/Lambda), `apps/worker` (SQS).
+Apps: `apps/api` (HTTP/ECS), `apps/worker` (SQS poller/ECS).

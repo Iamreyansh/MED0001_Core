@@ -1,5 +1,5 @@
 name: Setup Terraform + AWS OIDC
-description: Terraform 1.10.5 and assume deploy role in ap-south-1
+description: Terraform and assume deploy role in ap-south-1
 
 inputs:
   role-to-assume:

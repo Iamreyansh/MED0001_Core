@@ -13,6 +13,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 import org.springframework.core.Ordered;
+import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
@@ -201,5 +202,24 @@ class AwsSecretsEnvironmentPostProcessorTest {
 
     StandardEnvironment none = new StandardEnvironment();
     assertThat(AwsSecretsEnvironmentPostProcessor.isDeployed(none)).isFalse();
+  }
+
+  @Test
+  void isDeployedReadsProfileProperties() {
+    ConfigurableEnvironment commaSeparated = mock(ConfigurableEnvironment.class);
+    when(commaSeparated.getActiveProfiles()).thenReturn(new String[0]);
+    when(commaSeparated.getProperty("spring.profiles.active")).thenReturn("local, prod");
+    assertThat(AwsSecretsEnvironmentPostProcessor.isDeployed(commaSeparated)).isTrue();
+
+    ConfigurableEnvironment environmentVariable = mock(ConfigurableEnvironment.class);
+    when(environmentVariable.getActiveProfiles()).thenReturn(new String[0]);
+    when(environmentVariable.getProperty("spring.profiles.active")).thenReturn(" ");
+    when(environmentVariable.getProperty("SPRING_PROFILES_ACTIVE")).thenReturn("staging");
+    assertThat(AwsSecretsEnvironmentPostProcessor.isDeployed(environmentVariable)).isTrue();
+
+    ConfigurableEnvironment local = mock(ConfigurableEnvironment.class);
+    when(local.getActiveProfiles()).thenReturn(new String[0]);
+    when(local.getProperty("spring.profiles.active")).thenReturn("local,dev");
+    assertThat(AwsSecretsEnvironmentPostProcessor.isDeployed(local)).isFalse();
   }
 }

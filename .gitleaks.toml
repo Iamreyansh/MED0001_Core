@@ -1,0 +1,8 @@
+# False positive: JSON key name private_key_pem next to a Terraform attribute reference
+# (tls_private_key.*.private_key_pem_pkcs8), not a committed secret value.
+title = "med0001 gitleaks"
+
+[allowlist]
+paths = [
+  '''infra/terraform/stacks/staging/secrets\.tf''',
+]
