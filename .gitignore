@@ -2,7 +2,8 @@
 .idea/
 *.iml
 .vscode/
-out/
+# IntelliJ module output at repo root only — do not ignore hexagonal */adapter/out or */port/out
+/out/
 build/
 **/build/
 .gradle/
