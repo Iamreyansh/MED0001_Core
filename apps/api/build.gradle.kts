@@ -48,6 +48,9 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.0")
     testRuntimeOnly("com.h2database:h2")
+
+    integrationTestImplementation(project(":testing"))
+    integrationTestImplementation("org.springframework.security:spring-security-test")
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

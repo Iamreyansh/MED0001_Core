@@ -12,5 +12,9 @@ class AppExceptionTest {
     assertThat(ex.code()).isEqualTo("NOT_FOUND");
     assertThat(ex.httpStatus()).isEqualTo(404);
     assertThat(ex.getMessage()).isEqualTo("missing");
+    assertThat(ex.retryAfterSeconds()).isNull();
+
+    AppException limited = new AppException("OTP_RATE_LIMITED", "wait", 429, 12);
+    assertThat(limited.retryAfterSeconds()).isEqualTo(12);
   }
 }

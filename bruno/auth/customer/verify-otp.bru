@@ -1,0 +1,70 @@
+meta {
+  name: verify-otp
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/customer/verify-otp
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "session_id": "{{sessionId}}",
+    "phone": "{{phone}}",
+    "otp": "{{otp}}",
+    "device_token": "{{deviceToken}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("sessionId")) {
+    throw new Error("sessionId missing — run auth/customer/send-otp first");
+  }
+  if (!bru.getEnvVar("otp")) {
+    bru.setEnvVar("otp", "123456");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data)) {
+    return;
+  }
+  const data = body.data;
+  if (data.access_token) {
+    bru.setEnvVar("accessToken", data.access_token);
+  }
+  if (data.refresh_token) {
+    bru.setEnvVar("refreshToken", data.refresh_token);
+  }
+  if (data.customer && data.customer.id) {
+    bru.setEnvVar("customerId", data.customer.id);
+  }
+  console.log(`tokens saved; is_new_user=${data.is_new_user}`);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with tokens", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.refresh_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.token_type).to.equal("Bearer");
+    expect(body.data.customer).to.be.an("object");
+  });
+}
+
+docs {
+  POST /api/v1/auth/customer/verify-otp — exchange OTP for JWT. Requires `sessionId` from send-otp. Writes `accessToken` / `refreshToken` / `customerId` for protected calls.
+}

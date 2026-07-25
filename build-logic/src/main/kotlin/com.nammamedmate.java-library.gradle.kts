@@ -36,6 +36,11 @@ val jacocoExcludes =
 
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.dir("jacoco")) {
+            include("*.exec")
+        },
+    )
     reports {
         xml.required.set(true)
         html.required.set(true)
@@ -49,6 +54,11 @@ tasks.jacocoTestReport {
 
 tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.jacocoTestReport)
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.dir("jacoco")) {
+            include("*.exec")
+        },
+    )
     violationRules {
         rule {
             limit {

@@ -26,6 +26,9 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.GET, "/api/v1/health")
                     .permitAll()
+                    .requestMatchers(
+                        "/api/v1/auth/customer/send-otp", "/api/v1/auth/customer/verify-otp")
+                    .permitAll()
                     .requestMatchers("/api/v1/webhooks/**")
                     .permitAll()
                     .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**")

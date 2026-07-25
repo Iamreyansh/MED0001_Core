@@ -16,4 +16,8 @@ public record ApiResponse<T>(boolean success, T data, PaginationMeta meta, ApiEr
   public static <T> ApiResponse<T> fail(String code, String message) {
     return new ApiResponse<>(false, null, null, new ApiError(code, message));
   }
+
+  public static <T> ApiResponse<T> fail(String code, String message, Integer retryAfterSeconds) {
+    return new ApiResponse<>(false, null, null, new ApiError(code, message, retryAfterSeconds));
+  }
 }

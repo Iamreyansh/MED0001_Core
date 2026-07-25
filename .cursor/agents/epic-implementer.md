@@ -37,6 +37,7 @@ Implement **one** story end-to-end. Stay inside the mapped domain + `db/migratio
 ## Done when
 
 - Story endpoints, auth, error codes, and AC tests match the story.
+- `bruno/` synced for every HTTP endpoint (scripts chain vars; envelope tests).
 - `make check` green.
 - No unrelated file churn.
 

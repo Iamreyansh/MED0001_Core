@@ -1,6 +1,6 @@
 ---
 description: 100% JaCoCo, ArchUnit, Testcontainers
-globs: "**/*Test.java"
+globs: "**/*Test.java,**/*IT.java"
 alwaysApply: false
 ---
 
@@ -10,13 +10,15 @@ alwaysApply: false
 - Allowed excludes only: `*Application`, `*Config`/`*Configuration`, `*Priming`, `package-info`. Do not widen excludes without review.
 - Prefer smallest tests that still hit branches (Ponytail + coverage).
 - Map story Given/When/Then (or AC-00N) to test methods when implementing stories.
-- Integration: use `testing` module fixtures (`com.nammamedmate.testing.Containers`) for Testcontainers.
+- Unit tests live in `src/test`; prefer domain/application units for branches.
+- Integration tests live in `apps/*/src/integrationTest` (`*IT.java`). Use `testing` module fixtures (`com.nammamedmate.testing.Containers`) + Testcontainers for HTTP + Postgres + Redis wiring. Add/update an IT when an endpoint needs DB/Redis/security end-to-end.
 - ArchUnit rules in `apps/api` must stay green.
 
 Commands:
 
 ```bash
-make test       # unit/integration
-make coverage   # tests + jacocoTestCoverageVerification
-make check      # full quality gates
+make test              # unit tests
+make integration-test  # Testcontainers ITs
+make coverage          # unit + IT + jacocoTestCoverageVerification
+make check             # full quality gates (includes ITs)
 ```

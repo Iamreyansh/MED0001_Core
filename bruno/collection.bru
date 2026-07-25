@@ -1,0 +1,33 @@
+meta {
+  name: Namma MedMate API
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  if (!baseUrl) {
+    bru.setEnvVar("baseUrl", "http://localhost:8080");
+  }
+  if (!bru.getEnvVar("phone")) {
+    bru.setEnvVar("phone", "+919999900001");
+  }
+  if (!bru.getEnvVar("otp")) {
+    bru.setEnvVar("otp", "123456");
+  }
+}
+
+script:post-response {
+  // Shared hook: keep response timing visible for local smoke runs.
+  console.log(`status=${res.getStatus()} timeMs=${res.getResponseTime()}`);
+}
+
+tests {
+  test("response is JSON object", function () {
+    const body = res.getBody();
+    expect(body).to.be.an("object");
+  });
+}

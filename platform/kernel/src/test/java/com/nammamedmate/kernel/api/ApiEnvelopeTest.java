@@ -20,6 +20,11 @@ class ApiEnvelopeTest {
     ApiResponse<Void> fail = ApiResponse.fail("E", "m");
     assertThat(fail.success()).isFalse();
     assertThat(fail.error().code()).isEqualTo("E");
+    assertThat(fail.error().retryAfterSeconds()).isNull();
+
+    ApiResponse<Void> limited = ApiResponse.fail("OTP_RATE_LIMITED", "wait", 42);
+    assertThat(limited.error().retryAfterSeconds()).isEqualTo(42);
+    assertThat(new ApiError("X", "y").retryAfterSeconds()).isNull();
   }
 
   @Test

@@ -7,7 +7,7 @@ alwaysApply: true
 
 - Product: Namma MedMate backend (`MED0001_Core`). Requirements live in `docs/requirements/INDEX.md`.
 - Base path `/api/v1`. Success/error envelopes from INDEX. UUID v4 IDs. ISO-8601 UTC timestamps. Soft delete via `deleted_at`. Money in paise via `platform/kernel` `Money`.
-- Layout: `apps/` composition roots, `platform/` technical shared, `domains/` epic-aligned, `db/migration/` sole Flyway tree.
+- Layout: `apps/` composition roots, `platform/` technical shared, `domains/` epic-aligned, `db/migration/` sole Flyway tree, `bruno/` git-tracked API collection (update on every endpoint change — rule `bruno-api.mdc`).
 - Before adding files, read `docs/architecture/MODULE_MAP.md`.
 - Day-to-day: root `Makefile` + Podman (`make help`, `make up`, `make check`).
 - Never invent a new top-level module. Never commit Terraform state/locks (S3 only).

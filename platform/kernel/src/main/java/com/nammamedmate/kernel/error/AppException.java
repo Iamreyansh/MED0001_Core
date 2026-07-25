@@ -4,11 +4,17 @@ public class AppException extends RuntimeException {
 
   private final String code;
   private final int httpStatus;
+  private final Integer retryAfterSeconds;
 
   public AppException(String code, String message, int httpStatus) {
+    this(code, message, httpStatus, null);
+  }
+
+  public AppException(String code, String message, int httpStatus, Integer retryAfterSeconds) {
     super(message);
     this.code = code;
     this.httpStatus = httpStatus;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 
   public String code() {
@@ -17,5 +23,9 @@ public class AppException extends RuntimeException {
 
   public int httpStatus() {
     return httpStatus;
+  }
+
+  public Integer retryAfterSeconds() {
+    return retryAfterSeconds;
   }
 }

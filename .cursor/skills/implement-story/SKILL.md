@@ -14,8 +14,9 @@ description: Implement one Namma MedMate story from docs/requirements into the c
    - `adapter/out/{persistence,client,messaging}/`
 3. Add Flyway SQL under `db/migration/` via skill `add-flyway-migration`.
 4. Wire controllers/security as specified; keep `apps/*` as composition roots (no business rules).
-5. Map each Given/When/Then (or AC-00N) to tests; keep JaCoCo at 100%.
-6. Do not change unrelated epics. Terraform only if the story requires infra → skill `terraform-change`.
+5. Sync `bruno/` for every new/changed/removed HTTP endpoint (rule `bruno-api.mdc`): path-mirrored `.bru`, pre/post scripts that chain env vars, envelope `tests`.
+6. Map each Given/When/Then (or AC-00N) to tests; keep JaCoCo at 100%.
+7. Do not change unrelated epics. Terraform only if the story requires infra → skill `terraform-change`.
 
 ## Conventions (INDEX)
 
@@ -33,5 +34,6 @@ make check
 ## Done when
 
 - Endpoints, auth, error codes, and AC tests match the story
+- `bruno/` requests match the story contract (scripts automate the happy path)
 - `make check` green
 - Ready for `/review-story` (contract + security + tests)
