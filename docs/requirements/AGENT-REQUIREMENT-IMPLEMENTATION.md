@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 2 |
+| Phase 1 | 46 | 3 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **2** |
+| **Total** | **129** | **3** |
 
 ---
 
@@ -31,7 +31,7 @@
 |------|-------|-------|--------|-----------|-------|
 | EPIC-001 | [STORY-001](./EPIC-001-auth-identity/STORY-001-customer-otp-auth.md) | Customer Mobile OTP Authentication | done | 2026-07-25 | `domains/auth`; SMS stub (`LoggingSmsSender`); minimal `customers`+`sessions` for verify; STORY-004 owns refresh lifecycle; magic OTP for `+919999900000`–`+919999900099` |
 | EPIC-001 | [STORY-002](./EPIC-001-auth-identity/STORY-002-pharmacy-staff-auth.md) | Pharmacy Staff Authentication | done | 2026-07-26 | `domains/auth`; stub `pharmacies`+`pharmacy_roles` until EPIC-003/005; bcrypt cost 12 via `staffPasswordEncoder`; POS scope filter; login audit table |
-| EPIC-001 | [STORY-003](./EPIC-001-auth-identity/STORY-003-admin-auth.md) | Admin Staff Authentication & MFA | pending | — | — |
+| EPIC-001 | [STORY-003](./EPIC-001-auth-identity/STORY-003-admin-auth.md) | Admin Staff Authentication & MFA | done | 2026-07-26 | `domains/auth`; stub `admin_staff` until EPIC-021; TOTP via stdlib + AES-256-GCM (`AesGcmCipher`); MFA challenge scope filter; access 15m / refresh 8h |
 | EPIC-001 | [STORY-004](./EPIC-001-auth-identity/STORY-004-token-management.md) | JWT Token Management & Session Control | pending | — | — |
 | EPIC-001 | [STORY-005](./EPIC-001-auth-identity/STORY-005-rbac-permissions.md) | Role-Based Access Control (RBAC) | pending | — | — |
 

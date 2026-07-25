@@ -97,13 +97,15 @@ POST /api/v1/auth/admin/login
 
 **Error Responses:**
 
-| HTTP | Error Code            | Condition                                                 |
-| ---- | --------------------- | --------------------------------------------------------- |
-| 400  | `VALIDATION_ERROR`    | Missing or malformed email/password                       |
-| 401  | `INVALID_CREDENTIALS` | Password does not match                                   |
-| 403  | `ACCOUNT_LOCKED`      | Too many failed attempts; includes `unlock_at` in details |
-| 403  | `ACCOUNT_SUSPENDED`   | Admin account suspended by admin_super                    |
-| 404  | `ADMIN_NOT_FOUND`     | No admin account with the given email                     |
+| HTTP | Error Code                  | Condition                                                 |
+| ---- | --------------------------- | --------------------------------------------------------- |
+| 400  | `VALIDATION_ERROR`          | Missing or malformed email/password                       |
+| 401  | `INVALID_CREDENTIALS`       | Password does not match                                   |
+| 403  | `ACCOUNT_LOCKED`            | Too many failed attempts; includes `unlock_at` in details |
+| 403  | `ACCOUNT_SUSPENDED`         | Admin account suspended by admin_super                    |
+| 403  | `MFA_ENROLLMENT_REQUIRED`   | `admin_super` has no TOTP secret enrolled yet             |
+| 404  | `ADMIN_NOT_FOUND`           | No admin account with the given email                     |
+| 429  | `IP_RATE_LIMITED`           | IP login rate limit exceeded (20/min)                     |
 
 ---
 
@@ -158,8 +160,9 @@ POST /api/v1/auth/admin/verify-mfa
 | 400  | `INVALID_MFA_CODE`        | TOTP code is incorrect or expired             |
 | 400  | `INVALID_BACKUP_CODE`     | Backup code does not match or already used    |
 | 401  | `CHALLENGE_TOKEN_EXPIRED` | `mfa_challenge_token` has expired (5 min TTL) |
-| 401  | `CHALLENGE_TOKEN_INVALID` | Token tampered or not a valid challenge token |
+| 401  | `CHALLENGE_TOKEN_INVALID` | Token tampered, wrong scope, reused, or mismatch with Bearer |
 | 403  | `ACCOUNT_LOCKED`          | Account locked due to too many MFA failures   |
+| 429  | `IP_RATE_LIMITED`         | IP MFA rate limit exceeded (10/min)           |
 
 ---
 
@@ -195,8 +198,7 @@ POST /api/v1/auth/admin/setup-mfa
 			"U1V2-W3X4",
 			"Y5Z6-A7B8",
 			"C9D0-E1F2"
-		],
-		"qr_code_url": "https://api.qrserver.com/v1/create-qr-code/?data=otpauth%3A%2F%2Ftotp..."
+		]
 	},
 	"meta": {}
 }
@@ -209,6 +211,7 @@ POST /api/v1/auth/admin/setup-mfa
 | 400  | `MFA_ALREADY_ENROLLED` | Admin already has `mfa_enabled: true`                      |
 | 401  | `UNAUTHORIZED`         | Token missing or invalid                                   |
 | 403  | `FORBIDDEN`            | Role not permitted (should not happen for any valid admin) |
+| 429  | `IP_RATE_LIMITED`      | Setup rate limit exceeded (5/hour per user)                |
 
 ---
 
@@ -264,7 +267,10 @@ POST /api/v1/auth/admin/setup-mfa
 
 ## Notes
 
-- TOTP secrets must be encrypted at rest (AES-256-GCM) in the database. The encryption key should be stored in AWS Secrets Manager or equivalent, never in application config files.
+- TOTP secrets must be encrypted at rest (AES-256-GCM) in the database. The encryption key must be stored in AWS Secrets Manager (`MEDMATE_SECRETS_MFA_ARN` → `encryption_key_base64`), never as a known default in deployed profiles.
+- Clients render the authenticator QR locally from `totp_uri` / `totp_secret` — the API does not call third-party QR hosts (avoids leaking the TOTP secret).
 - In production, the setup-mfa flow must be followed by an activation step (first successful TOTP verification) before `mfa_enabled` is set to `true`. This prevents lockout due to misconfigured authenticator app.
 - Rate-limit the `setup-mfa` endpoint aggressively (5/hour) to prevent secret regeneration attacks.
 - Backup code format `XXXX-XXXX` (4 alphanumeric + hyphen + 4 alphanumeric) balances human readability with entropy.
+- Failed password and MFA attempts share the same lockout counter; password success does not reset the counter until full session issuance (post-MFA).
+- `verify-mfa` requires `Authorization: Bearer <mfa_challenge_token>` and the same token in the body; challenge JTIs are single-use via a shared Redis revocation store.

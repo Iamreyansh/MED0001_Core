@@ -15,3 +15,19 @@ resource "aws_secretsmanager_secret_version" "jwt" {
     public_key_pem  = tls_private_key.jwt.public_key_pem
   })
 }
+
+resource "random_bytes" "mfa_key" {
+  length = 32
+}
+
+resource "aws_secretsmanager_secret" "mfa" {
+  name       = "${local.name}/mfa-aes"
+  kms_key_id = aws_kms_key.this.arn
+}
+
+resource "aws_secretsmanager_secret_version" "mfa" {
+  secret_id = aws_secretsmanager_secret.mfa.id
+  secret_string = jsonencode({
+    encryption_key_base64 = random_bytes.mfa_key.base64
+  })
+}

@@ -2,6 +2,7 @@ package com.nammamedmate.api.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.auth.adapter.out.ratelimit.RedisRateLimiter;
+import com.nammamedmate.auth.adapter.out.revocation.RedisTokenRevocationStore;
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.kernel.storage.PresignedUrlService;
@@ -9,6 +10,7 @@ import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.messaging.OutboxStore;
 import com.nammamedmate.messaging.SqsEventDispatcher;
+import com.nammamedmate.security.AesGcmCipher;
 import com.nammamedmate.security.InMemoryTokenRevocationStore;
 import com.nammamedmate.security.Rs256JwtService;
 import com.nammamedmate.security.RsaKeyLoader;
@@ -35,6 +37,28 @@ public class PlatformConfig {
     return Clock.systemUTC();
   }
 
+  private static final String LOCAL_ONLY_MFA_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+  /** Local/dev/IT: fixed non-production key is allowed. */
+  @Bean
+  @Profile("!prod & !staging")
+  AesGcmCipher localAesGcmCipher(
+      @Value("${medmate.mfa.encryption-key-base64:" + LOCAL_ONLY_MFA_KEY + "}") String keyBase64) {
+    return AesGcmCipher.fromBase64Key(keyBase64);
+  }
+
+  /** Staging/prod: key must come from Secrets Manager — never the known local default. */
+  @Bean
+  @Profile({"prod", "staging"})
+  AesGcmCipher deployedAesGcmCipher(
+      @Value("${medmate.mfa.encryption-key-base64}") String keyBase64) {
+    if (keyBase64 == null || keyBase64.isBlank() || LOCAL_ONLY_MFA_KEY.equals(keyBase64.trim())) {
+      throw new IllegalStateException(
+          "medmate.mfa.encryption-key-base64 must be injected via Secrets Manager");
+    }
+    return AesGcmCipher.fromBase64Key(keyBase64);
+  }
+
   @Bean
   @ConditionalOnMissingBean(RateLimiter.class)
   RateLimiter rateLimiter(Clock clock, ObjectProvider<StringRedisTemplate> redis) {
@@ -46,7 +70,12 @@ public class PlatformConfig {
   }
 
   @Bean
-  TokenRevocationStore tokenRevocationStore(Clock clock) {
+  TokenRevocationStore tokenRevocationStore(
+      Clock clock, ObjectProvider<StringRedisTemplate> redis) {
+    StringRedisTemplate template = redis.getIfAvailable();
+    if (template != null) {
+      return new RedisTokenRevocationStore(template);
+    }
     return new InMemoryTokenRevocationStore(clock);
   }
 

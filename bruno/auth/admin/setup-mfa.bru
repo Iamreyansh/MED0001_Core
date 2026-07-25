@@ -1,0 +1,62 @@
+meta {
+  name: setup-mfa
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/admin/setup-mfa
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("adminAccessToken") || "";
+  bru.setEnvVar("adminAccessToken", token);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("totpSecret", body.data.totp_secret);
+    if (body.data.backup_codes && body.data.backup_codes.length > 0) {
+      bru.setEnvVar("mfaBackupCode", body.data.backup_codes[0]);
+    }
+    console.log("totpSecret and mfaBackupCode saved");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with TOTP enrollment", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.totp_uri).to.be.a("string").that.includes("otpauth://totp/");
+    expect(body.data.totp_secret).to.be.a("string").that.is.not.empty;
+    expect(body.data.backup_codes).to.be.an("array").with.lengthOf(8);
+    expect(body.data.qr_code_url).to.equal(undefined);
+  });
+}
+
+docs {
+  POST /api/v1/auth/admin/setup-mfa
+  Bearer admin session. Only when mfa_enabled=false. Replaces pending secret on repeat.
+  Clients render QR from totp_uri locally (no third-party qr_code_url).
+  Writes: totpSecret, mfaBackupCode
+  Errors: 400 MFA_ALREADY_ENROLLED, 401 UNAUTHORIZED, 403 FORBIDDEN, 429 IP_RATE_LIMITED
+}

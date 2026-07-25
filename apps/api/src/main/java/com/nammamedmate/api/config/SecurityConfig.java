@@ -5,6 +5,7 @@ import com.nammamedmate.observability.RequestIdFilter;
 import com.nammamedmate.security.ApiAccessDeniedHandler;
 import com.nammamedmate.security.ApiAuthenticationEntryPoint;
 import com.nammamedmate.security.JwtAuthenticationFilter;
+import com.nammamedmate.security.MfaChallengeRestrictionFilter;
 import com.nammamedmate.security.PosTokenRestrictionFilter;
 import com.nammamedmate.security.Rs256JwtService;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ public class SecurityConfig {
       throws Exception {
     JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService);
     PosTokenRestrictionFilter posFilter = new PosTokenRestrictionFilter();
+    MfaChallengeRestrictionFilter mfaFilter = new MfaChallengeRestrictionFilter();
     http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(
@@ -38,7 +40,8 @@ public class SecurityConfig {
                         "/api/v1/auth/customer/send-otp",
                         "/api/v1/auth/customer/verify-otp",
                         "/api/v1/auth/pharmacy/login",
-                        "/api/v1/auth/pharmacy/pos-pin")
+                        "/api/v1/auth/pharmacy/pos-pin",
+                        "/api/v1/auth/admin/login")
                     .permitAll()
                     .requestMatchers("/api/v1/webhooks/**")
                     .permitAll()
@@ -46,12 +49,21 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/auth/pharmacy/switch-pharmacy")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(
+                        "/api/v1/auth/admin/verify-mfa", "/api/v1/auth/admin/setup-mfa")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
                     .anyRequest()
                     .authenticated())
         .addFilterBefore(new RequestIdFilter(), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(new WebhookRawBodyFilter(), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-        .addFilterAfter(posFilter, JwtAuthenticationFilter.class);
+        .addFilterAfter(posFilter, JwtAuthenticationFilter.class)
+        .addFilterAfter(mfaFilter, PosTokenRestrictionFilter.class);
     return http.build();
   }
 }
