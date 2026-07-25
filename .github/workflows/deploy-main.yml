@@ -41,14 +41,17 @@ jobs:
         run: make check
       - name: Boot jars
         run: make jar
+      - name: Stage jars for artifact
+        run: |
+          mkdir -p boot-jars
+          cp apps/api/build/libs/med0001-api.jar boot-jars/
+          cp apps/worker/build/libs/med0001-worker.jar boot-jars/
       - uses: actions/upload-artifact@v4
         with:
           name: boot-jars
           retention-days: 3
           if-no-files-found: error
-          path: |
-            apps/api/build/libs/med0001-api.jar
-            apps/worker/build/libs/med0001-worker.jar
+          path: boot-jars/
 
   deploy-staging:
     needs: build
@@ -60,11 +63,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: boot-jars
-          path: .
-      - name: Verify boot jars
+          path: boot-jars
+      - name: Place jars for Docker context
         run: |
-          test -f apps/api/build/libs/med0001-api.jar
-          test -f apps/worker/build/libs/med0001-worker.jar
+          mkdir -p apps/api/build/libs apps/worker/build/libs
+          cp boot-jars/med0001-api.jar apps/api/build/libs/
+          cp boot-jars/med0001-worker.jar apps/worker/build/libs/
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: ./.github/actions/setup-terraform-aws
