@@ -1,8 +1,14 @@
 name: deploy-prod
 
+# Manual only. After staging creates a release-* tag, run this workflow from the
+# Actions UI (or `gh workflow run`) with that tag.
 on:
-  push:
-    tags: ['release-*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release-* tag to deploy (e.g. release-abc1234)
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -20,6 +26,8 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - name: Require AWS_DEPLOY_ROLE_ARN
         env:
@@ -29,6 +37,15 @@ jobs:
             echo "::error::vars.AWS_DEPLOY_ROLE_ARN is empty"
             exit 1
           fi
+      - id: tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          case "$TAG" in
+            release-*) ;;
+            *) echo "::error::tag must match release-*: got ${TAG}"; exit 1 ;;
+          esac
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
   deploy-production:
     needs: guard
@@ -37,6 +54,8 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.guard.outputs.tag }}
       - uses: ./.github/actions/setup-terraform-aws
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
@@ -46,9 +65,10 @@ jobs:
             | sudo tar -xz -C /usr/local/bin crane
           crane version
       - name: Ensure prod ECR then promote staging digests
+        env:
+          TAG: ${{ needs.guard.outputs.tag }}
         run: |
           set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
           FULL_SHA="$(git rev-parse HEAD)"
           ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
           REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
@@ -72,7 +92,7 @@ jobs:
           echo "Promoted ${FULL_SHA} → ${TAG} (and :prod)"
       - name: Terraform apply prod
         env:
-          TF_VAR_image_tag: ${{ github.ref_name }}
+          TF_VAR_image_tag: ${{ needs.guard.outputs.tag }}
         run: |
           make tf-apply ENV=prod TF_ARGS="-auto-approve -input=false"
       - name: Rolling ECS deploy + wait stable

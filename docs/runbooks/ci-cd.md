@@ -18,10 +18,10 @@ main push
     guard         require AWS_DEPLOY_ROLE_ARN
     build         make check + make jar → boot-jars artifact
     staging       push SHA images → tf apply → ECS roll → smoke
-    tag-release   annotated tag release-<sha7> (idempotent)
+    tag-release   annotated tag release-<sha7> (idempotent; does not deploy prod)
 
-tag push release-*
-  deploy-prod
+manual
+  deploy-prod     workflow_dispatch with tag=release-<sha7>
     promote       crane-copy staging digests → prod ECR (:tag + :prod)
     apply         TF_VAR_image_tag=<tag> → tf apply prod
     roll          ECS services-stable
@@ -31,9 +31,15 @@ tag push release-*
 | Workflow | Trigger |
 |----------|---------|
 | `quality-gates.yml` | PR to `main`, or `workflow_dispatch` |
-| `deploy-main.yml` | Push to `main` → staging, then release tag |
-| `deploy-prod.yml` | Push tag `release-*` → production |
+| `deploy-main.yml` | Push to `main` → staging → release tag |
+| `deploy-prod.yml` | Manual `workflow_dispatch` only (`tag` input) |
 | `terraform-force-unlock.yml` | Manual unlock |
+
+Promote to prod:
+
+```bash
+gh workflow run deploy-prod.yml -f tag=release-<sha7>
+```
 
 Repo variable: `AWS_DEPLOY_ROLE_ARN` (OIDC). Environments: `staging`, `production`.
 
