@@ -229,7 +229,7 @@ public class PharmacyLoginService {
     String refreshToken = opaqueToken();
     Instant refreshExpires = now.plus(REFRESH_TTL_SECONDS, ChronoUnit.SECONDS);
     sessionStore.save(
-        new AuthSessionRecord(
+        AuthSessionRecord.active(
             Ids.newId(),
             staff.id(),
             "pharmacy_staff",

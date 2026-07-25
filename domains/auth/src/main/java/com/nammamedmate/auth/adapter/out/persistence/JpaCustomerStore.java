@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -20,6 +21,11 @@ public class JpaCustomerStore implements CustomerStore {
   @Override
   public Optional<CustomerRecord> findByPhone(String phone) {
     return repository.findByPhoneAndDeletedAtIsNull(phone).map(JpaCustomerStore::toRecord);
+  }
+
+  @Override
+  public Optional<CustomerRecord> findById(UUID id) {
+    return repository.findByIdAndDeletedAtIsNull(id).map(JpaCustomerStore::toRecord);
   }
 
   @Override

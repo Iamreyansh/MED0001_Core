@@ -1,0 +1,54 @@
+meta {
+  name: list-sessions
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/auth/sessions?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && Array.isArray(body.data) && body.data.length > 0)) {
+    return;
+  }
+  const first = body.data[0];
+  if (first.session_id) {
+    bru.setEnvVar("sessionRowId", first.session_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("paginated sessions", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+    expect(body.meta.page).to.equal(1);
+    // is_current is always false for Bearer-only list (no refresh token in contract).
+    if (body.data.length > 0) {
+      expect(body.data[0].is_current).to.equal(false);
+    }
+  });
+}
+
+docs {
+  GET /api/v1/auth/sessions — active (non-rotated, non-revoked, unexpired) sessions. is_current is false under access-token auth; compare session_id client-side if stored at login.
+}

@@ -362,6 +362,7 @@ class VerifyOtpServiceTest {
 
   private static final class FakeCustomerStore implements CustomerStore {
     final Map<String, CustomerRecord> byPhone = new ConcurrentHashMap<>();
+    final Map<UUID, CustomerRecord> byId = new ConcurrentHashMap<>();
 
     @Override
     public Optional<CustomerRecord> findByPhone(String phone) {
@@ -369,8 +370,14 @@ class VerifyOtpServiceTest {
     }
 
     @Override
+    public Optional<CustomerRecord> findById(UUID id) {
+      return Optional.ofNullable(byId.get(id));
+    }
+
+    @Override
     public CustomerRecord save(CustomerRecord customer) {
       byPhone.put(customer.phone(), customer);
+      byId.put(customer.id(), customer);
       return customer;
     }
   }
@@ -382,6 +389,42 @@ class VerifyOtpServiceTest {
     public AuthSessionRecord save(AuthSessionRecord session) {
       saved.add(session);
       return session;
+    }
+
+    @Override
+    public Optional<AuthSessionRecord> findByRefreshTokenHash(String refreshTokenHash) {
+      return saved.stream().filter(s -> s.refreshTokenHash().equals(refreshTokenHash)).findFirst();
+    }
+
+    @Override
+    public Optional<AuthSessionRecord> findById(UUID id) {
+      return saved.stream().filter(s -> s.id().equals(id)).findFirst();
+    }
+
+    @Override
+    public int markRotatedIfActive(UUID id, Instant rotatedAt) {
+      return 0;
+    }
+
+    @Override
+    public int revokeIfActive(UUID id, Instant revokedAt) {
+      return 0;
+    }
+
+    @Override
+    public int revokeAllForUser(UUID userId, Instant revokedAt) {
+      return 0;
+    }
+
+    @Override
+    public List<AuthSessionRecord> listActiveByUserId(
+        UUID userId, Instant now, int page, int limit) {
+      return List.of();
+    }
+
+    @Override
+    public long countActiveByUserId(UUID userId, Instant now) {
+      return 0;
     }
   }
 

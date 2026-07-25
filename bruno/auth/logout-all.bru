@@ -1,0 +1,51 @@
+meta {
+  name: logout-all
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/logout-all
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login first");
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("refreshToken", "");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("sessions_revoked present", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.sessions_revoked).to.be.a("number");
+  });
+}
+
+docs {
+  POST /api/v1/auth/logout-all — soft-revoke all sessions for the authenticated user.
+}

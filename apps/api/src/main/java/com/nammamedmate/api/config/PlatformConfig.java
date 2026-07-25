@@ -6,7 +6,7 @@ import com.nammamedmate.auth.adapter.out.revocation.RedisTokenRevocationStore;
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.kernel.storage.PresignedUrlService;
-import com.nammamedmate.messaging.InMemoryOutboxStore;
+import com.nammamedmate.messaging.JdbcOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.messaging.OutboxStore;
 import com.nammamedmate.messaging.SqsEventDispatcher;
@@ -28,6 +28,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
 public class PlatformConfig {
@@ -80,8 +81,8 @@ public class PlatformConfig {
   }
 
   @Bean
-  OutboxStore outboxStore() {
-    return new InMemoryOutboxStore();
+  OutboxStore outboxStore(JdbcTemplate jdbcTemplate) {
+    return new JdbcOutboxStore(jdbcTemplate);
   }
 
   @Bean
