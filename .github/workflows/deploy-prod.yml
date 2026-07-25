@@ -1,12 +1,12 @@
 name: deploy-prod
 
-# Manual only. After staging creates a release-* tag, run this workflow from the
+# Manual only. After staging creates a vX.Y.Z tag, run this workflow from the
 # Actions UI (or `gh workflow run`) with that tag.
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: release-* tag to deploy (e.g. release-abc1234)
+        description: Semver tag to deploy (e.g. v0.1.0)
         required: true
         type: string
 
@@ -41,10 +41,10 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
         run: |
-          case "$TAG" in
-            release-*) ;;
-            *) echo "::error::tag must match release-*: got ${TAG}"; exit 1 ;;
-          esac
+          if ! echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::tag must be semver vMAJOR.MINOR.PATCH (got ${TAG})"
+            exit 1
+          fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
   deploy-production:
