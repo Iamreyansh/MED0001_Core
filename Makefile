@@ -7,6 +7,9 @@ SHELL := /bin/bash
 ROOT        := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMPOSE     := podman compose -f $(ROOT)/docker-compose.yml
 GRADLE      := $(ROOT)/gradlew
+# Optional local secrets. .env is gitignored; use KEY=value syntax.
+-include $(ROOT)/.env
+export MEDMATE_MAPS_GEOCODE_API_KEY
 # Local: --no-daemon (no leftover JVM). CI=true: allow daemon + cache reuse.
 ifeq ($(CI),true)
 GRADLE_FLAGS ?=

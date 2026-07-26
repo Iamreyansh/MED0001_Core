@@ -1,0 +1,53 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me/addresses
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && Array.isArray(body.data) && body.data.length > 0)) {
+    return;
+  }
+  const first = body.data[0];
+  if (first.id) {
+    bru.setEnvVar("addressId", first.id);
+  }
+  const def = body.data.find((a) => a.is_default);
+  if (def && def.id) {
+    bru.setEnvVar("defaultAddressId", def.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with address array", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/customers/me/addresses — list saved addresses (default first).
+  Errors: 401 UNAUTHORIZED
+}

@@ -69,7 +69,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.mfa.arn]
+        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.mfa.arn, data.aws_secretsmanager_secret.maps_geocode.arn]
       },
       {
         Effect   = "Allow"
@@ -116,7 +116,7 @@ resource "aws_iam_role_policy" "ecs_task" {
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.mfa.arn]
+        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.mfa.arn, data.aws_secretsmanager_secret.maps_geocode.arn]
       },
       {
         Effect   = "Allow"
@@ -204,7 +204,8 @@ locals {
     { name = "SPRING_DATASOURCE_USERNAME", valueFrom = "${aws_secretsmanager_secret.db.arn}:username::" },
     { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" },
     { name = "MEDMATE_JWT_PRIVATE_KEY_PEM", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:private_key_pem::" },
-    { name = "MEDMATE_JWT_PUBLIC_KEY_PEM", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:public_key_pem::" }
+    { name = "MEDMATE_JWT_PUBLIC_KEY_PEM", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:public_key_pem::" },
+    { name = "MEDMATE_MAPS_GEOCODE_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.maps_geocode.arn}:api_key::" }
   ]
   worker_env = [
     { name = "SPRING_PROFILES_ACTIVE", value = local.environment },

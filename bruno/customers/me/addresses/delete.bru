@@ -1,0 +1,51 @@
+meta {
+  name: delete
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/customers/me/addresses/{{addressId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("addressId")) {
+    throw new Error("addressId missing — run customers/me/addresses/create first");
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("addressId", "");
+  }
+}
+
+tests {
+  test("HTTP 200 or 409 in active order", function () {
+    expect([200, 409]).to.include(res.getStatus());
+  });
+
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.message).to.include("deleted");
+    } else {
+      expect(body.error.code).to.equal("ADDRESS_IN_ACTIVE_ORDER");
+    }
+  });
+}
+
+docs {
+  DELETE /api/v1/customers/me/addresses/:id — soft-delete; blocked if active order uses address.
+  Errors: 401 UNAUTHORIZED, 404 ADDRESS_NOT_FOUND, 409 ADDRESS_IN_ACTIVE_ORDER
+}
