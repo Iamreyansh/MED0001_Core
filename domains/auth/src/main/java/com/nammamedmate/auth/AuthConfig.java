@@ -1,13 +1,22 @@
 package com.nammamedmate.auth;
 
+import com.nammamedmate.auth.adapter.in.web.RequiresPermissionInterceptor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-public class AuthConfig {
+public class AuthConfig implements WebMvcConfigurer {
+
+  private final RequiresPermissionInterceptor requiresPermissionInterceptor;
+
+  public AuthConfig(RequiresPermissionInterceptor requiresPermissionInterceptor) {
+    this.requiresPermissionInterceptor = requiresPermissionInterceptor;
+  }
 
   @Bean
   PasswordEncoder passwordEncoder() {
@@ -18,5 +27,10 @@ public class AuthConfig {
   @Qualifier("staffPasswordEncoder")
   PasswordEncoder staffPasswordEncoder() {
     return new BCryptPasswordEncoder(12);
+  }
+
+  @Override
+  public void addInterceptors(InterceptorRegistry registry) {
+    registry.addInterceptor(requiresPermissionInterceptor);
   }
 }

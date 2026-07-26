@@ -101,9 +101,89 @@ class TokenManagementServicesTest {
             new SecureRandom(),
             reuseTx);
     logoutService = new SessionLogoutService(sessions, revocation, limiter, clock);
+    RbacPermissionService rbac =
+        new RbacPermissionService(
+            emptyRoleStore(),
+            assignments,
+            emptyPermissionCatalog(),
+            new com.nammamedmate.auth.adapter.out.cache.RedisRolePermissionCache());
     meService =
-        new CurrentUserService(customers, pharmacyStaff, assignments, pharmacies, admins, limiter);
+        new CurrentUserService(
+            customers, pharmacyStaff, assignments, pharmacies, admins, rbac, limiter);
     listService = new SessionListService(sessions, limiter, clock, new ObjectMapper());
+  }
+
+  private static com.nammamedmate.auth.application.port.out.PharmacyRoleStore emptyRoleStore() {
+    return new com.nammamedmate.auth.application.port.out.PharmacyRoleStore() {
+      @Override
+      public List<com.nammamedmate.auth.application.port.out.PharmacyRoleRecord> listSystemRoles() {
+        return List.of();
+      }
+
+      @Override
+      public List<com.nammamedmate.auth.application.port.out.PharmacyRoleRecord>
+          listCustomByPharmacy(UUID pharmacyId) {
+        return List.of();
+      }
+
+      @Override
+      public Optional<com.nammamedmate.auth.application.port.out.PharmacyRoleRecord> findById(
+          UUID id) {
+        return Optional.empty();
+      }
+
+      @Override
+      public Optional<com.nammamedmate.auth.application.port.out.PharmacyRoleRecord>
+          findSystemByCode(String code) {
+        return Optional.empty();
+      }
+
+      @Override
+      public Optional<com.nammamedmate.auth.application.port.out.PharmacyRoleRecord>
+          findActiveByPharmacyAndCode(UUID pharmacyId, String code) {
+        return Optional.empty();
+      }
+
+      @Override
+      public com.nammamedmate.auth.application.port.out.PharmacyRoleRecord save(
+          com.nammamedmate.auth.application.port.out.PharmacyRoleRecord role) {
+        return role;
+      }
+
+      @Override
+      public int countActiveStaff(UUID roleId, UUID pharmacyId) {
+        return 0;
+      }
+    };
+  }
+
+  private static com.nammamedmate.auth.application.port.out.PermissionCatalogStore
+      emptyPermissionCatalog() {
+    return new com.nammamedmate.auth.application.port.out.PermissionCatalogStore() {
+      @Override
+      public List<com.nammamedmate.auth.application.port.out.PermissionRecord> listByDomain(
+          String domain) {
+        return List.of(
+            new com.nammamedmate.auth.application.port.out.PermissionRecord(
+                "orders", "read", "d", "pharmacy"),
+            new com.nammamedmate.auth.application.port.out.PermissionRecord(
+                "inventory", "read", "d", "pharmacy"),
+            new com.nammamedmate.auth.application.port.out.PermissionRecord(
+                "staff", "manage", "d", "pharmacy"));
+      }
+
+      @Override
+      public List<com.nammamedmate.auth.application.port.out.PermissionRecord>
+          listByDomainAndResource(String domain, String resource) {
+        return List.of();
+      }
+
+      @Override
+      public Optional<com.nammamedmate.auth.application.port.out.PermissionRecord> find(
+          String domain, String resource, String action) {
+        return Optional.empty();
+      }
+    };
   }
 
   private static TransactionTemplate immediateReuseTx() {
@@ -485,24 +565,10 @@ class TokenManagementServicesTest {
     assignments.records.clear();
     assignments.records.add(
         new PharmacyAssignmentRecord(
-            Ids.newId(),
-            staffId,
-            otherPharmacy,
-            "pharmacy_owner",
-            true,
-            clock.instant(),
-            null,
-            "Other"));
+            Ids.newId(), staffId, otherPharmacy, "owner", true, clock.instant(), null, "Other"));
     assignments.records.add(
         new PharmacyAssignmentRecord(
-            Ids.newId(),
-            staffId,
-            pharmacyId,
-            "pharmacy_owner",
-            true,
-            clock.instant(),
-            null,
-            "Match"));
+            Ids.newId(), staffId, pharmacyId, "owner", true, clock.instant(), null, "Match"));
     String tok = "pharm-loop-ssssssssssssss";
     sessions.save(
         AuthSessionRecord.active(
@@ -685,14 +751,7 @@ class TokenManagementServicesTest {
     assignments.records.clear();
     assignments.records.add(
         new PharmacyAssignmentRecord(
-            Ids.newId(),
-            staffNoMatch,
-            Ids.newId(),
-            "pharmacy_owner",
-            true,
-            clock.instant(),
-            null,
-            "Nope"));
+            Ids.newId(), staffNoMatch, Ids.newId(), "owner", true, clock.instant(), null, "Nope"));
     String noMatchTok = "pharm-nomatch-wwwwwwwwwwww";
     sessions.save(
         AuthSessionRecord.active(
@@ -803,14 +862,7 @@ class TokenManagementServicesTest {
             clock.instant()));
     assignments.records.add(
         new PharmacyAssignmentRecord(
-            Ids.newId(),
-            staffId,
-            pharmacyId,
-            "pharmacy_owner",
-            true,
-            clock.instant(),
-            null,
-            "Shop"));
+            Ids.newId(), staffId, pharmacyId, "owner", true, clock.instant(), null, "Shop"));
     String pharmTok = "pharm-ok-hhhhhhhhhhhhhhhh";
     sessions.save(
         AuthSessionRecord.active(
@@ -1204,7 +1256,7 @@ class TokenManagementServicesTest {
     Map<String, Object> staffMe =
         meService.me(
             new MedmatePrincipal(staff2, AuthRole.PHARMACY_STAFF, null, TokenScope.FULL, "m4"));
-    assertThat(staffMe.get("permissions")).isEqualTo(CurrentUserService.STAFF_PERMISSIONS);
+    assertThat(staffMe.get("permissions")).isEqualTo(List.of());
 
     UUID phId = Ids.newId();
     pharmacies.byId.put(phId, new PharmacyRecord(phId, null, null, null, null));
@@ -1398,20 +1450,13 @@ class TokenManagementServicesTest {
     pharmacies.byId.put(pharmacyId, new PharmacyRecord(pharmacyId, "Sri Rama", null, "BLR", "PRO"));
     assignments.records.add(
         new PharmacyAssignmentRecord(
-            Ids.newId(),
-            staffId,
-            pharmacyId,
-            "pharmacy_owner",
-            true,
-            clock.instant(),
-            null,
-            "Sri Rama"));
+            Ids.newId(), staffId, pharmacyId, "owner", true, clock.instant(), null, "Sri Rama"));
     Map<String, Object> me =
         meService.me(
             new MedmatePrincipal(
                 staffId, AuthRole.PHARMACY_OWNER, pharmacyId, TokenScope.FULL, "jti"));
-    assertThat(me.get("role")).isEqualTo("pharmacy_owner");
-    assertThat(me.get("permissions")).isEqualTo(CurrentUserService.OWNER_PERMISSIONS);
+    assertThat(me.get("role")).isEqualTo("owner");
+    assertThat(me.get("permissions")).isEqualTo(List.of("inventory:*", "orders:*", "staff:*"));
   }
 
   private static CustomerRecord customer(UUID id) {

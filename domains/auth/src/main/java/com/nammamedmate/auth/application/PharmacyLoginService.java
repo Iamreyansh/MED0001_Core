@@ -213,7 +213,7 @@ public class PharmacyLoginService {
             .orElseThrow(() -> new AppException("PHARMACY_NOT_FOUND", "Pharmacy not found", 404));
 
     AuthRole role =
-        "pharmacy_owner".equals(activeAssignment.roleCode())
+        com.nammamedmate.auth.domain.PharmacyRoleCodes.isOwner(activeAssignment.roleCode())
             ? AuthRole.PHARMACY_OWNER
             : AuthRole.PHARMACY_STAFF;
     String accessToken =

@@ -63,14 +63,7 @@ class SwitchPharmacyServiceTest {
     assignmentStore.byStaffAndPharmacy.put(
         staffId + ":" + pharmacyId,
         new PharmacyAssignmentRecord(
-            Ids.newId(),
-            staffId,
-            pharmacyId,
-            "pharmacy_owner",
-            true,
-            NOW,
-            null,
-            "Sri Rama Medicals"));
+            Ids.newId(), staffId, pharmacyId, "owner", true, NOW, null, "Sri Rama Medicals"));
   }
 
   @Test
@@ -80,7 +73,7 @@ class SwitchPharmacyServiceTest {
     assertThat(result.accessToken()).isNotBlank();
     assertThat(result.accessTtlSeconds()).isEqualTo(900L);
     assertThat(result.pharmacy().name()).isEqualTo("Sri Rama Medicals");
-    assertThat(result.roleInPharmacy()).isEqualTo("pharmacy_owner");
+    assertThat(result.roleInPharmacy()).isEqualTo("owner");
 
     // Verify token has POS=FULL scope
     var parsed = jwtService.parseAndValidate(result.accessToken());

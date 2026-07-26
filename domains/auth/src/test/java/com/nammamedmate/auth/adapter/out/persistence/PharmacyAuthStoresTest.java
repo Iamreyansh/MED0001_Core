@@ -207,12 +207,12 @@ class PharmacyAuthStoresTest {
     UUID assignId = Ids.newId();
 
     var projection =
-        mockProjection(assignId, staffId, pharmacyId, "pharmacy_owner", "Sri Rama Medicals", true);
+        mockProjection(assignId, staffId, pharmacyId, "owner", "Sri Rama Medicals", true);
     when(repo.findActiveByStaffIdOrderByJoinedAt(staffId)).thenReturn(List.of(projection));
 
     List<PharmacyAssignmentRecord> list = store.listActiveByStaffId(staffId);
     assertThat(list).hasSize(1);
-    assertThat(list.get(0).roleCode()).isEqualTo("pharmacy_owner");
+    assertThat(list.get(0).roleCode()).isEqualTo("owner");
     assertThat(list.get(0).pharmacyName()).isEqualTo("Sri Rama Medicals");
     assertThat(list.get(0).isActive()).isTrue();
 
@@ -250,6 +250,116 @@ class PharmacyAuthStoresTest {
     assertEntityHasNoArgCtor(PharmacyAssignmentEntity.class);
     assertEntityHasNoArgCtor(PharmacyEntity.class);
     assertEntityHasNoArgCtor(LoginAuditEntity.class);
+    assertEntityHasNoArgCtor(PharmacyRoleEntity.class);
+    assertEntityHasNoArgCtor(PermissionEntity.class);
+  }
+
+  @Test
+  void pharmacyRoleAndPermissionStores() {
+    PharmacyRoleJpaRepository roleRepo = mock(PharmacyRoleJpaRepository.class);
+    JpaPharmacyRoleStore roleStore = new JpaPharmacyRoleStore(roleRepo);
+    UUID roleId = Ids.newId();
+    UUID pharmacyId = Ids.newId();
+    PharmacyRoleEntity entity =
+        new PharmacyRoleEntity(
+            roleId,
+            pharmacyId,
+            "senior",
+            "senior",
+            "Senior",
+            false,
+            new String[] {"orders:read"},
+            null,
+            NOW,
+            NOW,
+            null);
+    when(roleRepo.findBySystemTrueAndDeletedAtIsNullOrderByCodeAsc()).thenReturn(List.of(entity));
+    when(roleRepo.findByPharmacyIdAndDeletedAtIsNullOrderByCodeAsc(pharmacyId))
+        .thenReturn(List.of(entity));
+    when(roleRepo.findByIdAndDeletedAtIsNull(roleId)).thenReturn(Optional.of(entity));
+    when(roleRepo.findBySystemTrueAndCodeAndDeletedAtIsNull("owner"))
+        .thenReturn(Optional.of(entity));
+    when(roleRepo.findByPharmacyIdAndCodeAndDeletedAtIsNull(pharmacyId, "senior"))
+        .thenReturn(Optional.of(entity));
+    when(roleRepo.countActiveStaff(roleId, pharmacyId)).thenReturn(2);
+    when(roleRepo.countActiveStaffGlobal(roleId)).thenReturn(3);
+    when(roleRepo.save(any(PharmacyRoleEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertThat(roleStore.listSystemRoles()).hasSize(1);
+    assertThat(roleStore.listCustomByPharmacy(pharmacyId)).hasSize(1);
+    assertThat(roleStore.findById(roleId)).isPresent();
+    assertThat(roleStore.findSystemByCode("owner")).isPresent();
+    assertThat(roleStore.findActiveByPharmacyAndCode(pharmacyId, "senior")).isPresent();
+    assertThat(roleStore.countActiveStaff(roleId, pharmacyId)).isEqualTo(2);
+    assertThat(roleStore.countActiveStaff(roleId, null)).isEqualTo(3);
+    assertThat(
+            roleStore
+                .save(
+                    new com.nammamedmate.auth.application.port.out.PharmacyRoleRecord(
+                        roleId,
+                        pharmacyId,
+                        "senior",
+                        "Senior",
+                        false,
+                        List.of("orders:read"),
+                        null,
+                        NOW,
+                        NOW,
+                        null))
+                .code())
+        .isEqualTo("senior");
+
+    PharmacyRoleEntity emptyPerms =
+        new PharmacyRoleEntity(
+            roleId, null, "owner", "owner", "Owner", true, null, null, NOW, NOW, null);
+    when(roleRepo.findByIdAndDeletedAtIsNull(roleId)).thenReturn(Optional.of(emptyPerms));
+    assertThat(roleStore.findById(roleId).orElseThrow().permissions()).isEmpty();
+    emptyPerms.setPermissions(null);
+    assertThat(emptyPerms.getPermissions()).isNull();
+    emptyPerms.setPermissions(new String[] {"orders:*"});
+    emptyPerms.setUpdatedAt(NOW);
+    emptyPerms.setDeletedAt(NOW);
+    assertThat(emptyPerms.getPermissions()).containsExactly("orders:*");
+    // clone defensive copy
+    String[] exposed = emptyPerms.getPermissions();
+    exposed[0] = "tampered";
+    assertThat(emptyPerms.getPermissions()).containsExactly("orders:*");
+    assertThat(emptyPerms.getUpdatedAt()).isEqualTo(NOW);
+    assertThat(emptyPerms.getDeletedAt()).isEqualTo(NOW);
+    assertThat(emptyPerms.getName()).isEqualTo("owner");
+    assertThat(emptyPerms.getCreatedBy()).isNull();
+    assertThat(emptyPerms.getCreatedAt()).isEqualTo(NOW);
+    assertThat(emptyPerms.getPharmacyId()).isNull();
+    assertThat(emptyPerms.isSystem()).isTrue();
+    assertThat(emptyPerms.getDisplayName()).isEqualTo("Owner");
+    assertThat(emptyPerms.getCode()).isEqualTo("owner");
+    assertThat(emptyPerms.getId()).isEqualTo(roleId);
+
+    PermissionJpaRepository permRepo = mock(PermissionJpaRepository.class);
+    JpaPermissionCatalogStore permStore = new JpaPermissionCatalogStore(permRepo);
+    PermissionEntity pe = new PermissionEntity("orders", "read", "admin", "d");
+    when(permRepo.findByDomainOrderByResourceAscActionAsc("admin")).thenReturn(List.of(pe));
+    when(permRepo.findByDomainAndResourceOrderByActionAsc("admin", "orders"))
+        .thenReturn(List.of(pe));
+    when(permRepo.findByDomainAndResourceAndAction("admin", "orders", "read"))
+        .thenReturn(Optional.of(pe));
+    assertThat(permStore.listByDomain("admin")).hasSize(1);
+    assertThat(permStore.listByDomainAndResource("admin", "orders")).hasSize(1);
+    assertThat(permStore.find("admin", "orders", "read")).isPresent();
+    assertThat(pe.getResource()).isEqualTo("orders");
+    assertThat(pe.getAction()).isEqualTo("read");
+    assertThat(pe.getDomain()).isEqualTo("admin");
+    assertThat(pe.getDescription()).isEqualTo("d");
+
+    PermissionEntity.Pk pk = new PermissionEntity.Pk("a", "b", "admin");
+    assertThat(pk).isEqualTo(new PermissionEntity.Pk("a", "b", "admin"));
+    assertThat(pk.hashCode()).isEqualTo(new PermissionEntity.Pk("a", "b", "admin").hashCode());
+    assertThat(pk).isNotEqualTo(new PermissionEntity.Pk("x", "b", "admin"));
+    assertThat(pk).isNotEqualTo(new PermissionEntity.Pk("a", "x", "admin"));
+    assertThat(pk).isNotEqualTo(new PermissionEntity.Pk("a", "b", "pharmacy"));
+    assertThat(pk).isNotEqualTo("nope");
+    assertThat(pk.equals(pk)).isTrue();
+    assertThat(new PermissionEntity.Pk()).isNotNull();
   }
 
   private static PharmacyAssignmentJpaRepository.AssignmentProjection mockProjection(

@@ -1,0 +1,55 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/roles
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "senior_pharmacist",
+    "display_name": "Senior Pharmacist",
+    "permissions": ["orders:fulfill", "inventory:*", "prescriptions:verify", "reports:read"]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — pharmacy owner login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("pharmacyCustomRoleId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("custom role created", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string").that.is.not.empty;
+    expect(body.data.is_system).to.equal(false);
+    expect(body.data.name).to.equal("senior_pharmacist");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/roles — pharmacy_owner only.
+  Errors: 400 VALIDATION_ERROR, 403 FORBIDDEN, 409 ROLE_NAME_CONFLICT
+}

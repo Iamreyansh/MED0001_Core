@@ -1,0 +1,41 @@
+meta {
+  name: list-permissions
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/permissions?resource=orders
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("orders permissions only", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array").that.is.not.empty;
+    body.data.forEach((p) => expect(p.resource).to.equal("orders"));
+  });
+}
+
+docs {
+  GET /api/v1/admin/permissions?resource= — filter optional. Admin catalog only.
+}

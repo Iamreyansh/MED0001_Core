@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 4 |
+| Phase 1 | 46 | 5 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **4** |
+| **Total** | **129** | **5** |
 
 ---
 
@@ -33,7 +33,7 @@
 | EPIC-001 | [STORY-002](./EPIC-001-auth-identity/STORY-002-pharmacy-staff-auth.md) | Pharmacy Staff Authentication | done | 2026-07-26 | `domains/auth`; stub `pharmacies`+`pharmacy_roles` until EPIC-003/005; bcrypt cost 12 via `staffPasswordEncoder`; POS scope filter; login audit table |
 | EPIC-001 | [STORY-003](./EPIC-001-auth-identity/STORY-003-admin-auth.md) | Admin Staff Authentication & MFA | done | 2026-07-26 | `domains/auth`; stub `admin_staff` until EPIC-021; TOTP via stdlib + AES-256-GCM (`AesGcmCipher`); MFA challenge scope filter; access 15m / refresh 8h |
 | EPIC-001 | [STORY-004](./EPIC-001-auth-identity/STORY-004-token-management.md) | JWT Token Management & Session Control | done | 2026-07-26 | `domains/auth`; soft revoke via `revoked_at`; rotate creates new session row; admin `user_type`=`admin_staff` (legacy `admin` normalized); `is_current` always false under Bearer-only list; no GeoIP; POS/MFA filters unchanged; reuse revoke+`auth.refresh_token_reused` via `REQUIRES_NEW` + `JdbcOutboxStore`/`outbox_message` |
-| EPIC-001 | [STORY-005](./EPIC-001-auth-identity/STORY-005-rbac-permissions.md) | Role-Based Access Control (RBAC) | pending | — | — |
+| EPIC-001 | [STORY-005](./EPIC-001-auth-identity/STORY-005-rbac-permissions.md) | Role-Based Access Control (RBAC) | done | 2026-07-26 | `domains/auth`; system pharmacy roles owner/manager/pharmacist/cashier/delivery; custom roles + soft-delete ROLE_IN_USE; admin matrix in code (`*:*` for admin_super); `RequiresPermission` interceptor; Redis role-permission cache; stub `POST /admin/pharmacies/{id}/suspend` for middleware AC until EPIC-004 |
 
 ### EPIC-002 (`EPIC-002-customer-management`)
 

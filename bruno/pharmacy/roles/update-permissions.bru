@@ -1,0 +1,49 @@
+meta {
+  name: update-permissions
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/pharmacy/roles/{{pharmacyCustomRoleId}}/permissions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "permissions": ["orders:fulfill", "orders:read", "inventory:*", "prescriptions:verify", "reports:read"]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("pharmacyCustomRoleId")) {
+    throw new Error("pharmacyCustomRoleId missing — create role first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("permissions replaced", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.permissions).to.include("orders:read");
+  });
+}
+
+docs {
+  PUT /api/v1/pharmacy/roles/:id/permissions — bulk replace. Owner or staff:manage.
+}

@@ -15,7 +15,6 @@ import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
@@ -25,17 +24,12 @@ public class CurrentUserService {
   static final int ME_LIMIT = 60;
   static final int ME_WINDOW_SECONDS = 60;
 
-  /** Coarse pharmacy permissions until STORY-005 RBAC. */
-  static final List<String> OWNER_PERMISSIONS =
-      List.of("orders:read", "orders:fulfill", "inventory:*", "staff:*");
-
-  static final List<String> STAFF_PERMISSIONS = List.of("orders:read", "orders:fulfill");
-
   private final CustomerStore customerStore;
   private final PharmacyStaffStore pharmacyStaffStore;
   private final PharmacyAssignmentStore assignmentStore;
   private final PharmacyStore pharmacyStore;
   private final AdminStaffStore adminStaffStore;
+  private final RbacPermissionService rbacPermissionService;
   private final RateLimiter rateLimiter;
 
   public CurrentUserService(
@@ -44,12 +38,14 @@ public class CurrentUserService {
       PharmacyAssignmentStore assignmentStore,
       PharmacyStore pharmacyStore,
       AdminStaffStore adminStaffStore,
+      RbacPermissionService rbacPermissionService,
       RateLimiter rateLimiter) {
     this.customerStore = customerStore;
     this.pharmacyStaffStore = pharmacyStaffStore;
     this.assignmentStore = assignmentStore;
     this.pharmacyStore = pharmacyStore;
     this.adminStaffStore = adminStaffStore;
+    this.rbacPermissionService = rbacPermissionService;
     this.rateLimiter = rateLimiter;
   }
 
@@ -120,9 +116,7 @@ public class CurrentUserService {
           .map(PharmacyAssignmentRecord::roleCode)
           .ifPresent(code -> data.put("role", code));
     }
-    data.put(
-        "permissions",
-        principal.role() == AuthRole.PHARMACY_OWNER ? OWNER_PERMISSIONS : STAFF_PERMISSIONS);
+    data.put("permissions", rbacPermissionService.resolvePharmacyPermissions(principal));
     return data;
   }
 
@@ -138,6 +132,9 @@ public class CurrentUserService {
     data.put("email", admin.email());
     data.put("mfa_enabled", admin.mfaEnabled());
     data.put("last_login_at", admin.lastLoginAt());
+    data.put(
+        "permissions",
+        com.nammamedmate.auth.domain.AdminRoleDefinitions.permissionsFor(admin.role()));
     return data;
   }
 

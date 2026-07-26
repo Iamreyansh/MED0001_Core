@@ -59,7 +59,7 @@ public class SwitchPharmacyService {
                 () -> new AppException("FORBIDDEN", "Staff is not assigned to this pharmacy", 403));
 
     AuthRole role =
-        "pharmacy_owner".equals(assignment.roleCode())
+        com.nammamedmate.auth.domain.PharmacyRoleCodes.isOwner(assignment.roleCode())
             ? AuthRole.PHARMACY_OWNER
             : AuthRole.PHARMACY_STAFF;
     String accessToken =

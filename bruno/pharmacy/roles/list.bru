@@ -1,0 +1,43 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/roles
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — pharmacy login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("includes system owner", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    const owner = body.data.find((r) => r.id === "system-owner");
+    expect(owner).to.exist;
+    expect(owner.is_system).to.equal(true);
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/roles — pharmacy_owner or pharmacy_staff.
+}

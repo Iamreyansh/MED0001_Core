@@ -92,7 +92,7 @@ class PharmacyLoginServiceTest {
     baseStaff = staff("priya@test.in", null, encoder.encode(PASSWORD), 0, null, null);
     staffStore.byEmail.put("priya@test.in", baseStaff);
 
-    baseAssignment = assignment(staffId, pharmacyId, "pharmacy_owner", "Sri Rama Medicals");
+    baseAssignment = assignment(staffId, pharmacyId, "owner", "Sri Rama Medicals");
     assignmentStore.byStaffId.put(staffId, List.of(baseAssignment));
     assignmentStore.byStaffAndPharmacy.put(staffId + ":" + pharmacyId, baseAssignment);
 
@@ -108,7 +108,7 @@ class PharmacyLoginServiceTest {
     assertThat(result.accessToken()).isNotBlank();
     assertThat(result.refreshToken()).isNotBlank();
     assertThat(result.activePharmacy().name()).isEqualTo("Sri Rama Medicals");
-    assertThat(result.roleInActivePharmacy()).isEqualTo("pharmacy_owner");
+    assertThat(result.roleInActivePharmacy()).isEqualTo("owner");
     assertThat(result.staff().failedLoginAttempts()).isZero();
     assertThat(sessionStore.saved).hasSize(1);
     assertThat(auditStore.records).hasSize(1);
