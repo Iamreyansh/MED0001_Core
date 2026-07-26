@@ -92,7 +92,7 @@ public class CustomerProfileService {
         if (url.length() > 512 || !isAllowedAvatarUrl(url)) {
           throw new AppException(
               "VALIDATION_ERROR",
-              "avatar_url must be an HTTPS URL under cdn.nammamedmate.com/avatars/ (max 512)",
+              "avatar_url must be an HTTPS URL under the configured CDN /avatars/ path (max 512)",
               400);
         }
         avatarUrl = url;
