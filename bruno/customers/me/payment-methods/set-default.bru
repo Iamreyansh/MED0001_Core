@@ -47,3 +47,72 @@ docs {
   PATCH /api/v1/customers/me/payment-methods/:id/set-default — atomic default switch.
   Errors: 401 UNAUTHORIZED, 404 PAYMENT_METHOD_NOT_FOUND, 409 ALREADY_DEFAULT
 }
+
+example {
+  name: 200 OK
+  description: Default switched; previous_default_id is the prior default (or null).
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/payment-methods/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1/set-default
+    method: patch
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+            "type": "CARD",
+            "is_default": true,
+            "previous_default_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "message": "Default payment method updated."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ALREADY_DEFAULT
+  description: Method is already the customer's default.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/payment-methods/7c9e6679-7425-40de-944b-e07fc1f90ae7/set-default
+    method: patch
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 409
+      text: Conflict
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ALREADY_DEFAULT",
+            "message": "This method is already the default"
+          }
+        }
+      '''
+    }
+  }
+}

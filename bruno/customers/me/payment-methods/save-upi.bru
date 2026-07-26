@@ -62,3 +62,86 @@ docs {
   Optional Idempotency-Key header replays the original create.
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 409 UPI_ALREADY_SAVED, 422 INVALID_UPI_VPA | PAYMENT_METHOD_LIMIT_REACHED, 503 VPA_VALIDATION_TIMEOUT | VPA_VALIDATION_FAILED
 }
+
+example {
+  name: 201 Created
+  description: Valid VPA saved; upi_id never returned — only masked upi_handle.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/payment-methods/upi
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: 550e8400-e29b-41d4-a716-446655440001
+    }
+    body:json: {
+      {
+        "upi_id": "ramesh@okaxis",
+        "nickname": "GPay"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "type": "UPI",
+            "nickname": "GPay",
+            "upi_handle": "***@okaxis",
+            "is_default": true,
+            "added_at": "2026-07-26T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_UPI_VPA
+  description: Razorpay reports the VPA as invalid.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/payment-methods/upi
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "upi_id": "nobody@okaxis",
+        "nickname": "Bad"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 422
+      text: Unprocessable Entity
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_UPI_VPA",
+            "message": "UPI VPA is invalid"
+          }
+        }
+      '''
+    }
+  }
+}

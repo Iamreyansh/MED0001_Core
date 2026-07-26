@@ -68,3 +68,102 @@ tests {
 docs {
   POST /api/v1/auth/customer/verify-otp — exchange OTP for JWT. Requires `sessionId` from send-otp. Writes `accessToken` / `refreshToken` / `customerId` for protected calls.
 }
+
+example {
+  name: 200 OK
+  description: Valid OTP exchanged for JWT pair and customer summary.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/customer/verify-otp
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "phone": "+919999900001",
+        "otp": "123456",
+        "device_token": "bruno-local-device"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3YzllNjY3OSJ9.fake-access",
+            "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoIn0.fake-refresh",
+            "token_type": "Bearer",
+            "access_token_expires_in": 900,
+            "refresh_token_expires_in": 2592000,
+            "is_new_user": true,
+            "customer": {
+              "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+              "phone": "+919999900001",
+              "name": null,
+              "avatar_url": null,
+              "date_of_birth": null,
+              "gender": null,
+              "preferred_language": null,
+              "segment": null,
+              "wallet_balance": 0.00,
+              "loyalty_points": 0,
+              "created_at": "2026-07-26T10:00:00Z"
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 OTP_INVALID
+  description: OTP does not match the hashed value stored for the session.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/customer/verify-otp
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "phone": "+919999900001",
+        "otp": "000000",
+        "device_token": "bruno-local-device"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "OTP_INVALID",
+            "message": "OTP does not match"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -44,3 +44,102 @@ tests {
 docs {
   GET /api/v1/admin/roles — any admin role. Returns immutable built-in admin role matrix.
 }
+
+example {
+  name: 200 OK
+  description: Five built-in admin roles; admin_super has wildcard permissions.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/roles
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "role": "admin_super",
+              "display_name": "Super Administrator",
+              "description": "Full platform access with no restrictions. Required for MFA.",
+              "is_system": true,
+              "permissions": ["*:*"]
+            },
+            {
+              "role": "admin_operations",
+              "display_name": "Operations Manager",
+              "description": "Manages orders, logistics, pharmacies, and riders.",
+              "is_system": true,
+              "permissions": ["orders:*", "pharmacies:read", "pharmacies:update", "riders:*", "logistics:*", "catalogue:read", "customers:read"]
+            },
+            {
+              "role": "admin_finance",
+              "display_name": "Finance Manager",
+              "description": "Manages settlements, refunds, payouts, and financial analytics.",
+              "is_system": true,
+              "permissions": ["finance:*", "settlements:*", "refunds:*", "taxes:*", "analytics:finance", "customers:read"]
+            },
+            {
+              "role": "admin_support",
+              "display_name": "Customer Support",
+              "description": "Handles tickets, disputes, and customer-facing issues.",
+              "is_system": true,
+              "permissions": ["tickets:*", "disputes:*", "customers:read", "customers:notify", "orders:read"]
+            },
+            {
+              "role": "admin_compliance",
+              "display_name": "Compliance Officer",
+              "description": "Oversees prescription validation, catalogue compliance, and pharmacy KYC.",
+              "is_system": true,
+              "permissions": ["prescriptions:*", "compliance:*", "catalogue:update", "pharmacies:read", "customers:read"]
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  description: Non-admin token cannot list admin roles.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/roles
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+      text: Forbidden
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Admin role required"
+          }
+        }
+      '''
+    }
+  }
+}

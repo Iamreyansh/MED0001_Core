@@ -58,3 +58,82 @@ tests {
 docs {
   POST /api/v1/auth/refresh — rotate refresh token; public (refresh_token is the credential). Writes new accessToken/refreshToken.
 }
+
+example {
+  name: 200 OK
+  description: Refresh token rotated; new access and refresh pair issued.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/refresh
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoIn0.fake-refresh"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyb3RhdGVkLWFjY2VzcyJ9.fake-access",
+            "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyb3RhdGVkLXJlZnJlc2gifQ.fake-refresh",
+            "token_type": "Bearer",
+            "access_token_expires_in": 900,
+            "refresh_token_expires_in": 2592000
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 REFRESH_TOKEN_INVALID
+  description: Refresh token not found or already revoked.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/refresh
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.invalid-refresh"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "REFRESH_TOKEN_INVALID",
+            "message": "Refresh token not found"
+          }
+        }
+      '''
+    }
+  }
+}

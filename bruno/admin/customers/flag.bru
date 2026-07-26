@@ -61,3 +61,84 @@ docs {
   POST /api/v1/admin/customers/:id/flag — flag customer for trust & safety. `reason` required; `note` required when reason is OTHER.
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND, 409 ALREADY_FLAGGED
 }
+
+example {
+  name: 200 OK
+  description: Customer flagged for trust and safety review.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/7c9e6679-7425-40de-944b-e07fc1f90ae7/flag
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "reason": "FRAUD_SUSPICION",
+        "note": null
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "is_flagged": true,
+            "flag_reason": "FRAUD_SUSPICION",
+            "flagged_by": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+            "flagged_at": "2026-07-26T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ALREADY_FLAGGED
+  description: Customer is already flagged.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/7c9e6679-7425-40de-944b-e07fc1f90ae7/flag
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "reason": "FRAUD_SUSPICION",
+        "note": null
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 409
+      text: Conflict
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ALREADY_FLAGGED",
+            "message": "Customer is already flagged"
+          }
+        }
+      '''
+    }
+  }
+}

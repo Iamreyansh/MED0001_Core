@@ -52,3 +52,69 @@ docs {
   DELETE /api/v1/admin/customers/:id/flag — remove customer flag.
   Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND, 409 NOT_FLAGGED
 }
+
+example {
+  name: 200 OK
+  description: Customer flag removed.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/7c9e6679-7425-40de-944b-e07fc1f90ae7/flag
+    method: delete
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "is_flagged": false
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 NOT_FLAGGED
+  description: Customer is not currently flagged.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/7c9e6679-7425-40de-944b-e07fc1f90ae7/flag
+    method: delete
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 409
+      text: Conflict
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "NOT_FLAGGED",
+            "message": "Customer is not currently flagged"
+          }
+        }
+      '''
+    }
+  }
+}

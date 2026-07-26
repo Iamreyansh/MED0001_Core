@@ -69,3 +69,95 @@ docs {
   Writes: adminAccessToken, adminRefreshToken, adminId
   Errors: 400 VALIDATION_ERROR|INVALID_MFA_CODE|INVALID_BACKUP_CODE, 401 CHALLENGE_TOKEN_EXPIRED|CHALLENGE_TOKEN_INVALID, 403 ACCOUNT_LOCKED, 429 IP_RATE_LIMITED
 }
+
+example {
+  name: 200 OK
+  description: TOTP verified; full admin JWT pair issued.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/admin/verify-mfa
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{mfaChallengeToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "mfa_challenge_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZSI6Im1mYSJ9.fake-challenge",
+        "code": "123456"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiJ9.fake-access",
+            "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbi1yZWZyZXNoIn0.fake-refresh",
+            "token_type": "Bearer",
+            "access_token_expires_in": 900,
+            "refresh_token_expires_in": 28800,
+            "used_backup_code": false,
+            "admin": {
+              "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+              "name": "Ops Admin",
+              "email": "ops@namma-medmate.in",
+              "role": "admin_operations",
+              "mfa_enabled": true,
+              "backup_codes_remaining": 8
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 CHALLENGE_TOKEN_EXPIRED
+  description: MFA challenge JWT has passed its 300s TTL.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/admin/verify-mfa
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.expired-challenge
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "mfa_challenge_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.expired-challenge",
+        "code": "123456"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CHALLENGE_TOKEN_EXPIRED",
+            "message": "mfa_challenge_token has expired"
+          }
+        }
+      '''
+    }
+  }
+}

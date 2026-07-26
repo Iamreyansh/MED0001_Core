@@ -58,3 +58,89 @@ docs {
   POST /api/v1/customers/me/addresses/geocode — reverse geocode (cached 1h on lat,lng@4dp).
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 502 GEOCODE_SERVICE_ERROR
 }
+
+example {
+  name: 200 OK
+  description: Reverse-geocoded suggestion for Bengaluru coordinates.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses/geocode
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "latitude": 12.9716,
+        "longitude": 77.5946
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "suggested_address": {
+              "flat_building": "",
+              "area_locality": "MG Road",
+              "city": "Bengaluru",
+              "state": "Karnataka",
+              "pincode": "560001",
+              "formatted_address": "MG Road, Bengaluru, Karnataka 560001, India",
+              "latitude": 12.9716,
+              "longitude": 77.5946
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 502 GEOCODE_SERVICE_ERROR
+  description: Upstream geocoding provider failed or returned an error.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses/geocode
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "latitude": 12.9716,
+        "longitude": 77.5946
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 502
+      text: Bad Gateway
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "GEOCODE_SERVICE_ERROR",
+            "message": "Google Maps API returned an error"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -41,3 +41,92 @@ tests {
 docs {
   GET /api/v1/pharmacy/roles/:id/permissions — system id slug or custom UUID.
 }
+
+example {
+  name: 200 OK
+  description: Permission details for a custom role.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/roles/d4e5f6a7-b8c9-4012-d345-e6789012f345/permissions
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "role_id": "d4e5f6a7-b8c9-4012-d345-e6789012f345",
+            "role_name": "senior_pharmacist",
+            "is_system": false,
+            "permissions": [
+              {
+                "permission": "orders:fulfill",
+                "resource": "orders",
+                "action": "fulfill"
+              },
+              {
+                "permission": "inventory:*",
+                "resource": "inventory",
+                "action": "*"
+              },
+              {
+                "permission": "prescriptions:verify",
+                "resource": "prescriptions",
+                "action": "verify"
+              },
+              {
+                "permission": "reports:read",
+                "resource": "reports",
+                "action": "read"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ROLE_NOT_FOUND
+  description: Unknown role id.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/roles/00000000-0000-4000-8000-000000000000/permissions
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 404
+      text: Not Found
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ROLE_NOT_FOUND",
+            "message": "Role not found"
+          }
+        }
+      '''
+    }
+  }
+}

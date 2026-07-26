@@ -65,3 +65,92 @@ docs {
   Optional Idempotency-Key header replays the original create.
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 409 CARD_ALREADY_SAVED, 422 INVALID_RAZORPAY_TOKEN | PAYMENT_METHOD_LIMIT_REACHED
 }
+
+example {
+  name: 201 Created
+  description: Tokenised card saved; razorpay_token_id never returned.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/payment-methods/card
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: 550e8400-e29b-41d4-a716-446655440002
+    }
+    body:json: {
+      {
+        "razorpay_token_id": "token_demo4242",
+        "card_last4": "4242",
+        "card_network": "VISA",
+        "card_type": "CREDIT",
+        "nickname": "Axis Flipkart"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+            "type": "CARD",
+            "card_last4": "4242",
+            "card_network": "VISA",
+            "card_type": "CREDIT",
+            "nickname": "Axis Flipkart",
+            "is_default": false,
+            "added_at": "2026-07-26T10:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 VALIDATION_ERROR
+  description: card_last4 missing or not exactly 4 digits.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/payment-methods/card
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "razorpay_token_id": "token_nolast4",
+        "card_network": "VISA",
+        "card_type": "CREDIT"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "card_last4 is required"
+          }
+        }
+      '''
+    }
+  }
+}

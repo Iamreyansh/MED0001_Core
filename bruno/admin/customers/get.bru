@@ -50,3 +50,98 @@ docs {
   GET /api/v1/admin/customers/:id — full customer detail with order stats, wallet, loyalty.
   Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND
 }
+
+example {
+  name: 200 OK
+  description: Full customer detail with order stats, wallet, and loyalty.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/7c9e6679-7425-40de-944b-e07fc1f90ae7
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "phone": "+919876543210",
+            "name": "Ramesh Kumar",
+            "avatar_url": null,
+            "date_of_birth": "1990-05-12",
+            "gender": "MALE",
+            "preferred_language": "en",
+            "segment": "REGULAR",
+            "is_flagged": false,
+            "flag_reason": null,
+            "created_at": "2025-11-03T08:15:00Z",
+            "order_stats": {
+              "total_orders": 12,
+              "completed_orders": 11,
+              "cancelled_orders": 1,
+              "total_ltv": 4580.50,
+              "cancel_rate": 0.08,
+              "avg_order_value": 381.71,
+              "last_order_at": "2026-07-20T14:30:00Z"
+            },
+            "wallet": {
+              "balance": 100.00,
+              "lifetime_credited": 150.00,
+              "lifetime_debited": 50.00
+            },
+            "loyalty": {
+              "tier": "GOLD",
+              "points_balance": 420,
+              "points_earned_lifetime": 420,
+              "dispute_count": 0
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 CUSTOMER_NOT_FOUND
+  description: Unknown customer id.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/00000000-0000-4000-8000-000000000000
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 404
+      text: Not Found
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CUSTOMER_NOT_FOUND",
+            "message": "Customer not found"
+          }
+        }
+      '''
+    }
+  }
+}

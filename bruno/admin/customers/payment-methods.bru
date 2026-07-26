@@ -40,3 +40,89 @@ docs {
   GET /api/v1/admin/customers/:id/payment-methods — masked list for support/finance (customers:read).
   Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND
 }
+
+example {
+  name: 200 OK
+  description: Masked payment methods for support/finance (customers:read).
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/payment-methods
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "upi": [
+              {
+                "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                "type": "UPI",
+                "nickname": "GPay",
+                "upi_handle": "***@okaxis",
+                "is_default": true,
+                "added_at": "2026-07-26T10:00:00Z"
+              }
+            ],
+            "cards": [
+              {
+                "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+                "type": "CARD",
+                "card_last4": "4242",
+                "card_network": "VISA",
+                "card_type": "CREDIT",
+                "nickname": "Axis Flipkart",
+                "is_default": false,
+                "added_at": "2026-07-26T10:05:00Z"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 CUSTOMER_NOT_FOUND
+  description: Unknown customer id.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/00000000-0000-4000-8000-000000000000/payment-methods
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 404
+      text: Not Found
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CUSTOMER_NOT_FOUND",
+            "message": "Customer not found"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -49,3 +49,68 @@ docs {
   DELETE /api/v1/customers/me/addresses/:id — soft-delete; blocked if active order uses address.
   Errors: 401 UNAUTHORIZED, 404 ADDRESS_NOT_FOUND, 409 ADDRESS_IN_ACTIVE_ORDER
 }
+
+example {
+  name: 200 OK
+  description: Address soft-deleted successfully.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1
+    method: delete
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "message": "Address deleted successfully."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ADDRESS_IN_ACTIVE_ORDER
+  description: Address is tied to an order in PENDING, CONFIRMED, PACKED, or OUT_FOR_DELIVERY.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1
+    method: delete
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 409
+      text: Conflict
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ADDRESS_IN_ACTIVE_ORDER",
+            "message": "Address is used by an order in PENDING, CONFIRMED, PACKED, or OUT_FOR_DELIVERY"
+          }
+        }
+      '''
+    }
+  }
+}

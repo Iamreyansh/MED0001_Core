@@ -43,3 +43,73 @@ tests {
 docs {
   GET /api/v1/auth/me — current user profile from JWT role (customer / pharmacy_* / admin_*). MFA-challenge and POS-scoped tokens remain blocked by existing filters.
 }
+
+example {
+  name: 200 OK
+  description: Customer profile resolved from JWT subject.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/me
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "role": "customer",
+            "phone": "+919999900001",
+            "name": "Ramesh Kumar",
+            "avatar_url": null,
+            "preferred_language": "kn",
+            "segment": "REGULAR",
+            "wallet_balance": 125.50,
+            "loyalty_points": 38
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/me
+    method: get
+    mode: none
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -53,3 +53,86 @@ docs {
   PATCH /api/v1/customers/me — update own profile (name, avatar_url, date_of_birth, gender, preferred_language).
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED
 }
+
+example {
+  name: 200 OK
+  description: Profile fields updated; returns id and updated_at.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "name": "Ramesh Kumar",
+        "preferred_language": "kn"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "phone": "+919876543210",
+            "name": "Ramesh Kumar",
+            "avatar_url": "https://cdn.namma-medmate.in/avatars/ramesh.png",
+            "date_of_birth": "1990-01-15",
+            "gender": "MALE",
+            "preferred_language": "kn",
+            "updated_at": "2026-07-26T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 VALIDATION_ERROR
+  description: preferred_language must be a supported ISO 639-1 code.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "preferred_language": "xx"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "preferred_language must be one of: en, kn, hi, ta, te, ml, mr"
+          }
+        }
+      '''
+    }
+  }
+}

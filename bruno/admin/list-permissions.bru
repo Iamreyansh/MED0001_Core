@@ -39,3 +39,85 @@ tests {
 docs {
   GET /api/v1/admin/permissions?resource= — filter optional. Admin catalog only.
 }
+
+example {
+  name: 200 OK
+  description: Orders permissions from the admin catalog.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/permissions?resource=orders
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "resource": "orders",
+              "action": "read",
+              "permission": "orders:read",
+              "description": "View order details and history"
+            },
+            {
+              "resource": "orders",
+              "action": "write",
+              "permission": "orders:write",
+              "description": "Create and modify orders"
+            },
+            {
+              "resource": "orders",
+              "action": "cancel",
+              "permission": "orders:cancel",
+              "description": "Cancel any order"
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  description: Non-admin token cannot access the admin permission catalog.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/permissions?resource=orders
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+      text: Forbidden
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Admin role required"
+          }
+        }
+      '''
+    }
+  }
+}

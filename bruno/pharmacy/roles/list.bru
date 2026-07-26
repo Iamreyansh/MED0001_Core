@@ -41,3 +41,93 @@ tests {
 docs {
   GET /api/v1/pharmacy/roles — pharmacy_owner or pharmacy_staff.
 }
+
+example {
+  name: 200 OK
+  description: System and custom roles for the active pharmacy.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/roles
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "system-owner",
+              "name": "owner",
+              "display_name": "Pharmacy Owner",
+              "is_system": true,
+              "pharmacy_id": "c3d4e5f6-a7b8-4901-c234-d5678901ef23",
+              "permissions": ["*"],
+              "staff_count": 1
+            },
+            {
+              "id": "system-pharmacist",
+              "name": "pharmacist",
+              "display_name": "Pharmacist",
+              "is_system": true,
+              "pharmacy_id": "c3d4e5f6-a7b8-4901-c234-d5678901ef23",
+              "permissions": ["orders:fulfill", "inventory:read", "prescriptions:verify"],
+              "staff_count": 2
+            },
+            {
+              "id": "d4e5f6a7-b8c9-4012-d345-e6789012f345",
+              "name": "senior_pharmacist",
+              "display_name": "Senior Pharmacist",
+              "is_system": false,
+              "pharmacy_id": "c3d4e5f6-a7b8-4901-c234-d5678901ef23",
+              "permissions": ["orders:fulfill", "inventory:*", "prescriptions:verify", "reports:read"],
+              "staff_count": 0
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/roles
+    method: get
+    mode: none
+    headers: {
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required"
+          }
+        }
+      '''
+    }
+  }
+}
