@@ -55,7 +55,12 @@ public final class Rs256JwtService {
 
   public JwtClaims parseAndValidate(String token) {
     Claims claims =
-        Jwts.parser().verifyWith(publicKey).build().parseSignedClaims(token).getPayload();
+        Jwts.parser()
+            .clock(() -> Date.from(clock.instant()))
+            .verifyWith(publicKey)
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
     String jti = claims.getId();
     if (revocationStore.isRevoked(jti)) {
       throw new IllegalArgumentException("token revoked");

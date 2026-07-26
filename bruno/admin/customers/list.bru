@@ -1,0 +1,57 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/customers?page=1&limit=20&order=desc
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && Array.isArray(body.data) && body.data.length)) {
+    return;
+  }
+  const first = body.data[0];
+  if (first.id) {
+    bru.setEnvVar("customerId", first.id);
+  }
+  if (body.meta && body.meta.total != null) {
+    console.log(`customers listed; total=${body.meta.total}`);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with paginated list", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+    expect(body.meta.page).to.be.a("number");
+    expect(body.meta.limit).to.be.a("number");
+    expect(body.meta.total).to.be.a("number");
+    expect(body.meta.has_next).to.be.a("boolean");
+  });
+}
+
+docs {
+  GET /api/v1/admin/customers — list with filters (segment, is_flagged, search, city, page, limit, sort, order). Writes `customerId` from first row.
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN
+}

@@ -215,7 +215,7 @@ public class VerifyOtpService {
     List<String> tokens =
         deviceToken != null && !deviceToken.isBlank() ? List.of(deviceToken) : List.of();
     return new CustomerRecord(
-        Ids.newId(), phone, tokens, null, null, null, null, null, null, 0L, 0, now);
+        Ids.newId(), phone, tokens, null, null, null, null, "en", "NEW", 0L, 0, now);
   }
 
   private CustomerRecord upsertDeviceToken(CustomerRecord customer, String deviceToken) {

@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 5 |
+| Phase 1 | 46 | 6 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **5** |
+| **Total** | **129** | **6** |
 
 ---
 
@@ -39,7 +39,7 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-002 | [STORY-001](./EPIC-002-customer-management/STORY-001-customer-profile.md) | Customer Profile Management | pending | — | — |
+| EPIC-002 | [STORY-001](./EPIC-002-customer-management/STORY-001-customer-profile.md) | Customer Profile Management | done | 2026-07-26 | `domains/customer`; V006 flags/deletion/stats + city index; list order default desc; compliance blocked on GET detail; notify DB-locked 3/24h, `delivered=false`, outbox without phone; anonymise wipes city + 60-hex hash; nightly `@Scheduled` Asia/Kolkata; avatar CDN allowlist; wallet/loyalty stub until STORY-003/005; ActiveOrdersPort stub; FCM/SMS consumer EPIC-017 |
 | EPIC-002 | [STORY-002](./EPIC-002-customer-management/STORY-002-address-management.md) | Delivery Address Management | pending | — | — |
 | EPIC-002 | [STORY-003](./EPIC-002-customer-management/STORY-003-wallet-management.md) | Namma Money Wallet | pending | — | — |
 | EPIC-002 | [STORY-004](./EPIC-002-customer-management/STORY-004-saved-payment-methods.md) | Saved Payment Methods | pending | — | — |

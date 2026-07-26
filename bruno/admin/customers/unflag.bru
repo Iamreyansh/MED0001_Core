@@ -1,0 +1,54 @@
+meta {
+  name: unflag
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/customers/{{customerId}}/flag
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login first");
+  }
+  if (!bru.getEnvVar("customerId")) {
+    throw new Error("customerId missing — run customers/me/get or admin/customers/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or expected conflict", function () {
+    const status = res.getStatus();
+    if (status === 200) {
+      expect(status).to.equal(200);
+      return;
+    }
+    expect(status).to.be.oneOf([409]);
+    expect(res.getBody().error.code).to.equal("NOT_FLAGGED");
+  });
+
+  test("success envelope when unflagged", function () {
+    if (res.getStatus() !== 200) {
+      return;
+    }
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.equal(bru.getEnvVar("customerId"));
+    expect(body.data.is_flagged).to.equal(false);
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/customers/:id/flag — remove customer flag.
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND, 409 NOT_FLAGGED
+}

@@ -52,7 +52,16 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/roles", "/api/v1/pharmacy/roles/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/customers/**")
+                    .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/admin/roles", "/api/v1/admin/permissions")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
+                    .requestMatchers("/api/v1/admin/customers/**")
                     .hasAnyRole(
                         "ADMIN_SUPER",
                         "ADMIN_OPERATIONS",

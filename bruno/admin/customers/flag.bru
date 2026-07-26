@@ -1,0 +1,63 @@
+meta {
+  name: flag
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/customers/{{customerId}}/flag
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "reason": "FRAUD_SUSPICION",
+    "note": null
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login first");
+  }
+  if (!bru.getEnvVar("customerId")) {
+    throw new Error("customerId missing — run customers/me/get or admin/customers/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or expected conflict", function () {
+    const status = res.getStatus();
+    if (status === 200) {
+      expect(status).to.equal(200);
+      return;
+    }
+    expect(status).to.be.oneOf([409]);
+    expect(res.getBody().error.code).to.equal("ALREADY_FLAGGED");
+  });
+
+  test("success envelope when flagged", function () {
+    if (res.getStatus() !== 200) {
+      return;
+    }
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.equal(bru.getEnvVar("customerId"));
+    expect(body.data.is_flagged).to.equal(true);
+    expect(body.data.flag_reason).to.equal("FRAUD_SUSPICION");
+    expect(body.data.flagged_at).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  POST /api/v1/admin/customers/:id/flag — flag customer for trust & safety. `reason` required; `note` required when reason is OTHER.
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND, 409 ALREADY_FLAGGED
+}

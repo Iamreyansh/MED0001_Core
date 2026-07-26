@@ -1,0 +1,56 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data)) {
+    return;
+  }
+  const data = body.data;
+  if (data.id) {
+    bru.setEnvVar("customerId", data.id);
+  }
+  if (data.phone) {
+    bru.setEnvVar("customerPhone", data.phone);
+  }
+  console.log(`profile loaded; segment=${data.segment} flagged=${data.is_flagged}`);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with profile fields", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string").that.is.not.empty;
+    expect(body.data.phone).to.be.a("string").that.is.not.empty;
+    expect(body.data.segment).to.be.a("string").that.is.not.empty;
+    expect(body.data.is_flagged).to.be.a("boolean");
+  });
+}
+
+docs {
+  GET /api/v1/customers/me — own customer profile (phone, segment, wallet, loyalty). Writes `customerId` / `customerPhone` for admin calls.
+  Errors: 401 UNAUTHORIZED
+}
