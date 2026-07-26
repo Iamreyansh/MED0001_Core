@@ -366,7 +366,6 @@ class AwsSecretsEnvironmentPostProcessorTest {
     ConfigurableEnvironment local = mock(ConfigurableEnvironment.class);
     when(local.getActiveProfiles()).thenReturn(new String[0]);
     when(local.getProperty("spring.profiles.active")).thenReturn("local,dev");
-    when(local.getProperty("SPRING_PROFILES_ACTIVE")).thenReturn(null);
     assertThat(AwsSecretsEnvironmentPostProcessor.isDeployed(local)).isFalse();
   }
 }
