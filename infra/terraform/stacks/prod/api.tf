@@ -205,6 +205,8 @@ locals {
     { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" },
     { name = "MEDMATE_JWT_PRIVATE_KEY_PEM", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:private_key_pem::" },
     { name = "MEDMATE_JWT_PUBLIC_KEY_PEM", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:public_key_pem::" },
+    { name = "MEDMATE_MFA_ENCRYPTION_KEY_BASE64", valueFrom = "${aws_secretsmanager_secret.mfa.arn}:encryption_key_base64::" },
+    { name = "MEDMATE_PAYMENT_ENCRYPTION_KEY_BASE64", valueFrom = "${aws_secretsmanager_secret.mfa.arn}:payment_encryption_key_base64::" },
     { name = "MEDMATE_MAPS_GEOCODE_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.maps_geocode.arn}:api_key::" }
   ]
   worker_env = [
