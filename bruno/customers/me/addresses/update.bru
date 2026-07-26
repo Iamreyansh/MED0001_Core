@@ -1,0 +1,62 @@
+meta {
+  name: update
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/v1/customers/me/addresses/{{addressId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "label": "HOME",
+    "flat_building": "Flat 4B, Prestige Shantiniketan Tower 2",
+    "area_locality": "Whitefield",
+    "city": "Bengaluru",
+    "state": "Karnataka",
+    "pincode": "560066",
+    "latitude": 12.9693,
+    "longitude": 77.7499
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("addressId")) {
+    throw new Error("addressId missing — run customers/me/addresses/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("addressId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with updated address", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.flat_building).to.include("Tower 2");
+    expect(body.data.updated_at).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  PUT /api/v1/customers/me/addresses/:id — update address fields (not is_default).
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 404 ADDRESS_NOT_FOUND
+}

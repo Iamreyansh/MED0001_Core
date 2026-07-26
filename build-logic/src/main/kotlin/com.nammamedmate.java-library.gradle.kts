@@ -34,6 +34,8 @@ val jacocoExcludes =
         "**/*Priming.class",
     )
 
+val ci = providers.environmentVariable("CI").map { it == "true" }.orElse(false)
+
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
     executionData.setFrom(
@@ -43,7 +45,8 @@ tasks.jacocoTestReport {
     )
     reports {
         xml.required.set(true)
-        html.required.set(true)
+        // HTML is for local browsing; skip on CI (verification uses XML only).
+        html.required.set(ci.map { !it })
     }
     classDirectories.setFrom(
         sourceSets.main.get().output.classesDirs.map { dir ->
@@ -97,6 +100,11 @@ spotbugs {
     ignoreFailures.set(false)
     effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
     excludeFilter.set(rootProject.file("config/spotbugs-exclude.xml"))
+}
+
+// Main sources only — spotbugsTest / spotbugsIntegrationTest roughly doubled CI SpotBugs time.
+tasks.matching { it.name.startsWith("spotbugs") && it.name != "spotbugsMain" }.configureEach {
+    enabled = false
 }
 
 dependencies {

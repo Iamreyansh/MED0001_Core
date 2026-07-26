@@ -21,10 +21,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-java
+      - name: Pre-pull Testcontainers images
+        run: |
+          docker pull postgres:16-alpine &
+          docker pull redis:7-alpine &
+          wait
       - name: Spotless, unit + integration tests, JaCoCo 100%, SpotBugs, ArchUnit
         run: make check
       - name: Upload quality reports
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: quality-reports

@@ -10,4 +10,11 @@ runs:
         java-version: "21"
     - uses: gradle/actions/setup-gradle@v4
       with:
-        cache-read-only: ${{ github.event_name == 'pull_request' }}
+        # Warm cache on same-repo PRs; read-only only for fork PRs (untrusted).
+        cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        gradle-home-cache-cleanup: true
+    - name: CI Gradle workers
+      shell: bash
+      run: |
+        mkdir -p ~/.gradle
+        echo 'org.gradle.workers.max=4' >> ~/.gradle/gradle.properties

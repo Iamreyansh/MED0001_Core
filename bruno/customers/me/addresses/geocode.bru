@@ -1,0 +1,60 @@
+meta {
+  name: geocode
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customers/me/addresses/geocode
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "latitude": 12.9716,
+    "longitude": 77.5946
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data && body.data.suggested_address)) {
+    return;
+  }
+  const s = body.data.suggested_address;
+  if (s.pincode) {
+    bru.setEnvVar("geocodePincode", s.pincode);
+  }
+  if (s.city) {
+    bru.setEnvVar("geocodeCity", s.city);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("suggested address for Bengaluru pin", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.suggested_address.city).to.equal("Bengaluru");
+    expect(body.data.suggested_address.pincode).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  POST /api/v1/customers/me/addresses/geocode — reverse geocode (cached 1h on lat,lng@4dp).
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 502 GEOCODE_SERVICE_ERROR
+}

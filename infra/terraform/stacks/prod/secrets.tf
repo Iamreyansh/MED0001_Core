@@ -31,3 +31,7 @@ resource "aws_secretsmanager_secret_version" "mfa" {
     encryption_key_base64 = random_bytes.mfa_key.base64
   })
 }
+
+data "aws_secretsmanager_secret" "maps_geocode" {
+  name = "${local.name}/maps-geocode"
+}

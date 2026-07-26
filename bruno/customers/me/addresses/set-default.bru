@@ -1,0 +1,57 @@
+meta {
+  name: set-default
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/customers/me/addresses/{{addressId}}/set-default
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("addressId")) {
+    throw new Error("addressId missing — run customers/me/addresses/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data)) {
+    return;
+  }
+  if (body.data.id) {
+    bru.setEnvVar("defaultAddressId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200 or 409 already default", function () {
+    const status = res.getStatus();
+    expect([200, 409]).to.include(status);
+  });
+
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.is_default).to.equal(true);
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error.code).to.equal("ALREADY_DEFAULT");
+    }
+  });
+}
+
+docs {
+  PATCH /api/v1/customers/me/addresses/:id/set-default — atomic default switch.
+  Errors: 401 UNAUTHORIZED, 404 ADDRESS_NOT_FOUND, 409 ALREADY_DEFAULT
+}

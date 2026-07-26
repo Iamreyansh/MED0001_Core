@@ -1,0 +1,68 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customers/me/addresses
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "label": "HOME",
+    "flat_building": "Flat 4B, Prestige Shantiniketan",
+    "area_locality": "Whitefield",
+    "city": "Bengaluru",
+    "state": "Karnataka",
+    "pincode": "560066",
+    "latitude": 12.9693,
+    "longitude": 77.7499,
+    "is_default": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data)) {
+    return;
+  }
+  if (body.data.id) {
+    bru.setEnvVar("addressId", body.data.id);
+    if (body.data.is_default) {
+      bru.setEnvVar("defaultAddressId", body.data.id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("success envelope with address", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string").that.is.not.empty;
+    expect(body.data.label).to.equal("HOME");
+    expect(body.data.pincode).to.equal("560066");
+    expect(body.data.is_default).to.be.a("boolean");
+  });
+}
+
+docs {
+  POST /api/v1/customers/me/addresses — create address (first is auto-default; max 10).
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 422 ADDRESS_LIMIT_REACHED
+}
