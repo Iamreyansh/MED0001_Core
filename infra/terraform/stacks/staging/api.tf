@@ -193,6 +193,8 @@ locals {
     { name = "SPRING_DATA_REDIS_HOST", value = aws_elasticache_replication_group.redis.primary_endpoint_address },
     { name = "SPRING_DATA_REDIS_PORT", value = "6379" },
     { name = "MEDMATE_S3_BUCKET", value = aws_s3_bucket.uploads.bucket },
+    { name = "MEDMATE_CDN_BASE_URL", value = "https://cdn.nammamedmate.com" },
+    { name = "MEDMATE_REFERRAL_JOIN_BASE_URL", value = "https://nammamedmate.com/join" },
     { name = "MEDMATE_SQS_DOMAIN_EVENTS_URL", value = aws_sqs_queue.domain_events.url },
     { name = "MEDMATE_SECRETS_DB_ARN", value = aws_secretsmanager_secret.db.arn },
     { name = "MEDMATE_SECRETS_JWT_ARN", value = aws_secretsmanager_secret.jwt.arn },

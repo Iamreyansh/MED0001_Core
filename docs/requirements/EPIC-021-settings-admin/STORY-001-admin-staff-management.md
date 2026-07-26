@@ -64,7 +64,7 @@ GET /api/v1/admin/staff
     {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "name": "Ayesha Siddiqui",
-      "email": "ayesha@namma-medmate.in",
+      "email": "ayesha@nammamedmate.com",
       "role": "admin_super",
       "status": "ACTIVE",
       "mfa_enabled": true,
@@ -74,7 +74,7 @@ GET /api/v1/admin/staff
     {
       "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "name": "Sundar Rajan",
-      "email": "sundar@namma-medmate.in",
+      "email": "sundar@nammamedmate.com",
       "role": "admin_operations",
       "status": "ACTIVE",
       "mfa_enabled": false,
@@ -126,7 +126,7 @@ POST /api/v1/admin/staff
   "data": {
     "id": "c1d2e3f4-a5b6-7890-cdef-012345678901",
     "name": "Meera Krishnan",
-    "email": "meera@namma-medmate.in",
+    "email": "meera@nammamedmate.com",
     "role": "admin_support",
     "status": "INVITED",
     "mfa_enabled": false,
@@ -170,7 +170,7 @@ GET /api/v1/admin/staff/:id
   "data": {
     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "name": "Sundar Rajan",
-    "email": "sundar@namma-medmate.in",
+    "email": "sundar@nammamedmate.com",
     "role": "admin_operations",
     "status": "ACTIVE",
     "mfa_enabled": false,
@@ -312,7 +312,7 @@ POST /api/v1/admin/staff/:id/reset-password
 {
   "success": true,
   "data": {
-    "message": "Password reset email sent to sundar@namma-medmate.in.",
+    "message": "Password reset email sent to sundar@nammamedmate.com.",
     "reset_link_expires_at": "2026-07-24T06:00:00Z"
   },
   "meta": {}

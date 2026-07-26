@@ -10,6 +10,7 @@ import com.nammamedmate.customer.domain.LoyaltyTiers;
 import com.nammamedmate.customer.domain.PreferredLanguages;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
+import com.nammamedmate.kernel.storage.StorageObjectKeys;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ import java.time.Period;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,18 +41,22 @@ public class CustomerProfileService {
   private final LoyaltyStore loyalty;
   private final RateLimiter rateLimiter;
   private final Clock clock;
+  private final String avatarUrlPrefix;
 
   public CustomerProfileService(
       CustomerProfileStore store,
       ActiveOrdersPort activeOrders,
       LoyaltyStore loyalty,
       RateLimiter rateLimiter,
-      Clock clock) {
+      Clock clock,
+      @Value("${medmate.cdn.base-url:https://cdn.nammamedmate.com}") String cdnBaseUrl) {
     this.store = store;
     this.activeOrders = activeOrders;
     this.loyalty = loyalty;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
+    String base = cdnBaseUrl.endsWith("/") ? cdnBaseUrl.substring(0, cdnBaseUrl.length() - 1) : cdnBaseUrl;
+    this.avatarUrlPrefix = base + "/" + StorageObjectKeys.AVATARS + "/";
   }
 
   @Transactional(readOnly = true)
@@ -86,7 +92,7 @@ public class CustomerProfileService {
         if (url.length() > 512 || !isAllowedAvatarUrl(url)) {
           throw new AppException(
               "VALIDATION_ERROR",
-              "avatar_url must be an HTTPS URL on cdn.namma-medmate.in (max 512)",
+              "avatar_url must be an HTTPS URL under cdn.nammamedmate.com/avatars/ (max 512)",
               400);
         }
         avatarUrl = url;
@@ -273,8 +279,8 @@ public class CustomerProfileService {
     return BigDecimal.valueOf(paise).movePointLeft(2);
   }
 
-  static boolean isAllowedAvatarUrl(String url) {
-    return url.startsWith("https://cdn.namma-medmate.in/");
+  boolean isAllowedAvatarUrl(String url) {
+    return url.startsWith(avatarUrlPrefix);
   }
 
   public record UpdateProfileCommand(

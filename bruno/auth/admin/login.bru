@@ -22,7 +22,7 @@ body:json {
 }
 
 script:pre-request {
-  const email = bru.getEnvVar("adminEmail") || "ops@namma-medmate.in";
+  const email = bru.getEnvVar("adminEmail") || "ops@nammamedmate.com";
   bru.setEnvVar("adminEmail", email);
   const pass = bru.getEnvVar("adminPassword") || "Passw0rd!";
   bru.setEnvVar("adminPassword", pass);
@@ -88,7 +88,7 @@ example {
     }
     body:json: {
       {
-        "email": "ops@namma-medmate.in",
+        "email": "ops@nammamedmate.com",
         "password": "Passw0rd!"
       }
     }
@@ -129,7 +129,7 @@ example {
     }
     body:json: {
       {
-        "email": "ops@namma-medmate.in",
+        "email": "ops@nammamedmate.com",
         "password": "WrongPass1!"
       }
     }

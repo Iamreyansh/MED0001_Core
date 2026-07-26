@@ -367,7 +367,7 @@ class TokenManagementServicesTest {
         new AdminStaffRecord(
             adminId,
             "Ayesha",
-            "ayesha@namma-medmate.in",
+            "ayesha@nammamedmate.com",
             "hash",
             "admin_super",
             "ACTIVE",

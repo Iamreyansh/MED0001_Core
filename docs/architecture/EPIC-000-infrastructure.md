@@ -9,7 +9,7 @@ Stories across the product depend on this foundation (referenced as EPIC-000 in 
 | Worker | Fargate long-poll SQS | DLQ required |
 | Database | RDS PostgreSQL `db.t4g.micro` single-AZ | UTC storage; Flyway in `db/migration` |
 | Cache | ElastiCache Valkey `cache.t4g.micro` | Sessions, rate limits, config TTL |
-| Objects | S3 private buckets | Presigned PUT/GET; max 10 MB product uploads |
+| Objects | S3 private buckets | Bucket `med0001-{env}-uploads-105927215604`; keys via `StorageObjectKeys` prefixes (`avatars/`, `exports/`, `prescriptions/`, `kyc/`, …) — never bucket root; CDN `cdn.nammamedmate.com`; Presigned PUT/GET; max 10 MB |
 | Secrets | Secrets Manager | JWT RS256 keys, DB credentials |
 | Events | SQS (+ EventBridge Scheduler group) | Outbox consumer in worker |
 | Schedules | EventBridge Scheduler | Timezone `Asia/Kolkata` |
