@@ -31,5 +31,8 @@ class WalletDomainEnumsTest {
     assertThatThrownBy(() -> WalletCreditReason.require("X"))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> WalletCreditReason.require("REFERRAL"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("VALIDATION_ERROR");
   }
 }

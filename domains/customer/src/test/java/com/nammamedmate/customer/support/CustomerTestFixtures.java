@@ -42,6 +42,37 @@ public final class CustomerTestFixtures {
         null);
   }
 
+  public static CustomerProfileRecord customerWithName(UUID id, String name) {
+    CustomerProfileRecord base = customer(id);
+    return new CustomerProfileRecord(
+        base.id(),
+        base.phone(),
+        name,
+        base.avatarUrl(),
+        base.dateOfBirth(),
+        base.gender(),
+        base.preferredLanguage(),
+        base.segment(),
+        base.city(),
+        base.isFlagged(),
+        base.flagReason(),
+        base.flagNote(),
+        base.flaggedBy(),
+        base.flaggedAt(),
+        base.walletBalancePaise(),
+        base.loyaltyPoints(),
+        base.totalOrders(),
+        base.totalLtvPaise(),
+        base.cancelRate(),
+        base.disputeCount(),
+        base.lastOrderAt(),
+        base.deletionRequestedAt(),
+        base.deletionReason(),
+        base.createdAt(),
+        base.updatedAt(),
+        base.deletedAt());
+  }
+
   public static CustomerProfileRecord customerWith(
       UUID id, String segment, int totalOrders, long totalLtvPaise, boolean flagged) {
     CustomerProfileRecord base = customer(id);

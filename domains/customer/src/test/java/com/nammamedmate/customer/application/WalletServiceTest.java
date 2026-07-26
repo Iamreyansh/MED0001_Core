@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -893,5 +894,146 @@ class WalletServiceTest {
             NOW.minusSeconds(1)));
     assertThat(service.expireCredits()).isEqualTo(1);
     assertThat(wallets.findById(wid).orElseThrow().balancePaise()).isZero();
+  }
+
+  @Test
+  void systemCredit_referral_isIdempotent() {
+    Map<String, Object> first =
+        service.systemCredit(
+            customerId, 10_000L, "Referral reward", "ref-1", "referral-reward:evt1:referee");
+    Map<String, Object> replay =
+        service.systemCredit(
+            customerId, 10_000L, "Referral reward", "ref-1", "referral-reward:evt1:referee");
+
+    assertThat(first.get("amount_credited")).isEqualTo(new BigDecimal("100.00"));
+    assertThat(first.get("reason")).isEqualTo("REFERRAL");
+    assertThat(replay.get("transaction_id")).isEqualTo(first.get("transaction_id"));
+    long balance = wallets.findByCustomerId(customerId).orElseThrow().balancePaise();
+    assertThat(balance).isEqualTo(wallets.syncedBalance(customerId));
+    assertThat(balance).isGreaterThanOrEqualTo(10_000L);
+  }
+
+  @Test
+  void systemCredit_validationBranches() {
+    assertThatThrownBy(() -> service.systemCredit(null, 100, "x", null, "k"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.systemCredit(customerId, 0, "x", null, "k"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.systemCredit(Ids.newId(), 100, "x", null, "k2"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("CUSTOMER_NOT_FOUND");
+  }
+
+  @Test
+  void systemCredit_exceedsMaxCredit_returns422() {
+    assertThatThrownBy(
+            () -> service.systemCredit(customerId, 100_001L, "too big", null, "sys-over-cap"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("EXCEEDS_CREDIT_LIMIT");
+  }
+
+  @Test
+  void systemCredit_lockedReplayAndNullDescription() {
+    String idem = "sys-locked-replay";
+    FakeWalletStore racing =
+        new FakeWalletStore() {
+          boolean first = true;
+
+          @Override
+          public Optional<WalletTxRecord> findByIdempotencyKey(String key) {
+            if (!idem.equals(key)) {
+              return Optional.empty();
+            }
+            if (first) {
+              first = false;
+              return Optional.empty();
+            }
+            return Optional.of(
+                new WalletTxRecord(
+                    Ids.newId(),
+                    findByCustomerId(customerId).orElseThrow().id(),
+                    WalletTxType.CREDIT,
+                    100L,
+                    100L,
+                    "REFERRAL",
+                    "replay",
+                    null,
+                    idem,
+                    null,
+                    NOW.plus(365, ChronoUnit.DAYS),
+                    100L,
+                    NOW));
+          }
+        };
+    racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
+    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    assertThat(racingService.systemCredit(customerId, 100L, null, null, idem).get("reason"))
+        .isEqualTo("REFERRAL");
+  }
+
+  @Test
+  void systemCredit_createsWalletAndBlankDescription() {
+    wallets.clear();
+    Map<String, Object> result =
+        service.systemCredit(customerId, 1_000L, null, null, "sys-null-desc");
+    assertThat(result.get("new_balance")).isEqualTo(new BigDecimal("135.00"));
+    assertThat(wallets.allTransactions().getFirst().description())
+        .isEqualTo("System wallet credit");
+
+    service.systemCredit(customerId, 100L, "   ", null, "sys-blank-desc");
+    assertThat(wallets.allTransactions().getLast().description()).isEqualTo("System wallet credit");
+  }
+
+  @Test
+  void systemCredit_duplicateKeyRace_replaysExisting() {
+    String idem = "sys-race-key";
+    WalletTxRecord existing =
+        new WalletTxRecord(
+            Ids.newId(),
+            wallets.findByCustomerId(customerId).orElseThrow().id(),
+            WalletTxType.CREDIT,
+            500L,
+            500L,
+            "REFERRAL",
+            "won",
+            null,
+            idem,
+            null,
+            NOW.plus(365, ChronoUnit.DAYS),
+            500L,
+            NOW);
+    FakeWalletStore racing =
+        new FakeWalletStore() {
+          @Override
+          public WalletTxRecord insertTransaction(WalletTxRecord tx) {
+            throw new org.springframework.dao.DuplicateKeyException("race");
+          }
+
+          @Override
+          public Optional<WalletTxRecord> findByIdempotencyKey(String key) {
+            return idem.equals(key) ? Optional.of(existing) : Optional.empty();
+          }
+        };
+    racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
+    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    assertThat(racingService.systemCredit(customerId, 500L, "x", null, idem).get("transaction_id"))
+        .isEqualTo(existing.id());
+  }
+
+  @Test
+  void systemCredit_duplicateKeyMissingRow_rethrows() {
+    FakeWalletStore racing =
+        new FakeWalletStore() {
+          @Override
+          public WalletTxRecord insertTransaction(WalletTxRecord tx) {
+            throw new org.springframework.dao.DuplicateKeyException("race");
+          }
+        };
+    racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
+    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    assertThatThrownBy(() -> racingService.systemCredit(customerId, 100L, "x", null, "sys-miss"))
+        .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
   }
 }

@@ -79,6 +79,7 @@ GET /api/v1/customers/me/loyalty
 | HTTP | Error Code | Condition |
 |------|-----------|-----------|
 | 401 | `UNAUTHORIZED` | Token missing or invalid |
+| 429 | `RATE_LIMITED` | Rate limit exceeded (30 req/min per user) |
 
 ---
 
@@ -136,7 +137,9 @@ GET /api/v1/customers/me/loyalty/transactions
 
 | HTTP | Error Code | Condition |
 |------|-----------|-----------|
+| 400 | `VALIDATION_ERROR` | `type` is not one of EARN \| REVERSE |
 | 401 | `UNAUTHORIZED` | Token missing or invalid |
+| 429 | `RATE_LIMITED` | Rate limit exceeded (20 req/min per user) |
 
 ---
 
@@ -172,6 +175,7 @@ GET /api/v1/customers/me/referral
 | HTTP | Error Code | Condition |
 |------|-----------|-----------|
 | 401 | `UNAUTHORIZED` | Token missing or invalid |
+| 429 | `RATE_LIMITED` | Rate limit exceeded (30 req/min per user) |
 
 ---
 
@@ -216,6 +220,7 @@ POST /api/v1/customers/me/referral/apply
 | 409 | `REFERRAL_ALREADY_USED` | This customer has already applied a referral code |
 | 409 | `FIRST_ORDER_ALREADY_PLACED` | Customer has already placed their first order |
 | 422 | `SELF_REFERRAL_NOT_ALLOWED` | Customer is trying to apply their own referral code |
+| 429 | `RATE_LIMITED` | Rate limit exceeded (5 req/hour per user) |
 
 ---
 

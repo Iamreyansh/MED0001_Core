@@ -1,0 +1,127 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me/loyalty
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("loyaltyTier", body.data.tier);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with tier progress", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("tier");
+    expect(body.data).to.have.property("points_balance");
+    expect(body.data).to.have.property("points_earned_lifetime");
+    expect(body.data.tier_progress).to.be.an("object");
+    expect(body.data.tier_thresholds).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/customers/me/loyalty — tier, balance, lifetime points, progress.
+  Rate limit: 30 req/min per user.
+  Errors: 401 UNAUTHORIZED, 429 RATE_LIMITED
+}
+
+example {
+  name: 200 OK
+  description: GOLD tier with progress toward PLATINUM.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/loyalty
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "tier": "GOLD",
+            "points_balance": 50,
+            "points_earned_lifetime": 50,
+            "tier_progress": {
+              "current_tier": "GOLD",
+              "next_tier": "PLATINUM",
+              "points_for_next_tier": 120,
+              "points_needed": 70,
+              "progress_pct": 0
+            },
+            "tier_thresholds": {
+              "NONE": { "min": 0, "max": 11 },
+              "SILVER": { "min": 12, "max": 49 },
+              "GOLD": { "min": 50, "max": 119 },
+              "PLATINUM": { "min": 120, "max": null }
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/loyalty
+    method: get
+    mode: none
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Customer authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

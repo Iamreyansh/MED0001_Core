@@ -5,7 +5,6 @@ import com.nammamedmate.customer.application.port.out.CustomerProfileStore.Custo
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore.ListFilter;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore.PageResult;
 import com.nammamedmate.customer.domain.FlagReason;
-import com.nammamedmate.customer.domain.LoyaltyTiers;
 import com.nammamedmate.customer.domain.NotifyChannel;
 import com.nammamedmate.kernel.api.PageRequest;
 import com.nammamedmate.kernel.api.PaginationMeta;
@@ -42,6 +41,7 @@ public class AdminCustomerService {
 
   private final CustomerProfileStore store;
   private final WalletService wallets;
+  private final LoyaltyService loyalty;
   private final RateLimiter rateLimiter;
   private final OutboxPublisher outbox;
   private final Clock clock;
@@ -49,11 +49,13 @@ public class AdminCustomerService {
   public AdminCustomerService(
       CustomerProfileStore store,
       WalletService wallets,
+      LoyaltyService loyalty,
       RateLimiter rateLimiter,
       OutboxPublisher outbox,
       Clock clock) {
     this.store = store;
     this.wallets = wallets;
+    this.loyalty = loyalty;
     this.rateLimiter = rateLimiter;
     this.outbox = outbox;
     this.clock = clock;
@@ -339,12 +341,9 @@ public class AdminCustomerService {
 
     data.put("wallet", wallets.adminWalletSummary(c.id()));
 
-    Map<String, Object> loyalty = new LinkedHashMap<>();
-    loyalty.put("tier", LoyaltyTiers.fromPoints(c.loyaltyPoints()));
-    loyalty.put("points_balance", c.loyaltyPoints());
-    loyalty.put("points_earned_lifetime", c.loyaltyPoints());
-    loyalty.put("dispute_count", c.disputeCount());
-    data.put("loyalty", loyalty);
+    Map<String, Object> loyaltyView = new LinkedHashMap<>(loyalty.adminLoyaltySummary(c.id()));
+    loyaltyView.put("dispute_count", c.disputeCount());
+    data.put("loyalty", loyaltyView);
     return data;
   }
 

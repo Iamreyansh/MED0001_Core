@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 9 |
+| Phase 1 | 46 | 10 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **9** |
+| **Total** | **129** | **10** |
 
 ---
 
@@ -43,7 +43,7 @@
 | EPIC-002 | [STORY-002](./EPIC-002-customer-management/STORY-002-address-management.md) | Delivery Address Management | done | 2026-07-26 | `domains/customer`; V007 addresses + `default_address_id`; max 10; first auto-default; atomic set-default; soft delete; `AddressInActiveOrderPort` stub until EPIC-010; geocode stub + Redis 1h cache@4dp, Google when `medmate.maps.geocode.api-key` set; no admin address API in story |
 | EPIC-002 | [STORY-003](./EPIC-002-customer-management/STORY-003-wallet-management.md) | Namma Money Wallet | done | 2026-07-26 | `domains/customer`; V008 wallets+ledger (paise) + trigger auto-create; admin credit `finance:*` max 100000 paise; FIFO remaining_paise + nightly expiry Asia/Kolkata; checkout debit via `WalletService.debitForOrder` until EPIC-010; syncs `customers.wallet_balance_paise` |
 | EPIC-002 | [STORY-004](./EPIC-002-customer-management/STORY-004-saved-payment-methods.md) | Saved Payment Methods | done | 2026-07-26 | `domains/customer`; V009+V010 saved_payment_methods (+idempotency_key); dedicated `paymentMethodCipher`; StubRazorpayVpaClient (+ live / SM `MEDMATE_SECRETS_RAZORPAY_ARN`); admin `GET …/payment-methods` (`customers:read`); VPA validate outside TX; softDelete scoped by customer_id; PaymentMethodInActiveOrderPort stub until EPIC-010; max 5 UPI + 5 cards; COD not persisted |
-| EPIC-002 | [STORY-005](./EPIC-002-customer-management/STORY-005-loyalty-referrals.md) | Loyalty Points & Referral Programme | pending | — | — |
+| EPIC-002 | [STORY-005](./EPIC-002-customer-management/STORY-005-loyalty-referrals.md) | Loyalty Points & Referral Programme | done | 2026-07-26 | `domains/customer`; V011 customer_loyalty + loyalty_transactions + customer_referrals + referral_events; DB trigger MED+4 codes; tiers NONE/SILVER/GOLD/PLATINUM on lifetime; wallet REFERRAL via systemCredit; order award/reverse + referral settle ports until EPIC-010; outbox `customer.loyalty.tier_changed` |
 
 ### EPIC-003 (`EPIC-003-pharmacy-onboarding-kyc`)
 

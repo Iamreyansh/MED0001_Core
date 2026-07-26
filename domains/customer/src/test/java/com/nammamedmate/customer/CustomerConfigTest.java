@@ -6,7 +6,10 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.customer.adapter.out.geocode.CachingGeocodePort;
+import com.nammamedmate.customer.application.port.out.CustomerOrderHistoryPort;
 import com.nammamedmate.customer.application.port.out.GeocodePort;
+import com.nammamedmate.customer.support.CustomerTestFixtures;
+import com.nammamedmate.customer.support.FakeCustomerProfileStore;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -18,6 +21,22 @@ class CustomerConfigTest {
   void noActiveOrdersPort_returnsFalse() {
     CustomerConfig config = new CustomerConfig();
     assertThat(config.noActiveOrdersPort().hasActiveOrders(UUID.randomUUID())).isFalse();
+  }
+
+  @Test
+  void profileOrderHistoryPort_reflectsTotalOrders() {
+    CustomerConfig config = new CustomerConfig();
+    FakeCustomerProfileStore profiles = new FakeCustomerProfileStore();
+    CustomerOrderHistoryPort port = config.profileOrderHistoryPort(profiles);
+
+    UUID withOrders = UUID.randomUUID();
+    UUID withoutOrders = UUID.randomUUID();
+    profiles.saveProfile(CustomerTestFixtures.customerWith(withOrders, "REGULAR", 3, 0L, false));
+    profiles.saveProfile(CustomerTestFixtures.customerWith(withoutOrders, "NEW", 0, 0L, false));
+
+    assertThat(port.hasPlacedAnyOrder(withOrders)).isTrue();
+    assertThat(port.hasPlacedAnyOrder(withoutOrders)).isFalse();
+    assertThat(port.hasPlacedAnyOrder(UUID.randomUUID())).isFalse();
   }
 
   @Test
