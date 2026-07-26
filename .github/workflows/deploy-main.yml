@@ -14,7 +14,7 @@ concurrency:
 
 env:
   AWS_REGION: ap-south-1
-  STAGING_HEALTH_URL: https://staging-core.api.nammamedmate.com/api/v1/health
+  STAGING_HEALTH_URL: https://core.api.staging.nammamedmate.com/api/v1/health
 
 jobs:
   guard:

@@ -55,7 +55,8 @@ public class CustomerProfileService {
     this.loyalty = loyalty;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
-    String base = cdnBaseUrl.endsWith("/") ? cdnBaseUrl.substring(0, cdnBaseUrl.length() - 1) : cdnBaseUrl;
+    String base =
+        cdnBaseUrl.endsWith("/") ? cdnBaseUrl.substring(0, cdnBaseUrl.length() - 1) : cdnBaseUrl;
     this.avatarUrlPrefix = base + "/" + StorageObjectKeys.AVATARS + "/";
   }
 

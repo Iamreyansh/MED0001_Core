@@ -4,7 +4,7 @@ Stories across the product depend on this foundation (referenced as EPIC-000 in 
 
 | Capability | AWS / component | Notes |
 |------------|-----------------|-------|
-| API edge | ALB + ACM + Route 53 | staging `staging-core.api…`; prod `core.api.nammamedmate.com` |
+| API edge | ALB + ACM + Route 53 | staging `core.api.staging.nammamedmate.com`; prod `core.api.nammamedmate.com` |
 | Compute | ECS Fargate arm64 (public subnets, no NAT) | API + worker per env; prod via `release-*` tag promote |
 | Worker | Fargate long-poll SQS | DLQ required |
 | Database | RDS PostgreSQL `db.t4g.micro` single-AZ | UTC storage; Flyway in `db/migration` |

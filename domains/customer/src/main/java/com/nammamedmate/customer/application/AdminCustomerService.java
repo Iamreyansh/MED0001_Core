@@ -97,9 +97,7 @@ public class AdminCustomerService {
       Map<String, Object> data = new LinkedHashMap<>();
       data.put(
           "export_url",
-          cdnBaseUrl
-              + "/"
-              + StorageObjectKeys.export("customers-" + principal.subject() + ".csv"));
+          cdnBaseUrl + "/" + StorageObjectKeys.export("customers-" + principal.subject() + ".csv"));
       data.put("expires_at", clock.instant().plus(1, ChronoUnit.HOURS));
       return new AdminListResult(data, null);
     }

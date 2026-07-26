@@ -144,8 +144,7 @@ class AdminCustomerServiceTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> data = (Map<String, Object>) result.data();
     assertThat(data.get("export_url").toString())
-        .isEqualTo(
-            "https://cdn.nammamedmate.com/exports/customers-" + admin.subject() + ".csv");
+        .isEqualTo("https://cdn.nammamedmate.com/exports/customers-" + admin.subject() + ".csv");
     assertThat(data).containsKey("expires_at");
     assertThat(result.meta()).isNull();
   }

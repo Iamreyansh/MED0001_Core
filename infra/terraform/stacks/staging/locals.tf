@@ -8,7 +8,7 @@ locals {
   name            = "med0001-staging"
   environment     = "staging"
   hosted_zone_id  = "Z092619528F68GS3HR1ZE"
-  domain_name     = "staging-core.api.nammamedmate.com"
+  domain_name     = "core.api.staging.nammamedmate.com"
   cdn_domain_name = "cdn.staging.nammamedmate.com"
   cdn_base_url    = "https://${local.cdn_domain_name}"
   azs             = ["ap-south-1a", "ap-south-1b"]
