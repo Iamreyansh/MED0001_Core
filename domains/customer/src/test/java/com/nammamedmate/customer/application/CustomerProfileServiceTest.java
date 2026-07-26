@@ -8,6 +8,7 @@ import com.nammamedmate.customer.application.port.out.ActiveOrdersPort;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore.CustomerProfileRecord;
 import com.nammamedmate.customer.support.CustomerTestFixtures;
 import com.nammamedmate.customer.support.FakeCustomerProfileStore;
+import com.nammamedmate.customer.support.FakeLoyaltyStore;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
@@ -41,7 +42,8 @@ class CustomerProfileServiceTest {
     store = new FakeCustomerProfileStore();
     rateLimiter = new InMemoryRateLimiter(CLOCK);
     activeOrders = id -> false;
-    service = new CustomerProfileService(store, activeOrders, rateLimiter, CLOCK);
+    service =
+        new CustomerProfileService(store, activeOrders, new FakeLoyaltyStore(), rateLimiter, CLOCK);
     customerId = Ids.newId();
     store.saveProfile(CustomerTestFixtures.customer(customerId));
     customerPrincipal =
@@ -58,7 +60,7 @@ class CustomerProfileServiceTest {
         .containsEntry("segment", "REGULAR")
         .containsEntry("wallet_balance", new BigDecimal("125.00"))
         .containsEntry("loyalty_points", 75)
-        .containsEntry("loyalty_tier", "SILVER");
+        .containsEntry("loyalty_tier", "GOLD");
   }
 
   @Test
@@ -75,7 +77,8 @@ class CustomerProfileServiceTest {
   @Test
   void requestDeletion_withActiveOrders_returnsActiveOrdersExistAndDeletionNotSet() {
     activeOrders = id -> true;
-    service = new CustomerProfileService(store, activeOrders, rateLimiter, CLOCK);
+    service =
+        new CustomerProfileService(store, activeOrders, new FakeLoyaltyStore(), rateLimiter, CLOCK);
 
     assertThatThrownBy(() -> service.requestDeletion(customerPrincipal, "moving away"))
         .isInstanceOf(AppException.class)
@@ -421,5 +424,13 @@ class CustomerProfileServiceTest {
 
     assertThat(view).containsEntry("wallet_balance", new BigDecimal("125.00"));
     assertThat(CustomerProfileService.paiseToRupees(1L)).isEqualByComparingTo("0.01");
+
+    var loyalty =
+        new com.nammamedmate.customer.application.port.out.LoyaltyStore.LoyaltyRecord(
+            Ids.newId(), customerId, "PLATINUM", 120, 150, NOW);
+    Map<String, Object> withLoyalty = CustomerProfileService.toMeView(record, loyalty);
+    assertThat(withLoyalty)
+        .containsEntry("loyalty_points", 120)
+        .containsEntry("loyalty_tier", "PLATINUM");
   }
 }

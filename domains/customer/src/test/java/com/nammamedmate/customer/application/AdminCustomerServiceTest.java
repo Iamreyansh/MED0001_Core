@@ -8,6 +8,7 @@ import com.nammamedmate.customer.application.AdminCustomerService.AdminListResul
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore.CustomerProfileRecord;
 import com.nammamedmate.customer.support.CustomerTestFixtures;
 import com.nammamedmate.customer.support.FakeCustomerProfileStore;
+import com.nammamedmate.customer.support.FakeLoyaltyStore;
 import com.nammamedmate.customer.support.FakeWalletStore;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
@@ -48,10 +49,17 @@ class AdminCustomerServiceTest {
     rateLimiter = new InMemoryRateLimiter(CLOCK);
     outboxStore = new InMemoryOutboxStore();
     WalletService walletService = new WalletService(wallets, store, rateLimiter, CLOCK, 100_000L);
+    LoyaltyService loyaltyService =
+        new LoyaltyService(
+            new FakeLoyaltyStore(),
+            rateLimiter,
+            CLOCK,
+            new OutboxPublisher(outboxStore, new ObjectMapper()));
     service =
         new AdminCustomerService(
             store,
             walletService,
+            loyaltyService,
             rateLimiter,
             new OutboxPublisher(outboxStore, new ObjectMapper()),
             CLOCK);

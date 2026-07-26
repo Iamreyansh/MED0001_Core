@@ -189,6 +189,93 @@ public class WalletService {
   }
 
   /**
+   * System credit (referral rewards, etc.). Idempotent via idempotencyKey. Not exposed on admin
+   * credit API — reason may be {@link WalletCreditReason#REFERRAL}.
+   */
+  @Transactional
+  public Map<String, Object> systemCredit(
+      UUID customerId,
+      long amountPaise,
+      String description,
+      String referenceId,
+      String idempotencyKey) {
+    if (customerId == null) {
+      throw new AppException("VALIDATION_ERROR", "customer_id is required", 400);
+    }
+    if (amountPaise <= 0) {
+      throw new AppException("VALIDATION_ERROR", "amount must be positive", 400);
+    }
+    if (amountPaise > maxCreditPaise) {
+      throw new AppException(
+          "EXCEEDS_CREDIT_LIMIT", "Amount exceeds max_wallet_credit_per_transaction", 422);
+    }
+    String key = requireIdempotencyKey(idempotencyKey);
+    Optional<WalletTxRecord> replay = wallets.findByIdempotencyKey(key);
+    if (replay.isPresent()) {
+      return toCreditView(customerId, replay.get());
+    }
+    if (profiles.findById(customerId).isEmpty()) {
+      throw new AppException("CUSTOMER_NOT_FOUND", "Customer not found", 404);
+    }
+
+    Instant now = clock.instant();
+    WalletRecord locked =
+        wallets.lockByCustomerId(customerId).orElseGet(() -> createWallet(customerId, now));
+
+    Optional<WalletTxRecord> lockedReplay = wallets.findByIdempotencyKey(key);
+    if (lockedReplay.isPresent()) {
+      return toCreditView(customerId, lockedReplay.get());
+    }
+
+    long newBalance = locked.balancePaise() + amountPaise;
+    Instant expiresAt = now.plus(CREDIT_TTL_DAYS, ChronoUnit.DAYS);
+    UUID txId = Ids.newId();
+    String desc =
+        description == null || description.isBlank()
+            ? "System wallet credit"
+            : truncate(description, 500);
+    String ref = trimToNull(referenceId, 255);
+
+    WalletTxRecord credit =
+        new WalletTxRecord(
+            txId,
+            locked.id(),
+            WalletTxType.CREDIT,
+            amountPaise,
+            newBalance,
+            WalletCreditReason.REFERRAL.name(),
+            desc,
+            ref,
+            key,
+            null,
+            expiresAt,
+            amountPaise,
+            now);
+    try {
+      wallets.insertTransaction(credit);
+    } catch (DuplicateKeyException ex) {
+      return wallets
+          .findByIdempotencyKey(key)
+          .map(tx -> toCreditView(customerId, tx))
+          .orElseThrow(() -> ex);
+    }
+
+    WalletRecord updated =
+        new WalletRecord(
+            locked.id(),
+            locked.customerId(),
+            newBalance,
+            locked.lifetimeCreditedPaise() + amountPaise,
+            locked.lifetimeDebitedPaise(),
+            locked.version() + 1,
+            locked.createdAt(),
+            now);
+    wallets.updateWallet(updated, locked.version());
+    wallets.syncCustomerBalancePaise(customerId, newBalance);
+    return toCreditView(customerId, credit);
+  }
+
+  /**
    * Checkout debit: apply entire wallet balance up to order total. Used by order domain later
    * (EPIC-010); unit-tested here for STORY-003 AC.
    */
@@ -523,7 +610,7 @@ public class WalletService {
     return value.length() <= max ? value : value.substring(0, max);
   }
 
-  static BigDecimal paiseToRupees(long paise) {
+  public static BigDecimal paiseToRupees(long paise) {
     return BigDecimal.valueOf(paise).movePointLeft(2);
   }
 

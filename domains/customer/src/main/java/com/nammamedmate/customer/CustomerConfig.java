@@ -8,6 +8,9 @@ import com.nammamedmate.customer.adapter.out.razorpay.RazorpayVpaClient;
 import com.nammamedmate.customer.adapter.out.razorpay.StubRazorpayVpaClient;
 import com.nammamedmate.customer.application.port.out.ActiveOrdersPort;
 import com.nammamedmate.customer.application.port.out.AddressInActiveOrderPort;
+import com.nammamedmate.customer.application.port.out.CustomerOrderHistoryPort;
+import com.nammamedmate.customer.application.port.out.CustomerProfileStore;
+import com.nammamedmate.customer.application.port.out.CustomerProfileStore.CustomerProfileRecord;
 import com.nammamedmate.customer.application.port.out.GeocodePort;
 import com.nammamedmate.customer.application.port.out.PaymentMethodInActiveOrderPort;
 import com.nammamedmate.customer.application.port.out.RazorpayVpaPort;
@@ -28,6 +31,15 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Configuration
 public class CustomerConfig {
+
+  @Bean
+  @ConditionalOnMissingBean(CustomerOrderHistoryPort.class)
+  CustomerOrderHistoryPort profileOrderHistoryPort(CustomerProfileStore profiles) {
+    // Fail-closed first-order gate off customers.total_orders until EPIC-010 wires a live order
+    // port. A customer with any recorded order can no longer apply a referral code.
+    return customerId ->
+        profiles.findById(customerId).map(CustomerProfileRecord::totalOrders).orElse(0) > 0;
+  }
 
   @Bean
   @ConditionalOnMissingBean(ActiveOrdersPort.class)

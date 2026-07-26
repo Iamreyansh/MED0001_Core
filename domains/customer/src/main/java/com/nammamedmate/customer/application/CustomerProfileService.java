@@ -3,6 +3,8 @@ package com.nammamedmate.customer.application;
 import com.nammamedmate.customer.application.port.out.ActiveOrdersPort;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore.CustomerProfileRecord;
+import com.nammamedmate.customer.application.port.out.LoyaltyStore;
+import com.nammamedmate.customer.application.port.out.LoyaltyStore.LoyaltyRecord;
 import com.nammamedmate.customer.domain.CustomerGender;
 import com.nammamedmate.customer.domain.LoyaltyTiers;
 import com.nammamedmate.customer.domain.PreferredLanguages;
@@ -34,16 +36,19 @@ public class CustomerProfileService {
 
   private final CustomerProfileStore store;
   private final ActiveOrdersPort activeOrders;
+  private final LoyaltyStore loyalty;
   private final RateLimiter rateLimiter;
   private final Clock clock;
 
   public CustomerProfileService(
       CustomerProfileStore store,
       ActiveOrdersPort activeOrders,
+      LoyaltyStore loyalty,
       RateLimiter rateLimiter,
       Clock clock) {
     this.store = store;
     this.activeOrders = activeOrders;
+    this.loyalty = loyalty;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
   }
@@ -52,7 +57,7 @@ public class CustomerProfileService {
   public Map<String, Object> getMe(MedmatePrincipal principal) {
     CustomerProfileRecord c = requireCustomer(principal);
     rateLimit("customer:me:get:" + c.id(), GET_LIMIT, MINUTE);
-    return toMeView(c);
+    return toMeView(c, loyalty.findByCustomerId(c.id()).orElse(null));
   }
 
   @Transactional
@@ -239,6 +244,10 @@ public class CustomerProfileService {
   }
 
   static Map<String, Object> toMeView(CustomerProfileRecord c) {
+    return toMeView(c, null);
+  }
+
+  static Map<String, Object> toMeView(CustomerProfileRecord c, LoyaltyRecord loyalty) {
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("id", c.id());
     data.put("phone", c.phone());
@@ -250,8 +259,11 @@ public class CustomerProfileService {
     data.put("segment", c.segment());
     data.put("is_flagged", c.isFlagged());
     data.put("wallet_balance", paiseToRupees(c.walletBalancePaise()));
-    data.put("loyalty_points", c.loyaltyPoints());
-    data.put("loyalty_tier", LoyaltyTiers.fromPoints(c.loyaltyPoints()));
+    int points = loyalty != null ? loyalty.pointsBalance() : c.loyaltyPoints();
+    String tier =
+        loyalty != null ? loyalty.tier() : LoyaltyTiers.fromLifetimePoints(c.loyaltyPoints());
+    data.put("loyalty_points", points);
+    data.put("loyalty_tier", tier);
     data.put("total_orders", c.totalOrders());
     data.put("created_at", c.createdAt());
     return data;
