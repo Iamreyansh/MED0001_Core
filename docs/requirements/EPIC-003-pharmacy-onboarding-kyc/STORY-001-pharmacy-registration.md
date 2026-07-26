@@ -100,11 +100,17 @@ POST /api/v1/pharmacy/register
 | 400 | `INVALID_PAN` | PAN number fails format validation |
 | 400 | `INVALID_PINCODE` | Pincode is not a valid 6-digit Indian pincode |
 | 400 | `INVALID_PHONE` | Phone not in +91XXXXXXXXXX format |
+| 400 | `INVALID_BUSINESS_TYPE` | business_type not in allowed enum |
+| 400 | `INVALID_STATE` | address.state is not a valid Indian state/UT |
+| 400 | `INVALID_FSSAI` | Optional fssai_number present but not 14 digits |
+| 400 | `INVALID_COORDINATES` | latitude/longitude out of range |
 | 400 | `MISSING_REQUIRED_FIELD` | Any required field absent |
 | 400 | `INVALID_PASSWORD_STRENGTH` | Password does not meet complexity requirements |
 | 409 | `EMAIL_ALREADY_REGISTERED` | Email exists on any platform account |
 | 409 | `PHONE_ALREADY_REGISTERED` | Phone exists on any platform account |
 | 409 | `DRUG_LICENCE_ALREADY_REGISTERED` | Drug licence + state combination already in use |
+| 409 | `GSTIN_ALREADY_REGISTERED` | GSTIN already registered |
+| 409 | `PAN_ALREADY_REGISTERED` | PAN already registered |
 | 429 | `RATE_LIMIT_EXCEEDED` | Too many registration attempts |
 
 ---
@@ -151,6 +157,7 @@ POST /api/v1/pharmacy/register/verify-email
 | 400 | `OTP_MAX_ATTEMPTS` | More than 3 failed OTP attempts; new OTP must be requested |
 | 404 | `EMAIL_NOT_FOUND` | Email not found in pending registrations |
 | 409 | `EMAIL_ALREADY_VERIFIED` | Email already verified for this account |
+| 429 | `RATE_LIMIT_EXCEEDED` | Too many verify attempts (IP rate limit) |
 
 ---
 
@@ -190,6 +197,7 @@ POST /api/v1/pharmacy/register/resend-otp
 | 409 | `EMAIL_ALREADY_VERIFIED` | Already verified |
 | 429 | `RESEND_LIMIT_EXCEEDED` | Max 5 resends per session reached |
 | 429 | `RESEND_TOO_SOON` | 60-second cooldown not elapsed |
+| 429 | `RATE_LIMIT_EXCEEDED` | Too many resend attempts (email rate limit) |
 
 ---
 
@@ -235,6 +243,7 @@ GET /api/v1/pharmacy/registration-status
 |------|-----------|-----------|
 | 401 | `UNAUTHORIZED` | Missing or invalid JWT |
 | 403 | `FORBIDDEN` | User is not a pharmacy_owner or pharmacy_staff |
+| 429 | `RATE_LIMIT_EXCEEDED` | Too many status requests |
 
 ---
 

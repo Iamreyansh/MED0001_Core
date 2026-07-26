@@ -180,6 +180,32 @@ class PharmacyLoginServiceTest {
   }
 
   @Test
+  void invitedAccountCannotLoginUntilEmailVerified() {
+    PharmacyStaffRecord invited =
+        new PharmacyStaffRecord(
+            staffId,
+            "P",
+            "priya@test.in",
+            null,
+            encoder.encode(PASSWORD),
+            null,
+            "INVITED",
+            0,
+            null,
+            null,
+            null,
+            null,
+            NOW,
+            NOW);
+    staffStore.byEmail.put("priya@test.in", invited);
+
+    assertThatThrownBy(() -> service.login("priya@test.in", PASSWORD, null, "1.1.1.1", "ua"))
+        .isInstanceOf(AppException.class)
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("EMAIL_NOT_VERIFIED");
+  }
+
+  @Test
   void lockedAccountReturns403WithUnlockAt() {
     Instant lockedUntil = NOW.plusSeconds(1800);
     PharmacyStaffRecord locked =

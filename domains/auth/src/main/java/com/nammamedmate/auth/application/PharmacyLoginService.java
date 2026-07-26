@@ -158,6 +158,10 @@ public class PharmacyLoginService {
       audit(normalised.value(), staff.id(), false, "ACCOUNT_SUSPENDED", clientIp, userAgent);
       throw new AppException("ACCOUNT_SUSPENDED", "Account has been suspended", 403);
     }
+    if (!"ACTIVE".equals(staff.status())) {
+      audit(normalised.value(), staff.id(), false, "EMAIL_NOT_VERIFIED", clientIp, userAgent);
+      throw new AppException("EMAIL_NOT_VERIFIED", "Verify your email before signing in", 403);
+    }
 
     Instant now = clock.instant();
     if (staff.lockedUntil() != null && now.isBefore(staff.lockedUntil())) {

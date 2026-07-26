@@ -42,13 +42,18 @@ public class SecurityConfig {
                         "/api/v1/auth/pharmacy/login",
                         "/api/v1/auth/pharmacy/pos-pin",
                         "/api/v1/auth/admin/login",
-                        "/api/v1/auth/refresh")
+                        "/api/v1/auth/refresh",
+                        "/api/v1/pharmacy/register",
+                        "/api/v1/pharmacy/register/verify-email",
+                        "/api/v1/pharmacy/register/resend-otp")
                     .permitAll()
                     .requestMatchers("/api/v1/webhooks/**")
                     .permitAll()
                     .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**")
                     .permitAll()
                     .requestMatchers("/api/v1/auth/pharmacy/switch-pharmacy")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/pharmacy/registration-status")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/roles", "/api/v1/pharmacy/roles/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")

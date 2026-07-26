@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 10 |
+| Phase 1 | 46 | 11 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **10** |
+| **Total** | **129** | **11** |
 
 ---
 
@@ -49,7 +49,7 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-003 | [STORY-001](./EPIC-003-pharmacy-onboarding-kyc/STORY-001-pharmacy-registration.md) | Pharmacy Registration | pending | — | — |
+| EPIC-003 | [STORY-001](./EPIC-003-pharmacy-onboarding-kyc/STORY-001-pharmacy-registration.md) | Pharmacy Registration | done | 2026-07-26 | `domains/pharmacy`; V012 widen `pharmacies` + OTP/pincode/audit; owner via `pharmacy_staff` + system `owner` role; magic OTP `*@nammamedmate.test`→`123456`; email uniqueness excludes `customers` (no email col); phone excludes `admin_staff`; password on `pharmacy_staff` (+ optional `pharmacies.password_hash`); partial pincode seed (ponytail) |
 | EPIC-003 | [STORY-002](./EPIC-003-pharmacy-onboarding-kyc/STORY-002-kyc-document-upload.md) | KYC Document Upload | pending | — | — |
 | EPIC-003 | [STORY-003](./EPIC-003-pharmacy-onboarding-kyc/STORY-003-auto-kyc-verification.md) | Auto KYC Verification | pending | — | — |
 | EPIC-003 | [STORY-004](./EPIC-003-pharmacy-onboarding-kyc/STORY-004-kyc-status-management.md) | KYC Status Management (Admin) | pending | — | — |
