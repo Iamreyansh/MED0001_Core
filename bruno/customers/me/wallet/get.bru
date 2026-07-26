@@ -1,0 +1,50 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me/wallet
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.wallet_id) {
+    bru.setEnvVar("walletId", body.data.wallet_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with wallet balance", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.wallet_id).to.be.a("string").that.is.not.empty;
+    expect(body.data.currency).to.equal("INR");
+    expect(body.data).to.have.property("balance");
+    expect(body.data).to.have.property("lifetime_credited");
+    expect(body.data).to.have.property("lifetime_debited");
+    expect(body.data.expiring_soon).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/customers/me/wallet — Namma Money balance.
+  Errors: 401 UNAUTHORIZED
+}

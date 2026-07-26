@@ -46,6 +46,9 @@ medmate:
   mfa:
     # 32 zero bytes, Base64 — local/dev/IT only. Staging/prod reject this and require Secrets Manager.
     encryption-key-base64: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  wallet:
+    # Rs 1,000 — platform config key max_wallet_credit_per_transaction (EPIC-021 STORY-004 later)
+    max-credit-paise: 100000
 
 springdoc:
   api-docs:

@@ -8,6 +8,7 @@ import com.nammamedmate.customer.application.AdminCustomerService.AdminListResul
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore.CustomerProfileRecord;
 import com.nammamedmate.customer.support.CustomerTestFixtures;
 import com.nammamedmate.customer.support.FakeCustomerProfileStore;
+import com.nammamedmate.customer.support.FakeWalletStore;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
@@ -32,6 +33,7 @@ class AdminCustomerServiceTest {
   private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
   private FakeCustomerProfileStore store;
+  private FakeWalletStore wallets;
   private InMemoryRateLimiter rateLimiter;
   private InMemoryOutboxStore outboxStore;
   private AdminCustomerService service;
@@ -42,11 +44,17 @@ class AdminCustomerServiceTest {
   @BeforeEach
   void setUp() {
     store = new FakeCustomerProfileStore();
+    wallets = new FakeWalletStore();
     rateLimiter = new InMemoryRateLimiter(CLOCK);
     outboxStore = new InMemoryOutboxStore();
+    WalletService walletService = new WalletService(wallets, store, rateLimiter, CLOCK, 100_000L);
     service =
         new AdminCustomerService(
-            store, rateLimiter, new OutboxPublisher(outboxStore, new ObjectMapper()), CLOCK);
+            store,
+            walletService,
+            rateLimiter,
+            new OutboxPublisher(outboxStore, new ObjectMapper()),
+            CLOCK);
     admin = new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPER, null, TokenScope.FULL, "j");
 
     vipId = Ids.newId();
