@@ -70,7 +70,7 @@ POST /api/v1/auth/pharmacy/login
 		"active_pharmacy": {
 			"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 			"name": "Sri Rama Medicals",
-			"logo_url": "https://cdn.namma-medmate.in/pharmacy/logos/abc.jpg",
+			"logo_url": "https://cdn.nammamedmate.com/pharmacy/logos/abc.jpg",
 			"city": "Bengaluru",
 			"subscription_plan": "GROWTH"
 		},

@@ -97,7 +97,7 @@ Folder-only `folder.bru` files do not need examples.
 ## Environments
 
 - `bruno/environments/Local.bru` — `baseUrl: http://localhost:8080`
-- `bruno/environments/Staging.bru` — `baseUrl: https://staging-core.api.nammamedmate.com`
+- `bruno/environments/Staging.bru` — `baseUrl: https://core.api.staging.nammamedmate.com`
 - `bruno/environments/Prod.bru` — `baseUrl: https://core.api.nammamedmate.com`
 - Mark secrets with `vars:secret` (`accessToken`, `refreshToken`, etc.). Never commit real production secrets.
 - Keep placeholders empty for tokens and credentials; fill only in the Bruno UI (not in git).

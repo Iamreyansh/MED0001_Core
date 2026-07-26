@@ -121,7 +121,7 @@ POST /api/v1/auth/customer/verify-otp
 			"id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
 			"phone": "+919876543210",
 			"name": "Ramesh Kumar",
-			"avatar_url": "https://cdn.namma-medmate.in/avatars/abc123.jpg",
+			"avatar_url": "https://cdn.nammamedmate.com/avatars/abc123.jpg",
 			"date_of_birth": "1988-05-14",
 			"gender": "MALE",
 			"preferred_language": "kn",

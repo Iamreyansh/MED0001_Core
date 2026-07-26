@@ -62,7 +62,8 @@ class AdminCustomerServiceTest {
             loyaltyService,
             rateLimiter,
             new OutboxPublisher(outboxStore, new ObjectMapper()),
-            CLOCK);
+            CLOCK,
+            "https://cdn.nammamedmate.com");
     admin = new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPER, null, TokenScope.FULL, "j");
 
     vipId = Ids.newId();
@@ -119,12 +120,31 @@ class AdminCustomerServiceTest {
 
   @Test
   void list_exportTrue_returnsStubExportUrl() {
+    WalletService walletService = new WalletService(wallets, store, rateLimiter, CLOCK, 100_000L);
+    LoyaltyService loyaltyService =
+        new LoyaltyService(
+            new FakeLoyaltyStore(),
+            rateLimiter,
+            CLOCK,
+            new OutboxPublisher(outboxStore, new ObjectMapper()));
+    // trailing slash on CDN base must normalize to the same export URL
+    service =
+        new AdminCustomerService(
+            store,
+            walletService,
+            loyaltyService,
+            rateLimiter,
+            new OutboxPublisher(outboxStore, new ObjectMapper()),
+            CLOCK,
+            "https://cdn.nammamedmate.com/");
+
     AdminListResult result =
         service.list(admin, null, null, null, null, null, null, null, null, true);
 
     @SuppressWarnings("unchecked")
     Map<String, Object> data = (Map<String, Object>) result.data();
-    assertThat(data.get("export_url").toString()).contains(admin.subject().toString());
+    assertThat(data.get("export_url").toString())
+        .isEqualTo("https://cdn.nammamedmate.com/exports/customers-" + admin.subject() + ".csv");
     assertThat(data).containsKey("expires_at");
     assertThat(result.meta()).isNull();
   }

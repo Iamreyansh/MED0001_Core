@@ -9,7 +9,7 @@ alwaysApply: false
 - Region: `ap-south-1`.
 - Flattened stacks only: `infra/terraform/stacks/{staging,prod}/*.tf` (no `modules/`).
 - State + locks: `s3://terraform-locks-105927215604/MED0001/{env}/terraform.tfstate` with `use_lockfile = true`. Never commit `.terraform/` or `*.tfstate*`. Commit `.terraform.lock.hcl`.
-- Compute: ECS Fargate arm64 (API + SQS worker). Staging hostname `staging-core.api…`; prod `core.api…`.
+- Compute: ECS Fargate arm64 (API + SQS worker). Staging hostname `core.api.staging…`; prod `core.api…`.
 - Auth to AWS in CI: GitHub OIDC only — no long-lived access keys. Role `med0001-gha-deploy`.
 - Local: `make tf-fmt`, `make tf-validate`, optional `make tf-plan ENV=staging|prod`.
 - Stuck lock: `/tf-unlock` / skill `terraform-force-unlock` — do not delete lock objects by hand unless instructed.

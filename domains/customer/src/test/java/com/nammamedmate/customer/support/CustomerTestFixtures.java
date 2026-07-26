@@ -17,7 +17,7 @@ public final class CustomerTestFixtures {
         id,
         "+919876543210",
         "Test User",
-        "https://cdn.namma-medmate.in/avatars/abc.png",
+        "https://cdn.nammamedmate.com/avatars/abc.png",
         LocalDate.of(1990, 1, 15),
         "MALE",
         "en",

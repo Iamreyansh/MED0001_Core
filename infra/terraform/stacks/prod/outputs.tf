@@ -1,5 +1,8 @@
 output "deploy_role_arn" { value = data.aws_iam_role.gha.arn }
 output "api_domain" { value = local.domain_name }
+output "cdn_domain" { value = local.cdn_domain_name }
+output "cdn_distribution_id" { value = aws_cloudfront_distribution.cdn.id }
+output "cdn_base_url" { value = local.cdn_base_url }
 output "api_ecr_url" { value = aws_ecr_repository.api.repository_url }
 output "worker_ecr_url" { value = aws_ecr_repository.worker.repository_url }
 output "ecs_cluster_name" { value = aws_ecs_cluster.this.name }

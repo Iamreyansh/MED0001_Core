@@ -4,12 +4,12 @@ Stories across the product depend on this foundation (referenced as EPIC-000 in 
 
 | Capability | AWS / component | Notes |
 |------------|-----------------|-------|
-| API edge | ALB + ACM + Route 53 | staging `staging-core.api…`; prod `core.api.nammamedmate.com` |
+| API edge | ALB + ACM + Route 53 | staging `core.api.staging.nammamedmate.com`; prod `core.api.nammamedmate.com` |
 | Compute | ECS Fargate arm64 (public subnets, no NAT) | API + worker per env; prod via `release-*` tag promote |
 | Worker | Fargate long-poll SQS | DLQ required |
 | Database | RDS PostgreSQL `db.t4g.micro` single-AZ | UTC storage; Flyway in `db/migration` |
 | Cache | ElastiCache Valkey `cache.t4g.micro` | Sessions, rate limits, config TTL |
-| Objects | S3 private buckets | Presigned PUT/GET; max 10 MB product uploads |
+| Objects | S3 private buckets + CloudFront | Bucket `med0001-{env}-uploads-105927215604`; keys via `StorageObjectKeys` prefixes — never bucket root. Public CDN: staging `cdn.staging.nammamedmate.com`, prod `cdn.nammamedmate.com` (OAC + SSE-KMS; edge allows only `avatars/` `products/` `pharmacies/` `doctors/` `riders/` `banners/`). Private prefixes use presigned GET only. Max 10 MB uploads. |
 | Secrets | Secrets Manager | JWT RS256 keys, DB credentials |
 | Events | SQS (+ EventBridge Scheduler group) | Outbox consumer in worker |
 | Schedules | EventBridge Scheduler | Timezone `Asia/Kolkata` |

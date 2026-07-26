@@ -43,7 +43,13 @@ class CustomerProfileServiceTest {
     rateLimiter = new InMemoryRateLimiter(CLOCK);
     activeOrders = id -> false;
     service =
-        new CustomerProfileService(store, activeOrders, new FakeLoyaltyStore(), rateLimiter, CLOCK);
+        new CustomerProfileService(
+            store,
+            activeOrders,
+            new FakeLoyaltyStore(),
+            rateLimiter,
+            CLOCK,
+            "https://cdn.nammamedmate.com/");
     customerId = Ids.newId();
     store.saveProfile(CustomerTestFixtures.customer(customerId));
     customerPrincipal =
@@ -78,7 +84,13 @@ class CustomerProfileServiceTest {
   void requestDeletion_withActiveOrders_returnsActiveOrdersExistAndDeletionNotSet() {
     activeOrders = id -> true;
     service =
-        new CustomerProfileService(store, activeOrders, new FakeLoyaltyStore(), rateLimiter, CLOCK);
+        new CustomerProfileService(
+            store,
+            activeOrders,
+            new FakeLoyaltyStore(),
+            rateLimiter,
+            CLOCK,
+            "https://cdn.nammamedmate.com");
 
     assertThatThrownBy(() -> service.requestDeletion(customerPrincipal, "moving away"))
         .isInstanceOf(AppException.class)
@@ -268,7 +280,17 @@ class CustomerProfileServiceTest {
                 service.updateMe(
                     customerPrincipal,
                     new UpdateProfileCommand(
-                        null, "https://cdn.namma-medmate.in/" + "a".repeat(500), null, null, null)))
+                        null, "https://cdn.nammamedmate.com/" + "a".repeat(500), null, null, null)))
+        .isInstanceOf(AppException.class)
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+
+    assertThatThrownBy(
+            () ->
+                service.updateMe(
+                    customerPrincipal,
+                    new UpdateProfileCommand(
+                        null, "https://cdn.nammamedmate.com/exports/x.png", null, null, null)))
         .isInstanceOf(AppException.class)
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
@@ -382,10 +404,10 @@ class CustomerProfileServiceTest {
         service.updateMe(
             customerPrincipal,
             new UpdateProfileCommand(
-                null, "https://cdn.namma-medmate.in/avatars/new-avatar.png", null, null, null));
+                null, "https://cdn.nammamedmate.com/avatars/new-avatar.png", null, null, null));
 
     assertThat(data)
-        .containsEntry("avatar_url", "https://cdn.namma-medmate.in/avatars/new-avatar.png");
+        .containsEntry("avatar_url", "https://cdn.nammamedmate.com/avatars/new-avatar.png");
   }
 
   @Test

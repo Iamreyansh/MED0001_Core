@@ -11,6 +11,7 @@ import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
+import com.nammamedmate.kernel.storage.StorageObjectKeys;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.security.AuthRole;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +47,7 @@ public class AdminCustomerService {
   private final RateLimiter rateLimiter;
   private final OutboxPublisher outbox;
   private final Clock clock;
+  private final String cdnBaseUrl;
 
   public AdminCustomerService(
       CustomerProfileStore store,
@@ -52,13 +55,16 @@ public class AdminCustomerService {
       LoyaltyService loyalty,
       RateLimiter rateLimiter,
       OutboxPublisher outbox,
-      Clock clock) {
+      Clock clock,
+      @Value("${medmate.cdn.base-url:https://cdn.nammamedmate.com}") String cdnBaseUrl) {
     this.store = store;
     this.wallets = wallets;
     this.loyalty = loyalty;
     this.rateLimiter = rateLimiter;
     this.outbox = outbox;
     this.clock = clock;
+    this.cdnBaseUrl =
+        cdnBaseUrl.endsWith("/") ? cdnBaseUrl.substring(0, cdnBaseUrl.length() - 1) : cdnBaseUrl;
   }
 
   @Transactional(readOnly = true)
@@ -91,7 +97,7 @@ public class AdminCustomerService {
       Map<String, Object> data = new LinkedHashMap<>();
       data.put(
           "export_url",
-          "https://cdn.namma-medmate.in/exports/customers-" + principal.subject() + ".csv");
+          cdnBaseUrl + "/" + StorageObjectKeys.export("customers-" + principal.subject() + ".csv"));
       data.put("expires_at", clock.instant().plus(1, ChronoUnit.HOURS));
       return new AdminListResult(data, null);
     }

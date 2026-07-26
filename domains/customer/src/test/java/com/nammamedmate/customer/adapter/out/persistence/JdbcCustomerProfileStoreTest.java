@@ -377,7 +377,7 @@ class JdbcCustomerProfileStoreTest {
         id,
         "+919999999999",
         "Ada",
-        "https://cdn.namma-medmate.in/avatars/a.png",
+        "https://cdn.nammamedmate.com/avatars/a.png",
         LocalDate.of(1992, 3, 4),
         "FEMALE",
         "en",

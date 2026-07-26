@@ -39,7 +39,14 @@ management:
 
 medmate:
   s3:
-    bucket: namma-medmate-uploads-local
+    # Local only. Staging/prod: MEDMATE_S3_BUCKET=med0001-{env}-uploads-105927215604
+    bucket: med0001-local-uploads
+  cdn:
+    # Public CDN fronting uploads prefixes (avatars/, products/, …). Staging uses
+    # https://cdn.staging.nammamedmate.com; prod uses https://cdn.nammamedmate.com.
+    base-url: https://cdn.nammamedmate.com
+  referral:
+    join-base-url: https://nammamedmate.com/join
   jwt:
     private-key-pem: ""
     public-key-pem: ""

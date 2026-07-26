@@ -172,7 +172,7 @@ GET /api/v1/auth/me
     "role": "customer",
     "phone": "+919876543210",
     "name": "Ramesh Kumar",
-    "avatar_url": "https://cdn.namma-medmate.in/avatars/abc123.jpg",
+    "avatar_url": "https://cdn.nammamedmate.com/avatars/abc123.jpg",
     "preferred_language": "kn",
     "segment": "LOYAL",
     "wallet_balance": 125.50,
@@ -210,7 +210,7 @@ GET /api/v1/auth/me
     "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     "role": "admin_super",
     "name": "Ayesha Siddiqui",
-    "email": "ayesha@namma-medmate.in",
+    "email": "ayesha@nammamedmate.com",
     "mfa_enabled": true,
     "last_login_at": "2026-07-24T01:00:00Z"
   },

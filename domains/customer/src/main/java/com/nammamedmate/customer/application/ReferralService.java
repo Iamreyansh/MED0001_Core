@@ -49,7 +49,7 @@ public class ReferralService {
       WalletService wallets,
       RateLimiter rateLimiter,
       Clock clock,
-      @Value("${medmate.referral.join-base-url:https://namma-medmate.in/join}") String joinBaseUrl,
+      @Value("${medmate.referral.join-base-url:https://nammamedmate.com/join}") String joinBaseUrl,
       @Value("${medmate.referral.reward-paise:10000}") long rewardPaise) {
     this.referrals = referrals;
     this.profiles = profiles;

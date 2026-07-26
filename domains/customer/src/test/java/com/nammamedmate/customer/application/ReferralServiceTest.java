@@ -59,7 +59,7 @@ class ReferralServiceTest {
             walletService,
             new InMemoryRateLimiter(CLOCK),
             CLOCK,
-            "https://namma-medmate.in/join",
+            "https://nammamedmate.com/join",
             10_000L);
 
     referrerId = Ids.newId();
@@ -179,7 +179,7 @@ class ReferralServiceTest {
 
     assertThat(data)
         .containsEntry("referral_code", "MEDRAM7")
-        .containsEntry("referral_link", "https://namma-medmate.in/join?ref=MEDRAM7")
+        .containsEntry("referral_link", "https://nammamedmate.com/join?ref=MEDRAM7")
         .containsEntry("total_referrals", 0)
         .containsEntry("pending_referrals", 0);
     assertThat(data.get("share_message").toString()).contains("MEDRAM7");
@@ -195,7 +195,7 @@ class ReferralServiceTest {
             new WalletService(wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, 100_000L),
             new InMemoryRateLimiter(CLOCK),
             CLOCK,
-            "https://namma-medmate.in/join/",
+            "https://nammamedmate.com/join/",
             0L);
     assertThat(
             trailing
@@ -203,7 +203,7 @@ class ReferralServiceTest {
                     new MedmatePrincipal(referrerId, AuthRole.CUSTOMER, null, TokenScope.FULL, "j"))
                 .get("referral_link")
                 .toString())
-        .startsWith("https://namma-medmate.in/join?ref=");
+        .startsWith("https://nammamedmate.com/join?ref=");
 
     assertThatThrownBy(() -> service.applyCode(refereePrincipal, null))
         .extracting(e -> ((AppException) e).code())

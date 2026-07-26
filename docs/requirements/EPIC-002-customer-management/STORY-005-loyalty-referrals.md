@@ -158,13 +158,13 @@ GET /api/v1/customers/me/referral
   "success": true,
   "data": {
     "referral_code": "MEDRAM7",
-    "referral_link": "https://namma-medmate.in/join?ref=MEDRAM7",
+    "referral_link": "https://nammamedmate.com/join?ref=MEDRAM7",
     "total_referrals": 5,
     "converted_referrals": 3,
     "pending_referrals": 1,
     "total_earned": 300.00,
     "pending_rewards": 100.00,
-    "share_message": "Download Namma MedMate and get Rs 100 wallet credit on your first order! Use my referral code MEDRAM7. Link: https://namma-medmate.in/join?ref=MEDRAM7"
+    "share_message": "Download Namma MedMate and get Rs 100 wallet credit on your first order! Use my referral code MEDRAM7. Link: https://nammamedmate.com/join?ref=MEDRAM7"
   },
   "meta": {}
 }

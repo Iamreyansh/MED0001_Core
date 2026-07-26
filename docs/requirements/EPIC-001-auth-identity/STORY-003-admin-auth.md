@@ -71,7 +71,7 @@ POST /api/v1/auth/admin/login
 		"admin": {
 			"id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
 			"name": "Sundar Rajan",
-			"email": "sundar@namma-medmate.in",
+			"email": "sundar@nammamedmate.com",
 			"role": "admin_operations",
 			"mfa_enabled": false
 		}
@@ -142,7 +142,7 @@ POST /api/v1/auth/admin/verify-mfa
 		"admin": {
 			"id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
 			"name": "Ayesha Siddiqui",
-			"email": "ayesha@namma-medmate.in",
+			"email": "ayesha@nammamedmate.com",
 			"role": "admin_super",
 			"mfa_enabled": true,
 			"backup_codes_remaining": 7
@@ -187,7 +187,7 @@ POST /api/v1/auth/admin/setup-mfa
 {
 	"success": true,
 	"data": {
-		"totp_uri": "otpauth://totp/NammaMedMate:ayesha%40namma-medmate.in?secret=JBSWY3DPEHPK3PXP&issuer=NammaMedMate&algorithm=SHA1&digits=6&period=30",
+		"totp_uri": "otpauth://totp/NammaMedMate:ayesha%40nammamedmate.com?secret=JBSWY3DPEHPK3PXP&issuer=NammaMedMate&algorithm=SHA1&digits=6&period=30",
 		"totp_secret": "JBSWY3DPEHPK3PXP",
 		"backup_codes": [
 			"A1B2-C3D4",
