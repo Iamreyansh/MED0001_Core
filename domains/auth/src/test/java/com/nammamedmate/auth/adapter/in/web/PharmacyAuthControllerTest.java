@@ -52,19 +52,12 @@ class PharmacyAuthControllerTest {
             NOW, NOW);
     PharmacyAssignmentRecord assignment =
         new PharmacyAssignmentRecord(
-            Ids.newId(), staffId, pharmacyId, "pharmacy_owner", true, NOW, null, "Test Pharmacy");
+            Ids.newId(), staffId, pharmacyId, "owner", true, NOW, null, "Test Pharmacy");
 
     when(loginService.login(any(), any(), any(), any(), any()))
         .thenReturn(
             new PharmacyLoginResult(
-                "access",
-                "refresh",
-                900L,
-                604800L,
-                pharmacy,
-                "pharmacy_owner",
-                staff,
-                List.of(assignment)));
+                "access", "refresh", 900L, 604800L, pharmacy, "owner", staff, List.of(assignment)));
 
     HttpServletRequest http = mock(HttpServletRequest.class);
     when(http.getRemoteAddr()).thenReturn("1.1.1.1");

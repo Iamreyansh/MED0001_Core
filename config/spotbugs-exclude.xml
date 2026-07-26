@@ -4,8 +4,17 @@
   <Match>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
+  <!-- Immutable / DTO accessors returning unmodifiable lists or cloned arrays. -->
   <Match>
     <Bug pattern="EI_EXPOSE_REP"/>
-    <Class name="~.*\.DomainEvent"/>
+    <Or>
+      <Class name="~.*\.DomainEvent"/>
+      <Class name="com.nammamedmate.auth.adapter.in.web.dto.CreatePharmacyRoleRequest"/>
+      <Class name="com.nammamedmate.auth.adapter.in.web.dto.UpdateRolePermissionsRequest"/>
+      <Class name="com.nammamedmate.auth.application.port.out.PharmacyRoleRecord"/>
+      <Class name="com.nammamedmate.auth.application.port.out.RolePermissionCache$OptionalPermissions"/>
+      <Class name="com.nammamedmate.auth.domain.AdminRoleDefinitions$AdminRole"/>
+      <Class name="com.nammamedmate.auth.adapter.out.persistence.PharmacyRoleEntity"/>
+    </Or>
   </Match>
 </FindBugsFilter>

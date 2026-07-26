@@ -156,7 +156,7 @@ public class PosPinLoginService {
     PharmacyRecord pharmacy = pharmacyStore.findById(pharmacyId).orElseThrow();
 
     AuthRole role =
-        "pharmacy_owner".equals(assignment.roleCode())
+        com.nammamedmate.auth.domain.PharmacyRoleCodes.isOwner(assignment.roleCode())
             ? AuthRole.PHARMACY_OWNER
             : AuthRole.PHARMACY_STAFF;
     String accessToken =

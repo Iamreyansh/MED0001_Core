@@ -12,5 +12,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.security:spring-security-crypto")
+    compileOnly("io.swagger.core.v3:swagger-annotations-jakarta:2.2.29")
     testImplementation("org.springframework.security:spring-security-test")
 }

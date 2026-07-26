@@ -348,14 +348,7 @@ class PosPinLoginServiceTest {
   void pharmacyOwnerRoleIssuedInToken() {
     PharmacyAssignmentRecord ownerAssignment =
         new PharmacyAssignmentRecord(
-            Ids.newId(),
-            staffId,
-            pharmacyId,
-            "pharmacy_owner",
-            true,
-            NOW,
-            null,
-            "Sri Rama Medicals");
+            Ids.newId(), staffId, pharmacyId, "owner", true, NOW, null, "Sri Rama Medicals");
     assignmentStore.byStaffAndPharmacy.put(staffId + ":" + pharmacyId, ownerAssignment);
 
     PosPinLoginResult result = service.login(pharmacyId, staffId, PIN, "1.1.1.1", "ua");

@@ -361,7 +361,7 @@ GET /api/v1/pharmacy/roles/:id/permissions
 PUT /api/v1/pharmacy/roles/:id/permissions
 ```
 
-**Authentication:** Bearer JWT - `pharmacy_owner`
+**Authentication:** Bearer JWT - `pharmacy_owner`, or `pharmacy_staff` with `staff:manage`
 **Rate Limit:** 20 req/min per user
 
 **Path Parameters:**
@@ -408,8 +408,35 @@ PUT /api/v1/pharmacy/roles/:id/permissions
 |------|-----------|-----------|
 | 400 | `VALIDATION_ERROR` | Unknown permission string in the array |
 | 401 | `UNAUTHORIZED` | Token missing or invalid |
-| 403 | `FORBIDDEN` | Not the owner of the pharmacy that owns this role; or attempting to modify a system role |
+| 403 | `FORBIDDEN` | Not the owner (or staff without `staff:manage`) of the pharmacy that owns this role; or attempting to modify a system role |
 | 404 | `ROLE_NOT_FOUND` | Role ID not found or is a system role (immutable) |
+
+---
+
+### 7. Soft-Delete Custom Pharmacy Role
+
+```
+DELETE /api/v1/pharmacy/roles/:id
+```
+
+**Authentication:** Bearer JWT - `pharmacy_owner`
+**Rate Limit:** 20 req/min per user
+
+**Path Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| :id | UUID | ID of the custom pharmacy role to soft-delete |
+
+**Success Response - `204 No Content`:** empty body
+
+**Error Responses:**
+
+| HTTP | Error Code | Condition |
+|------|-----------|-----------|
+| 401 | `UNAUTHORIZED` | Token missing or invalid |
+| 403 | `FORBIDDEN` | Not the pharmacy owner; or attempting to delete a system role; or role belongs to another pharmacy |
+| 404 | `ROLE_NOT_FOUND` | Role ID not found |
+| 409 | `ROLE_IN_USE` | At least one staff member is still assigned to this role |
 
 ---
 

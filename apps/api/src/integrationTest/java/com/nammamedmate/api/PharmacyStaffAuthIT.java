@@ -184,7 +184,7 @@ class PharmacyStaffAuthIT extends AbstractApiIT {
     @SuppressWarnings("unchecked")
     Map<String, Object> ap = (Map<String, Object>) switchData.get("active_pharmacy");
     assertThat(ap.get("name")).isEqualTo("Rama Pharmacy Koramangala");
-    assertThat(switchData.get("role_in_pharmacy")).isEqualTo("pharmacy_staff");
+    assertThat(switchData.get("role_in_pharmacy")).isEqualTo("manager");
   }
 
   @Test

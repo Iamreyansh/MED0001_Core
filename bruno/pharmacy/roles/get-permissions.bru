@@ -1,0 +1,43 @@
+meta {
+  name: get-permissions
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/roles/{{pharmacyCustomRoleId}}/permissions
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("pharmacyCustomRoleId")) {
+    throw new Error("pharmacyCustomRoleId missing — create role first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("permission details", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.permissions).to.be.an("array").that.is.not.empty;
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/roles/:id/permissions — system id slug or custom UUID.
+}

@@ -1,0 +1,46 @@
+meta {
+  name: delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/roles/{{pharmacyCustomRoleId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("pharmacyCustomRoleId")) {
+    throw new Error("pharmacyCustomRoleId missing");
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 204 || (res.getBody() && res.getBody().success)) {
+    bru.setEnvVar("pharmacyCustomRoleId", "");
+  }
+}
+
+tests {
+  test("HTTP 204 or ROLE_IN_USE", function () {
+    const status = res.getStatus();
+    if (status === 204) {
+      expect(status).to.equal(204);
+      return;
+    }
+    expect(status).to.equal(409);
+    expect(res.getBody().error.code).to.equal("ROLE_IN_USE");
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/roles/:id — soft delete. 409 ROLE_IN_USE if staff assigned.
+}

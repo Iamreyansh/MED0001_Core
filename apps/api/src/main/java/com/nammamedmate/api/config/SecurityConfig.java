@@ -50,6 +50,22 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/auth/pharmacy/switch-pharmacy")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/pharmacy/roles", "/api/v1/pharmacy/roles/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/admin/roles", "/api/v1/admin/permissions")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
+                    .requestMatchers("/api/v1/admin/pharmacies/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
                     .requestMatchers(
                         "/api/v1/auth/admin/verify-mfa", "/api/v1/auth/admin/setup-mfa")
                     .hasAnyRole(

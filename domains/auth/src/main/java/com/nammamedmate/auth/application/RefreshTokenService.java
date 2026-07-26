@@ -256,7 +256,7 @@ public class RefreshTokenService {
           for (PharmacyAssignmentRecord a : assignments) {
             if (pharmacyId.equals(a.pharmacyId())) {
               role =
-                  "pharmacy_owner".equals(a.roleCode())
+                  com.nammamedmate.auth.domain.PharmacyRoleCodes.isOwner(a.roleCode())
                       ? AuthRole.PHARMACY_OWNER
                       : AuthRole.PHARMACY_STAFF;
               break;
