@@ -66,3 +66,107 @@ docs {
   Writes: pharmacyAccessToken, pharmacyRefreshToken, pharmacyId, staffId.
   Errors: 400 VALIDATION_ERROR, 401 INVALID_CREDENTIALS, 403 ACCOUNT_LOCKED|ACCOUNT_SUSPENDED, 404 STAFF_NOT_FOUND.
 }
+
+example {
+  name: 200 OK
+  description: Staff credentials accepted; pharmacy JWT pair and assignments returned.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/pharmacy/login
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "identifier": "priya@test-pharmacy.in",
+        "password": "Passw0rd!"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJwaGFybWFjeSJ9.fake-access",
+            "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJwaGFybWFjeS1yZWZyZXNoIn0.fake-refresh",
+            "token_type": "Bearer",
+            "access_token_expires_in": 900,
+            "refresh_token_expires_in": 604800,
+            "active_pharmacy": {
+              "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+              "name": "Sri Rama Pharmacy",
+              "logo_url": null,
+              "city": "Bengaluru",
+              "subscription_plan": "GROWTH"
+            },
+            "staff": {
+              "id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+              "name": "Priya",
+              "email": "priya@test-pharmacy.in",
+              "phone": null,
+              "role": "owner",
+              "mfa_enabled": false
+            },
+            "pharmacies": [
+              {
+                "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+                "name": "Sri Rama Pharmacy",
+                "role": "owner",
+                "is_active": true
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 INVALID_CREDENTIALS
+  description: Identifier found but password does not match.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/pharmacy/login
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "identifier": "priya@test-pharmacy.in",
+        "password": "WrongPass1!"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_CREDENTIALS",
+            "message": "Password does not match"
+          }
+        }
+      '''
+    }
+  }
+}

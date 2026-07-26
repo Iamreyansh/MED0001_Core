@@ -51,3 +51,78 @@ docs {
   GET /api/v1/customers/me/addresses — list saved addresses (default first).
   Errors: 401 UNAUTHORIZED
 }
+
+example {
+  name: 200 OK
+  description: Saved addresses; default address listed first.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+              "label": "HOME",
+              "flat_building": "Flat 4B, Prestige Shantiniketan",
+              "area_locality": "Whitefield",
+              "city": "Bengaluru",
+              "state": "Karnataka",
+              "pincode": "560066",
+              "latitude": 12.9693,
+              "longitude": 77.7499,
+              "is_default": true,
+              "created_at": "2026-07-20T10:00:00Z",
+              "updated_at": "2026-07-20T10:00:00Z"
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses
+    method: get
+    mode: none
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Customer authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

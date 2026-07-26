@@ -52,3 +52,79 @@ tests {
 docs {
   POST /api/v1/auth/logout — soft-revoke the session for the given refresh_token; revokes current access jti in Redis.
 }
+
+example {
+  name: 200 OK
+  description: Session for the refresh token soft-revoked.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/logout
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoIn0.fake-refresh"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "message": "Session terminated successfully."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/logout
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoIn0.fake-refresh"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

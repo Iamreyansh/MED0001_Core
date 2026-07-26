@@ -15,7 +15,7 @@ After **creating or changing** any HTTP endpoint (`@RestController` / `@*Mapping
 1. Add or update the matching `.bru` request under `bruno/`.
 2. Keep folder layout aligned with the URL after `/api/v1/`  
    (e.g. `POST /api/v1/auth/customer/send-otp` → `bruno/auth/customer/send-otp.bru`).
-3. Update request method, URL (`{{baseUrl}}/api/v1/...`), headers, body (snake_case JSON), auth, and docs to match the controller + DTOs + story error codes.
+3. Update request method, URL (`{{baseUrl}}/api/v1/...`), headers, body (snake_case JSON), auth, docs, and **examples** to match the controller + DTOs + story error codes.
 4. Delete obsolete `.bru` files when an endpoint is removed or renamed.
 5. Do this in the **same change** as the Java endpoint — not a follow-up.
 
@@ -35,6 +35,65 @@ Auth token flow: login/OTP verify requests write `accessToken` / `refreshToken` 
 
 Public endpoints: `auth: none`. Protected: bearer from env. Webhooks: no bearer; document HMAC headers in scripts/docs.
 
+## Required examples (contract samples)
+
+Every request `.bru` must include Bruno `example { ... }` blocks so the collection documents the contract without running the API.
+
+| Example | When |
+|---------|------|
+| Happy-path success | **Always** — one named example with request + response |
+| Primary error | When docs list story error codes beyond auth — at least one representative `ApiError` |
+
+Rules for examples:
+
+1. Response body uses the real envelopes from `docs/requirements/INDEX.md` (`success`/`data`/`meta` or `success`/`error.code`).
+2. Sample values are realistic placeholders (UUID v4, ISO-8601 UTC, masked PII like `***@okaxis`) — never real tokens, PANs, or production secrets.
+3. Status uses numeric `code` (+ optional `text`): `status: { code: 201 text: Created }`.
+4. JSON response bodies go in `body: { type: json content: ''' ... ''' }`.
+5. Request examples mirror the live `body:json` / headers (including `Idempotency-Key` when required).
+6. Name examples clearly (`201 Created`, `422 INVALID_UPI_VPA`, etc.).
+
+Minimal shape:
+
+```bru
+example {
+  name: 201 Created
+  description: Happy path
+
+  request: {
+    url: {{baseUrl}}/api/v1/...
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "field": "value"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {}
+        }
+      '''
+    }
+  }
+}
+```
+
+Folder-only `folder.bru` files do not need examples.
+
 ## Environments
 
 - `bruno/environments/Local.bru` — `baseUrl: http://localhost:8080`
@@ -45,4 +104,4 @@ Public endpoints: `auth: none`. Protected: bearer from env. Webhooks: no bearer;
 
 ## Done check
 
-Endpoint PR/story is incomplete until `bruno/` reflects the contract and scripts chain the happy path without manual copy-paste.
+Endpoint PR/story is incomplete until `bruno/` reflects the contract (scripts + tests + examples) and chains the happy path without manual copy-paste.

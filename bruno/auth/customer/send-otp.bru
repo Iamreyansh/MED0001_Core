@@ -58,3 +58,87 @@ tests {
 docs {
   POST /api/v1/auth/customer/send-otp — start OTP session. Persists `sessionId` for verify-otp.
 }
+
+example {
+  name: 200 OK
+  description: OTP session created; SMS dispatched with hashed OTP.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/customer/send-otp
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "phone": "+919999900001",
+        "device_info": {
+          "platform": "bruno",
+          "device_id": "bruno-local-device",
+          "app_version": "local"
+        }
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "phone": "+919999900001",
+            "expires_at": "2026-07-26T10:10:00Z",
+            "resend_allowed_at": "2026-07-26T10:01:00Z",
+            "attempts_remaining": 3
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 VALIDATION_ERROR
+  description: Phone must be a valid +91 Indian mobile number.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/customer/send-otp
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "phone": "9876543210"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Invalid Indian mobile number"
+          }
+        }
+      '''
+    }
+  }
+}

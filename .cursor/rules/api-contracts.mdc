@@ -15,4 +15,4 @@ Source of truth for globals: `docs/requirements/INDEX.md`.
 - Payment-like mutators: support `Idempotency-Key` when the story requires it.
 - Webhooks under `/api/v1/webhooks/**` must use the raw-body filter for HMAC.
 - Document endpoints with springdoc when implementing stories.
-- After create/update/delete of any endpoint, sync `bruno/` in the same change (rule `bruno-api.mdc`): matching `.bru`, scripts that chain vars, envelope `tests`.
+- After create/update/delete of any endpoint, sync `bruno/` in the same change (rule `bruno-api.mdc`): matching `.bru`, scripts that chain vars, envelope `tests`, and `example` blocks (happy path + primary error).

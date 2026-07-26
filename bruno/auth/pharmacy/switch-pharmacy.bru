@@ -64,3 +64,89 @@ docs {
   Writes: pharmacyAccessToken (new).
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN|POS_TOKEN_RESTRICTED, 404 PHARMACY_NOT_FOUND.
 }
+
+example {
+  name: 200 OK
+  description: Active pharmacy switched; new access token with updated pharmacy context.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/pharmacy/switch-pharmacy
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{pharmacyAccessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "pharmacy_id": "c3d4e5f6-a7b8-9012-cdef-123456789012"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaGFybWFjeSI6InN3aXRjaGVkIn0.fake-access",
+            "token_type": "Bearer",
+            "access_token_expires_in": 900,
+            "active_pharmacy": {
+              "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+              "name": "Sri Rama Pharmacy",
+              "logo_url": null,
+              "city": "Bengaluru",
+              "subscription_plan": "GROWTH"
+            },
+            "role_in_pharmacy": "pharmacist"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/pharmacy/switch-pharmacy
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "pharmacy_id": "c3d4e5f6-a7b8-9012-cdef-123456789012"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -39,3 +39,67 @@ docs {
   POST /api/v1/customers/me/cancel-deletion — cancel pending account deletion during grace period.
   Errors: 401 UNAUTHORIZED
 }
+
+example {
+  name: 200 OK
+  description: Pending deletion cleared; account remains active.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/cancel-deletion
+    method: post
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "deletion_requested_at": null,
+            "message": "Account deletion request cancelled"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/cancel-deletion
+    method: post
+    mode: none
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Customer authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

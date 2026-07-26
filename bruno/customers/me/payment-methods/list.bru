@@ -63,3 +63,86 @@ docs {
   GET /api/v1/customers/me/payment-methods — list masked UPI + cards.
   Errors: 401 UNAUTHORIZED
 }
+
+example {
+  name: 200 OK
+  description: Masked UPI + cards; raw upi_id / razorpay_token_id never present.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/payment-methods
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "upi": [
+              {
+                "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                "type": "UPI",
+                "nickname": "GPay",
+                "upi_handle": "***@okaxis",
+                "is_default": true,
+                "added_at": "2026-07-26T10:00:00Z"
+              }
+            ],
+            "cards": [
+              {
+                "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+                "type": "CARD",
+                "card_last4": "4242",
+                "card_network": "VISA",
+                "card_type": "CREDIT",
+                "nickname": "Axis Flipkart",
+                "is_default": false,
+                "added_at": "2026-07-26T10:05:00Z"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/payment-methods
+    method: get
+    mode: none
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

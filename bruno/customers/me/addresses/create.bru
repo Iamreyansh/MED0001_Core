@@ -66,3 +66,104 @@ docs {
   POST /api/v1/customers/me/addresses — create address (first is auto-default; max 10).
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 422 ADDRESS_LIMIT_REACHED
 }
+
+example {
+  name: 201 Created
+  description: New address saved; first address becomes default automatically.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "label": "HOME",
+        "flat_building": "Flat 4B, Prestige Shantiniketan",
+        "area_locality": "Whitefield",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "pincode": "560066",
+        "latitude": 12.9693,
+        "longitude": 77.7499,
+        "is_default": true
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+            "label": "HOME",
+            "flat_building": "Flat 4B, Prestige Shantiniketan",
+            "area_locality": "Whitefield",
+            "city": "Bengaluru",
+            "state": "Karnataka",
+            "pincode": "560066",
+            "latitude": 12.9693,
+            "longitude": 77.7499,
+            "is_default": true,
+            "created_at": "2026-07-26T10:00:00Z",
+            "updated_at": "2026-07-26T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 ADDRESS_LIMIT_REACHED
+  description: Customer already has the maximum of 10 saved addresses.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "label": "WORK",
+        "flat_building": "WeWork Galaxy",
+        "area_locality": "Koramangala",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "pincode": "560034",
+        "latitude": 12.9352,
+        "longitude": 77.6245
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 422
+      text: Unprocessable Entity
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ADDRESS_LIMIT_REACHED",
+            "message": "Customer already has the maximum of 10 saved addresses"
+          }
+        }
+      '''
+    }
+  }
+}

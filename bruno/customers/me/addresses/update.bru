@@ -60,3 +60,102 @@ docs {
   PUT /api/v1/customers/me/addresses/:id — update address fields (not is_default).
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 404 ADDRESS_NOT_FOUND
 }
+
+example {
+  name: 200 OK
+  description: Address fields updated; is_default unchanged.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1
+    method: put
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "label": "HOME",
+        "flat_building": "Flat 4B, Prestige Shantiniketan Tower 2",
+        "area_locality": "Whitefield",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "pincode": "560066",
+        "latitude": 12.9693,
+        "longitude": 77.7499
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+            "label": "HOME",
+            "flat_building": "Flat 4B, Prestige Shantiniketan Tower 2",
+            "area_locality": "Whitefield",
+            "city": "Bengaluru",
+            "state": "Karnataka",
+            "pincode": "560066",
+            "latitude": 12.9693,
+            "longitude": 77.7499,
+            "is_default": true,
+            "updated_at": "2026-07-26T10:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ADDRESS_NOT_FOUND
+  description: Address id does not exist or belongs to another customer.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/addresses/00000000-0000-4000-8000-000000000099
+    method: put
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "label": "HOME",
+        "flat_building": "Flat 4B",
+        "area_locality": "Whitefield",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "pincode": "560066",
+        "latitude": 12.9693,
+        "longitude": 77.7499
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 404
+      text: Not Found
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ADDRESS_NOT_FOUND",
+            "message": "Address not found"
+          }
+        }
+      '''
+    }
+  }
+}

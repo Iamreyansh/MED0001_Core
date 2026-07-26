@@ -55,3 +55,86 @@ docs {
   GET /api/v1/admin/customers — list with filters (segment, is_flagged, search, city, page, limit, sort, order). Writes `customerId` from first row.
   Errors: 401 UNAUTHORIZED, 403 FORBIDDEN
 }
+
+example {
+  name: 200 OK
+  description: Paginated customer list with meta.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers?page=1&limit=20&order=desc
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+              "phone": "+919876543210",
+              "name": "Ramesh Kumar",
+              "city": "Bengaluru",
+              "segment": "REGULAR",
+              "is_flagged": false,
+              "total_orders": 12,
+              "total_ltv": 4580.50,
+              "cancel_rate": 0.08,
+              "created_at": "2025-11-03T08:15:00Z",
+              "last_order_at": "2026-07-20T14:30:00Z"
+            }
+          ],
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  description: Token lacks customers:read permission.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers?page=1&limit=20&order=desc
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+      text: Forbidden
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Insufficient permissions"
+          }
+        }
+      '''
+    }
+  }
+}

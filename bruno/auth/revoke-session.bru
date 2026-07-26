@@ -43,3 +43,66 @@ tests {
 docs {
   DELETE /api/v1/auth/sessions/:session_id — soft-revoke own session only (403 FORBIDDEN for another user's session). No admin cross-user endpoint in this story.
 }
+
+example {
+  name: 200 OK
+  description: Own session soft-revoked by session_id.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/sessions/e5f6a7b8-c9d0-1234-ef01-345678901234
+    method: delete
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "session_id": "e5f6a7b8-c9d0-1234-ef01-345678901234",
+            "message": "Session revoked."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/sessions/e5f6a7b8-c9d0-1234-ef01-345678901234
+    method: delete
+    mode: none
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

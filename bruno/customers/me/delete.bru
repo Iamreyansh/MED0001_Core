@@ -58,3 +58,80 @@ docs {
   DELETE /api/v1/customers/me — request account deletion (30-day grace). Optional `reason` body.
   Errors: 401 UNAUTHORIZED, 409 ACTIVE_ORDERS_EXIST, 409 DELETION_ALREADY_REQUESTED
 }
+
+example {
+  name: 200 OK
+  description: Deletion scheduled after 30-day grace; cancel before deletion_scheduled_at.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me
+    method: delete
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "No longer need the service"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "message": "Account deletion requested. Your account will be permanently deleted on 2026-08-25T10:00:00Z unless you cancel this request.",
+            "deletion_scheduled_at": "2026-08-25T10:00:00Z",
+            "cancel_before": "2026-08-25T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ACTIVE_ORDERS_EXIST
+  description: Cannot delete while orders are PENDING, CONFIRMED, or OUT_FOR_DELIVERY.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me
+    method: delete
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "Moving abroad"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 409
+      text: Conflict
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ACTIVE_ORDERS_EXIST",
+            "message": "Cannot delete account while orders are PENDING, CONFIRMED, or OUT_FOR_DELIVERY"
+          }
+        }
+      '''
+    }
+  }
+}

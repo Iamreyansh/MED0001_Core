@@ -67,3 +67,87 @@ docs {
   POST /api/v1/admin/customers/:id/notify — send PUSH/SMS/BOTH notification (max 3 per customer per 24h). Writes `lastNotificationId`.
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND, 429 NOTIFICATION_RATE_LIMITED
 }
+
+example {
+  name: 200 OK
+  description: Push notification queued for delivery.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/7c9e6679-7425-40de-944b-e07fc1f90ae7/notify
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "channel": "PUSH",
+        "title": "Order update",
+        "body": "Your prescription order is ready for pickup.",
+        "deep_link": "medmate://orders/123"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "notification_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+            "channel": "PUSH",
+            "delivered": false,
+            "queued_at": "2026-07-26T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 NOTIFICATION_RATE_LIMITED
+  description: Maximum 3 notifications per customer per 24 hours.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/customers/7c9e6679-7425-40de-944b-e07fc1f90ae7/notify
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "channel": "PUSH",
+        "title": "Order update",
+        "body": "Your prescription order is ready for pickup.",
+        "deep_link": "medmate://orders/123"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 429
+      text: Too Many Requests
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "NOTIFICATION_RATE_LIMITED",
+            "message": "Maximum 3 notifications per customer per 24 hours"
+          }
+        }
+      '''
+    }
+  }
+}

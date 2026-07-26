@@ -74,3 +74,83 @@ docs {
   Non-MFA path writes: adminAccessToken, adminRefreshToken, adminId
   Errors: 400 VALIDATION_ERROR, 401 INVALID_CREDENTIALS, 403 ACCOUNT_LOCKED|ACCOUNT_SUSPENDED|MFA_ENROLLMENT_REQUIRED, 404 ADMIN_NOT_FOUND, 429 IP_RATE_LIMITED
 }
+
+example {
+  name: 200 OK
+  description: Password accepted; MFA challenge issued for enrolled admin.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/admin/login
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "email": "ops@namma-medmate.in",
+        "password": "Passw0rd!"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "mfa_required": true,
+            "mfa_challenge_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZSI6Im1mYSJ9.fake-challenge",
+            "mfa_challenge_expires_in": 300,
+            "admin_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 INVALID_CREDENTIALS
+  description: Email exists but password does not match.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/admin/login
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "email": "ops@namma-medmate.in",
+        "password": "WrongPass1!"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_CREDENTIALS",
+            "message": "Password does not match"
+          }
+        }
+      '''
+    }
+  }
+}

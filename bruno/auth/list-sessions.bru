@@ -52,3 +52,86 @@ tests {
 docs {
   GET /api/v1/auth/sessions — active (non-rotated, non-revoked, unexpired) sessions. is_current is false under access-token auth; compare session_id client-side if stored at login.
 }
+
+example {
+  name: 200 OK
+  description: Paginated list of active sessions for the authenticated user.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/sessions?page=1&limit=20
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "session_id": "e5f6a7b8-c9d0-1234-ef01-345678901234",
+              "device": {
+                "platform": "bruno",
+                "device_id": "bruno-local-device",
+                "app_version": "local"
+              },
+              "ip_address": "10.0.0.1",
+              "country": "IN",
+              "city": "Bengaluru",
+              "user_agent": "Bruno/1.0",
+              "created_at": "2026-07-26T09:00:00Z",
+              "last_active_at": "2026-07-26T10:00:00Z",
+              "expires_at": "2026-08-25T10:00:00Z",
+              "is_current": false
+            }
+          ],
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/sessions?page=1&limit=20
+    method: get
+    mode: none
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required"
+          }
+        }
+      '''
+    }
+  }
+}

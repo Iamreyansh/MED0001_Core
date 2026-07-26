@@ -47,3 +47,81 @@ tests {
 docs {
   PUT /api/v1/pharmacy/roles/:id/permissions — bulk replace. Owner or staff:manage.
 }
+
+example {
+  name: 200 OK
+  description: Permissions replaced on a custom role.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/roles/d4e5f6a7-b8c9-4012-d345-e6789012f345/permissions
+    method: put
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "permissions": ["orders:fulfill", "orders:read", "inventory:*", "prescriptions:verify", "reports:read"]
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "role_id": "d4e5f6a7-b8c9-4012-d345-e6789012f345",
+            "role_name": "senior_pharmacist",
+            "permissions": ["orders:fulfill", "orders:read", "inventory:*", "prescriptions:verify", "reports:read"],
+            "updated_at": "2026-07-26T10:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  description: System roles are immutable.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/roles/system-owner/permissions
+    method: put
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "permissions": ["orders:read"]
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+      text: Forbidden
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "System roles are immutable"
+          }
+        }
+      '''
+    }
+  }
+}

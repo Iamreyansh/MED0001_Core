@@ -44,3 +44,63 @@ tests {
 docs {
   DELETE /api/v1/pharmacy/roles/:id — soft delete. 409 ROLE_IN_USE if staff assigned.
 }
+
+example {
+  name: 204 No Content
+  description: Custom role soft-deleted; no response body.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/roles/d4e5f6a7-b8c9-4012-d345-e6789012f345
+    method: delete
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 204
+      text: No Content
+    }
+    body: {
+      type: json
+      content: '''
+        null
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ROLE_IN_USE
+  description: Reassign staff before deleting this role.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/roles/d4e5f6a7-b8c9-4012-d345-e6789012f345
+    method: delete
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 409
+      text: Conflict
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ROLE_IN_USE",
+            "message": "Reassign staff before deleting this role"
+          }
+        }
+      '''
+    }
+  }
+}

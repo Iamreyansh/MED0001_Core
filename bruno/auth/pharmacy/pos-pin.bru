@@ -62,3 +62,94 @@ docs {
   Writes: posAccessToken.
   Errors: 400 VALIDATION_ERROR, 401 INVALID_PIN, 403 POS_PIN_NOT_SET|ACCOUNT_LOCKED|STAFF_NOT_ASSIGNED, 404 STAFF_NOT_FOUND.
 }
+
+example {
+  name: 200 OK
+  description: Valid 4-digit PIN; POS-scoped access token issued.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/pharmacy/pos-pin
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "pharmacy_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        "staff_id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+        "pin": "1234"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZSI6InBvcyJ9.fake-pos-access",
+            "token_type": "Bearer",
+            "token_scope": "pos",
+            "access_token_expires_in": 14400,
+            "staff": {
+              "id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+              "name": "Kavya",
+              "role": "cashier"
+            },
+            "pharmacy": {
+              "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+              "name": "Sri Rama Pharmacy"
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 INVALID_PIN
+  description: PIN does not match the stored hash for the staff member.
+
+  request: {
+    url: {{baseUrl}}/api/v1/auth/pharmacy/pos-pin
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "pharmacy_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        "staff_id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+        "pin": "0000"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PIN",
+            "message": "PIN does not match"
+          }
+        }
+      '''
+    }
+  }
+}

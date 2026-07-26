@@ -50,3 +50,81 @@ docs {
   GET /api/v1/customers/me/wallet/transactions — ledger history (filter type=CREDIT|DEBIT|EXPIRED).
   Errors: 401 UNAUTHORIZED
 }
+
+example {
+  name: 200 OK
+  description: Paginated CREDIT transactions (newest first).
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/wallet/transactions?page=1&limit=20&type=CREDIT
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "b2c3d4e5-f6a7-4890-b123-456789abcdef",
+              "type": "CREDIT",
+              "amount": 50.00,
+              "balance_after": 125.00,
+              "reason": "REFUND",
+              "description": "Refund for order #NM-1042",
+              "reference_id": "ord-1042",
+              "expires_at": "2027-07-26T10:00:00Z",
+              "created_at": "2026-07-26T09:30:00Z"
+            }
+          ],
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/wallet/transactions?page=1&limit=20&type=CREDIT
+    method: get
+    mode: none
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Customer authentication required"
+          }
+        }
+      '''
+    }
+  }
+}
