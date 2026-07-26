@@ -1,0 +1,60 @@
+meta {
+  name: delete
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/customers/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "reason": "No longer need the service"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or expected conflict", function () {
+    const status = res.getStatus();
+    if (status === 200) {
+      expect(status).to.equal(200);
+      return;
+    }
+    expect(status).to.be.oneOf([409]);
+    const body = res.getBody();
+    expect(body.success).to.equal(false);
+    expect(body.error.code).to.be.oneOf(["ACTIVE_ORDERS_EXIST", "DELETION_ALREADY_REQUESTED"]);
+  });
+
+  test("success envelope when deletion requested", function () {
+    if (res.getStatus() !== 200) {
+      return;
+    }
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.message).to.be.a("string").that.is.not.empty;
+    expect(body.data.deletion_scheduled_at).to.be.a("string").that.is.not.empty;
+    expect(body.data.cancel_before).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  DELETE /api/v1/customers/me — request account deletion (30-day grace). Optional `reason` body.
+  Errors: 401 UNAUTHORIZED, 409 ACTIVE_ORDERS_EXIST, 409 DELETION_ALREADY_REQUESTED
+}

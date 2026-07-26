@@ -1,0 +1,55 @@
+meta {
+  name: patch
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/customers/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "Ramesh Kumar",
+    "preferred_language": "kn"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("customerId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with updated profile", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string").that.is.not.empty;
+    expect(body.data.name).to.equal("Ramesh Kumar");
+    expect(body.data.preferred_language).to.equal("kn");
+    expect(body.data.updated_at).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  PATCH /api/v1/customers/me — update own profile (name, avatar_url, date_of_birth, gender, preferred_language).
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED
+}

@@ -181,14 +181,26 @@ class RbacServicesTest {
             "pharmacies:update",
             "riders:*",
             "logistics:*",
-            "catalogue:read");
+            "catalogue:read",
+            "customers:read");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_finance"))
-        .containsExactly("finance:*", "settlements:*", "refunds:*", "taxes:*", "analytics:finance");
+        .containsExactly(
+            "finance:*",
+            "settlements:*",
+            "refunds:*",
+            "taxes:*",
+            "analytics:finance",
+            "customers:read");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_support"))
         .containsExactly(
             "tickets:*", "disputes:*", "customers:read", "customers:notify", "orders:read");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_compliance"))
-        .containsExactly("prescriptions:*", "compliance:*", "catalogue:update", "pharmacies:read");
+        .containsExactly(
+            "prescriptions:*",
+            "compliance:*",
+            "catalogue:update",
+            "pharmacies:read",
+            "customers:read");
     assertThatThrownBy(() -> AdminRoleDefinitions.require("nope"))
         .isInstanceOf(IllegalArgumentException.class);
   }

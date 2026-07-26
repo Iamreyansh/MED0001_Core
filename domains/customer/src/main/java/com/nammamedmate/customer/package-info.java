@@ -1,2 +1,2 @@
-/** Domain module shell for customer. Business logic lands via epic stories. */
+/** EPIC-002 customer management — profile, addresses, wallet, loyalty. */
 package com.nammamedmate.customer;

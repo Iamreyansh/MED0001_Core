@@ -38,13 +38,20 @@ public final class AdminRoleDefinitions {
                   "pharmacies:update",
                   "riders:*",
                   "logistics:*",
-                  "catalogue:read")),
+                  "catalogue:read",
+                  "customers:read")),
           new AdminRole(
               "admin_finance",
               "Finance Manager",
               "Manages settlements, refunds, payouts, and financial analytics.",
               true,
-              List.of("finance:*", "settlements:*", "refunds:*", "taxes:*", "analytics:finance")),
+              List.of(
+                  "finance:*",
+                  "settlements:*",
+                  "refunds:*",
+                  "taxes:*",
+                  "analytics:finance",
+                  "customers:read")),
           new AdminRole(
               "admin_support",
               "Customer Support",
@@ -57,7 +64,12 @@ public final class AdminRoleDefinitions {
               "Compliance Officer",
               "Oversees prescription validation, catalogue compliance, and pharmacy KYC.",
               true,
-              List.of("prescriptions:*", "compliance:*", "catalogue:update", "pharmacies:read")));
+              List.of(
+                  "prescriptions:*",
+                  "compliance:*",
+                  "catalogue:update",
+                  "pharmacies:read",
+                  "customers:read")));
 
   private static final Map<String, AdminRole> BY_ROLE =
       ALL.stream().collect(java.util.stream.Collectors.toMap(AdminRole::role, r -> r));

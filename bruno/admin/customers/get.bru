@@ -1,0 +1,52 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/customers/{{customerId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login first");
+  }
+  if (!bru.getEnvVar("customerId")) {
+    throw new Error("customerId missing — run customers/me/get or admin/customers/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("customerId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with customer detail", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string").that.is.not.empty;
+    expect(body.data.phone).to.be.a("string").that.is.not.empty;
+    expect(body.data.order_stats).to.be.an("object");
+    expect(body.data.wallet).to.be.an("object");
+    expect(body.data.loyalty).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/admin/customers/:id — full customer detail with order stats, wallet, loyalty.
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND
+}
