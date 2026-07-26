@@ -1,0 +1,52 @@
+meta {
+  name: transactions
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me/wallet/transactions?page=1&limit=20&type=CREDIT
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  page: 1
+  limit: 20
+  type: CREDIT
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && Array.isArray(body.data) && body.data.length > 0 && body.data[0].id) {
+    bru.setEnvVar("walletTransactionId", body.data[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with paginated transactions", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.include.keys("page", "limit", "total", "has_next");
+  });
+}
+
+docs {
+  GET /api/v1/customers/me/wallet/transactions — ledger history (filter type=CREDIT|DEBIT|EXPIRED).
+  Errors: 401 UNAUTHORIZED
+}

@@ -1,0 +1,68 @@
+meta {
+  name: wallet-credit
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/customers/{{customerId}}/wallet/credit
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+headers {
+  Idempotency-Key: {{walletCreditIdempotencyKey}}
+}
+
+body:json {
+  {
+    "amount": 100,
+    "reason": "GOODWILL",
+    "note": "Apology credit for delayed delivery",
+    "reference_id": "ticket-123"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login with finance:* first");
+  }
+  if (!bru.getEnvVar("customerId")) {
+    throw new Error("customerId missing — run customers/me/get first");
+  }
+  if (!bru.getEnvVar("walletCreditIdempotencyKey")) {
+    bru.setEnvVar("walletCreditIdempotencyKey", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.transaction_id) {
+    bru.setEnvVar("walletTransactionId", body.data.transaction_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("success envelope with credit result", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.transaction_id).to.be.a("string").that.is.not.empty;
+    expect(body.data.reason).to.equal("GOODWILL");
+    expect(body.data).to.have.property("expires_at");
+    expect(body.data).to.have.property("new_balance");
+  });
+}
+
+docs {
+  POST /api/v1/admin/customers/:id/wallet/credit — manual credit (finance:*).
+  Requires Idempotency-Key header (replay returns the original credit).
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND, 422 EXCEEDS_CREDIT_LIMIT
+}

@@ -41,13 +41,19 @@ public class AdminCustomerService {
       Set.of("created_at", "name", "total_orders", "total_ltv");
 
   private final CustomerProfileStore store;
+  private final WalletService wallets;
   private final RateLimiter rateLimiter;
   private final OutboxPublisher outbox;
   private final Clock clock;
 
   public AdminCustomerService(
-      CustomerProfileStore store, RateLimiter rateLimiter, OutboxPublisher outbox, Clock clock) {
+      CustomerProfileStore store,
+      WalletService wallets,
+      RateLimiter rateLimiter,
+      OutboxPublisher outbox,
+      Clock clock) {
     this.store = store;
+    this.wallets = wallets;
     this.rateLimiter = rateLimiter;
     this.outbox = outbox;
     this.clock = clock;
@@ -292,7 +298,7 @@ public class AdminCustomerService {
     return data;
   }
 
-  static Map<String, Object> toDetail(CustomerProfileRecord c) {
+  Map<String, Object> toDetail(CustomerProfileRecord c) {
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("id", c.id());
     data.put("phone", c.phone());
@@ -331,12 +337,7 @@ public class AdminCustomerService {
     orderStats.put("last_order_at", c.lastOrderAt());
     data.put("order_stats", orderStats);
 
-    Map<String, Object> wallet = new LinkedHashMap<>();
-    wallet.put("balance", CustomerProfileService.paiseToRupees(c.walletBalancePaise()));
-    // ponytail: lifetime wallet ledgers land in STORY-003
-    wallet.put("lifetime_credited", BigDecimal.ZERO.setScale(2));
-    wallet.put("lifetime_debited", BigDecimal.ZERO.setScale(2));
-    data.put("wallet", wallet);
+    data.put("wallet", wallets.adminWalletSummary(c.id()));
 
     Map<String, Object> loyalty = new LinkedHashMap<>();
     loyalty.put("tier", LoyaltyTiers.fromPoints(c.loyaltyPoints()));
