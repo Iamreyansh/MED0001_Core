@@ -42,20 +42,23 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
 
     Map<String, Object> props = new HashMap<>();
     try (SecretsManagerClient client = clientSupplier.get()) {
-      String dbArn = environment.getProperty("MEDMATE_SECRETS_DB_ARN");
-      if (dbArn != null && !dbArn.isBlank()) {
+      String dbArn = firstNonBlank(
+          environment.getProperty("MEDMATE_SECRETS_DB_ARN"), System.getenv("MEDMATE_SECRETS_DB_ARN"));
+      if (dbArn != null) {
         JsonNode db = MAPPER.readTree(getSecret(client, dbArn));
         props.put("spring.datasource.username", text(db, "username"));
         props.put("spring.datasource.password", text(db, "password"));
       }
-      String jwtArn = environment.getProperty("MEDMATE_SECRETS_JWT_ARN");
-      if (jwtArn != null && !jwtArn.isBlank()) {
+      String jwtArn = firstNonBlank(
+          environment.getProperty("MEDMATE_SECRETS_JWT_ARN"), System.getenv("MEDMATE_SECRETS_JWT_ARN"));
+      if (jwtArn != null) {
         JsonNode jwt = MAPPER.readTree(getSecret(client, jwtArn));
         props.put("medmate.jwt.private-key-pem", text(jwt, "private_key_pem"));
         props.put("medmate.jwt.public-key-pem", text(jwt, "public_key_pem"));
       }
-      String mfaArn = environment.getProperty("MEDMATE_SECRETS_MFA_ARN");
-      if (mfaArn != null && !mfaArn.isBlank()) {
+      String mfaArn = firstNonBlank(
+          environment.getProperty("MEDMATE_SECRETS_MFA_ARN"), System.getenv("MEDMATE_SECRETS_MFA_ARN"));
+      if (mfaArn != null) {
         JsonNode mfa = MAPPER.readTree(getSecret(client, mfaArn));
         props.put("medmate.mfa.encryption-key-base64", text(mfa, "encryption_key_base64"));
         if (mfa.hasNonNull("payment_encryption_key_base64")) {
@@ -65,8 +68,10 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
           }
         }
       }
-      String razorpayArn = environment.getProperty("MEDMATE_SECRETS_RAZORPAY_ARN");
-      if (razorpayArn != null && !razorpayArn.isBlank()) {
+      String razorpayArn = firstNonBlank(
+          environment.getProperty("MEDMATE_SECRETS_RAZORPAY_ARN"),
+          System.getenv("MEDMATE_SECRETS_RAZORPAY_ARN"));
+      if (razorpayArn != null) {
         JsonNode razorpay = MAPPER.readTree(getSecret(client, razorpayArn));
         props.put("medmate.razorpay.key-id", text(razorpay, "key_id"));
         props.put("medmate.razorpay.key-secret", text(razorpay, "key_secret"));
@@ -79,6 +84,16 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
     }
   }
 
+  private static String firstNonBlank(String a, String b) {
+    if (a != null && !a.isBlank()) {
+      return a;
+    }
+    if (b != null && !b.isBlank()) {
+      return b;
+    }
+    return null;
+  }
+
   static boolean isDeployed(ConfigurableEnvironment environment) {
     for (String p : environment.getActiveProfiles()) {
       if (DEPLOYED.contains(p)) {
@@ -89,6 +104,10 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
     String raw = environment.getProperty("spring.profiles.active");
     if (raw == null || raw.isBlank()) {
       raw = environment.getProperty("SPRING_PROFILES_ACTIVE");
+    }
+    // System.getenv is available before Spring property sources are fully wired.
+    if (raw == null || raw.isBlank()) {
+      raw = System.getenv("SPRING_PROFILES_ACTIVE");
     }
     if (raw != null) {
       for (String p : raw.split(",")) {
