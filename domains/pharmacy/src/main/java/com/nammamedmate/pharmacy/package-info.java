@@ -1,2 +1,2 @@
-/** Domain module shell for pharmacy. Business logic lands via epic stories. */
+/** Pharmacy onboarding & operations (EPIC-003, EPIC-004). */
 package com.nammamedmate.pharmacy;

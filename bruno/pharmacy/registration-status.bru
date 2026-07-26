@@ -1,0 +1,152 @@
+meta {
+  name: registration-status
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/registration-status
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy/register/verify-email first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    console.log(`status=${body.data.status} completeness=${body.data.profile_completeness_pct}`);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("KYC status shape", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.kyc.documents_required).to.equal(5);
+    expect(body.data.profile_completeness_pct).to.be.a("number");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/registration-status — owner/staff registration + KYC progress.
+}
+
+example {
+  name: 200 OK
+  description: PENDING_KYC with documents_required=5.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/registration-status
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "business_name": "Sharma Medical Store",
+            "status": "PENDING_KYC",
+            "plan": "FREE",
+            "email_verified": true,
+            "kyc": {
+              "documents_uploaded": 0,
+              "documents_required": 5,
+              "documents_verified": 0,
+              "documents_rejected": 0,
+              "submitted_at": null,
+              "reviewed_at": null,
+              "rejection_reason": null,
+              "can_reapply": true,
+              "next_step": "UPLOAD_REMAINING_DOCUMENTS"
+            },
+            "profile_completeness_pct": 45,
+            "created_at": "2026-07-26T00:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing bearer token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/registration-status
+    method: get
+  }
+
+  response: {
+    status: {
+      code: 401
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  description: JWT present but not pharmacy_owner/pharmacy_staff.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/registration-status
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Pharmacy role required"
+          }
+        }
+      '''
+    }
+  }
+}

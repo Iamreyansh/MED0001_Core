@@ -1,0 +1,141 @@
+meta {
+  name: verify-email
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/register/verify-email
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{pharmacyEmail}}",
+    "otp": "123456"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyEmail")) {
+    throw new Error("pharmacyEmail missing — run pharmacy/register first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.access_token) {
+      bru.setEnvVar("accessToken", body.data.access_token);
+    }
+    if (body.data.refresh_token) {
+      bru.setEnvVar("refreshToken", body.data.refresh_token);
+    }
+    if (body.data.pharmacy_id) {
+      bru.setEnvVar("pharmacyId", body.data.pharmacy_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("tokens issued", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.email_verified).to.equal(true);
+    expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.next_step).to.equal("UPLOAD_KYC_DOCUMENTS");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/register/verify-email — verify OTP (magic 123456 for *@nammamedmate.test). Writes accessToken.
+}
+
+example {
+  name: 200 OK
+  description: Email verified; pharmacy_owner JWT issued.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/register/verify-email
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "email": "owner@nammamedmate.test",
+        "otp": "123456"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "email_verified": true,
+            "access_token": "<jwt>",
+            "refresh_token": "<opaque>",
+            "status": "PENDING_KYC",
+            "next_step": "UPLOAD_KYC_DOCUMENTS",
+            "message": "Email verified. Please upload your KYC documents to proceed."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 OTP_EXPIRED
+  description: OTP older than 15 minutes.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/register/verify-email
+    method: post
+    mode: json
+    body:json: {
+      {
+        "email": "owner@nammamedmate.test",
+        "otp": "123456"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "OTP_EXPIRED",
+            "message": "OTP has expired"
+          }
+        }
+      '''
+    }
+  }
+}

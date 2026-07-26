@@ -1,0 +1,133 @@
+meta {
+  name: resend-otp
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/register/resend-otp
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{pharmacyEmail}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyEmail")) {
+    throw new Error("pharmacyEmail missing — run pharmacy/register first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    console.log(`resends_remaining=${body.data.resends_remaining}`);
+  }
+}
+
+tests {
+  test("HTTP 200 or 429", function () {
+    expect([200, 429]).to.include(res.getStatus());
+  });
+
+  test("success envelope when 200", function () {
+    if (res.getStatus() !== 200) return;
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.message).to.be.a("string");
+    expect(body.data.retry_after_seconds).to.equal(60);
+    expect(body.data.resends_remaining).to.be.a("number");
+  });
+
+  test("error envelope when 429", function () {
+    if (res.getStatus() !== 429) return;
+    const body = res.getBody();
+    expect(body.success).to.equal(false);
+    expect(["RESEND_TOO_SOON", "RESEND_LIMIT_EXCEEDED", "RATE_LIMIT_EXCEEDED"]).to.include(
+      body.error.code
+    );
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/register/resend-otp — resend email OTP (60s cooldown, max 5).
+}
+
+example {
+  name: 200 OK
+  description: New OTP sent.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/register/resend-otp
+    method: post
+    mode: json
+    body:json: {
+      {
+        "email": "owner@nammamedmate.test"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "message": "New OTP sent to your email.",
+            "retry_after_seconds": 60,
+            "resends_remaining": 4
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 RESEND_TOO_SOON
+  description: Cooldown not elapsed.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/register/resend-otp
+    method: post
+    mode: json
+    body:json: {
+      {
+        "email": "owner@nammamedmate.test"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 429
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RESEND_TOO_SOON",
+            "message": "Please wait before requesting another OTP",
+            "retry_after_seconds": 45
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,238 @@
+meta {
+  name: register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "owner_name": "Priya Sharma",
+    "business_name": "Sharma Medical Store",
+    "phone": "{{pharmacyPhone}}",
+    "email": "{{pharmacyEmail}}",
+    "password": "Passw0rd!",
+    "business_type": "PHARMACY",
+    "address": {
+      "flat": "12",
+      "area": "MG Road",
+      "city": "Bengaluru",
+      "state": "Karnataka",
+      "pincode": "560001"
+    },
+    "gstin": "29AABPP1234F1ZZ",
+    "drug_licence_number": "{{pharmacyLicence}}",
+    "pan_number": "AABPP1234F"
+  }
+}
+
+script:pre-request {
+  const suffix = Date.now().toString().slice(-8);
+  if (!bru.getEnvVar("pharmacyEmail")) {
+    bru.setEnvVar("pharmacyEmail", `owner-${suffix}@nammamedmate.test`);
+  }
+  if (!bru.getEnvVar("pharmacyPhone")) {
+    bru.setEnvVar("pharmacyPhone", `+9198${suffix}`);
+  }
+  if (!bru.getEnvVar("pharmacyLicence")) {
+    bru.setEnvVar("pharmacyLicence", `KA-DL-${suffix}`);
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.pharmacy_id) {
+    bru.setEnvVar("pharmacyId", body.data.pharmacy_id);
+    console.log(`pharmacyId=${body.data.pharmacy_id}`);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("PENDING_KYC registration envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("PENDING_KYC");
+    expect(body.data.plan).to.equal("FREE");
+    expect(body.data.pharmacy_id).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/register — public pharmacy self-registration. Persists `pharmacyId` for verify-email.
+}
+
+example {
+  name: 201 Created
+  description: Pharmacy created in PENDING_KYC; email OTP sent.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/register
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "owner_name": "Priya Sharma",
+        "business_name": "Sharma Medical Store",
+        "phone": "+919876543210",
+        "email": "owner@nammamedmate.test",
+        "password": "Passw0rd!",
+        "business_type": "PHARMACY",
+        "address": {
+          "flat": "12",
+          "area": "MG Road",
+          "city": "Bengaluru",
+          "state": "Karnataka",
+          "pincode": "560001"
+        },
+        "gstin": "29AABPP1234F1ZZ",
+        "drug_licence_number": "KA-DL-12345",
+        "pan_number": "AABPP1234F"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "status": "PENDING_KYC",
+            "plan": "FREE",
+            "email_verification_required": true,
+            "message": "Registration submitted. Please verify your email to continue."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_GSTIN
+  description: GSTIN checksum/format failure; no rows persisted.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/register
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "owner_name": "Priya Sharma",
+        "business_name": "Sharma Medical Store",
+        "phone": "+919876543210",
+        "email": "owner@nammamedmate.test",
+        "password": "Passw0rd!",
+        "business_type": "PHARMACY",
+        "address": {
+          "flat": "12",
+          "area": "MG Road",
+          "city": "Bengaluru",
+          "state": "Karnataka",
+          "pincode": "560001"
+        },
+        "gstin": "29AABPP1234F1ZA",
+        "drug_licence_number": "KA-DL-12345",
+        "pan_number": "AABPP1234F"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_GSTIN",
+            "message": "GSTIN fails format or checksum validation"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 GSTIN_ALREADY_REGISTERED
+  description: Duplicate GSTIN conflict.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/register
+    method: post
+    mode: json
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "owner_name": "Priya Sharma",
+        "business_name": "Sharma Medical Store",
+        "phone": "+919876543211",
+        "email": "owner2@nammamedmate.test",
+        "password": "Passw0rd!",
+        "business_type": "PHARMACY",
+        "address": {
+          "flat": "12",
+          "area": "MG Road",
+          "city": "Bengaluru",
+          "state": "Karnataka",
+          "pincode": "560001"
+        },
+        "gstin": "29AABPP1234F1ZZ",
+        "drug_licence_number": "KA-DL-99999",
+        "pan_number": "AABPP9999F"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 409
+      text: Conflict
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "GSTIN_ALREADY_REGISTERED",
+            "message": "GSTIN already registered"
+          }
+        }
+      '''
+    }
+  }
+}
