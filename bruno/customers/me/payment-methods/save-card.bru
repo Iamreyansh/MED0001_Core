@@ -1,0 +1,67 @@
+meta {
+  name: save-card
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customers/me/payment-methods/card
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Idempotency-Key: {{cardPaymentMethodIdempotencyKey}}
+}
+
+body:json {
+  {
+    "razorpay_token_id": "token_demo4242",
+    "card_last4": "4242",
+    "card_network": "VISA",
+    "card_type": "CREDIT",
+    "nickname": "Axis Flipkart"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("cardPaymentMethodIdempotencyKey")) {
+    bru.setEnvVar("cardPaymentMethodIdempotencyKey", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data && body.data.id)) {
+    return;
+  }
+  bru.setEnvVar("paymentMethodId", body.data.id);
+  bru.setEnvVar("cardPaymentMethodId", body.data.id);
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("card envelope without token", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.type).to.equal("CARD");
+    expect(body.data.card_last4).to.equal("4242");
+    expect(body.data).to.not.have.property("razorpay_token_id");
+  });
+}
+
+docs {
+  POST /api/v1/customers/me/payment-methods/card — save Razorpay token metadata only (token encrypted at rest).
+  Optional Idempotency-Key header replays the original create.
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 409 CARD_ALREADY_SAVED, 422 INVALID_RAZORPAY_TOKEN | PAYMENT_METHOD_LIMIT_REACHED
+}

@@ -58,8 +58,20 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
       if (mfaArn != null && !mfaArn.isBlank()) {
         JsonNode mfa = MAPPER.readTree(getSecret(client, mfaArn));
         props.put("medmate.mfa.encryption-key-base64", text(mfa, "encryption_key_base64"));
+        if (mfa.hasNonNull("payment_encryption_key_base64")) {
+          String paymentKey = mfa.get("payment_encryption_key_base64").asText();
+          if (!paymentKey.isBlank()) {
+            props.put("medmate.payment.encryption-key-base64", paymentKey);
+          }
+        }
       }
-    } catch (Exception e) {
+      String razorpayArn = environment.getProperty("MEDMATE_SECRETS_RAZORPAY_ARN");
+      if (razorpayArn != null && !razorpayArn.isBlank()) {
+        JsonNode razorpay = MAPPER.readTree(getSecret(client, razorpayArn));
+        props.put("medmate.razorpay.key-id", text(razorpay, "key_id"));
+        props.put("medmate.razorpay.key-secret", text(razorpay, "key_secret"));
+      }
+    } catch (RuntimeException | java.io.IOException e) {
       throw new IllegalStateException("Failed to load secrets for deployed profile", e);
     }
     if (!props.isEmpty()) {

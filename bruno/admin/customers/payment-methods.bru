@@ -1,0 +1,42 @@
+meta {
+  name: payment-methods
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/customers/{{customerId}}/payment-methods
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login first");
+  }
+  if (!bru.getEnvVar("customerId")) {
+    throw new Error("customerId missing — run customers/me/get or admin/customers/list first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("masked payment methods envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.upi).to.be.an("array");
+    expect(body.data.cards).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/customers/:id/payment-methods — masked list for support/finance (customers:read).
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND
+}

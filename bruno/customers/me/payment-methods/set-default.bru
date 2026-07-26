@@ -1,0 +1,49 @@
+meta {
+  name: set-default
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/customers/me/payment-methods/{{paymentMethodId}}/set-default
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("paymentMethodId")) {
+    throw new Error("paymentMethodId missing — run save-upi or save-card first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data && body.data.id)) {
+    return;
+  }
+  bru.setEnvVar("defaultPaymentMethodId", body.data.id);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_default).to.equal(true);
+  });
+}
+
+docs {
+  PATCH /api/v1/customers/me/payment-methods/:id/set-default — atomic default switch.
+  Errors: 401 UNAUTHORIZED, 404 PAYMENT_METHOD_NOT_FOUND, 409 ALREADY_DEFAULT
+}

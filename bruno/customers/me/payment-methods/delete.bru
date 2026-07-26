@@ -1,0 +1,47 @@
+meta {
+  name: delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/customers/me/payment-methods/{{paymentMethodId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("paymentMethodId")) {
+    throw new Error("paymentMethodId missing — run save-upi or save-card first");
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("paymentMethodId", "");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.message).to.include("removed");
+  });
+}
+
+docs {
+  DELETE /api/v1/customers/me/payment-methods/:id — soft-delete; blocked if in-flight order uses method.
+  Errors: 401 UNAUTHORIZED, 404 PAYMENT_METHOD_NOT_FOUND, 409 PAYMENT_METHOD_IN_ACTIVE_ORDER
+}

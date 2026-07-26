@@ -46,9 +46,17 @@ medmate:
   mfa:
     # 32 zero bytes, Base64 — local/dev/IT only. Staging/prod reject this and require Secrets Manager.
     encryption-key-base64: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  payment:
+    # Dedicated AES key for saved UPI/token ciphertext. Blank → falls back to MFA key (local only).
+    encryption-key-base64: ""
   wallet:
     # Rs 1,000 — platform config key max_wallet_credit_per_transaction (EPIC-021 STORY-004 later)
     max-credit-paise: 100000
+  razorpay:
+    # Blank → StubRazorpayVpaClient (local/CI). Staging/prod: inject via MEDMATE_SECRETS_RAZORPAY_ARN
+    # (Secrets Manager JSON key_id / key_secret) or ECS valueFrom when EPIC-022 secret exists.
+    key-id: ""
+    key-secret: ""
 
 springdoc:
   api-docs:
