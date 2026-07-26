@@ -22,10 +22,12 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,6 +44,7 @@ public class PlatformConfig {
 
   /** Local/dev/IT: fixed non-production key is allowed. */
   @Bean
+  @Primary
   @Profile("!prod & !staging")
   AesGcmCipher localAesGcmCipher(
       @Value("${medmate.mfa.encryption-key-base64:" + LOCAL_ONLY_MFA_KEY + "}") String keyBase64) {
@@ -50,6 +53,7 @@ public class PlatformConfig {
 
   /** Staging/prod: key must come from Secrets Manager — never the known local default. */
   @Bean
+  @Primary
   @Profile({"prod", "staging"})
   AesGcmCipher deployedAesGcmCipher(
       @Value("${medmate.mfa.encryption-key-base64}") String keyBase64) {
@@ -58,6 +62,34 @@ public class PlatformConfig {
           "medmate.mfa.encryption-key-base64 must be injected via Secrets Manager");
     }
     return AesGcmCipher.fromBase64Key(keyBase64);
+  }
+
+  /**
+   * Dedicated cipher for saved payment methods (UPI / Razorpay token). Falls back to MFA key when
+   * payment key is unset (local/legacy secrets).
+   */
+  @Bean
+  @Qualifier("paymentMethodCipher")
+  @Profile("!prod & !staging")
+  AesGcmCipher localPaymentMethodCipher(
+      @Value("${medmate.payment.encryption-key-base64:}") String paymentKey,
+      @Value("${medmate.mfa.encryption-key-base64:" + LOCAL_ONLY_MFA_KEY + "}") String mfaKey) {
+    String key = paymentKey == null || paymentKey.isBlank() ? mfaKey : paymentKey;
+    return AesGcmCipher.fromBase64Key(key);
+  }
+
+  @Bean
+  @Qualifier("paymentMethodCipher")
+  @Profile({"prod", "staging"})
+  AesGcmCipher deployedPaymentMethodCipher(
+      @Value("${medmate.payment.encryption-key-base64:}") String paymentKey,
+      @Value("${medmate.mfa.encryption-key-base64}") String mfaKey) {
+    String key = paymentKey == null || paymentKey.isBlank() ? mfaKey : paymentKey;
+    if (key == null || key.isBlank() || LOCAL_ONLY_MFA_KEY.equals(key.trim())) {
+      throw new IllegalStateException(
+          "medmate.payment.encryption-key-base64 (or MFA fallback) must be injected via Secrets Manager");
+    }
+    return AesGcmCipher.fromBase64Key(key);
   }
 
   @Bean

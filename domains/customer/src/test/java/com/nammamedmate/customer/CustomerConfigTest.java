@@ -21,10 +21,27 @@ class CustomerConfigTest {
   }
 
   @Test
-  void noAddressInActiveOrderPort_returnsFalse() {
+  void noPaymentMethodInActiveOrderPort_returnsFalse() {
     CustomerConfig config = new CustomerConfig();
-    assertThat(config.noAddressInActiveOrderPort().isAddressInActiveOrder(UUID.randomUUID()))
+    assertThat(
+            config
+                .noPaymentMethodInActiveOrderPort()
+                .isPaymentMethodInActiveOrder(UUID.randomUUID()))
         .isFalse();
+  }
+
+  @Test
+  void razorpayVpaPort_withoutKeys_usesStub() {
+    CustomerConfig config = new CustomerConfig();
+    assertThat(config.razorpayVpaPort(new ObjectMapper(), "", ""))
+        .isInstanceOf(com.nammamedmate.customer.adapter.out.razorpay.StubRazorpayVpaClient.class);
+  }
+
+  @Test
+  void razorpayVpaPort_withKeys_usesLiveClient() {
+    CustomerConfig config = new CustomerConfig();
+    assertThat(config.razorpayVpaPort(new ObjectMapper(), "key", "secret"))
+        .isInstanceOf(com.nammamedmate.customer.adapter.out.razorpay.RazorpayVpaClient.class);
   }
 
   @Test

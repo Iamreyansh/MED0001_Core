@@ -33,7 +33,7 @@ Namma MedMate Core (`MED0001_Core`) — Java 21 / Spring Boot modular monolith.
 | Lambda package / SnapStart | Skill `lambda-snapstart` |
 | Security checklist | Skill `security-review-medmate` → agent `security-reviewer` |
 | Ship to prod | Command `/ship-main` |
-| HTTP endpoint create/update | Rule `bruno-api.mdc` → update matching `.bru` under `bruno/` (scripts + tests) |
+| HTTP endpoint create/update | Rule `bruno-api.mdc` → update matching `.bru` under `bruno/` (scripts + tests + examples) |
 
 ## Commands
 

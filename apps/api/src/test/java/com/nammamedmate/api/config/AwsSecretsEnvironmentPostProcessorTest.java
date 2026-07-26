@@ -61,6 +61,7 @@ class AwsSecretsEnvironmentPostProcessorTest {
     props.put("MEDMATE_SECRETS_DB_ARN", "   ");
     props.put("MEDMATE_SECRETS_JWT_ARN", "");
     props.put("MEDMATE_SECRETS_MFA_ARN", " ");
+    props.put("MEDMATE_SECRETS_RAZORPAY_ARN", " ");
     env.getPropertySources().addFirst(new MapPropertySource("test", props));
 
     new AwsSecretsEnvironmentPostProcessor(() -> client)
@@ -115,7 +116,8 @@ class AwsSecretsEnvironmentPostProcessorTest {
                 body = "{\"private_key_pem\":\"PRIV\",\"public_key_pem\":\"PUB\"}";
               } else if (id.contains("mfa")) {
                 body =
-                    "{\"encryption_key_base64\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=\"}";
+                    "{\"encryption_key_base64\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=\","
+                        + "\"payment_encryption_key_base64\":\"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=\"}";
               } else {
                 body = "{\"username\":\"u\",\"password\":\"p\"}";
               }
@@ -140,6 +142,89 @@ class AwsSecretsEnvironmentPostProcessorTest {
     assertThat(env.getProperty("medmate.jwt.private-key-pem")).isEqualTo("PRIV");
     assertThat(env.getProperty("medmate.mfa.encryption-key-base64"))
         .isEqualTo("QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=");
+    assertThat(env.getProperty("medmate.payment.encryption-key-base64"))
+        .isEqualTo("QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=");
+  }
+
+  @Test
+  void loadsRazorpayFromSecretsManager() {
+    SecretsManagerClient client = mock(SecretsManagerClient.class);
+    when(client.getSecretValue(any(GetSecretValueRequest.class)))
+        .thenReturn(
+            GetSecretValueResponse.builder()
+                .secretString("{\"key_id\":\"rzp_test\",\"key_secret\":\"sec\"}")
+                .build());
+
+    StandardEnvironment env = new StandardEnvironment();
+    env.setActiveProfiles("prod");
+    env.getPropertySources()
+        .addFirst(
+            new MapPropertySource("test", Map.of("MEDMATE_SECRETS_RAZORPAY_ARN", "arn:razorpay")));
+
+    new AwsSecretsEnvironmentPostProcessor(() -> client)
+        .postProcessEnvironment(env, new SpringApplication());
+
+    assertThat(env.getProperty("medmate.razorpay.key-id")).isEqualTo("rzp_test");
+    assertThat(env.getProperty("medmate.razorpay.key-secret")).isEqualTo("sec");
+  }
+
+  @Test
+  void mfaWithoutPaymentKey_skipsPaymentProperty() {
+    SecretsManagerClient client = mock(SecretsManagerClient.class);
+    when(client.getSecretValue(any(GetSecretValueRequest.class)))
+        .thenReturn(
+            GetSecretValueResponse.builder()
+                .secretString(
+                    "{\"encryption_key_base64\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=\"}")
+                .build());
+
+    StandardEnvironment env = new StandardEnvironment();
+    env.setActiveProfiles("staging");
+    env.getPropertySources()
+        .addFirst(new MapPropertySource("test", Map.of("MEDMATE_SECRETS_MFA_ARN", "arn:mfa")));
+
+    new AwsSecretsEnvironmentPostProcessor(() -> client)
+        .postProcessEnvironment(env, new SpringApplication());
+
+    assertThat(env.getProperty("medmate.mfa.encryption-key-base64")).isNotBlank();
+    assertThat(env.getProperty("medmate.payment.encryption-key-base64")).isNull();
+  }
+
+  @Test
+  void mfaWithNullOrBlankPaymentKey_skipsPaymentProperty() {
+    SecretsManagerClient client = mock(SecretsManagerClient.class);
+    when(client.getSecretValue(any(GetSecretValueRequest.class)))
+        .thenReturn(
+            GetSecretValueResponse.builder()
+                .secretString(
+                    "{\"encryption_key_base64\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=\","
+                        + "\"payment_encryption_key_base64\":null}")
+                .build())
+        .thenReturn(
+            GetSecretValueResponse.builder()
+                .secretString(
+                    "{\"encryption_key_base64\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=\","
+                        + "\"payment_encryption_key_base64\":\"   \"}")
+                .build());
+
+    StandardEnvironment envNull = new StandardEnvironment();
+    envNull.setActiveProfiles("staging");
+    envNull
+        .getPropertySources()
+        .addFirst(new MapPropertySource("test", Map.of("MEDMATE_SECRETS_MFA_ARN", "arn:mfa-null")));
+    new AwsSecretsEnvironmentPostProcessor(() -> client)
+        .postProcessEnvironment(envNull, new SpringApplication());
+    assertThat(envNull.getProperty("medmate.payment.encryption-key-base64")).isNull();
+
+    StandardEnvironment envBlank = new StandardEnvironment();
+    envBlank.setActiveProfiles("prod");
+    envBlank
+        .getPropertySources()
+        .addFirst(
+            new MapPropertySource("test", Map.of("MEDMATE_SECRETS_MFA_ARN", "arn:mfa-blank")));
+    new AwsSecretsEnvironmentPostProcessor(() -> client)
+        .postProcessEnvironment(envBlank, new SpringApplication());
+    assertThat(envBlank.getProperty("medmate.payment.encryption-key-base64")).isNull();
   }
 
   @Test
@@ -161,6 +246,27 @@ class AwsSecretsEnvironmentPostProcessorTest {
 
     assertThat(env.getProperty("medmate.jwt.private-key-pem")).isEqualTo("PRIV");
     assertThat(env.getProperty("spring.datasource.username")).isNull();
+  }
+
+  @Test
+  void failsWhenSecretJsonUnreadable() {
+    SecretsManagerClient client = mock(SecretsManagerClient.class);
+    when(client.getSecretValue(any(GetSecretValueRequest.class)))
+        .thenReturn(GetSecretValueResponse.builder().secretString("not-json").build());
+
+    StandardEnvironment env = new StandardEnvironment();
+    env.setActiveProfiles("staging");
+    env.getPropertySources()
+        .addFirst(new MapPropertySource("test", Map.of("MEDMATE_SECRETS_DB_ARN", "arn:db")));
+
+    assertThatThrownBy(
+            () ->
+                new AwsSecretsEnvironmentPostProcessor(() -> client)
+                    .postProcessEnvironment(env, new SpringApplication()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to load secrets")
+        .cause()
+        .isInstanceOf(java.io.IOException.class);
   }
 
   @Test

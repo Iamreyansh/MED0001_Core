@@ -1,0 +1,65 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me/payment-methods
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data)) {
+    return;
+  }
+  const upi = body.data.upi || [];
+  const cards = body.data.cards || [];
+  if (upi.length > 0 && upi[0].id) {
+    bru.setEnvVar("paymentMethodId", upi[0].id);
+  } else if (cards.length > 0 && cards[0].id) {
+    bru.setEnvVar("paymentMethodId", cards[0].id);
+  }
+  const def = [...upi, ...cards].find((m) => m.is_default);
+  if (def && def.id) {
+    bru.setEnvVar("defaultPaymentMethodId", def.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with upi and cards arrays (masked)", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.upi).to.be.an("array");
+    expect(body.data.cards).to.be.an("array");
+    for (const u of body.data.upi) {
+      expect(u).to.not.have.property("upi_id");
+      expect(u.upi_handle).to.match(/^\*\*\*@/);
+    }
+    for (const c of body.data.cards) {
+      expect(c).to.not.have.property("razorpay_token_id");
+      expect(c.card_last4).to.be.a("string");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/customers/me/payment-methods — list masked UPI + cards.
+  Errors: 401 UNAUTHORIZED
+}

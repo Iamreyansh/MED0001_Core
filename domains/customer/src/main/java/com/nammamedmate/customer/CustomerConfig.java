@@ -4,15 +4,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.customer.adapter.out.geocode.CachingGeocodePort;
 import com.nammamedmate.customer.adapter.out.geocode.GoogleMapsGeocodeClient;
 import com.nammamedmate.customer.adapter.out.geocode.StubGeocodeClient;
+import com.nammamedmate.customer.adapter.out.razorpay.RazorpayVpaClient;
+import com.nammamedmate.customer.adapter.out.razorpay.StubRazorpayVpaClient;
 import com.nammamedmate.customer.application.port.out.ActiveOrdersPort;
 import com.nammamedmate.customer.application.port.out.AddressInActiveOrderPort;
 import com.nammamedmate.customer.application.port.out.GeocodePort;
+import com.nammamedmate.customer.application.port.out.PaymentMethodInActiveOrderPort;
+import com.nammamedmate.customer.application.port.out.RazorpayVpaPort;
+import com.nammamedmate.kernel.error.AppException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -39,6 +45,13 @@ public class CustomerConfig {
   }
 
   @Bean
+  @ConditionalOnMissingBean(PaymentMethodInActiveOrderPort.class)
+  PaymentMethodInActiveOrderPort noPaymentMethodInActiveOrderPort() {
+    // ponytail: orders domain (EPIC-010) not wired — payment-method delete never blocked
+    return methodId -> false;
+  }
+
+  @Bean
   @ConditionalOnMissingBean(GeocodePort.class)
   GeocodePort geocodePort(
       ObjectProvider<StringRedisTemplate> redis,
@@ -49,6 +62,18 @@ public class CustomerConfig {
             ? new StubGeocodeClient()
             : new GoogleMapsGeocodeClient(apiKey, objectMapper, CustomerConfig::httpGet);
     return new CachingGeocodePort(delegate, redis);
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(RazorpayVpaPort.class)
+  RazorpayVpaPort razorpayVpaPort(
+      ObjectMapper objectMapper,
+      @Value("${medmate.razorpay.key-id:}") String keyId,
+      @Value("${medmate.razorpay.key-secret:}") String keySecret) {
+    if (keyId == null || keyId.isBlank() || keySecret == null || keySecret.isBlank()) {
+      return new StubRazorpayVpaClient();
+    }
+    return new RazorpayVpaClient(keyId, keySecret, objectMapper, CustomerConfig::razorpayHttpGet);
   }
 
   /**
@@ -69,6 +94,31 @@ public class CustomerConfig {
         Thread.currentThread().interrupt();
       }
       throw new IllegalStateException(ex);
+    }
+  }
+
+  /** Razorpay VPA HTTP — 5s timeout per story; JaCoCo excludes Config. */
+  static String razorpayHttpGet(RazorpayVpaClient.Request request) {
+    try {
+      HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+      HttpRequest.Builder builder =
+          HttpRequest.newBuilder(request.uri()).timeout(Duration.ofSeconds(5)).GET();
+      for (Map.Entry<String, String> header : request.headers().entrySet()) {
+        builder.header(header.getKey(), header.getValue());
+      }
+      HttpResponse<String> response =
+          client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+      if (response.statusCode() >= 400) {
+        throw new AppException("VPA_VALIDATION_FAILED", "Razorpay VPA validation unavailable", 503);
+      }
+      return response.body();
+    } catch (AppException ex) {
+      throw ex;
+    } catch (IOException | InterruptedException ex) {
+      if (ex instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+      throw new AppException("VPA_VALIDATION_TIMEOUT", "Razorpay VPA validation timed out", 503);
     }
   }
 }

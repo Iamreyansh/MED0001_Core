@@ -1,0 +1,64 @@
+meta {
+  name: save-upi
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customers/me/payment-methods/upi
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Idempotency-Key: {{paymentMethodIdempotencyKey}}
+}
+
+body:json {
+  {
+    "upi_id": "ramesh@okaxis",
+    "nickname": "GPay"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("paymentMethodIdempotencyKey")) {
+    bru.setEnvVar("paymentMethodIdempotencyKey", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data && body.data.id)) {
+    return;
+  }
+  bru.setEnvVar("paymentMethodId", body.data.id);
+  bru.setEnvVar("upiPaymentMethodId", body.data.id);
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("masked UPI envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.type).to.equal("UPI");
+    expect(body.data.upi_handle).to.equal("***@okaxis");
+    expect(body.data).to.not.have.property("upi_id");
+  });
+}
+
+docs {
+  POST /api/v1/customers/me/payment-methods/upi — validate VPA via Razorpay then save (encrypted at rest).
+  Optional Idempotency-Key header replays the original create.
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 409 UPI_ALREADY_SAVED, 422 INVALID_UPI_VPA | PAYMENT_METHOD_LIMIT_REACHED, 503 VPA_VALIDATION_TIMEOUT | VPA_VALIDATION_FAILED
+}
