@@ -78,7 +78,7 @@ public class AdminPharmacyKycController {
   public ApiResponse<Map<String, Object>> getAutoVerifyResult(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @PathVariable UUID id,
-      @RequestParam(required = false) UUID jobId) {
+      @RequestParam(name = "job_id", required = false) UUID jobId) {
     return ApiResponse.ok(autoKyc.adminGetAutoVerifyResult(principal, id, jobId));
   }
 

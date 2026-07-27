@@ -72,8 +72,16 @@ medmate:
   kyc:
     # ponytail: feature flag via property, not EPIC-021 settings service (simpler for now)
     auto-verification-enabled: false
-    # Staging/prod: GuardDuty Malware Protection for S3 (prefix kyc/) scans after PutObject;
-    # GuardDutyDeferredVirusScanner is a no-op on the request path; worker applies EventBridge results.
+    # Local/dev only — staging/prod must inject via MEDMATE_SECRETS_KYC_ARN
+    webhook-secret: local-kyc-webhook-secret
+    jobs:
+      enabled: true
+      retry-delay-ms: 30000
+
+  outbox:
+    dispatch:
+      enabled: true
+      delay-ms: 5000
 
 springdoc:
   api-docs:

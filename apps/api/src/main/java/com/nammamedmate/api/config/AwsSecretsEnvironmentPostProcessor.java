@@ -71,6 +71,11 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
         props.put("medmate.razorpay.key-id", text(razorpay, "key_id"));
         props.put("medmate.razorpay.key-secret", text(razorpay, "key_secret"));
       }
+      String kycArn = environment.getProperty("MEDMATE_SECRETS_KYC_ARN");
+      if (kycArn != null && !kycArn.isBlank()) {
+        JsonNode kyc = MAPPER.readTree(getSecret(client, kycArn));
+        props.put("medmate.kyc.webhook-secret", text(kyc, "webhook_secret"));
+      }
     } catch (RuntimeException | java.io.IOException e) {
       throw new IllegalStateException("Failed to load secrets for deployed profile", e);
     }

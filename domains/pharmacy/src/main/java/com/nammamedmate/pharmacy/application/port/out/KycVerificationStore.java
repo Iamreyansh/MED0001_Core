@@ -22,7 +22,42 @@ public interface KycVerificationStore {
       int retryCount,
       Instant nextRetryAt,
       Instant verifiedAt,
-      Instant createdAt) {}
+      Instant createdAt) {
+
+    public KycVerificationRecord {
+      requestPayload = copyMap(requestPayload);
+      responsePayload = responsePayload == null ? null : copyMap(responsePayload);
+      details = details == null ? null : copyMap(details);
+      adminFlags = adminFlags == null ? List.of() : List.copyOf(adminFlags);
+    }
+
+    @Override
+    public Map<String, Object> requestPayload() {
+      return copyMap(requestPayload);
+    }
+
+    @Override
+    public Map<String, Object> responsePayload() {
+      return responsePayload == null ? null : copyMap(responsePayload);
+    }
+
+    @Override
+    public Map<String, Object> details() {
+      return details == null ? null : copyMap(details);
+    }
+
+    @Override
+    public List<Map<String, Object>> adminFlags() {
+      return List.copyOf(adminFlags);
+    }
+
+    private static Map<String, Object> copyMap(Map<String, Object> source) {
+      if (source == null || source.isEmpty()) {
+        return Map.of();
+      }
+      return Map.copyOf(source);
+    }
+  }
 
   void insert(KycVerificationRecord record);
 
@@ -43,4 +78,6 @@ public interface KycVerificationStore {
       Instant verifiedAt);
 
   List<KycVerificationRecord> findDueRetries(Instant now, int limit);
+
+  List<KycVerificationRecord> findStalePending(Instant createdBefore, int limit);
 }

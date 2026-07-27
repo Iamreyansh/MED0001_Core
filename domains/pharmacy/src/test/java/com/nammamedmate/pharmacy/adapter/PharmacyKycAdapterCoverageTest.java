@@ -637,6 +637,10 @@ class PharmacyKycAdapterCoverageTest {
     when(jdbc.query(contains("next_retry_at"), any(RowMapper.class), any(), anyInt()))
         .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(verificationRs, 0)));
     assertThat(verificationStore.findDueRetries(NOW, 5)).hasSize(1);
+    when(jdbc.query(
+            contains("status = 'PENDING' AND created_at"), any(RowMapper.class), any(), anyInt()))
+        .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(verificationRs, 0)));
+    assertThat(verificationStore.findStalePending(NOW, 5)).hasSize(1);
 
     ResultSet blankJsonRs = mockVerificationRs();
     when(blankJsonRs.getString("request_payload")).thenReturn(null);
