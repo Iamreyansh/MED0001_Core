@@ -65,8 +65,8 @@ class RbacPermissionsIT extends AbstractApiIT {
 
     String hash = ENCODER.encode(PASSWORD);
     jdbc.update(
-        "INSERT INTO pharmacies (id, name, city, subscription_plan, created_at, updated_at)"
-            + " VALUES (?, 'RBAC Pharmacy', 'Bengaluru', 'GROWTH', NOW(), NOW())",
+        "INSERT INTO pharmacies (id, name, city, subscription_plan, code, created_at, updated_at)"
+            + " VALUES (?, 'RBAC Pharmacy', 'Bengaluru', 'GROWTH', 'PHM-RBAC', NOW(), NOW())",
         PHARMACY_ID);
     jdbc.update(
         "INSERT INTO pharmacy_staff (id, name, email, password_hash, status,"

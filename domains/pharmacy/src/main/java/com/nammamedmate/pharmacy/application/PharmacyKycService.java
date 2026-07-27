@@ -335,7 +335,8 @@ public class PharmacyKycService {
       throw new AppException(
           "ALREADY_SUBMITTED", "KYC documents already submitted and under review", 409);
     }
-    if ("KYC_REJECTED".equals(pharmacy.status()) && !pharmacy.canReapply()) {
+    if (("REJECTED".equals(pharmacy.status()) || "KYC_REJECTED".equals(pharmacy.status()))
+        && !pharmacy.canReapply()) {
       throw new AppException("CANNOT_REAPPLY", "This pharmacy is not eligible to reapply", 409);
     }
 

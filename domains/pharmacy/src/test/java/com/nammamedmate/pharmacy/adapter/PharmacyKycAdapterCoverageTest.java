@@ -480,6 +480,12 @@ class PharmacyKycAdapterCoverageTest {
                     admin, PID, new AdminPharmacyKycController.AutoVerifyRequest(null))
                 .success())
         .isTrue();
+    assertThat(
+            controller
+                .triggerAutoVerify(
+                    admin, PID, new AdminPharmacyKycController.AutoVerifyRequest(List.of("GSTIN")))
+                .success())
+        .isTrue();
     assertThat(controller.getAutoVerifyResult(admin, PID, DOC_ID).success()).isTrue();
     assertThat(controller.triggerAutoVerify(admin, PID, null).success()).isTrue();
   }
@@ -756,7 +762,7 @@ class PharmacyKycAdapterCoverageTest {
         new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcPharmacyRegistrationStore(
             jdbc, mapper);
     pharmacyStore.activateAfterAutoKyc(PID, ZONE_ID, NOW);
-    verify(jdbc).update(contains("is_online = TRUE"), eq(ZONE_ID), any(), eq(PID));
+    verify(jdbc).update(contains("is_online = TRUE"), eq(ZONE_ID), any(), any(), eq(PID));
   }
 
   private static ResultSet mockAutoKycJobRs() throws Exception {

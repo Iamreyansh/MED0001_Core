@@ -86,5 +86,9 @@ public class AdminPharmacyKycController {
   public record VerifyRequest(Boolean verified, String rejectionReason) {}
 
   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-  public record AutoVerifyRequest(List<String> checks) {}
+  public record AutoVerifyRequest(List<String> checks) {
+    public AutoVerifyRequest {
+      checks = checks == null ? null : List.copyOf(checks);
+    }
+  }
 }

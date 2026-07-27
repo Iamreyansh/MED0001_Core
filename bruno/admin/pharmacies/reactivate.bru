@@ -1,0 +1,72 @@
+meta {
+  name: reactivate-pharmacy
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/reactivate
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "notes": "Complaints resolved; reactivate storefront"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reactivated", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("ACTIVE");
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/reactivate — notes required (audit).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "status": "ACTIVE",
+            "is_online": true,
+            "notifications_sent": ["WHATSAPP", "EMAIL"]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 NOTES_REQUIRED
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "NOTES_REQUIRED", "message": "notes is required" } }
+      '''
+    }
+  }
+}

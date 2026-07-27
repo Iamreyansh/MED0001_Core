@@ -1,0 +1,81 @@
+meta {
+  name: list-pharmacies
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies?status=KYC_SUBMITTED&page=1&limit=50
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run admin login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.pharmacies && body.data.pharmacies[0]) {
+    bru.setEnvVar("pharmacyId", body.data.pharmacies[0].pharmacy_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pharmacies).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies — KYC queue / pharmacy directory.
+  Requires pharmacies:read. Default sort for status=KYC_SUBMITTED is submitted_at asc.
+}
+
+example {
+  name: 200 OK — KYC queue
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacies": [
+              {
+                "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                "code": "PHM-0042",
+                "business_name": "Sharma Medical Store",
+                "status": "KYC_SUBMITTED",
+                "urgency": "HIGH",
+                "auto_kyc_status": "PARTIAL"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 50, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Admin role required" } }
+      '''
+    }
+  }
+}

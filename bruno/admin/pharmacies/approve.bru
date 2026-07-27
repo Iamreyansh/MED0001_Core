@@ -1,0 +1,87 @@
+meta {
+  name: approve-pharmacy
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/approve
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "commission_pct": 8.00,
+    "zone_id": "a0000001-0000-4000-8000-000000000001",
+    "notes": "Docs look good"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("approved", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("ACTIVE");
+    expect(body.data.is_online).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/approve — admin_super / admin_operations only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/approve
+    method: post
+    body:json: {
+      {
+        "commission_pct": 8.00,
+        "zone_id": "a0000001-0000-4000-8000-000000000001"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "status": "ACTIVE",
+            "is_online": true,
+            "commission_pct": 8.00,
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "notifications_sent": ["WHATSAPP", "EMAIL"]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Only admin_super or admin_operations may decide KYC" } }
+      '''
+    }
+  }
+}

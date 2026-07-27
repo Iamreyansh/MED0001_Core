@@ -1,0 +1,75 @@
+meta {
+  name: reject-pharmacy
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/reject
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "rejection_reason": "Drug Licence is expired. Please renew and reapply.",
+    "rejection_details": "Expiry was 2025-01-01",
+    "can_reapply": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("rejected", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("REJECTED");
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/reject
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "status": "REJECTED",
+            "can_reapply": true,
+            "rejection_reason": "Drug Licence is expired. Please renew and reapply.",
+            "notifications_sent": ["WHATSAPP", "EMAIL"]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 REJECTION_REASON_REQUIRED
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "REJECTION_REASON_REQUIRED", "message": "rejection_reason is required" } }
+      '''
+    }
+  }
+}

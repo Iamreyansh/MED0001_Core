@@ -1017,7 +1017,7 @@ class PharmacyKycServiceTest {
         "hash",
         "PHARMACY",
         Map.of(),
-        "KYC_REJECTED",
+        "REJECTED",
         "FREE",
         null,
         "g3",

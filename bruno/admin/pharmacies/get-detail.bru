@@ -1,0 +1,71 @@
+meta {
+  name: get-pharmacy-detail
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pharmacy_id).to.be.a("string");
+    expect(body.data.kyc).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{id} — full pharmacy + KYC summary for admin.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "code": "PHM-0042",
+            "status": "KYC_SUBMITTED",
+            "kyc": {
+              "submitted_at": "2026-07-23T10:00:00Z",
+              "auto_kyc_status": "PARTIAL",
+              "documents_summary": { "GSTIN_CERTIFICATE": "VERIFIED" }
+            }
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 PHARMACY_NOT_FOUND
+  response: {
+    status: { code: 404 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "PHARMACY_NOT_FOUND", "message": "Pharmacy not found" } }
+      '''
+    }
+  }
+}

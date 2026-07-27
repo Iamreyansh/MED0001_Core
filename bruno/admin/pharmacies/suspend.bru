@@ -1,0 +1,77 @@
+meta {
+  name: suspend-pharmacy
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/suspend
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "Customer complaints — temporary hold",
+    "suspend_type": "TEMPORARY",
+    "notes": "Review in 7 days"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("suspended", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("SUSPENDED");
+    expect(body.data.is_online).to.equal(false);
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/suspend — requires pharmacies:suspend.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "status": "SUSPENDED",
+            "is_online": false,
+            "suspend_type": "TEMPORARY",
+            "can_reapply": true,
+            "notifications_sent": ["WHATSAPP", "EMAIL"]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ALREADY_SUSPENDED
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "ALREADY_SUSPENDED", "message": "Pharmacy already in SUSPENDED status" } }
+      '''
+    }
+  }
+}
