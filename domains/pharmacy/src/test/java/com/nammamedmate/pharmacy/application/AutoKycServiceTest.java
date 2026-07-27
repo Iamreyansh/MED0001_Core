@@ -59,6 +59,7 @@ class AutoKycServiceTest {
   private OutboxPublisher outbox;
   private MutableClock clock;
   private AutoKycService service;
+  private AutoKycRetryWorker retryWorker;
 
   @BeforeEach
   void setUp() {
@@ -72,6 +73,7 @@ class AutoKycServiceTest {
     pharmacyStore.save(kycSubmittedPharmacy(PHARMACY_ID));
     pincodeZoneStore.zoneByPincode.put("560001", ZONE_ID);
     service = newService(true);
+    retryWorker = new AutoKycRetryWorker(service, verificationStore, clock);
   }
 
   // ─── 1. Admin trigger accepted shape ─────────────────────────────────────────
@@ -210,13 +212,13 @@ class AutoKycServiceTest {
     assertThat(afterFirst.nextRetryAt()).isEqualTo(NOW.plusSeconds(10));
 
     clock.advance(Duration.ofSeconds(10));
-    assertThat(service.processDueRetries()).isEqualTo(1);
+    assertThat(retryWorker.processDueRetries()).isEqualTo(1);
 
     clock.advance(Duration.ofSeconds(30));
-    assertThat(service.processDueRetries()).isEqualTo(1);
+    assertThat(retryWorker.processDueRetries()).isEqualTo(1);
 
     clock.advance(Duration.ofSeconds(90));
-    assertThat(service.processDueRetries()).isEqualTo(1);
+    assertThat(retryWorker.processDueRetries()).isEqualTo(1);
 
     KycVerificationRecord exhausted =
         verificationStore
@@ -457,7 +459,7 @@ class AutoKycServiceTest {
     pharmacyStore.save(
         withDrugLicence(kycSubmittedPharmacy(PHARMACY_ID), "DL-MH-error-12345", "MH"));
 
-    int count = service.processDueRetries();
+    int count = retryWorker.processDueRetries();
     assertThat(count).isEqualTo(2);
   }
 
@@ -521,17 +523,35 @@ class AutoKycServiceTest {
   }
 
   @Test
-  void webhookRejectsCompletedJob() throws Exception {
+  void webhookAcksCompletedJobIdempotently() throws Exception {
     UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
     jobStore.insert(
         new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PASS", false, NOW, NOW));
+    verificationStore.insert(
+        new KycVerificationRecord(
+            verificationId,
+            PHARMACY_ID,
+            jobId,
+            "FSSAI",
+            StubFssaiVerificationClient.API_PROVIDER,
+            Map.of("licence_number", "11223344556677"),
+            null,
+            "PASS",
+            null,
+            List.of(),
+            0,
+            null,
+            NOW,
+            NOW));
     String body =
         "{\"provider\":\"FSSAI_PORTAL_API\",\"job_id\":\""
             + jobId
             + "\",\"verification_type\":\"FSSAI\",\"status\":\"PASS\",\"data\":{}}";
-    assertThatThrownBy(() -> service.handleWebhookCallback(sign(body), body.getBytes()))
-        .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("JOB_NOT_FOUND");
+    Map<String, Object> response = service.handleWebhookCallback(sign(body), body.getBytes());
+    assertThat(response.get("acknowledged")).isEqualTo(true);
+    assertThat(response.get("duplicate")).isEqualTo(true);
+    assertThat(response.get("verification_id")).isEqualTo(verificationId.toString());
   }
 
   @Test
@@ -686,7 +706,7 @@ class AutoKycServiceTest {
   }
 
   @Test
-  void webhookUnknownStatusYieldsPartialOverall() throws Exception {
+  void webhookRejectsUnknownStatus() throws Exception {
     UUID jobId = Ids.newId();
     jobStore.insert(
         new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PARTIAL", false, NOW, null));
@@ -710,8 +730,9 @@ class AutoKycServiceTest {
         "{\"provider\":\"FSSAI_PORTAL_API\",\"job_id\":\""
             + jobId
             + "\",\"verification_type\":\"FSSAI\",\"status\":\"WEIRD\",\"data\":{\"licence_number\":\"11223344556677\"}}";
-    service.handleWebhookCallback(sign(body), body.getBytes());
-    assertThat(jobStore.findById(jobId).orElseThrow().overallStatus()).isEqualTo("PARTIAL");
+    assertThatThrownBy(() -> service.handleWebhookCallback(sign(body), body.getBytes()))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("VALIDATION_ERROR");
   }
 
   @Test
@@ -785,22 +806,177 @@ class AutoKycServiceTest {
         + AutoKycService.hmacSha256Hex(WEBHOOK_SECRET, body.getBytes(StandardCharsets.UTF_8));
   }
 
+  @Test
+  void gstinTransientErrorRetriesViaWorker() {
+    UUID jobId = Ids.newId();
+    jobStore.insert(
+        new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PARTIAL", false, NOW, null));
+    UUID verificationId = Ids.newId();
+    verificationStore.insert(
+        pendingRetryVerification(verificationId, PHARMACY_ID, jobId, "GSTIN", NOW));
+    pharmacyStore.save(withGstin(kycSubmittedPharmacy(PHARMACY_ID), "27errorAABCS1429B1ZB"));
+
+    assertThat(retryWorker.processDueRetries()).isEqualTo(1);
+
+    KycVerificationRecord after = verificationStore.findById(verificationId).orElseThrow();
+    assertThat(after.status()).isEqualTo("ERROR");
+    assertThat(after.retryCount()).isEqualTo(2);
+    assertThat(after.nextRetryAt()).isEqualTo(NOW.plusSeconds(30));
+  }
+
+  @Test
+  void processStaleAsyncChecksTimesOutPendingVerification() {
+    UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
+    Instant staleCreatedAt = NOW.minus(AutoKycService.ASYNC_CHECK_TIMEOUT).minusSeconds(1);
+    jobStore.insert(
+        new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PARTIAL", false, NOW, null));
+    verificationStore.insert(
+        new KycVerificationRecord(
+            verificationId,
+            PHARMACY_ID,
+            jobId,
+            "FSSAI",
+            StubFssaiVerificationClient.API_PROVIDER,
+            Map.of("licence_number", "11223344556677"),
+            null,
+            "PENDING",
+            null,
+            List.of(),
+            0,
+            null,
+            null,
+            staleCreatedAt));
+
+    assertThat(service.processStaleAsyncChecks()).isEqualTo(1);
+    assertThat(verificationStore.findById(verificationId).orElseThrow().status())
+        .isEqualTo("ERROR");
+    assertThat(verificationStore.findById(verificationId).orElseThrow().details())
+        .containsEntry("reason", "ASYNC_CHECK_TIMEOUT");
+  }
+
+  @Test
+  void validateWebhookSecretRejectsLocalDefaultInDeployedProfile() {
+    assertThatThrownBy(
+            () ->
+                AutoKycService.validateWebhookSecretForDeployedProfile(
+                    "local-kyc-webhook-secret", true))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void validateWebhookSecretAllowsLocalProfile() {
+    AutoKycService.validateWebhookSecretForDeployedProfile("local-kyc-webhook-secret", false);
+    AutoKycService.validateWebhookSecretForDeployedProfile("", false);
+  }
+
+  @Test
+  void validateWebhookSecretRejectsBlankInDeployedProfile() {
+    assertThatThrownBy(() -> AutoKycService.validateWebhookSecretForDeployedProfile("", true))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> AutoKycService.validateWebhookSecretForDeployedProfile(null, true))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void validateWebhookSecretAcceptsInjectedDeployedSecret() {
+    AutoKycService.validateWebhookSecretForDeployedProfile("prod-kyc-hmac-secret", true);
+  }
+
+  @Test
+  void gstinRetryUsesPharmacyNameWhenBusinessNameNull() {
+    UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
+    PharmacyRecord base = kycSubmittedPharmacy(PHARMACY_ID);
+    PharmacyRecord noBusinessName =
+        new PharmacyRecord(
+            base.id(),
+            "Fallback Store Name",
+            null,
+            base.ownerName(),
+            base.phone(),
+            base.email(),
+            base.passwordHash(),
+            base.businessType(),
+            base.address(),
+            base.status(),
+            base.plan(),
+            base.planExpiresAt(),
+            "27errorAABCS1429B1ZB",
+            base.drugLicenceNumber(),
+            base.licenceStateCode(),
+            base.fssaiNumber(),
+            base.panNumber(),
+            base.commissionPct(),
+            base.zoneId(),
+            base.online(),
+            base.emailVerified(),
+            base.canReapply(),
+            base.city(),
+            base.subscriptionPlan(),
+            base.createdAt(),
+            base.updatedAt(),
+            base.kycSubmittedAt());
+    pharmacyStore.save(noBusinessName);
+    jobStore.insert(
+        new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PARTIAL", false, NOW, null));
+    verificationStore.insert(
+        pendingRetryVerification(verificationId, PHARMACY_ID, jobId, "GSTIN", NOW));
+
+    retryWorker.processDueRetries();
+
+    assertThat(verificationStore.findById(verificationId).orElseThrow().retryCount()).isEqualTo(2);
+  }
+
+  @Test
+  void webhookAcksTerminalVerificationWhenJobStillOpen() throws Exception {
+    UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
+    jobStore.insert(
+        new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PARTIAL", false, NOW, null));
+    verificationStore.insert(
+        new KycVerificationRecord(
+            verificationId,
+            PHARMACY_ID,
+            jobId,
+            "FSSAI",
+            StubFssaiVerificationClient.API_PROVIDER,
+            Map.of("licence_number", "11223344556677"),
+            null,
+            "PASS",
+            Map.of("licence_status", "ACTIVE"),
+            List.of(),
+            0,
+            null,
+            NOW,
+            NOW));
+    String body =
+        "{\"provider\":\"FSSAI_PORTAL_API\",\"job_id\":\""
+            + jobId
+            + "\",\"verification_type\":\"FSSAI\",\"status\":\"PASS\",\"data\":{}}";
+    Map<String, Object> response = service.handleWebhookCallback(sign(body), body.getBytes());
+    assertThat(response.get("duplicate")).isEqualTo(true);
+  }
+
   // ─── Service factory & helpers ───────────────────────────────────────────────
 
   private AutoKycService newService(boolean autoVerificationEnabled) {
-    return new AutoKycService(
-        pharmacyStore,
-        jobStore,
-        verificationStore,
-        pincodeZoneStore,
-        new StubGstinVerificationClient(),
-        new StubDrugLicenceVerificationClient(),
-        new StubFssaiVerificationClient(),
-        outbox,
-        new AllowAllRateLimiter(),
-        clock,
-        autoVerificationEnabled,
-        WEBHOOK_SECRET);
+    AutoKycService svc =
+        new AutoKycService(
+            pharmacyStore,
+            jobStore,
+            verificationStore,
+            pincodeZoneStore,
+            new StubGstinVerificationClient(),
+            new StubDrugLicenceVerificationClient(),
+            new StubFssaiVerificationClient(),
+            outbox,
+            new AllowAllRateLimiter(),
+            clock,
+            autoVerificationEnabled,
+            WEBHOOK_SECRET);
+    svc.setSelf(svc);
+    return svc;
   }
 
   private MedmatePrincipal adminPrincipal() {
@@ -1205,6 +1381,14 @@ class AutoKycServiceTest {
                   "ERROR".equals(r.status())
                       && r.nextRetryAt() != null
                       && !r.nextRetryAt().isAfter(now))
+          .limit(limit)
+          .toList();
+    }
+
+    @Override
+    public List<KycVerificationRecord> findStalePending(Instant createdBefore, int limit) {
+      return records.stream()
+          .filter(r -> "PENDING".equals(r.status()) && !r.createdAt().isAfter(createdBefore))
           .limit(limit)
           .toList();
     }

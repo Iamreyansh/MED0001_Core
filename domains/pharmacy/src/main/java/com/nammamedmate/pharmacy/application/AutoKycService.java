@@ -37,8 +37,11 @@ import java.util.Set;
 import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -53,6 +56,8 @@ public class AutoKycService {
   static final Duration[] RETRY_BACKOFF = {
     Duration.ofSeconds(10), Duration.ofSeconds(30), Duration.ofSeconds(90)
   };
+  static final Duration ASYNC_CHECK_TIMEOUT = Duration.ofMinutes(30);
+  static final String LOCAL_WEBHOOK_SECRET = "local-kyc-webhook-secret";
 
   static final Set<String> ALL_CHECKS = Set.of("GSTIN", "DRUG_LICENCE", "FSSAI");
   static final Set<String> ASYNC_CHECKS = Set.of("DRUG_LICENCE", "FSSAI");
@@ -71,6 +76,12 @@ public class AutoKycService {
   private final Clock clock;
   private final boolean autoVerificationEnabled;
   private final String webhookSecret;
+  private AutoKycService self;
+
+  @Autowired
+  void setSelf(@Lazy AutoKycService self) {
+    this.self = self;
+  }
 
   public AutoKycService(
       PharmacyRegistrationStore pharmacies,
@@ -84,7 +95,7 @@ public class AutoKycService {
       RateLimiter rateLimiter,
       Clock clock,
       @Value("${medmate.kyc.auto-verification-enabled:false}") boolean autoVerificationEnabled,
-      @Value("${medmate.kyc.webhook-secret:local-kyc-webhook-secret}") String webhookSecret) {
+      @Value("${medmate.kyc.webhook-secret:}") String webhookSecret) {
     this.pharmacies = pharmacies;
     this.jobs = jobs;
     this.verifications = verifications;
@@ -96,7 +107,18 @@ public class AutoKycService {
     this.rateLimiter = rateLimiter;
     this.clock = clock;
     this.autoVerificationEnabled = autoVerificationEnabled;
-    this.webhookSecret = webhookSecret == null ? "" : webhookSecret;
+    this.webhookSecret = webhookSecret == null ? "" : webhookSecret.trim();
+  }
+
+  public static void validateWebhookSecretForDeployedProfile(
+      String secret, boolean deployedProfile) {
+    if (!deployedProfile) {
+      return;
+    }
+    if (secret == null || secret.isBlank() || LOCAL_WEBHOOK_SECRET.equals(secret)) {
+      throw new IllegalStateException(
+          "medmate.kyc.webhook-secret must be injected via Secrets Manager for staging/prod");
+    }
   }
 
   // ─── Admin trigger ───────────────────────────────────────────────────────────
@@ -171,7 +193,6 @@ public class AutoKycService {
 
   // ─── Webhook callback ────────────────────────────────────────────────────────
 
-  @Transactional
   public Map<String, Object> handleWebhookCallback(String signatureHeader, byte[] rawBody) {
     verifyWebhookSignature(signatureHeader, rawBody);
     Map<String, Object> body = parseJsonBody(rawBody);
@@ -187,13 +208,16 @@ public class AutoKycService {
     if (!"DRUG_LICENCE".equals(verificationType) && !"FSSAI".equals(verificationType)) {
       throw new AppException("VALIDATION_ERROR", "Invalid verification_type", 400);
     }
+    if (!"PASS".equals(status)
+        && !"FAIL".equals(status)
+        && !"ERROR".equals(status)
+        && !"WARN".equals(status)) {
+      throw new AppException("VALIDATION_ERROR", "status must be PASS, FAIL, ERROR, or WARN", 400);
+    }
 
     AutoKycJobRecord job =
         jobs.findById(jobId)
             .orElseThrow(() -> new AppException("JOB_NOT_FOUND", "Auto-KYC job not found", 404));
-    if (RESOLVED_JOB_STATUSES.contains(job.overallStatus())) {
-      throw new AppException("JOB_NOT_FOUND", "Auto-KYC job already completed", 404);
-    }
 
     KycVerificationRecord verification =
         verifications
@@ -201,21 +225,20 @@ public class AutoKycService {
             .orElseThrow(
                 () -> new AppException("JOB_NOT_FOUND", "Verification record not found", 404));
 
+    if (RESOLVED_JOB_STATUSES.contains(job.overallStatus())
+        || isVerificationTerminal(verification)) {
+      return idempotentWebhookAck(verification.id(), true);
+    }
+
     @SuppressWarnings("unchecked")
     Map<String, Object> data = (Map<String, Object>) body.get("data");
     KycCheckResult result = webhookToResult(provider, verificationType, status, data);
-    applyCheckResult(verification, result);
-    reevaluateJob(job.id());
-
-    Map<String, Object> response = new LinkedHashMap<>();
-    response.put("acknowledged", true);
-    response.put("verification_id", verification.id().toString());
-    return response;
+    self.persistCheckOutcome(verification, result);
+    return idempotentWebhookAck(verification.id(), false);
   }
 
   // ─── Async processing (outbox consumer) ──────────────────────────────────────
 
-  @Transactional
   public void processAsyncCheck(UUID verificationId) {
     KycVerificationRecord verification =
         verifications
@@ -230,25 +253,54 @@ public class AutoKycService {
             .findById(verification.pharmacyId())
             .orElseThrow(() -> new AppException("PHARMACY_NOT_FOUND", "Pharmacy not found", 404));
 
-    KycCheckResult result =
-        switch (verification.verificationType()) {
-          case "DRUG_LICENCE" ->
-              drugLicencePort.verifyDrugLicence(
-                  pharmacy.drugLicenceNumber(), pharmacy.licenceStateCode());
-          case "FSSAI" -> fssaiPort.verifyFssai(pharmacy.fssaiNumber());
-          default -> throw new AppException("INVALID_CHECK_TYPE", "Unknown verification type", 400);
-        };
+    KycCheckResult result = invokeExternalCheck(verification, pharmacy);
+    self.persistCheckOutcome(verification, result);
+  }
+
+  public int processStaleAsyncChecks() {
+    Instant cutoff = clock.instant().minus(ASYNC_CHECK_TIMEOUT);
+    List<KycVerificationRecord> stale = verifications.findStalePending(cutoff, 25);
+    for (KycVerificationRecord record : stale) {
+      self.markStaleCheckAsError(record);
+    }
+    return stale.size();
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void persistCheckOutcome(KycVerificationRecord verification, KycCheckResult result) {
     applyCheckResult(verification, result);
     reevaluateJob(verification.jobId());
   }
 
-  @Transactional
-  public int processDueRetries() {
-    List<KycVerificationRecord> due = verifications.findDueRetries(clock.instant(), 25);
-    for (KycVerificationRecord record : due) {
-      processAsyncCheck(record.id());
-    }
-    return due.size();
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void markStaleCheckAsError(KycVerificationRecord verification) {
+    KycCheckResult timeout =
+        new KycCheckResult(
+            "ERROR",
+            verification.apiProvider(),
+            Map.of("reason", "ASYNC_CHECK_TIMEOUT"),
+            null,
+            Map.of("reason", "ASYNC_CHECK_TIMEOUT"),
+            List.of(),
+            false);
+    applyCheckResult(verification, timeout);
+    reevaluateJob(verification.jobId());
+  }
+
+  private KycCheckResult invokeExternalCheck(
+      KycVerificationRecord verification, PharmacyRecord pharmacy) {
+    return switch (verification.verificationType()) {
+      case "GSTIN" -> {
+        String businessName =
+            pharmacy.businessName() == null ? pharmacy.name() : pharmacy.businessName();
+        yield gstinPort.verifyGstin(pharmacy.gstin(), businessName);
+      }
+      case "DRUG_LICENCE" ->
+          drugLicencePort.verifyDrugLicence(
+              pharmacy.drugLicenceNumber(), pharmacy.licenceStateCode());
+      case "FSSAI" -> fssaiPort.verifyFssai(pharmacy.fssaiNumber());
+      default -> throw new AppException("INVALID_CHECK_TYPE", "Unknown verification type", 400);
+    };
   }
 
   // ─── Internal orchestration ──────────────────────────────────────────────────
@@ -489,6 +541,20 @@ public class AutoKycService {
     data.put("checks", checkMaps);
     data.put("admin_flags", allFlags);
     return data;
+  }
+
+  private static Map<String, Object> idempotentWebhookAck(UUID verificationId, boolean duplicate) {
+    Map<String, Object> response = new LinkedHashMap<>();
+    response.put("acknowledged", true);
+    response.put("verification_id", verificationId.toString());
+    if (duplicate) {
+      response.put("duplicate", true);
+    }
+    return response;
+  }
+
+  private static boolean isVerificationTerminal(KycVerificationRecord verification) {
+    return TERMINAL_STATUSES.contains(verification.status()) && verification.verifiedAt() != null;
   }
 
   private static Map<String, Object> checkResultMap(KycVerificationRecord check) {

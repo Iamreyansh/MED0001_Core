@@ -51,6 +51,24 @@ class OutboxTest {
   }
 
   @Test
+  void dispatchStopsOnTransportFailure() {
+    InMemoryOutboxStore store = new InMemoryOutboxStore();
+    store.append(OutboxMessage.pending("first", "{}"));
+    store.append(OutboxMessage.pending("second", "{}"));
+    SqsEventDispatcher dispatcher =
+        new SqsEventDispatcher(
+            store,
+            message -> {
+              if ("first".equals(message.type())) {
+                throw new RuntimeException("transport down");
+              }
+            },
+            10);
+    assertThat(dispatcher.dispatchOnce()).isEqualTo(0);
+    assertThat(store.findUnpublished(10)).hasSize(2);
+  }
+
+  @Test
   void jdbcOutboxStoreDelegatesToJdbc() throws Exception {
     JdbcTemplate jdbc = mock(JdbcTemplate.class);
     JdbcOutboxStore store = new JdbcOutboxStore(jdbc);

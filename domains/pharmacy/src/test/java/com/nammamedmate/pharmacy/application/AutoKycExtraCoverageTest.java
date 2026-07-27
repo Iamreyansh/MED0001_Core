@@ -67,6 +67,7 @@ class AutoKycExtraCoverageTest {
             Clock.fixed(NOW, ZoneOffset.UTC),
             true,
             WEBHOOK_SECRET);
+    service.setSelf(service);
   }
 
   @Test
@@ -363,6 +364,7 @@ class AutoKycExtraCoverageTest {
             Clock.fixed(NOW, ZoneOffset.UTC),
             true,
             WEBHOOK_SECRET);
+    custom.setSelf(custom);
     UUID jobId = Ids.newId();
     jobStore.insert(
         new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PENDING", false, NOW, null));
@@ -775,6 +777,199 @@ class AutoKycExtraCoverageTest {
     assertThat(extract.invoke(null, Map.of("pincode", "560001"))).isEqualTo("560001");
     assertThat(extract.invoke(null, Map.of("line1", "x"))).isNull();
     assertThat(extract.invoke(null, (Object) null)).isNull();
+  }
+
+  @Test
+  void triggerAutoVerifySkipsUnknownCheckTypesInLoop() throws Exception {
+    Method trigger =
+        AutoKycService.class.getDeclaredMethod(
+            "triggerAutoVerify", UUID.class, UUID.class, String.class, List.class);
+    trigger.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> result =
+        (Map<String, Object>)
+            trigger.invoke(service, PHARMACY_ID, ADMIN_ID, "ADMIN", List.of("UNKNOWN"));
+    assertThat(result.get("checks_triggered")).asList().containsExactly("UNKNOWN");
+    assertThat(jobStore.jobs).hasSize(1);
+    assertThat(verificationStore.records).isEmpty();
+  }
+
+  @Test
+  void applyCheckResultSkipsExpiryWhenDetailsNull() throws Exception {
+    UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
+    verificationStore.insert(
+        new KycVerificationRecord(
+            verificationId,
+            PHARMACY_ID,
+            jobId,
+            "DRUG_LICENCE",
+            StubDrugLicenceVerificationClient.API_PROVIDER,
+            Map.of("licence_number", "DL-MH-1"),
+            null,
+            "PENDING",
+            null,
+            List.of(),
+            0,
+            null,
+            null,
+            NOW));
+    KycVerificationRecord verification = verificationStore.findById(verificationId).orElseThrow();
+    KycCheckResult passWithoutDetails =
+        new KycCheckResult(
+            "PASS",
+            StubDrugLicenceVerificationClient.API_PROVIDER,
+            Map.of(),
+            Map.of(),
+            null,
+            List.of(),
+            false);
+    Method apply =
+        AutoKycService.class.getDeclaredMethod(
+            "applyCheckResult", KycVerificationRecord.class, KycCheckResult.class);
+    apply.setAccessible(true);
+    apply.invoke(service, verification, passWithoutDetails);
+    assertThat(verificationStore.findById(verificationId).orElseThrow().status()).isEqualTo("PASS");
+  }
+
+  @Test
+  void applyCheckResultSkipsExpiryWhenExpiryDateNotString() throws Exception {
+    UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
+    verificationStore.insert(
+        new KycVerificationRecord(
+            verificationId,
+            PHARMACY_ID,
+            jobId,
+            "DRUG_LICENCE",
+            StubDrugLicenceVerificationClient.API_PROVIDER,
+            Map.of("licence_number", "DL-MH-1"),
+            null,
+            "PENDING",
+            null,
+            List.of(),
+            0,
+            null,
+            null,
+            NOW));
+    KycVerificationRecord verification = verificationStore.findById(verificationId).orElseThrow();
+    KycCheckResult passWithNumericExpiry =
+        new KycCheckResult(
+            "PASS",
+            StubDrugLicenceVerificationClient.API_PROVIDER,
+            Map.of(),
+            Map.of(),
+            Map.of("expiry_date", 20280101),
+            List.of(),
+            false);
+    Method apply =
+        AutoKycService.class.getDeclaredMethod(
+            "applyCheckResult", KycVerificationRecord.class, KycCheckResult.class);
+    apply.setAccessible(true);
+    apply.invoke(service, verification, passWithNumericExpiry);
+    assertThat(verificationStore.findById(verificationId).orElseThrow().status()).isEqualTo("PASS");
+  }
+
+  @Test
+  void applyCheckResultLeavesNonTerminalStatusWithoutVerifiedAt() throws Exception {
+    UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
+    verificationStore.insert(
+        new KycVerificationRecord(
+            verificationId,
+            PHARMACY_ID,
+            jobId,
+            "GSTIN",
+            "GSTN_SANDBOX_API",
+            Map.of("gstin", "27AABCS1429B1ZB"),
+            null,
+            "PENDING",
+            null,
+            List.of(),
+            0,
+            null,
+            null,
+            NOW));
+    KycVerificationRecord verification = verificationStore.findById(verificationId).orElseThrow();
+    KycCheckResult pending =
+        new KycCheckResult(
+            "PENDING", "GSTN_SANDBOX_API", Map.of(), Map.of(), Map.of(), List.of(), false);
+    Method apply =
+        AutoKycService.class.getDeclaredMethod(
+            "applyCheckResult", KycVerificationRecord.class, KycCheckResult.class);
+    apply.setAccessible(true);
+    apply.invoke(service, verification, pending);
+    KycVerificationRecord updated = verificationStore.findById(verificationId).orElseThrow();
+    assertThat(updated.status()).isEqualTo("PENDING");
+    assertThat(updated.verifiedAt()).isNull();
+  }
+
+  @Test
+  void webhookErrorStatusSchedulesRetry() throws Exception {
+    UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
+    jobStore.insert(
+        new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PARTIAL", false, NOW, null));
+    verificationStore.insert(
+        new KycVerificationRecord(
+            verificationId,
+            PHARMACY_ID,
+            jobId,
+            "FSSAI",
+            StubFssaiVerificationClient.API_PROVIDER,
+            Map.of("licence_number", "11223344556677"),
+            null,
+            "PENDING",
+            null,
+            List.of(),
+            0,
+            null,
+            null,
+            NOW));
+    String body =
+        "{\"provider\":\"FSSAI_PORTAL_API\",\"job_id\":\""
+            + jobId
+            + "\",\"verification_type\":\"FSSAI\",\"status\":\"ERROR\",\"data\":{}}";
+    Map<String, Object> response = service.handleWebhookCallback(sign(body), body.getBytes());
+    assertThat(response.get("acknowledged")).isEqualTo(true);
+    assertThat(response.containsKey("duplicate")).isFalse();
+    KycVerificationRecord updated = verificationStore.findById(verificationId).orElseThrow();
+    assertThat(updated.status()).isEqualTo("ERROR");
+    assertThat(updated.retryCount()).isEqualTo(1);
+    assertThat(updated.nextRetryAt()).isEqualTo(NOW.plusSeconds(10));
+  }
+
+  @Test
+  void webhookReprocessesTerminalStatusWhenVerifiedAtMissing() throws Exception {
+    UUID jobId = Ids.newId();
+    UUID verificationId = Ids.newId();
+    jobStore.insert(
+        new AutoKycJobRecord(jobId, PHARMACY_ID, ADMIN_ID, "ADMIN", "PARTIAL", false, NOW, null));
+    verificationStore.insert(
+        new KycVerificationRecord(
+            verificationId,
+            PHARMACY_ID,
+            jobId,
+            "FSSAI",
+            StubFssaiVerificationClient.API_PROVIDER,
+            Map.of("licence_number", "11223344556677"),
+            null,
+            "PASS",
+            Map.of("licence_status", "ACTIVE"),
+            List.of(),
+            0,
+            null,
+            null,
+            NOW));
+    String body =
+        "{\"provider\":\"FSSAI_PORTAL_API\",\"job_id\":\""
+            + jobId
+            + "\",\"verification_type\":\"FSSAI\",\"status\":\"PASS\",\"data\":{\"licence_status\":\"ACTIVE\"}}";
+    Map<String, Object> response = service.handleWebhookCallback(sign(body), body.getBytes());
+    assertThat(response.get("acknowledged")).isEqualTo(true);
+    assertThat(response.containsKey("duplicate")).isFalse();
+    assertThat(verificationStore.findById(verificationId).orElseThrow().verifiedAt())
+        .isEqualTo(NOW);
   }
 
   private MedmatePrincipal adminPrincipal() {

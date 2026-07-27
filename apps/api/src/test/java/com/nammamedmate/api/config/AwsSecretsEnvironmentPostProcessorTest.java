@@ -62,6 +62,7 @@ class AwsSecretsEnvironmentPostProcessorTest {
     props.put("MEDMATE_SECRETS_JWT_ARN", "");
     props.put("MEDMATE_SECRETS_MFA_ARN", " ");
     props.put("MEDMATE_SECRETS_RAZORPAY_ARN", " ");
+    props.put("MEDMATE_SECRETS_KYC_ARN", " ");
     env.getPropertySources().addFirst(new MapPropertySource("test", props));
 
     new AwsSecretsEnvironmentPostProcessor(() -> client)
@@ -144,6 +145,26 @@ class AwsSecretsEnvironmentPostProcessorTest {
         .isEqualTo("QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=");
     assertThat(env.getProperty("medmate.payment.encryption-key-base64"))
         .isEqualTo("QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=");
+  }
+
+  @Test
+  void loadsKycWebhookSecretFromSecretsManager() {
+    SecretsManagerClient client = mock(SecretsManagerClient.class);
+    when(client.getSecretValue(any(GetSecretValueRequest.class)))
+        .thenReturn(
+            GetSecretValueResponse.builder()
+                .secretString("{\"webhook_secret\":\"prod-kyc-hmac-secret\"}")
+                .build());
+
+    StandardEnvironment env = new StandardEnvironment();
+    env.setActiveProfiles("prod");
+    env.getPropertySources()
+        .addFirst(new MapPropertySource("test", Map.of("MEDMATE_SECRETS_KYC_ARN", "arn:kyc")));
+
+    new AwsSecretsEnvironmentPostProcessor(() -> client)
+        .postProcessEnvironment(env, new SpringApplication());
+
+    assertThat(env.getProperty("medmate.kyc.webhook-secret")).isEqualTo("prod-kyc-hmac-secret");
   }
 
   @Test

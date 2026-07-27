@@ -135,6 +135,20 @@ public class JdbcKycVerificationStore implements KycVerificationStore {
         limit);
   }
 
+  @Override
+  public List<KycVerificationRecord> findStalePending(Instant createdBefore, int limit) {
+    return jdbc.query(
+        """
+        SELECT * FROM kyc_verifications
+        WHERE status = 'PENDING' AND created_at <= ?
+        ORDER BY created_at ASC
+        LIMIT ?
+        """,
+        this::mapRow,
+        Timestamp.from(createdBefore),
+        limit);
+  }
+
   private KycVerificationRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
     return new KycVerificationRecord(
         (UUID) rs.getObject("id"),

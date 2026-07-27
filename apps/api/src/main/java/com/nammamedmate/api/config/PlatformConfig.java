@@ -136,6 +136,15 @@ public class PlatformConfig {
   }
 
   @Bean
+  @Profile({"prod", "staging"})
+  org.springframework.boot.ApplicationRunner kycWebhookSecretGuard(
+      @Value("${medmate.kyc.webhook-secret:}") String webhookSecret) {
+    return args ->
+        com.nammamedmate.pharmacy.application.AutoKycService
+            .validateWebhookSecretForDeployedProfile(webhookSecret, true);
+  }
+
+  @Bean
   @Profile("!prod & !staging")
   Rs256JwtService localJwtService(TokenRevocationStore revocationStore, Clock clock)
       throws Exception {

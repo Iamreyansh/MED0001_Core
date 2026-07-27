@@ -21,10 +21,16 @@ public final class SqsEventDispatcher {
 
   public int dispatchOnce() {
     List<OutboxMessage> batch = store.findUnpublished(batchSize);
+    int dispatched = 0;
     for (OutboxMessage message : batch) {
-      transport.accept(message);
-      store.markPublished(message);
+      try {
+        transport.accept(message);
+        store.markPublished(message);
+        dispatched++;
+      } catch (RuntimeException ex) {
+        break;
+      }
     }
-    return batch.size();
+    return dispatched;
   }
 }

@@ -36,5 +36,12 @@ class KycGovernmentApiPortTest {
     assertThat(populated.responsePayload()).containsEntry("b", 2);
     assertThat(populated.details()).containsEntry("c", 3);
     assertThat(populated.adminFlags()).hasSize(1);
+
+    KycGovernmentApiPort.KycCheckResult emptyMaps =
+        new KycGovernmentApiPort.KycCheckResult(
+            "PASS", "PROVIDER", Map.of(), Map.of(), Map.of(), List.of(), false);
+    assertThat(emptyMaps.requestPayload()).isEmpty();
+    assertThat(emptyMaps.responsePayload()).isEmpty();
+    assertThat(emptyMaps.details()).isEmpty();
   }
 }

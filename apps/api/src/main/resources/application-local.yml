@@ -17,3 +17,7 @@ spring:
 logging:
   level:
     root: INFO
+
+medmate:
+  kyc:
+    webhook-secret: local-kyc-webhook-secret
