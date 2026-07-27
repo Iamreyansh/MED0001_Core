@@ -487,6 +487,11 @@ class PharmacyRegistrationServiceTest {
               updatedAt,
               kycSubmittedAt));
     }
+
+    @Override
+    public void activateAfterAutoKyc(UUID pharmacyId, UUID zoneId, Instant at) {
+      updateStatus(pharmacyId, "ACTIVE", null, at);
+    }
   }
 
   static final class FakeOwners implements PharmacyOwnerAccountStore {

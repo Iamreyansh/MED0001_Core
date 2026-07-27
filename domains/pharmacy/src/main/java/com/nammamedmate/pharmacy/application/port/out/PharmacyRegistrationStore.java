@@ -60,4 +60,6 @@ public interface PharmacyRegistrationStore {
   void markEmailVerified(UUID pharmacyId, Instant at);
 
   void updateStatus(UUID pharmacyId, String status, Instant kycSubmittedAt, Instant updatedAt);
+
+  void activateAfterAutoKyc(UUID pharmacyId, UUID zoneId, Instant at);
 }

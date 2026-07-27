@@ -158,6 +158,23 @@ public class JdbcPharmacyRegistrationStore implements PharmacyRegistrationStore 
         pharmacyId);
   }
 
+  @Override
+  public void activateAfterAutoKyc(UUID pharmacyId, UUID zoneId, Instant at) {
+    jdbc.update(
+        """
+        UPDATE pharmacies SET
+          status = 'ACTIVE',
+          is_online = TRUE,
+          zone_id = ?,
+          plan = 'FREE',
+          updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL
+        """,
+        zoneId,
+        Timestamp.from(at),
+        pharmacyId);
+  }
+
   private PharmacyRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
     return new PharmacyRecord(
         (UUID) rs.getObject("id"),

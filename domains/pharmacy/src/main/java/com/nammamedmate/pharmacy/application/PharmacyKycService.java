@@ -89,6 +89,7 @@ public class PharmacyKycService {
   private final RateLimiter rateLimiter;
   private final Clock clock;
   private final boolean autoVerificationEnabled;
+  private final AutoKycService autoKyc;
 
   public PharmacyKycService(
       PharmacyRegistrationStore pharmacies,
@@ -99,7 +100,8 @@ public class PharmacyKycService {
       OutboxPublisher outbox,
       RateLimiter rateLimiter,
       Clock clock,
-      @Value("${medmate.kyc.auto-verification-enabled:false}") boolean autoVerificationEnabled) {
+      @Value("${medmate.kyc.auto-verification-enabled:false}") boolean autoVerificationEnabled,
+      AutoKycService autoKyc) {
     this.pharmacies = pharmacies;
     this.kycDocs = kycDocs;
     this.kycObjectStore = kycObjectStore;
@@ -109,6 +111,7 @@ public class PharmacyKycService {
     this.rateLimiter = rateLimiter;
     this.clock = clock;
     this.autoVerificationEnabled = autoVerificationEnabled;
+    this.autoKyc = autoKyc;
   }
 
   // ─── Upload ──────────────────────────────────────────────────────────────────
@@ -367,6 +370,7 @@ public class PharmacyKycService {
               "pharmacy",
               pharmacyId,
               Map.of("pharmacy_id", pharmacyId.toString())));
+      autoKyc.handleAutoVerifyRequested(pharmacyId);
     }
 
     Map<String, Object> data = new LinkedHashMap<>();
@@ -423,8 +427,7 @@ public class PharmacyKycService {
     data.put(
         "submitted_at",
         pharmacy.kycSubmittedAt() != null ? pharmacy.kycSubmittedAt().toString() : null);
-    // ponytail: auto_kyc_result null until STORY-003 implements government API checks
-    data.put("auto_kyc_result", null);
+    data.put("auto_kyc_result", autoKyc.latestAutoKycSummary(pharmacyId));
     data.put("documents", docMaps);
     return data;
   }

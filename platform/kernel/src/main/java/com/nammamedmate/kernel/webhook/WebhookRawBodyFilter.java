@@ -15,7 +15,10 @@ public final class WebhookRawBodyFilter extends OncePerRequestFilter {
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
     String path = request.getRequestURI();
-    return path == null || !path.startsWith("/api/v1/webhooks");
+    if (path == null) {
+      return true;
+    }
+    return !path.startsWith("/api/v1/webhooks") && !path.startsWith("/api/v1/internal/kyc/");
   }
 
   @Override

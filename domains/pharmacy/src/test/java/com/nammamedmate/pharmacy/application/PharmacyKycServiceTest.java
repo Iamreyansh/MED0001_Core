@@ -2,6 +2,10 @@ package com.nammamedmate.pharmacy.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
@@ -54,6 +58,7 @@ class PharmacyKycServiceTest {
   private InMemoryOutboxStore outboxStore;
   private Clock clock;
   private PharmacyKycService service;
+  private AutoKycService autoKyc;
 
   static byte[] pdfSample() {
     return "%PDF-1.4 sample".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
@@ -85,6 +90,9 @@ class PharmacyKycServiceTest {
     presignedUrls = new FakePresignedUrls();
     outboxStore = new InMemoryOutboxStore();
     outbox = new OutboxPublisher(outboxStore, new ObjectMapper());
+    autoKyc = mock(AutoKycService.class);
+    when(autoKyc.latestAutoKycSummary(any())).thenReturn(null);
+    doNothing().when(autoKyc).handleAutoVerifyRequested(any());
     service =
         new PharmacyKycService(
             pharmacyStore,
@@ -95,7 +103,8 @@ class PharmacyKycServiceTest {
             outbox,
             rateLimiter,
             clock,
-            false);
+            false,
+            autoKyc);
 
     pharmacyStore.save(pendingKycPharmacy(PHARMACY_ID));
   }
@@ -209,7 +218,8 @@ class PharmacyKycServiceTest {
             outbox,
             limiter,
             clock,
-            false);
+            false,
+            autoKyc);
     for (int i = 0; i < PharmacyKycService.UPLOAD_LIMIT; i++) {
       limited.uploadDocument(
           ownerPrincipal(), "PAN_CARD", pdfSample(), "p.pdf", "application/pdf", null);
@@ -511,7 +521,8 @@ class PharmacyKycServiceTest {
             outbox,
             rateLimiter,
             clock,
-            true);
+            true,
+            autoKyc);
     addAllRequiredDocs();
     Map<String, Object> data = autoService.submitKyc(ownerPrincipal());
     assertThat(data.get("auto_kyc_triggered")).isEqualTo(true);
@@ -1166,6 +1177,11 @@ class PharmacyKycServiceTest {
                 kycSubmittedAt));
       }
     }
+
+    @Override
+    public void activateAfterAutoKyc(UUID pharmacyId, UUID zoneId, Instant at) {
+      updateStatus(pharmacyId, "ACTIVE", null, at);
+    }
   }
 
   static class FakeKycDocStore implements KycDocumentStore {
@@ -1390,7 +1406,8 @@ class PharmacyKycServiceTest {
             outbox,
             rateLimiter,
             clock,
-            false);
+            false,
+            autoKyc);
     // Upload DRUG_LICENCE far in future — both T-60 and T-30 would be future, but existsAlert=true
     svc.uploadDocument(
         ownerPrincipal(),

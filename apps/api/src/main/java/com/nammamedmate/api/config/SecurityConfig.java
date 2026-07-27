@@ -47,7 +47,7 @@ public class SecurityConfig {
                         "/api/v1/pharmacy/register/verify-email",
                         "/api/v1/pharmacy/register/resend-otp")
                     .permitAll()
-                    .requestMatchers("/api/v1/webhooks/**")
+                    .requestMatchers("/api/v1/webhooks/**", "/api/v1/internal/kyc/**")
                     .permitAll()
                     .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**")
                     .permitAll()
