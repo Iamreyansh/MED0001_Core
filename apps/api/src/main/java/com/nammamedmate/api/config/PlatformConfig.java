@@ -10,6 +10,7 @@ import com.nammamedmate.messaging.JdbcOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.messaging.OutboxStore;
 import com.nammamedmate.messaging.SqsEventDispatcher;
+import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
 import com.nammamedmate.security.AesGcmCipher;
 import com.nammamedmate.security.InMemoryTokenRevocationStore;
 import com.nammamedmate.security.Rs256JwtService;
@@ -124,8 +125,14 @@ public class PlatformConfig {
   }
 
   @Bean
-  SqsEventDispatcher sqsEventDispatcher(OutboxStore store) {
-    return new SqsEventDispatcher(store, message -> {}, 25);
+  SqsEventDispatcher sqsEventDispatcher(
+      OutboxStore store, AutoKycOutboxConsumer autoKycOutboxConsumer) {
+    return new SqsEventDispatcher(
+        store,
+        message -> {
+          autoKycOutboxConsumer.accept(message);
+        },
+        25);
   }
 
   @Bean

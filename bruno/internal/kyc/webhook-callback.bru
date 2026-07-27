@@ -1,0 +1,122 @@
+meta {
+  name: kyc-webhook-callback
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/internal/kyc/webhook-callback
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+  X-Webhook-Signature: sha256={{kycWebhookSignature}}
+}
+
+body:json {
+  {
+    "provider": "MH_DRUG_CONTROL_API",
+    "job_id": "{{autoKycJobId}}",
+    "verification_type": "DRUG_LICENCE",
+    "status": "PASS",
+    "data": {
+      "licence_number": "DL-MH-12345",
+      "registered_name": "SHARMA MEDICAL STORES",
+      "licence_status": "ACTIVE",
+      "expiry_date": "2028-03-31",
+      "state": "MH"
+    }
+  }
+}
+
+script:pre-request {
+  const secret = bru.getEnvVar("kycWebhookSecret") || "local-kyc-webhook-secret";
+  const jobId = bru.getEnvVar("autoKycJobId");
+  if (!jobId) {
+    throw new Error("autoKycJobId missing — run admin/pharmacies/auto-verify first");
+  }
+  const payload = JSON.stringify({
+    provider: "MH_DRUG_CONTROL_API",
+    job_id: jobId,
+    verification_type: "DRUG_LICENCE",
+    status: "PASS",
+    data: {
+      licence_number: "DL-MH-12345",
+      registered_name: "SHARMA MEDICAL STORES",
+      licence_status: "ACTIVE",
+      expiry_date: "2028-03-31",
+      state: "MH"
+    }
+  });
+  const signature = CryptoJS.HmacSHA256(payload, secret).toString(CryptoJS.enc.Hex);
+  req.setHeader("X-Webhook-Signature", "sha256=" + signature);
+  req.setBody(payload);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("webhook ack envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.acknowledged).to.equal(true);
+    expect(body.data.verification_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/internal/kyc/webhook-callback — HMAC-signed async KYC provider callback.
+  No bearer auth; X-Webhook-Signature must match medmate.kyc.webhook-secret.
+}
+
+example {
+  name: 200 OK — callback acknowledged
+  description: Drug licence provider posts async verification result.
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "acknowledged": true,
+            "verification_id": "c3d4e5f6-a7b8-9012-cdef-123456789012"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 INVALID_WEBHOOK_SIGNATURE
+  description: HMAC signature does not match shared secret.
+
+  response: {
+    status: {
+      code: 401
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_WEBHOOK_SIGNATURE",
+            "message": "HMAC signature does not match"
+          }
+        }
+      '''
+    }
+  }
+}

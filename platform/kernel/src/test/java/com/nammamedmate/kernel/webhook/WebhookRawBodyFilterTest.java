@@ -37,6 +37,22 @@ class WebhookRawBodyFilterTest {
   }
 
   @Test
+  void cachesBodyForInternalKycPaths() throws Exception {
+    WebhookRawBodyFilter filter = new WebhookRawBodyFilter();
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/api/v1/internal/kyc/webhook-callback");
+    byte[] payload = "{\"provider\":\"FSSAI_PORTAL_API\"}".getBytes(StandardCharsets.UTF_8);
+    request.setContent(payload);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain chain =
+        (req, res) -> {
+          CachedBodyHttpServletRequest cached = (CachedBodyHttpServletRequest) req;
+          assertThat(WebhookRawBodyFilter.rawBody(cached)).isEqualTo(payload);
+        };
+    filter.doFilter(request, response, chain);
+  }
+
+  @Test
   void skipsNonWebhookPaths() throws Exception {
     WebhookRawBodyFilter filter = new WebhookRawBodyFilter();
     HttpServletRequest request = mock(HttpServletRequest.class);
