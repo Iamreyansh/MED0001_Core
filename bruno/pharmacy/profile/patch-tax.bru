@@ -1,0 +1,60 @@
+meta {
+  name: patch-tax
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/profile/tax
+  auth: inherit
+  body: json
+}
+
+body:json {
+  {
+    "registered_pharmacist_name": "Dr. Rajesh Sharma"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy owner first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("envelope", function () {
+    expect(res.getBody().success).to.equal(true);
+    expect(res.getBody().data).to.have.property("re_verification_triggered");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/profile/tax — tax/compliance fields. GSTIN change re-triggers auto-KYC.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "11111111-1111-4111-8111-111111111111",
+            "updated_fields": ["registered_pharmacist_name"],
+            "re_verification_triggered": false,
+            "message": "Tax settings updated successfully."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

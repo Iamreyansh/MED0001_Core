@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 14 |
+| Phase 1 | 46 | 15 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **13** |
+| **Total** | **129** | **15** |
 
 ---
 
@@ -53,7 +53,7 @@
 | EPIC-003 | [STORY-002](./EPIC-003-pharmacy-onboarding-kyc/STORY-002-kyc-document-upload.md) | KYC Document Upload | done | 2026-07-27 | `domains/pharmacy`; V013; multipart (story waiver) + local/S3 store; GuardDuty Malware Protection for S3 (`kyc/`) + EventBridge→SQS→worker soft-delete; deferred request-path scanner; rate limits; `admin_compliance`+`pharmacies:update`; servlet ≤10MB; magic-byte MIME; flag `medmate.kyc.auto-verification-enabled`; admin audit at URL issuance; auto_kyc_result null until STORY-003 |
 | EPIC-003 | [STORY-003](./EPIC-003-pharmacy-onboarding-kyc/STORY-003-auto-kyc-verification.md) | Auto KYC Verification | done | — | — |
 | EPIC-003 | [STORY-004](./EPIC-003-pharmacy-onboarding-kyc/STORY-004-kyc-status-management.md) | KYC Status Management (Admin) | done | 2026-07-28 | `domains/pharmacy`; V015 audit_log + stub zones + pharmacy code/SLA/suspend metadata; AdminPharmacyController list/detail/approve/reject/suspend/reactivate/request-documents; replaced auth suspend stub; outbox notify stubs; RBAC ops+suspend, support/finance+read; REJECTED status (legacy KYC_REJECTED still gated); commission default 8.00; list meta INDEX `has_next`; BR6 reactivate restores `can_reapply` only for `admin_super` |
-| EPIC-003 | [STORY-005](./EPIC-003-pharmacy-onboarding-kyc/STORY-005-pharmacy-profile-update.md) | Pharmacy Profile Update | pending | — | — |
+| EPIC-003 | [STORY-005](./EPIC-003-pharmacy-onboarding-kyc/STORY-005-pharmacy-profile-update.md) | Pharmacy Profile Update | done | 2026-07-28 | `domains/pharmacy`; V016 hours/bank/change-requests/OTPs + profile tax flags; PharmacyProfileController + AdminPharmacyProfileController; stub penny-drop + magic OTP; bankAccountCipher; completeness N=13 (BR6); logo/IFSC format-only; no Redis hours cache; verify-contact endpoint; OTP outbox ids-only + ProfileContactNotifier; bank GET owner-only / admin finance+super via admin path; soft-delete bank re-entry |
 
 ### EPIC-004 (`EPIC-004-pharmacy-operations-admin`)
 

@@ -61,6 +61,13 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/kyc/**")
                     .hasRole("PHARMACY_OWNER")
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/pharmacy/profile",
+                        "/api/v1/pharmacy/profile/completeness")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/pharmacy/profile/**")
+                    .hasRole("PHARMACY_OWNER")
                     .requestMatchers("/api/v1/customers/**")
                     .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/admin/roles", "/api/v1/admin/permissions")

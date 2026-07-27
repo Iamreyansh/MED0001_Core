@@ -972,6 +972,38 @@ class AutoKycExtraCoverageTest {
         .isEqualTo(NOW);
   }
 
+  @Test
+  void triggerGstinReverificationForActivePharmacy() {
+    int before = jobStore.jobs.size();
+    service.triggerGstinReverification(PHARMACY_ID);
+    assertThat(jobStore.jobs.size()).isGreaterThan(before);
+
+    AutoKycService disabled =
+        new AutoKycService(
+            pharmacyStore,
+            jobStore,
+            verificationStore,
+            pincodeZoneStore,
+            new StubGstinVerificationClient(),
+            new StubDrugLicenceVerificationClient(),
+            new StubFssaiVerificationClient(),
+            new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
+            new AutoKycServiceTest.AllowAllRateLimiter(),
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            false,
+            WEBHOOK_SECRET);
+    disabled.setSelf(disabled);
+    disabled.triggerGstinReverification(PHARMACY_ID);
+
+    service.triggerGstinReverification(Ids.newId());
+    pharmacyStore.save(
+        AutoKycServiceTest.withGstin(AutoKycServiceTest.kycSubmittedPharmacy(PHARMACY_ID), ""));
+    service.triggerGstinReverification(PHARMACY_ID);
+    pharmacyStore.save(
+        AutoKycServiceTest.withGstin(AutoKycServiceTest.kycSubmittedPharmacy(PHARMACY_ID), null));
+    service.triggerGstinReverification(PHARMACY_ID);
+  }
+
   private MedmatePrincipal adminPrincipal() {
     return new MedmatePrincipal(ADMIN_ID, AuthRole.ADMIN_OPERATIONS, null, TokenScope.FULL, "j");
   }
