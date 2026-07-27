@@ -1,0 +1,75 @@
+meta {
+  name: request-documents
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/request-documents
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "document_types": ["PAN_CARD", "BANK_STATEMENT"],
+    "message": "Please re-upload a clear PAN scan and latest bank statement."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("docs requested", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.kyc_sla_reset_at).to.be.a("string");
+    expect(body.data.notifications_sent).to.include("IN_APP");
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/request-documents — resets KYC SLA timer.
+  Roles: admin_super, admin_operations, admin_compliance.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "requested_document_types": ["PAN_CARD", "BANK_STATEMENT"],
+            "kyc_sla_reset_at": "2026-07-24T00:30:00Z",
+            "notifications_sent": ["WHATSAPP", "EMAIL", "IN_APP"]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_DOCUMENT_TYPES
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "INVALID_DOCUMENT_TYPES", "message": "Unknown document type in array" } }
+      '''
+    }
+  }
+}

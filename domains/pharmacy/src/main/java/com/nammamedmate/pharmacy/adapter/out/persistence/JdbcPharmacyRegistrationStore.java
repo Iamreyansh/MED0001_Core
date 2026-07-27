@@ -39,13 +39,13 @@ public class JdbcPharmacyRegistrationStore implements PharmacyRegistrationStore 
           owner_name, business_name, phone, email, password_hash, business_type, address,
           status, plan, plan_expires_at, gstin, drug_licence_number, licence_state_code,
           fssai_number, pan_number, commission_pct, zone_id, is_online, email_verified,
-          can_reapply, created_at, updated_at
+          can_reapply, code, created_at, updated_at
         ) VALUES (
           ?, ?, NULL, ?, ?,
           ?, ?, ?, ?, ?, ?, ?::jsonb,
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?,
-          ?, ?, ?
+          ?, 'PHM-' || lpad(nextval('pharmacy_code_seq')::text, 4, '0'), ?, ?
         )
         """,
         pharmacy.id(),
@@ -167,10 +167,12 @@ public class JdbcPharmacyRegistrationStore implements PharmacyRegistrationStore 
           is_online = TRUE,
           zone_id = ?,
           plan = 'FREE',
+          activated_at = COALESCE(activated_at, ?),
           updated_at = ?
         WHERE id = ? AND deleted_at IS NULL
         """,
         zoneId,
+        Timestamp.from(at),
         Timestamp.from(at),
         pharmacyId);
   }

@@ -179,6 +179,7 @@ class RbacServicesTest {
             "orders:*",
             "pharmacies:read",
             "pharmacies:update",
+            "pharmacies:suspend",
             "riders:*",
             "logistics:*",
             "catalogue:read",
@@ -190,10 +191,16 @@ class RbacServicesTest {
             "refunds:*",
             "taxes:*",
             "analytics:finance",
-            "customers:read");
+            "customers:read",
+            "pharmacies:read");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_support"))
         .containsExactly(
-            "tickets:*", "disputes:*", "customers:read", "customers:notify", "orders:read");
+            "tickets:*",
+            "disputes:*",
+            "customers:read",
+            "customers:notify",
+            "orders:read",
+            "pharmacies:read");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_compliance"))
         .containsExactly(
             "prescriptions:*",
@@ -222,7 +229,7 @@ class RbacServicesTest {
     assertThat(adminRoles.listPermissions(ops, null)).isNotEmpty();
     assertThat(adminRoles.listPermissions(ops, " ")).isNotEmpty();
     assertThat(rbac.hasPermission(ops, "orders:cancel")).isTrue();
-    assertThat(rbac.hasPermission(ops, "pharmacies:suspend")).isFalse();
+    assertThat(rbac.hasPermission(ops, "pharmacies:suspend")).isTrue();
     assertThat(rbac.hasPermission(null, "orders:read")).isFalse();
     assertThat(rbac.hasPermission(ops, "  ")).isFalse();
     assertThat(

@@ -95,7 +95,7 @@ GET /api/v1/admin/pharmacies
     "page": 1,
     "limit": 50,
     "total": 128,
-    "total_pages": 3
+    "has_next": true
   }
 }
 ```

@@ -67,12 +67,13 @@ class PharmacyStaffAuthIT extends AbstractApiIT {
 
     // Pharmacies
     jdbc.update(
-        "INSERT INTO pharmacies (id, name, city, subscription_plan, created_at, updated_at)"
-            + " VALUES (?, 'Sri Rama Medicals', 'Bengaluru', 'GROWTH', NOW(), NOW())",
+        "INSERT INTO pharmacies (id, name, city, subscription_plan, code, created_at, updated_at)"
+            + " VALUES (?, 'Sri Rama Medicals', 'Bengaluru', 'GROWTH', 'PHM-STA1', NOW(), NOW())",
         PHARMACY_1_ID);
     jdbc.update(
-        "INSERT INTO pharmacies (id, name, city, subscription_plan, created_at, updated_at)"
-            + " VALUES (?, 'Rama Pharmacy Koramangala', 'Bengaluru', 'STARTER', NOW(), NOW())",
+        "INSERT INTO pharmacies (id, name, city, subscription_plan, code, created_at, updated_at)"
+            + " VALUES (?, 'Rama Pharmacy Koramangala', 'Bengaluru', 'STARTER', 'PHM-STA2', NOW(),"
+            + " NOW())",
         PHARMACY_2_ID);
 
     // Staff 1: owner in pharmacy1, staff in pharmacy2, has POS PIN

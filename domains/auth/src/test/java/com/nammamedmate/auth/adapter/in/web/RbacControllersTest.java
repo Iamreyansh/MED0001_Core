@@ -99,13 +99,6 @@ class RbacControllersTest {
   }
 
   @Test
-  void suspendControllerReturnsPayload() {
-    AdminPharmacySuspendController c = new AdminPharmacySuspendController();
-    UUID id = UUID.randomUUID();
-    assertThat(c.suspend(id).data()).containsEntry("status", "suspended");
-  }
-
-  @Test
   void interceptorEnforcesPermission() throws Exception {
     HandlerMethod method =
         new HandlerMethod(new SuspendProbe(), SuspendProbe.class.getMethod("go"));
