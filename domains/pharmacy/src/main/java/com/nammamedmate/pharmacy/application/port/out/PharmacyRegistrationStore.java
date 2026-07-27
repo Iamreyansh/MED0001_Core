@@ -34,7 +34,8 @@ public interface PharmacyRegistrationStore {
       String city,
       String subscriptionPlan,
       Instant createdAt,
-      Instant updatedAt) {
+      Instant updatedAt,
+      Instant kycSubmittedAt) {
     public PharmacyRecord {
       address = address == null ? null : Map.copyOf(address);
     }
@@ -57,4 +58,6 @@ public interface PharmacyRegistrationStore {
   boolean existsEmail(String email);
 
   void markEmailVerified(UUID pharmacyId, Instant at);
+
+  void updateStatus(UUID pharmacyId, String status, Instant kycSubmittedAt, Instant updatedAt);
 }

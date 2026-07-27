@@ -1,0 +1,150 @@
+meta {
+  name: upload-document
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/kyc/documents
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  document_type: GSTIN_CERTIFICATE
+  expiry_date:
+  file: @file(/path/to/document.pdf)
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy/register + verify-email first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.document_id) {
+    bru.setEnvVar("documentId", body.data.document_id);
+    console.log(`documentId=${body.data.document_id}`);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("success envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.document_id).to.be.a("string").that.is.not.empty;
+    expect(body.data.status).to.equal("UPLOADED");
+    expect(body.data.signed_url).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/kyc/documents — multipart upload. document_type, file (PDF/JPG/PNG ≤10 MB), expiry_date (required for DRUG_LICENCE and FSSAI_CERTIFICATE, YYYY-MM-DD).
+  Requires PHARMACY_OWNER role. Sets documentId env var for subsequent calls.
+}
+
+example {
+  name: 201 GSTIN uploaded
+  description: GSTIN certificate uploaded successfully.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/kyc/documents
+    method: post
+    mode: multipartForm
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:multipart-form: {
+      document_type: GSTIN_CERTIFICATE
+      file: @file(/path/to/gstin.pdf)
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "document_id": "d1b3e9a2-1234-4abc-8def-000000000001",
+            "document_type": "GSTIN_CERTIFICATE",
+            "file_name": "gstin.pdf",
+            "file_size_bytes": 204800,
+            "status": "UPLOADED",
+            "expiry_date": null,
+            "signed_url": "https://local.invalid/kyc/...",
+            "uploaded_at": "2026-07-27T10:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 FILE_TOO_LARGE
+  description: File exceeds 10 MB limit.
+
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/kyc/documents
+    method: post
+    mode: multipartForm
+    body:multipart-form: {
+      document_type: PAN_CARD
+      file: @file(/path/to/large.pdf)
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FILE_TOO_LARGE",
+            "message": "File exceeds maximum size of 10 MB"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 DOCUMENT_TYPE_ALREADY_PENDING
+  description: A non-rejected document of the same type already exists.
+
+  response: {
+    status: {
+      code: 409
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DOCUMENT_TYPE_ALREADY_PENDING",
+            "message": "A document of this type is already pending or verified"
+          }
+        }
+      '''
+    }
+  }
+}

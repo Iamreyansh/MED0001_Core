@@ -144,6 +144,20 @@ public class JdbcPharmacyRegistrationStore implements PharmacyRegistrationStore 
         pharmacyId);
   }
 
+  @Override
+  public void updateStatus(
+      UUID pharmacyId, String status, Instant kycSubmittedAt, Instant updatedAt) {
+    jdbc.update(
+        """
+        UPDATE pharmacies SET status = ?, kyc_submitted_at = ?, updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL
+        """,
+        status,
+        kycSubmittedAt != null ? Timestamp.from(kycSubmittedAt) : null,
+        Timestamp.from(updatedAt),
+        pharmacyId);
+  }
+
   private PharmacyRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
     return new PharmacyRecord(
         (UUID) rs.getObject("id"),
@@ -173,7 +187,8 @@ public class JdbcPharmacyRegistrationStore implements PharmacyRegistrationStore 
         rs.getString("city"),
         rs.getString("subscription_plan"),
         ts(rs, "created_at"),
-        ts(rs, "updated_at"));
+        ts(rs, "updated_at"),
+        ts(rs, "kyc_submitted_at"));
   }
 
   private static Instant ts(ResultSet rs, String col) throws SQLException {

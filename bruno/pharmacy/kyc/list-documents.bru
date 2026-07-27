@@ -1,0 +1,79 @@
+meta {
+  name: list-documents
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/kyc/documents
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy/register + verify-email first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with kyc fields", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.kyc_status).to.be.a("string");
+    expect(body.data.documents).to.be.an("array");
+    expect(body.data.required_documents).to.be.an("array");
+    expect(body.data.missing_documents).to.be.an("array");
+    expect(body.data).to.have.property("ready_to_submit");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/kyc/documents — list KYC documents for the authenticated pharmacy.
+  Returns signed 1-hour GET URLs, required/missing document lists, ready_to_submit flag.
+  Accessible by PHARMACY_OWNER and PHARMACY_STAFF.
+}
+
+example {
+  name: 200 OK — all docs uploaded
+  description: All required documents uploaded; ready_to_submit = true.
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "kyc_status": "PENDING_KYC",
+            "submitted_at": null,
+            "documents": [
+              {
+                "document_id": "d1b3e9a2-1234-4abc-8def-000000000001",
+                "document_type": "GSTIN_CERTIFICATE",
+                "file_name": "gstin.pdf",
+                "file_size_bytes": 204800,
+                "status": "UPLOADED",
+                "expiry_date": null,
+                "signed_url": "https://local.invalid/kyc/...",
+                "uploaded_at": "2026-07-27T10:00:00Z"
+              }
+            ],
+            "required_documents": ["GSTIN_CERTIFICATE", "DRUG_LICENCE", "PAN_CARD", "FSSAI_CERTIFICATE"],
+            "missing_documents": ["DRUG_LICENCE", "PAN_CARD", "FSSAI_CERTIFICATE"],
+            "ready_to_submit": false
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,119 @@
+meta {
+  name: submit-kyc
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/kyc/submit
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy/register + verify-email first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("KYC_SUBMITTED status", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("KYC_SUBMITTED");
+    expect(body.data.estimated_review_hours).to.equal(24);
+    expect(body.data).to.have.property("auto_kyc_triggered");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/kyc/submit — submit all uploaded KYC documents for review.
+  Transitions pharmacy to KYC_SUBMITTED and moves UPLOADED docs to UNDER_REVIEW.
+  Requires email verified, PENDING_KYC or KYC_REJECTED(reapply=true) status, and all required docs present.
+  PHARMACY_OWNER only.
+}
+
+example {
+  name: 200 OK — submitted
+  description: KYC submitted successfully.
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "status": "KYC_SUBMITTED",
+            "submitted_at": "2026-07-27T10:05:00Z",
+            "message": "Your KYC documents have been submitted for review. You will be notified once the review is complete.",
+            "estimated_review_hours": 24,
+            "auto_kyc_triggered": false
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 DOCUMENTS_INCOMPLETE
+  description: Required documents are missing or rejected.
+
+  response: {
+    status: {
+      code: 400
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DOCUMENTS_INCOMPLETE",
+            "message": "Required KYC documents are missing or rejected",
+            "details": {
+              "missing_types": ["DRUG_LICENCE", "PAN_CARD"]
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ALREADY_SUBMITTED
+  description: KYC already submitted and under review.
+
+  response: {
+    status: {
+      code: 409
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ALREADY_SUBMITTED",
+            "message": "KYC is already under review"
+          }
+        }
+      '''
+    }
+  }
+}

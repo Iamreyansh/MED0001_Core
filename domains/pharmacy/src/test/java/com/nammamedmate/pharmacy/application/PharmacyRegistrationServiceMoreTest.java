@@ -706,7 +706,8 @@ class PharmacyRegistrationServiceMoreTest {
             "C",
             "FREE",
             NOW,
-            NOW));
+            NOW,
+            null));
     Map<String, Object> st =
         service.registrationStatus(
             new MedmatePrincipal(Ids.newId(), AuthRole.PHARMACY_OWNER, id, TokenScope.FULL, "j"),
@@ -842,7 +843,8 @@ class PharmacyRegistrationServiceMoreTest {
             "C",
             "FREE",
             NOW,
-            NOW));
+            NOW,
+            null));
     otps.latest =
         new OtpRecord(
             Ids.newId(),
@@ -1097,6 +1099,70 @@ class PharmacyRegistrationServiceMoreTest {
         "Bengaluru",
         "FREE",
         NOW,
-        NOW);
+        NOW,
+        null);
+  }
+
+  // ─── registrationStatus with kycDocumentStore wired ────────────────────────
+
+  @Test
+  void registrationStatusWithKycDocumentStoreWiredAndNonNullSubmittedAt() {
+    // Set up a pharmacy with email verified and non-null kycSubmittedAt
+    UUID pharmacyId = Ids.newId();
+    Instant kycSubmittedAt = NOW.plusSeconds(1000);
+    pharmacies.byId.put(pharmacyId, pharmacyWithKycSubmittedAt(pharmacyId, kycSubmittedAt));
+
+    // Wire kycDocumentStore into service (package-private field)
+    PharmacyKycServiceTest.FakeKycDocStore fakeKycStore =
+        new PharmacyKycServiceTest.FakeKycDocStore();
+    fakeKycStore.docs.add(
+        PharmacyKycServiceTest.docRecord(pharmacyId, "GSTIN_CERTIFICATE", "UPLOADED"));
+    fakeKycStore.docs.add(PharmacyKycServiceTest.docRecord(pharmacyId, "DRUG_LICENCE", "VERIFIED"));
+    fakeKycStore.docs.add(PharmacyKycServiceTest.docRecord(pharmacyId, "PAN_CARD", "REJECTED"));
+    service.kycDocumentStore = fakeKycStore;
+
+    MedmatePrincipal principal =
+        new MedmatePrincipal(
+            Ids.newId(), AuthRole.PHARMACY_OWNER, pharmacyId, TokenScope.FULL, "j");
+    Map<String, Object> status = service.registrationStatus(principal, "1.2.3.4");
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> kyc = (Map<String, Object>) status.get("kyc");
+    assertThat(kyc.get("documents_uploaded"))
+        .isEqualTo(2); // UPLOADED + VERIFIED (non-rejected active)
+    assertThat(kyc.get("documents_verified")).isEqualTo(1);
+    assertThat(kyc.get("documents_rejected")).isEqualTo(1);
+    assertThat(kyc.get("submitted_at")).isEqualTo(kycSubmittedAt.toString());
+  }
+
+  private static PharmacyRecord pharmacyWithKycSubmittedAt(UUID id, Instant kycSubmittedAt) {
+    return new PharmacyRecord(
+        id,
+        "Shop",
+        "Shop",
+        "Owner",
+        "+919876500000",
+        "shop@test.in",
+        "hash",
+        "PHARMACY",
+        Map.of(),
+        "KYC_SUBMITTED",
+        "FREE",
+        null,
+        "29AABPP1234F9ZA",
+        "DL-KYC",
+        "29",
+        null,
+        "AABPP1239F",
+        new java.math.BigDecimal("8.00"),
+        null,
+        false,
+        true,
+        true,
+        "Bengaluru",
+        "FREE",
+        NOW,
+        NOW,
+        kycSubmittedAt);
   }
 }

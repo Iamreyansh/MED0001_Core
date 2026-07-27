@@ -109,6 +109,8 @@ class PharmacyAdapterCoverageTest {
     assertThat(pharmacies.existsEmail("x")).isFalse();
     assertThat(pharmacies.existsDrugLicence("d", "29")).isTrue();
     pharmacies.markEmailVerified(id, NOW);
+    pharmacies.updateStatus(id, "KYC_SUBMITTED", NOW, NOW);
+    pharmacies.updateStatus(id, "PENDING_KYC", null, NOW); // null kycSubmittedAt branch
 
     JdbcPharmacyEmailOtpStore otps = new JdbcPharmacyEmailOtpStore(jdbc);
     OtpRecord otp = new OtpRecord(id, id, "a@test", "hash", 0, 0, NOW, null, null, NOW, NOW);
@@ -188,7 +190,8 @@ class PharmacyAdapterCoverageTest {
         "Bengaluru",
         "FREE",
         NOW,
-        NOW);
+        NOW,
+        null);
   }
 
   private static ResultSet mockRs(PharmacyRecord r) throws Exception {
@@ -219,6 +222,7 @@ class PharmacyAdapterCoverageTest {
     when(rs.getString("subscription_plan")).thenReturn(r.subscriptionPlan());
     when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
     when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(NOW));
+    when(rs.getTimestamp("kyc_submitted_at")).thenReturn(null);
     return rs;
   }
 }

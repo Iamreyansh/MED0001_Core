@@ -109,7 +109,8 @@ class DomainAndJdbcExtraCoverageTest {
                         "C",
                         "FREE",
                         NOW,
-                        NOW)))
+                        NOW,
+                        null)))
         .isInstanceOf(IllegalStateException.class);
     // writeJson null-address branch + insert non-null planExpiresAt
     store.insert(
@@ -139,7 +140,8 @@ class DomainAndJdbcExtraCoverageTest {
             "C",
             "FREE",
             NOW,
-            NOW));
+            NOW,
+            null));
 
     when(jdbc.query(anyString(), any(RowMapper.class), eq(id)))
         .thenAnswer(
@@ -171,6 +173,7 @@ class DomainAndJdbcExtraCoverageTest {
               when(rs.getString("subscription_plan")).thenReturn("FREE");
               when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
               when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(NOW));
+              when(rs.getTimestamp("kyc_submitted_at")).thenReturn(null);
               return List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(rs, 0));
             });
     assertThat(store.findById(id)).isPresent();
@@ -208,6 +211,7 @@ class DomainAndJdbcExtraCoverageTest {
               when(rs.getString("subscription_plan")).thenReturn("FREE");
               when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
               when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(NOW));
+              when(rs.getTimestamp("kyc_submitted_at")).thenReturn(null);
               return List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(rs, 0));
             });
     assertThat(store.findById(UUID.fromString("00000000-0000-0000-0000-000000000098"))).isPresent();
@@ -245,6 +249,7 @@ class DomainAndJdbcExtraCoverageTest {
               when(rs.getString("subscription_plan")).thenReturn("FREE");
               when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
               when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(NOW));
+              when(rs.getTimestamp("kyc_submitted_at")).thenReturn(null);
               return List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(rs, 0));
             });
     assertThatThrownBy(

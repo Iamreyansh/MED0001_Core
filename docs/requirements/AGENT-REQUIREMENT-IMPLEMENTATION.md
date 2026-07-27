@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 11 |
+| Phase 1 | 46 | 12 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **11** |
+| **Total** | **129** | **12** |
 
 ---
 
@@ -50,7 +50,7 @@
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
 | EPIC-003 | [STORY-001](./EPIC-003-pharmacy-onboarding-kyc/STORY-001-pharmacy-registration.md) | Pharmacy Registration | done | 2026-07-26 | `domains/pharmacy`; V012 widen `pharmacies` + OTP/pincode/audit; owner via `pharmacy_staff` + system `owner` role; magic OTP `*@nammamedmate.test`→`123456`; email uniqueness excludes `customers` (no email col); phone excludes `admin_staff`; password on `pharmacy_staff` (+ optional `pharmacies.password_hash`); partial pincode seed (ponytail) |
-| EPIC-003 | [STORY-002](./EPIC-003-pharmacy-onboarding-kyc/STORY-002-kyc-document-upload.md) | KYC Document Upload | pending | — | — |
+| EPIC-003 | [STORY-002](./EPIC-003-pharmacy-onboarding-kyc/STORY-002-kyc-document-upload.md) | KYC Document Upload | done | 2026-07-27 | `domains/pharmacy`; V013; multipart (story waiver) + local/S3 store; GuardDuty Malware Protection for S3 (`kyc/`) + EventBridge→SQS→worker soft-delete; deferred request-path scanner; rate limits; `admin_compliance`+`pharmacies:update`; servlet ≤10MB; magic-byte MIME; flag `medmate.kyc.auto-verification-enabled`; admin audit at URL issuance; auto_kyc_result null until STORY-003 |
 | EPIC-003 | [STORY-003](./EPIC-003-pharmacy-onboarding-kyc/STORY-003-auto-kyc-verification.md) | Auto KYC Verification | pending | — | — |
 | EPIC-003 | [STORY-004](./EPIC-003-pharmacy-onboarding-kyc/STORY-004-kyc-status-management.md) | KYC Status Management (Admin) | pending | — | — |
 | EPIC-003 | [STORY-005](./EPIC-003-pharmacy-onboarding-kyc/STORY-005-pharmacy-profile-update.md) | Pharmacy Profile Update | pending | — | — |

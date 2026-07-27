@@ -1,0 +1,82 @@
+meta {
+  name: delete-document
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/kyc/documents/{{documentId}}
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("documentId")) {
+    throw new Error("documentId missing — run upload-document first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("deleted flag true", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.deleted).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/kyc/documents/{documentId} — soft-delete a KYC document.
+  Allowed for UPLOADED or REJECTED status only (PHARMACY_OWNER only).
+  Returns 403 CANNOT_DELETE_VERIFIED or CANNOT_DELETE_UNDER_REVIEW if status is locked.
+}
+
+example {
+  name: 200 OK — deleted
+  description: Document soft-deleted successfully.
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "deleted": true,
+            "document_id": "d1b3e9a2-1234-4abc-8def-000000000001"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 CANNOT_DELETE_VERIFIED
+  description: Attempt to delete a VERIFIED document.
+
+  response: {
+    status: {
+      code: 403
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CANNOT_DELETE_VERIFIED",
+            "message": "Verified documents cannot be deleted"
+          }
+        }
+      '''
+    }
+  }
+}

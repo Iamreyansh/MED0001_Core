@@ -447,7 +447,45 @@ class PharmacyRegistrationServiceTest {
               p.city(),
               p.subscriptionPlan(),
               p.createdAt(),
-              at));
+              at,
+              null));
+    }
+
+    @Override
+    public void updateStatus(
+        UUID pharmacyId, String status, Instant kycSubmittedAt, Instant updatedAt) {
+      PharmacyRecord p = byId.get(pharmacyId);
+      if (p == null) return;
+      byId.put(
+          pharmacyId,
+          new PharmacyRecord(
+              p.id(),
+              p.name(),
+              p.businessName(),
+              p.ownerName(),
+              p.phone(),
+              p.email(),
+              p.passwordHash(),
+              p.businessType(),
+              p.address(),
+              status,
+              p.plan(),
+              p.planExpiresAt(),
+              p.gstin(),
+              p.drugLicenceNumber(),
+              p.licenceStateCode(),
+              p.fssaiNumber(),
+              p.panNumber(),
+              p.commissionPct(),
+              p.zoneId(),
+              p.online(),
+              p.emailVerified(),
+              p.canReapply(),
+              p.city(),
+              p.subscriptionPlan(),
+              p.createdAt(),
+              updatedAt,
+              kycSubmittedAt));
     }
   }
 

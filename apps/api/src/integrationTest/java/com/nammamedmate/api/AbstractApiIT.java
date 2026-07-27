@@ -1,14 +1,17 @@
 package com.nammamedmate.api;
 
 import com.nammamedmate.api.support.SharedContainers;
+import com.nammamedmate.api.support.TestRateLimiterConfig;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers(disabledWithoutDocker = true)
+@Import(TestRateLimiterConfig.class)
 public abstract class AbstractApiIT {
 
   @LocalServerPort protected int port;

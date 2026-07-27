@@ -69,6 +69,7 @@ public final class AdminRoleDefinitions {
                   "compliance:*",
                   "catalogue:update",
                   "pharmacies:read",
+                  "pharmacies:update",
                   "customers:read")));
 
   private static final Map<String, AdminRole> BY_ROLE =
