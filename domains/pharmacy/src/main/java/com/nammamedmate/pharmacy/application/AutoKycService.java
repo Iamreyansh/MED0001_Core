@@ -157,6 +157,25 @@ public class AutoKycService {
     triggerAutoVerify(pharmacyId, null, "SYSTEM", List.copyOf(ALL_CHECKS));
   }
 
+  /** GSTIN-only re-check for ACTIVE pharmacies after profile tax update (STORY-005). */
+  @Transactional
+  public void triggerGstinReverification(UUID pharmacyId) {
+    if (!autoVerificationEnabled) {
+      return;
+    }
+    PharmacyRecord pharmacy = pharmacies.findById(pharmacyId).orElse(null);
+    if (pharmacy == null || pharmacy.gstin() == null || pharmacy.gstin().isBlank()) {
+      return;
+    }
+    Instant now = clock.instant();
+    UUID jobId = Ids.newId();
+    jobs.insert(
+        new AutoKycJobRecord(
+            jobId, pharmacyId, null, "GSTIN_REVERIFY", "PENDING", false, now, null));
+    runGstinCheck(pharmacy, jobId, now);
+    reevaluateJob(jobId);
+  }
+
   // ─── Admin get result ────────────────────────────────────────────────────────
 
   public Map<String, Object> adminGetAutoVerifyResult(

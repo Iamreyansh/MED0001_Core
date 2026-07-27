@@ -1,0 +1,94 @@
+meta {
+  name: bank-account-post
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/profile/bank-account
+  auth: inherit
+  body: json
+}
+
+body:json {
+  {
+    "account_holder": "Sharma Medical Store",
+    "bank_name": "HDFC Bank",
+    "account_number": "12345678901234",
+    "ifsc_code": "HDFC0001234",
+    "account_type": "CURRENT"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy owner first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.bank_account_id) {
+    bru.setEnvVar("bankAccountId", body.data.bank_account_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () { expect(res.getStatus()).to.equal(201); });
+  test("envelope", function () {
+    const d = res.getBody().data;
+    expect(res.getBody().success).to.equal(true);
+    expect(d.verification_status).to.equal("PENDING");
+    expect(d.penny_drop_initiated).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/profile/bank-account — save bank details and initiate penny-drop (owner only).
+}
+
+example {
+  name: 201 Created
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "bank_account_id": "22222222-2222-4222-8222-222222222222",
+            "account_holder": "Sharma Medical Store",
+            "bank_name": "HDFC Bank",
+            "account_number_masked": "XXXXXXXXXXXX1234",
+            "ifsc_code": "HDFC0001234",
+            "account_type": "CURRENT",
+            "verification_status": "PENDING",
+            "penny_drop_initiated": true,
+            "estimated_verification_hours": 24
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 BANK_ACCOUNT_ALREADY_VERIFIED
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "BANK_ACCOUNT_ALREADY_VERIFIED",
+            "message": "A verified bank account already exists; contact support to change"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -95,6 +95,38 @@ public class PlatformConfig {
   }
 
   @Bean
+  @Qualifier("bankAccountCipher")
+  @Profile("!prod & !staging")
+  AesGcmCipher localBankAccountCipher(
+      @Value("${medmate.crypto.bank-account-key-base64:}") String bankKey,
+      @Value("${medmate.payment.encryption-key-base64:}") String paymentKey,
+      @Value("${medmate.mfa.encryption-key-base64:" + LOCAL_ONLY_MFA_KEY + "}") String mfaKey) {
+    String key =
+        bankKey != null && !bankKey.isBlank()
+            ? bankKey
+            : (paymentKey != null && !paymentKey.isBlank() ? paymentKey : mfaKey);
+    return AesGcmCipher.fromBase64Key(key);
+  }
+
+  @Bean
+  @Qualifier("bankAccountCipher")
+  @Profile({"prod", "staging"})
+  AesGcmCipher deployedBankAccountCipher(
+      @Value("${medmate.crypto.bank-account-key-base64:}") String bankKey,
+      @Value("${medmate.payment.encryption-key-base64:}") String paymentKey,
+      @Value("${medmate.mfa.encryption-key-base64}") String mfaKey) {
+    String key =
+        bankKey != null && !bankKey.isBlank()
+            ? bankKey
+            : (paymentKey != null && !paymentKey.isBlank() ? paymentKey : mfaKey);
+    if (key == null || key.isBlank() || LOCAL_ONLY_MFA_KEY.equals(key.trim())) {
+      throw new IllegalStateException(
+          "medmate.crypto.bank-account-key-base64 (or payment/MFA fallback) must be injected via Secrets Manager");
+    }
+    return AesGcmCipher.fromBase64Key(key);
+  }
+
+  @Bean
   @ConditionalOnMissingBean(RateLimiter.class)
   RateLimiter rateLimiter(Clock clock, ObjectProvider<StringRedisTemplate> redis) {
     StringRedisTemplate template = redis.getIfAvailable();

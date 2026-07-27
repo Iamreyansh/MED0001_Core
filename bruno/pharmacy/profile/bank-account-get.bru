@@ -1,0 +1,78 @@
+meta {
+  name: bank-account-get
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/profile/bank-account
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy owner first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("envelope", function () {
+    expect(res.getBody().success).to.equal(true);
+    expect(res.getBody().data.account_number_masked).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/profile/bank-account — pharmacy owner only.
+  Admins: GET /api/v1/admin/pharmacies/{id}/bank-account (admin_finance, admin_super).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "bank_account_id": "22222222-2222-4222-8222-222222222222",
+            "account_holder": "Sharma Medical Store",
+            "bank_name": "HDFC Bank",
+            "account_number_masked": "XXXXXXXXXXXX4321",
+            "ifsc_code": "HDFC0001234",
+            "account_type": "CURRENT",
+            "verification_status": "VERIFIED",
+            "verified_at": "2026-07-20T10:00:00Z",
+            "penny_drop_reference": "RZP-PENNY-XXXXX"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 BANK_ACCOUNT_NOT_FOUND
+  response: {
+    status: { code: 404 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "BANK_ACCOUNT_NOT_FOUND",
+            "message": "No bank account saved"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,57 @@
+meta {
+  name: completeness
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/profile/completeness
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy owner/staff first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("completeness shape", function () {
+    const d = res.getBody().data;
+    expect(res.getBody().success).to.equal(true);
+    expect(d.completeness_pct).to.be.a("number");
+    expect(d.missing_fields).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/profile/completeness — dashboard completeness checklist.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "11111111-1111-4111-8111-111111111111",
+            "completeness_pct": 85,
+            "missing_fields": [
+              { "field": "fssai_number", "impact_pct": 8, "action": "Add FSSAI licence number" }
+            ],
+            "completed_fields": ["business_name", "phone", "email"]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

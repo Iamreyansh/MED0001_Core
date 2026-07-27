@@ -1,0 +1,48 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/profile
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy owner first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.pharmacy_id) {
+    bru.setEnvVar("pharmacyId", body.data.pharmacy_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pharmacy_id).to.be.a("string");
+    expect(body.data.profile_completeness_pct).to.be.a("number");
+  });
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        { "success": true, "data": { "pharmacy_id": "uuid", "code": "PHM-0042", "profile_completeness_pct": 85 }, "meta": {} }
+      '''
+    }
+  }
+}

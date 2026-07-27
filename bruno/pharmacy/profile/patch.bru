@@ -1,0 +1,66 @@
+meta {
+  name: patch
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/profile
+  auth: inherit
+  body: json
+}
+
+body:json {
+  {
+    "tagline": "Your neighbourhood pharmacy"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy owner first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.pharmacy_id) {
+    bru.setEnvVar("pharmacyId", body.data.pharmacy_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("envelope", function () {
+    expect(res.getBody().success).to.equal(true);
+    expect(res.getBody().data.updated_fields).to.be.an("array");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/profile — update business details (owner only).
+  business_name → pending approval; phone/email → OTP via verify-contact.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "11111111-1111-4111-8111-111111111111",
+            "updated_fields": ["tagline"],
+            "pending_approval_fields": [],
+            "pending_verification_fields": [],
+            "message": "Profile updated successfully."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

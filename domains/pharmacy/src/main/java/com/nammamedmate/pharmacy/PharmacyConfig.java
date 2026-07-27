@@ -3,9 +3,11 @@ package com.nammamedmate.pharmacy;
 import com.nammamedmate.pharmacy.adapter.out.kyc.StubDrugLicenceVerificationClient;
 import com.nammamedmate.pharmacy.adapter.out.kyc.StubFssaiVerificationClient;
 import com.nammamedmate.pharmacy.adapter.out.kyc.StubGstinVerificationClient;
+import com.nammamedmate.pharmacy.adapter.out.kyc.StubPennyDropClient;
 import com.nammamedmate.pharmacy.application.port.out.KycGovernmentApiPort.DrugLicenceVerificationPort;
 import com.nammamedmate.pharmacy.application.port.out.KycGovernmentApiPort.FssaiVerificationPort;
 import com.nammamedmate.pharmacy.application.port.out.KycGovernmentApiPort.GstinVerificationPort;
+import com.nammamedmate.pharmacy.application.port.out.PennyDropPort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,5 +31,11 @@ public class PharmacyConfig {
   @ConditionalOnMissingBean(FssaiVerificationPort.class)
   FssaiVerificationPort fssaiVerificationPort() {
     return new StubFssaiVerificationClient();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(PennyDropPort.class)
+  PennyDropPort pennyDropPort() {
+    return new StubPennyDropClient();
   }
 }
