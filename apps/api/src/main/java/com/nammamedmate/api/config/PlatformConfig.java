@@ -31,6 +31,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import software.amazon.awssdk.services.s3.S3Client;
 
 @Configuration
 public class PlatformConfig {
@@ -167,6 +168,14 @@ public class PlatformConfig {
         return new PresignedUrl("https://local.invalid/" + bucket + "/" + key + "?get=1", key, ttl);
       }
     };
+  }
+
+  /** Staging/prod: default-credential S3 client for KYC PutObject (and future uploads). */
+  @Bean
+  @Profile({"prod", "staging"})
+  @ConditionalOnMissingBean(S3Client.class)
+  S3Client s3Client() {
+    return S3Client.create();
   }
 
   /** Helper for tests/docs — not a secret. */

@@ -5,10 +5,17 @@ spring:
     web-application-type: none
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/medmate}
+    username: ${SPRING_DATASOURCE_USERNAME:medmate}
+    password: ${SPRING_DATASOURCE_PASSWORD:medmate}
 
 medmate:
+  s3:
+    bucket: ${MEDMATE_S3_BUCKET:med0001-local-uploads}
   sqs:
     queue-url: ${MEDMATE_SQS_DOMAIN_EVENTS_URL:}
+    # kyc-malware-queue-url: set only via MEDMATE_SQS_KYC_MALWARE_URL in ECS (staging/prod)
 
 logging:
   pattern:

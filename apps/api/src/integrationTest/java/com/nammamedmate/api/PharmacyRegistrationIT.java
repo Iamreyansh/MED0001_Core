@@ -24,12 +24,12 @@ class PharmacyRegistrationIT extends AbstractApiIT {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
     String email = "owner-" + suffix + "@nammamedmate.test";
     String phone = "+9198" + String.format("%08d", Math.floorMod(suffix.hashCode(), 100_000_000));
+    String[] gstinPan = makeGstinPan(suffix, "AAB");
 
     ResponseEntity<Map> register =
         rest.postForEntity(
             baseUrl() + "/api/v1/pharmacy/register",
-            jsonBody(
-                registrationBody(email, phone, "29AABPP1234F1ZZ", "AABPP1234F", "DL-" + suffix)),
+            jsonBody(registrationBody(email, phone, gstinPan[0], gstinPan[1], "DL-" + suffix)),
             Map.class);
 
     assertThat(register.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -108,6 +108,26 @@ class PharmacyRegistrationIT extends AbstractApiIT {
     Map<String, Object> phoneErr =
         (Map<String, Object>) Objects.requireNonNull(badPhone.getBody()).get("error");
     assertThat(phoneErr.get("code")).isEqualTo("INVALID_PHONE");
+  }
+
+  /**
+   * Returns [gstin, pan] with a valid MOD-36 checksum. prefix3 is the first 3 alpha chars of PAN;
+   * entity type is forced to 'P' (individual) at position 3.
+   */
+  private static String[] makeGstinPan(String hexSeed8, String prefix3) {
+    int seed = (int) (Long.parseUnsignedLong(hexSeed8, 16) % 9000L) + 1000;
+    String pan = String.format("%sPA%04dF", prefix3, seed);
+    String first14 = "29" + pan + "1Z";
+    String base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    int factor = 1, total = 0;
+    for (char c : first14.toCharArray()) {
+      int cp = base36.indexOf(c);
+      int prod = factor * cp;
+      total += (prod / 36) + (prod % 36);
+      factor = factor == 1 ? 2 : 1;
+    }
+    char check = base36.charAt((36 - (total % 36)) % 36);
+    return new String[] {first14 + check, pan};
   }
 
   private static Map<String, Object> registrationBody(

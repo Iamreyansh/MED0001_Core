@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: med0001-api
+  servlet:
+    multipart:
+      # Product rule: max 10 MB per upload (KYC and future uploads)
+      max-file-size: 10MB
+      max-request-size: 10MB
   datasource:
     url: jdbc:postgresql://localhost:5432/medmate
     username: medmate
@@ -64,6 +69,11 @@ medmate:
     # (Secrets Manager JSON key_id / key_secret) or ECS valueFrom when EPIC-022 secret exists.
     key-id: ""
     key-secret: ""
+  kyc:
+    # ponytail: feature flag via property, not EPIC-021 settings service (simpler for now)
+    auto-verification-enabled: false
+    # Staging/prod: GuardDuty Malware Protection for S3 (prefix kyc/) scans after PutObject;
+    # GuardDutyDeferredVirusScanner is a no-op on the request path; worker applies EventBridge results.
 
 springdoc:
   api-docs:

@@ -1,0 +1,100 @@
+meta {
+  name: get-pharmacy-kyc
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/kyc
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing — run pharmacy/register first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("admin KYC envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pharmacy_id).to.be.a("string");
+    expect(body.data.kyc_status).to.be.a("string");
+    expect(body.data.documents).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{id}/kyc — admin view of pharmacy KYC documents.
+  Generates signed 1-hour URLs and logs access in kyc_document_access_audit.
+  Requires permission: pharmacies:read.
+}
+
+example {
+  name: 200 OK — KYC details
+  description: Admin retrieves KYC documents with signed URLs. Access is audit-logged.
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "kyc_status": "KYC_SUBMITTED",
+            "submitted_at": "2026-07-27T10:05:00Z",
+            "auto_kyc_result": null,
+            "documents": [
+              {
+                "document_id": "d1b3e9a2-1234-4abc-8def-000000000001",
+                "document_type": "GSTIN_CERTIFICATE",
+                "file_name": "gstin.pdf",
+                "status": "UNDER_REVIEW",
+                "expiry_date": null,
+                "signed_url": "https://s3.amazonaws.com/...",
+                "rejection_reason": null,
+                "verified_by": null,
+                "verified_at": null,
+                "uploaded_at": "2026-07-27T10:00:00Z"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 PHARMACY_NOT_FOUND
+  description: No pharmacy with the given ID.
+
+  response: {
+    status: {
+      code: 404
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PHARMACY_NOT_FOUND",
+            "message": "Pharmacy not found"
+          }
+        }
+      '''
+    }
+  }
+}

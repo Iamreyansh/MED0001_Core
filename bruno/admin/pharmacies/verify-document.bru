@@ -1,0 +1,180 @@
+meta {
+  name: verify-document
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/kyc/documents/{{documentId}}/verify
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "verified": true,
+    "rejection_reason": null
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing — run pharmacy/register first");
+  }
+  if (!bru.getEnvVar("documentId")) {
+    throw new Error("documentId missing — run upload-document first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    console.log(`document status=${body.data.status}`);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("verified status", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(["VERIFIED", "REJECTED"]).to.include(body.data.status);
+    expect(body.data.document_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/kyc/documents/{docId}/verify — verify or reject a KYC document.
+  verified=true → VERIFIED (clears rejection_reason).
+  verified=false → REJECTED (rejection_reason required, max 500 chars).
+  Requires permission: pharmacies:update. Sets verified_by + verified_at.
+}
+
+example {
+  name: 200 OK — verified
+  description: Document approved by admin.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/kyc/documents/{{documentId}}/verify
+    method: post
+    mode: json
+    body:json: {
+      {
+        "verified": true,
+        "rejection_reason": null
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "document_id": "d1b3e9a2-1234-4abc-8def-000000000001",
+            "status": "VERIFIED",
+            "verified_by": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+            "verified_at": "2026-07-27T12:00:00Z",
+            "rejection_reason": null
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 OK — rejected
+  description: Document rejected by admin with reason.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/kyc/documents/{{documentId}}/verify
+    method: post
+    mode: json
+    body:json: {
+      {
+        "verified": false,
+        "rejection_reason": "Document is blurry and unreadable"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "document_id": "d1b3e9a2-1234-4abc-8def-000000000001",
+            "status": "REJECTED",
+            "verified_by": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+            "verified_at": "2026-07-27T12:00:00Z",
+            "rejection_reason": "Document is blurry and unreadable"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 REJECTION_REASON_REQUIRED
+  description: verified=false but rejection_reason blank.
+
+  response: {
+    status: {
+      code: 400
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "REJECTION_REASON_REQUIRED",
+            "message": "rejection_reason is required when verified=false"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 DOCUMENT_ALREADY_VERIFIED
+  description: Document is already in VERIFIED status.
+
+  response: {
+    status: {
+      code: 409
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DOCUMENT_ALREADY_VERIFIED",
+            "message": "Document is already verified"
+          }
+        }
+      '''
+    }
+  }
+}

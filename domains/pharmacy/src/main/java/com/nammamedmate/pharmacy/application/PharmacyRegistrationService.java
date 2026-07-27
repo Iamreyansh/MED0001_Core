@@ -5,6 +5,7 @@ import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.pharmacy.application.port.out.KycDocumentStore;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyEmailOtpStore;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyEmailOtpStore.OtpRecord;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyOwnerAccountStore;
@@ -92,6 +93,10 @@ public class PharmacyRegistrationService {
   private final SecureRandom secureRandom;
   private final Supplier<String> otpGenerator;
   private final DigestFactory digestFactory;
+
+  // Optional: wired by Spring when KycDocumentStore is available; null in unit tests
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  KycDocumentStore kycDocumentStore;
 
   @Autowired
   public PharmacyRegistrationService(
@@ -286,7 +291,8 @@ public class PharmacyRegistrationService {
             v.city(),
             "FREE",
             now,
-            now);
+            now,
+            null);
     pharmacies.insert(pharmacy);
     owners.createOwner(
         new OwnerCreate(
@@ -561,12 +567,30 @@ public class PharmacyRegistrationService {
             .findById(principal.pharmacyId())
             .orElseThrow(() -> new AppException("UNAUTHORIZED", "Pharmacy not found", 401));
 
+    int uploaded =
+        kycDocumentStore != null
+            ? kycDocumentStore.countByPharmacyAndStatuses(
+                principal.pharmacyId(), java.util.List.of("UPLOADED", "UNDER_REVIEW", "VERIFIED"))
+            : 0;
+    int verified =
+        kycDocumentStore != null
+            ? kycDocumentStore.countByPharmacyAndStatuses(
+                principal.pharmacyId(), java.util.List.of("VERIFIED"))
+            : 0;
+    int rejected =
+        kycDocumentStore != null
+            ? kycDocumentStore.countByPharmacyAndStatuses(
+                principal.pharmacyId(), java.util.List.of("REJECTED"))
+            : 0;
+
     Map<String, Object> kyc = new LinkedHashMap<>();
-    kyc.put("documents_uploaded", 0);
+    kyc.put("documents_uploaded", uploaded);
     kyc.put("documents_required", DOCUMENTS_REQUIRED);
-    kyc.put("documents_verified", 0);
-    kyc.put("documents_rejected", 0);
-    kyc.put("submitted_at", null);
+    kyc.put("documents_verified", verified);
+    kyc.put("documents_rejected", rejected);
+    kyc.put(
+        "submitted_at",
+        pharmacy.kycSubmittedAt() != null ? pharmacy.kycSubmittedAt().toString() : null);
     kyc.put("reviewed_at", null);
     kyc.put("rejection_reason", null);
     kyc.put("can_reapply", pharmacy.canReapply());

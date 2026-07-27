@@ -99,13 +99,16 @@ resource "aws_iam_role_policy" "ecs_task" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility", "sqs:SendMessage"]
-        Resource = [aws_sqs_queue.domain_events.arn]
+        Effect = "Allow"
+        Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility", "sqs:SendMessage"]
+        Resource = [
+          aws_sqs_queue.domain_events.arn,
+          aws_sqs_queue.kyc_malware_scans.arn
+        ]
       },
       {
         Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload"]
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:GetObjectTagging"]
         Resource = ["${aws_s3_bucket.uploads.arn}/*"]
       },
       {
@@ -213,9 +216,16 @@ locals {
   ]
   worker_env = [
     { name = "SPRING_PROFILES_ACTIVE", value = local.environment },
+    { name = "SPRING_DATASOURCE_URL", value = "jdbc:postgresql://${aws_db_instance.this.address}:5432/medmate" },
+    { name = "MEDMATE_S3_BUCKET", value = aws_s3_bucket.uploads.bucket },
     { name = "MEDMATE_SQS_DOMAIN_EVENTS_URL", value = aws_sqs_queue.domain_events.url },
+    { name = "MEDMATE_SQS_KYC_MALWARE_URL", value = aws_sqs_queue.kyc_malware_scans.url },
     { name = "AWS_REGION", value = data.aws_region.current.region },
     { name = "JAVA_TOOL_OPTIONS", value = "-XX:MaxRAMPercentage=75.0" }
+  ]
+  worker_secrets = [
+    { name = "SPRING_DATASOURCE_USERNAME", valueFrom = "${aws_secretsmanager_secret.db.arn}:username::" },
+    { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" }
   ]
 }
 
@@ -266,6 +276,7 @@ resource "aws_ecs_task_definition" "worker" {
     image       = local.worker_image
     essential   = true
     environment = local.worker_env
+    secrets     = local.worker_secrets
     logConfiguration = {
       logDriver = "awslogs"
       options = {

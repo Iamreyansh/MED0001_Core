@@ -200,6 +200,7 @@ class RbacServicesTest {
             "compliance:*",
             "catalogue:update",
             "pharmacies:read",
+            "pharmacies:update",
             "customers:read");
     assertThatThrownBy(() -> AdminRoleDefinitions.require("nope"))
         .isInstanceOf(IllegalArgumentException.class);
