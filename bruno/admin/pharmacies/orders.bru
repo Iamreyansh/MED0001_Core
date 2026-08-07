@@ -1,0 +1,75 @@
+meta {
+  name: get-pharmacy-orders
+  type: http
+  seq: 22
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/orders?from_date=2026-07-01&to_date=2026-07-24&page=1&limit=20
+  auth: inherit
+}
+
+params:query {
+  from_date: 2026-07-01
+  to_date: 2026-07-24
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("orders envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.orders).to.be.an("array");
+    if (body.data.orders.length > 0) {
+      expect(body.data.orders[0]).to.have.property("prep_on_time");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{id}/orders — recent orders with prep_on_time SLA flag.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "orders": [
+              {
+                "order_id": "b0000001-0000-4000-8000-000000000001",
+                "order_number": "ORD-20260724-0042",
+                "status": "DELIVERED",
+                "customer_name": "Priya K.",
+                "item_count": 3,
+                "total_amount": 450.00,
+                "prep_minutes": 12,
+                "prep_on_time": true,
+                "has_rx": false,
+                "created_at": "2026-07-24T08:00:00Z",
+                "delivered_at": "2026-07-24T08:35:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 34, "total_pages": 2 }
+        }
+      '''
+    }
+  }
+}

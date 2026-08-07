@@ -1,0 +1,81 @@
+meta {
+  name: patch-zone
+  type: http
+  seq: 21
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/zone
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "zone_id": "{{zoneId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "a0000002-0000-4000-8000-000000000002");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("zone reassigned", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.new_zone_id).to.be.a("string");
+    expect(body.data.cache_invalidation_triggered).to.equal(true);
+    expect(body.data.customer_app_reflects_change_in_minutes).to.equal(5);
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/pharmacies/{id}/zone — requires pharmacies:update.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "previous_zone_id": "a0000001-0000-4000-8000-000000000001",
+            "previous_zone_name": "Koramangala Zone",
+            "new_zone_id": "a0000002-0000-4000-8000-000000000002",
+            "new_zone_name": "Mumbai South Zone",
+            "effective_from": "2026-07-24T00:00:00Z",
+            "cache_invalidation_triggered": true,
+            "customer_app_reflects_change_in_minutes": 5
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ALREADY_IN_ZONE
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "ALREADY_IN_ZONE", "message": "Pharmacy is already in this zone" } }
+      '''
+    }
+  }
+}

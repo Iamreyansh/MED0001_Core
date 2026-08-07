@@ -43,6 +43,13 @@ management:
         enabled: true
 
 medmate:
+  pharmacy:
+    jobs:
+      enabled: true
+    catalogue-pause:
+      poll-delay-ms: 60000
+    zones:
+      low-pharmacy-warning-threshold: 3
   s3:
     # Local only. Staging/prod: MEDMATE_S3_BUCKET=med0001-{env}-uploads-105927215604
     bucket: med0001-local-uploads
@@ -69,6 +76,9 @@ medmate:
     # (Secrets Manager JSON key_id / key_secret) or ECS valueFrom when EPIC-022 secret exists.
     key-id: ""
     key-secret: ""
+  razorpayx:
+    # Local/dev only — staging/prod must inject via Secrets Manager
+    webhook-secret: local-razorpayx-webhook-secret
   kyc:
     # ponytail: feature flag via property, not EPIC-021 settings service (simpler for now)
     auto-verification-enabled: false

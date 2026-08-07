@@ -23,12 +23,15 @@ tests {
     const body = res.getBody();
     expect(body.success).to.equal(true);
     expect(body.data.pharmacy_id).to.be.a("string");
-    expect(body.data.kyc).to.be.an("object");
+    expect(body.data.performance).to.be.an("object");
+    expect(body.data.catalogue_stats).to.be.an("object");
+    expect(body.data.recent_orders).to.be.an("array");
   });
 }
 
 docs {
-  GET /api/v1/admin/pharmacies/{id} — full pharmacy + KYC summary for admin.
+  GET /api/v1/admin/pharmacies/{id} — admin drawer: KYC + performance + commission ledger + catalogue + recent orders.
+  Order/catalogue metrics may be stub zeros until EPIC-008 / catalogue mapping land.
 }
 
 example {
@@ -43,7 +46,36 @@ example {
           "data": {
             "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
             "code": "PHM-0042",
-            "status": "KYC_SUBMITTED",
+            "business_name": "Sharma Medical Store",
+            "status": "ACTIVE",
+            "kyc_status": "ACTIVE",
+            "zone": {
+              "zone_id": "a0000001-0000-4000-8000-000000000001",
+              "zone_name": "Koramangala Zone"
+            },
+            "performance": {
+              "fill_rate_pct": 0.00,
+              "on_time_prep_pct": 0.00,
+              "cancel_rate_pct": 0.00,
+              "avg_rating": 0.00,
+              "review_count": 0,
+              "orders_30d": 0,
+              "gmv_30d": 0.00
+            },
+            "commission_ledger": {
+              "gmv_current_period": 0.00,
+              "commission_earned": 0.00,
+              "tcs_deducted": 0.00,
+              "net_payable": 0.00,
+              "last_settlement_date": null,
+              "next_settlement_date": null
+            },
+            "catalogue_stats": {
+              "mapped_skus": 0,
+              "in_stock_skus": 0,
+              "out_of_stock_skus": 0
+            },
+            "recent_orders": [],
             "kyc": {
               "submitted_at": "2026-07-23T10:00:00Z",
               "auto_kyc_status": "PARTIAL",

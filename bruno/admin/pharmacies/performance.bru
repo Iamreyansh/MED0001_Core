@@ -1,0 +1,105 @@
+meta {
+  name: get-pharmacy-performance
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/performance?period=30d
+  auth: inherit
+}
+
+params:query {
+  period: 30d
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("performance envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.metrics).to.be.an("object");
+    expect(body.data.metrics).to.have.property("fill_rate_pct");
+    expect(body.data.alerts).to.be.an("object");
+    expect(body.data.thresholds).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{id}/performance — trailing KPIs (7d|30d|90d).
+  Nightly batch at 02:00 IST; Redis cache TTL 4h (pharmacy:perf:snapshot:{id}:{period}).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "business_name": "Sharma Medical Store",
+            "period": "30d",
+            "period_start": "2026-06-24",
+            "period_end": "2026-07-24",
+            "metrics": {
+              "fill_rate_pct": 91.2,
+              "on_time_prep_pct": 88.5,
+              "cancel_rate_pct": 3.1,
+              "out_of_stock_rate_pct": 6.3,
+              "avg_prep_minutes": 14.2,
+              "complaint_count": 4,
+              "avg_rating": 4.3,
+              "review_count": 128,
+              "orders_received": 842,
+              "orders_fulfilled": 768,
+              "orders_cancelled": 26,
+              "gmv_period": 485000.00
+            },
+            "alerts": {
+              "auto_warning_triggered": false,
+              "auto_suspension_risk": false,
+              "consecutive_low_fill_rate_days": 0
+            },
+            "thresholds": {
+              "fill_rate_warning_pct": 85,
+              "fill_rate_suspension_pct": 70,
+              "cancel_rate_warning_pct": 15,
+              "on_time_prep_warning_pct": 80
+            },
+            "trend": {
+              "fill_rate_trend": "IMPROVING",
+              "cancel_rate_trend": "STABLE"
+            },
+            "computed_at": "2026-07-24T02:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PERIOD
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "INVALID_PERIOD", "message": "period must be 7d, 30d, or 90d" } }
+      '''
+    }
+  }
+}

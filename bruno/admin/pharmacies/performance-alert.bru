@@ -1,0 +1,96 @@
+meta {
+  name: post-performance-alert
+  type: http
+  seq: 23
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/performance/alert
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "alert_type": "LOW_FILL_RATE",
+    "threshold_value": 78.5,
+    "message": "Fill rate dropped below target this week."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    const body = res.getBody();
+    if (body.data && body.data.next_alert_allowed_at) {
+      bru.setEnvVar("nextAlertAllowedAt", body.data.next_alert_allowed_at);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("alert envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.channels_notified).to.include("WHATSAPP");
+    expect(body.data.channels_notified).to.include("IN_APP");
+    expect(body.data.next_alert_allowed_at).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/performance/alert — admin_super/operations only; 10/min; 1/type/24h.
+  Notification via outbox (pharmacy.notification.performance_alert); no sync WhatsApp in request path.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "alert_type": "LOW_FILL_RATE",
+            "threshold_value": 78.5,
+            "channels_notified": ["WHATSAPP", "IN_APP"],
+            "sent_at": "2026-07-24T00:00:00Z",
+            "next_alert_allowed_at": "2026-07-25T00:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 ALERT_THROTTLED
+  response: {
+    status: { code: 429 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ALERT_THROTTLED",
+            "message": "Same alert type already sent within 24 hours",
+            "details": { "next_alert_allowed_at": "2026-07-25T00:00:00Z" }
+          }
+        }
+      '''
+    }
+  }
+}

@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/v1/admin/pharmacies?status=KYC_SUBMITTED&page=1&limit=50
+  url: {{baseUrl}}/api/v1/admin/pharmacies?status=ACTIVE&sort=gmv_today&order=desc&page=1&limit=50
   auth: inherit
 }
 
@@ -31,16 +31,19 @@ tests {
     expect(body.success).to.equal(true);
     expect(body.data.pharmacies).to.be.an("array");
     expect(body.meta).to.have.property("page");
+    expect(body.meta.limit).to.equal(50);
   });
 }
 
 docs {
-  GET /api/v1/admin/pharmacies — KYC queue / pharmacy directory.
-  Requires pharmacies:read. Default sort for status=KYC_SUBMITTED is submitted_at asc.
+  GET /api/v1/admin/pharmacies — pharmacy directory / KYC queue.
+  Requires pharmacies:read. Default limit=50 (max 200). Sort: created_at|gmv_today|orders_today|rating|fill_rate|submitted_at|business_name.
+  search min 2 chars (fuzzy on business_name, owner_name, phone, code).
+  commission_pct/net_payout omitted for admin_support and admin_compliance.
 }
 
 example {
-  name: 200 OK — KYC queue
+  name: 200 OK — ACTIVE by gmv_today
   response: {
     status: { code: 200 text: OK }
     body: {
@@ -54,13 +57,25 @@ example {
                 "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
                 "code": "PHM-0042",
                 "business_name": "Sharma Medical Store",
-                "status": "KYC_SUBMITTED",
-                "urgency": "HIGH",
-                "auto_kyc_status": "PARTIAL"
+                "owner_name": "Rajesh Sharma",
+                "phone": "+919876543210",
+                "zone": { "zone_id": "a0000001-0000-4000-8000-000000000001", "zone_name": "Koramangala Zone" },
+                "status": "ACTIVE",
+                "plan": "GROWTH",
+                "is_online": true,
+                "rating": 4.3,
+                "review_count": 128,
+                "orders_today": 34,
+                "gmv_today": 18750.00,
+                "fill_rate_pct": 91.2,
+                "commission_pct": 8.00,
+                "net_payout": 1725.00,
+                "metrics_as_of": "2026-07-24T00:00:00Z",
+                "created_at": "2026-06-01T00:00:00Z"
               }
             ]
           },
-          "meta": { "page": 1, "limit": 50, "total": 1, "has_next": false }
+          "meta": { "page": 1, "limit": 50, "total": 342, "has_next": true }
         }
       '''
     }
@@ -68,13 +83,13 @@ example {
 }
 
 example {
-  name: 403 FORBIDDEN
+  name: 400 INVALID_SORT_FIELD
   response: {
-    status: { code: 403 }
+    status: { code: 400 }
     body: {
       type: json
       content: '''
-        { "success": false, "error": { "code": "FORBIDDEN", "message": "Admin role required" } }
+        { "success": false, "error": { "code": "INVALID_SORT_FIELD", "message": "sort must be one of: created_at, submitted_at, business_name, gmv_today, orders_today, rating, fill_rate" } }
       '''
     }
   }

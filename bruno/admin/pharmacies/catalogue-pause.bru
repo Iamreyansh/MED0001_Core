@@ -1,0 +1,78 @@
+meta {
+  name: catalogue-pause
+  type: http
+  seq: 22
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/catalogue/pause
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "duration_minutes": 120,
+    "reason": "Inventory audit in progress"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("catalogue paused", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.catalogue_paused).to.equal(true);
+    expect(body.data.items_hidden_count).to.be.a("number");
+    expect(body.data.is_online).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/catalogue/pause — requires pharmacies:update.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "catalogue_paused": true,
+            "pause_reason": "Inventory audit in progress",
+            "paused_at": "2026-07-24T00:00:00Z",
+            "auto_resume_at": "2026-07-24T02:00:00Z",
+            "items_hidden_count": 234,
+            "is_online": true
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 CATALOGUE_ALREADY_PAUSED
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "CATALOGUE_ALREADY_PAUSED", "message": "Catalogue is already paused" } }
+      '''
+    }
+  }
+}

@@ -1,0 +1,87 @@
+meta {
+  name: patch-pharmacy-commission
+  type: http
+  seq: 31
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/commission
+  auth: inherit
+}
+
+body:json {
+  {
+    "commission_pct": 7.00,
+    "effective_from": "2026-07-28",
+    "reason": "Loyalty incentive for Q2 performance",
+    "notes": "Approved by finance head"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body.success && body.data.commission_history_id) {
+    bru.setEnvVar("commissionHistoryId", body.data.commission_history_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("commission change envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("commission_history_id");
+    expect(body.data.new_commission_pct).to.equal(7);
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/pharmacies/{id}/commission — schedule future commission change (finance/super).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "previous_commission_pct": 8.00,
+            "new_commission_pct": 7.00,
+            "effective_from": "2026-07-28",
+            "reason": "Loyalty incentive for Q2 performance",
+            "changed_by": "admin-uuid-v4",
+            "changed_at": "2026-07-24T00:00:00Z",
+            "commission_history_id": "uuid-v4"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 PENDING_CHANGE_EXISTS
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "PENDING_CHANGE_EXISTS", "message": "A commission change is already scheduled" } }
+      '''
+    }
+  }
+}

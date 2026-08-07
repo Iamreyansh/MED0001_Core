@@ -1,0 +1,62 @@
+meta {
+  name: notes-post
+  type: http
+  seq: 24
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/notes
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "note": "Called owner — awaiting FSSAI renewal upload.",
+    "is_flagged": false
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("note created", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.note_id).to.be.a("string");
+    expect(body.data.is_flagged).to.equal(false);
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/notes — internal admin note (201).
+}
+
+example {
+  name: 201 Created
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "note_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "pharmacy_id": "11111111-1111-4111-8111-111111111111",
+            "note": "Called owner — awaiting FSSAI renewal upload.",
+            "is_flagged": false,
+            "created_at": "2026-07-24T00:10:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

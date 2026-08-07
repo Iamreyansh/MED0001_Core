@@ -1,0 +1,75 @@
+meta {
+  name: get-status
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bulk-jobs/{{bulkJobId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("bulkJobId")) {
+    throw new Error("bulkJobId missing — run pharmacies/bulk-action first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("job status envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.job_id).to.equal(bru.getEnvVar("bulkJobId"));
+    expect(body.data.status).to.be.oneOf(["QUEUED", "RUNNING", "COMPLETED"]);
+    expect(body.data.total_pharmacies).to.be.a("number");
+  });
+}
+
+docs {
+  GET /api/v1/admin/bulk-jobs/{job_id} — poll bulk action job status.
+}
+
+example {
+  name: 200 OK completed
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "action": "SEND_NOTICE",
+            "status": "COMPLETED",
+            "total_pharmacies": 2,
+            "processed": 2,
+            "succeeded": 1,
+            "failed": 0,
+            "skipped": 1,
+            "skipped_pharmacies": [
+              { "pharmacy_id": "22222222-2222-4222-8222-222222222222", "reason": "NOTICE_RATE_LIMIT_EXCEEDED" }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 JOB_NOT_FOUND
+  response: {
+    status: { code: 404 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "JOB_NOT_FOUND", "message": "Bulk job not found" } }
+      '''
+    }
+  }
+}

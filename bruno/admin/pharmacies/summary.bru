@@ -1,0 +1,85 @@
+meta {
+  name: pharmacies-summary
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/summary
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run admin login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("pharmacySummaryAsOf", body.data.data_as_of || "");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("total_active");
+    expect(body.data).to.have.property("pending_kyc");
+    expect(body.data).to.have.property("data_as_of");
+    expect(body.data.cache_ttl_seconds).to.equal(300);
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/summary — directory KPI chips (5-minute cache).
+  Requires pharmacies:read. Financial chips omitted for admin_compliance.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total_active": 342,
+            "pending_kyc": 18,
+            "kyc_submitted": 11,
+            "suspended": 7,
+            "rejected": 23,
+            "currently_online": 289,
+            "gmv_today": 1482500.00,
+            "commission_today": 118600.00,
+            "orders_today": 3820,
+            "payout_due": 94250.00,
+            "data_as_of": "2026-07-24T00:05:00Z",
+            "cache_ttl_seconds": 300
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Admin role required" } }
+      '''
+    }
+  }
+}

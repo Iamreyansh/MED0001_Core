@@ -1,0 +1,80 @@
+meta {
+  name: notice
+  type: http
+  seq: 23
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/notice
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "channel": "WHATSAPP",
+    "message": "Please renew your drug licence before expiry.",
+    "priority": "NORMAL",
+    "template_name": "PHARMACY_GENERAL_NOTICE"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("notice sent envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.notice_id).to.be.a("string");
+    expect(body.data.rate_limit_remaining).to.be.a("number");
+    expect(body.data.channels_sent).to.include("WHATSAPP");
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/notice — send notice (WA/EMAIL/IN_APP/ALL). Max 3/hour per pharmacy.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "notice_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "pharmacy_id": "11111111-1111-4111-8111-111111111111",
+            "channels_sent": ["WHATSAPP"],
+            "priority": "NORMAL",
+            "sent_at": "2026-07-24T00:10:00Z",
+            "rate_limit_remaining": 2,
+            "rate_limit_reset_at": "2026-07-24T01:10:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 NOTICE_RATE_LIMIT_EXCEEDED
+  response: {
+    status: { code: 429 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "NOTICE_RATE_LIMIT_EXCEEDED", "message": "Maximum 3 notices per hour for this pharmacy" } }
+      '''
+    }
+  }
+}

@@ -1,0 +1,59 @@
+meta {
+  name: list-zones
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/zones?is_active=true
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("zones envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.zones).to.be.an("array");
+    expect(body.meta.total).to.be.a("number");
+  });
+}
+
+docs {
+  GET /api/v1/admin/zones — requires pharmacies:read.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zones": [
+              {
+                "zone_id": "a0000001-0000-4000-8000-000000000001",
+                "zone_name": "Koramangala Zone",
+                "city": "Bengaluru",
+                "state": "Karnataka",
+                "is_active": true,
+                "pharmacy_count": 12,
+                "online_pharmacy_count": 9,
+                "coverage_area_sqkm": 8.4,
+                "has_low_pharmacy_warning": false,
+                "created_at": "2026-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "meta": { "total": 1 }
+        }
+      '''
+    }
+  }
+}

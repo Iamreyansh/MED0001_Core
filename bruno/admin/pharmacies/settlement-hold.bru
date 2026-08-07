@@ -1,0 +1,78 @@
+meta {
+  name: hold-pharmacy-settlement
+  type: http
+  seq: 34
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/settlements/{{settlementId}}/hold
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "Fraud review in progress for order ORD-20260710-0088"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+  if (!bru.getEnvVar("settlementId")) {
+    throw new Error("settlementId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("hold envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("HELD");
+    expect(body.data.pharmacy_notified).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/settlements/{settlement_id}/hold — hold payout with reason (finance/super).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "settlement_id": "uuid-v4",
+            "status": "HELD",
+            "held_at": "2026-07-24T00:00:00Z",
+            "held_by": "admin-finance-uuid",
+            "reason": "Fraud review in progress for order ORD-20260710-0088",
+            "pharmacy_notified": true
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 REASON_REQUIRED
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "REASON_REQUIRED", "message": "reason is required" } }
+      '''
+    }
+  }
+}

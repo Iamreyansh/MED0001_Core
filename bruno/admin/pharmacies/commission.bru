@@ -1,0 +1,84 @@
+meta {
+  name: get-pharmacy-commission
+  type: http
+  seq: 30
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/commission
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("commission envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("current_commission_pct");
+    expect(body.data).to.have.property("current_period");
+    expect(body.data).to.have.property("bank_account_masked");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{id}/commission — commission tier, TCS, current period, bank mask.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "business_name": "Sharma Medical Store",
+            "current_commission_pct": 8.00,
+            "pending_commission_change": null,
+            "tcs_applicable": true,
+            "tcs_rate_pct": 1.00,
+            "annual_gmv_ytd": 2850000.00,
+            "tcs_threshold_crossed": true,
+            "current_period": {
+              "period_label": "2026-07-14 to 2026-07-20",
+              "gmv": 185000.00,
+              "commission_earned": 14800.00,
+              "tcs_deducted": 1850.00,
+              "net_payable_to_pharmacy": 168350.00,
+              "settlement_status": "PENDING_RELEASE"
+            },
+            "bank_account_masked": "XXXXXXXXXXXX4321",
+            "bank_account_verified": true,
+            "last_settlement_date": "2026-07-17",
+            "next_settlement_date": "2026-07-28"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_COMMISSION_PCT
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "INVALID_COMMISSION_PCT", "message": "Commission must be between 3.00% and 20.00%" } }
+      '''
+    }
+  }
+}

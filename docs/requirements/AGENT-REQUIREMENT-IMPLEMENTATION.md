@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 15 |
+| Phase 1 | 46 | 20 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **15** |
+| **Total** | **129** | **20** |
 
 ---
 
@@ -59,11 +59,11 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-004 | [STORY-001](./EPIC-004-pharmacy-operations-admin/STORY-001-pharmacy-directory.md) | Pharmacy Directory | pending | — | — |
-| EPIC-004 | [STORY-002](./EPIC-004-pharmacy-operations-admin/STORY-002-pharmacy-performance-metrics.md) | Pharmacy Performance Metrics | pending | — | — |
-| EPIC-004 | [STORY-003](./EPIC-004-pharmacy-operations-admin/STORY-003-commission-payout-management.md) | Commission & Payout Management | pending | — | — |
-| EPIC-004 | [STORY-004](./EPIC-004-pharmacy-operations-admin/STORY-004-storefront-zone-control.md) | Storefront & Zone Control | pending | — | — |
-| EPIC-004 | [STORY-005](./EPIC-004-pharmacy-operations-admin/STORY-005-admin-pharmacy-actions.md) | Admin Pharmacy Actions | pending | — | — |
+| EPIC-004 | [STORY-001](./EPIC-004-pharmacy-operations-admin/STORY-001-pharmacy-directory.md) | Pharmacy Directory | done | 2026-08-08 | `domains/pharmacy`; V017 directory metrics + view; Redis summary 5m; OrderMetrics/CatalogueStats stubs; export CSV; support/compliance omit commission fields incl. ledger |
+| EPIC-004 | [STORY-002](./EPIC-004-pharmacy-operations-admin/STORY-002-pharmacy-performance-metrics.md) | Pharmacy Performance Metrics | done | 2026-08-08 | `domains/pharmacy`; V018 snapshots+alerts; aggregator 02:00 IST; NotificationDispatchPort stub/outbox; OrderMetrics ratings/orders; compliance performance view fill+OOS only |
+| EPIC-004 | [STORY-003](./EPIC-004-pharmacy-operations-admin/STORY-003-commission-payout-management.md) | Commission & Payout Management | done | 2026-08-08 | `domains/pharmacy`; V019 commission_history+settlement; RazorpayX stub+HMAC webhook; Idempotency-Key required on release; TCS; IST schedulers; finance:update/settlements:process RBAC |
+| EPIC-004 | [STORY-004](./EPIC-004-pharmacy-operations-admin/STORY-004-storefront-zone-control.md) | Storefront & Zone Control | done | 2026-08-08 | `domains/pharmacy`; V020 admin_forced_offline+catalogue_pause+zones; ZonePharmacyCachePort Redis; CatalogueVisibilityPort stub; owner storefront; PHARMACY_OFFLINE order check deferred EPIC-010 |
+| EPIC-004 | [STORY-005](./EPIC-004-pharmacy-operations-admin/STORY-005-admin-pharmacy-actions.md) | Admin Pharmacy Actions | done | 2026-08-08 | `domains/pharmacy`; V021 notices/notes/call_log/bulk_jobs; NotificationDispatchPort outbox; WA template registry; bulk ponytail in-process (upgrade→SQS); pharmacies:read gate + service RBAC; bulk skips per-pharmacy notice limit |
 
 ### EPIC-005 (`EPIC-005-master-catalogue`)
 

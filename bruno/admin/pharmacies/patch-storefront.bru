@@ -1,0 +1,78 @@
+meta {
+  name: patch-storefront
+  type: http
+  seq: 20
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/storefront
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "is_online": false,
+    "reason": "Temporary closure due to local emergency"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("offline with admin override", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_online).to.equal(false);
+    expect(body.data.admin_forced_offline).to.equal(true);
+    expect(body.data.cache_invalidated).to.equal(true);
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/pharmacies/{id}/storefront — requires pharmacies:update.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "is_online": false,
+            "admin_forced_offline": true,
+            "reason": "Temporary closure due to local emergency",
+            "changed_at": "2026-07-24T00:00:00Z",
+            "cache_invalidated": true,
+            "customer_app_reflects_change_in_seconds": 5
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 PHARMACY_NOT_ACTIVE
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "PHARMACY_NOT_ACTIVE", "message": "Pharmacy not in ACTIVE status; cannot toggle storefront" } }
+      '''
+    }
+  }
+}

@@ -1,0 +1,84 @@
+meta {
+  name: list-pharmacy-settlements
+  type: http
+  seq: 32
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/settlements?status=ALL&page=1&limit=20
+  auth: inherit
+}
+
+params:query {
+  status: ALL
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body.success && body.data.settlements && body.data.settlements.length > 0) {
+    bru.setEnvVar("settlementId", body.data.settlements[0].settlement_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("settlements envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.settlements).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{id}/settlements — paginated settlement history.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "settlements": [
+              {
+                "settlement_id": "uuid-v4",
+                "period_label": "2026-07-14 to 2026-07-20",
+                "period_start": "2026-07-14",
+                "period_end": "2026-07-20",
+                "gmv": 185000.00,
+                "commission_pct": 8.00,
+                "commission_earned": 14800.00,
+                "tcs_rate_pct": 1.00,
+                "tcs_deducted": 1850.00,
+                "net_paid": 168350.00,
+                "status": "PAID",
+                "released_at": "2026-07-22T10:00:00Z",
+                "paid_at": "2026-07-22T10:45:00Z",
+                "utr_number": "HDFC2026072212345678",
+                "hold_reason": null,
+                "receipt_url": "https://cdn.example.com/receipts/settlement-uuid.pdf"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 12, "total_pages": 1 }
+        }
+      '''
+    }
+  }
+}

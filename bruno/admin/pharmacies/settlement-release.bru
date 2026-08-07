@@ -1,0 +1,88 @@
+meta {
+  name: release-pharmacy-settlement
+  type: http
+  seq: 33
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/settlements/{{settlementId}}/release
+  auth: inherit
+}
+
+headers {
+  Idempotency-Key: {{settlementReleaseIdempotencyKey}}
+}
+
+body:json {
+  {
+    "notes": "Weekly release after fraud review window"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+  if (!bru.getEnvVar("settlementId")) {
+    throw new Error("settlementId missing — run list-pharmacy-settlements first");
+  }
+  if (!bru.getEnvVar("settlementReleaseIdempotencyKey")) {
+    bru.setEnvVar("settlementReleaseIdempotencyKey", "settlement-release-" + Date.now());
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("release envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RELEASED");
+    expect(body.data.payout_initiated).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/{id}/settlements/{settlement_id}/release — RazorpayX payout (finance/super).
+  Requires Idempotency-Key header.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "settlement_id": "uuid-v4",
+            "status": "RELEASED",
+            "released_at": "2026-07-24T00:00:00Z",
+            "released_by": "admin-finance-uuid",
+            "payout_initiated": true,
+            "razorpayx_payout_id": "pout_XXXXXXXXXXXX",
+            "estimated_credit_hours": 4,
+            "message": "Settlement released. Payout initiated to pharmacy bank account."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 SETTLEMENT_HELD
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "SETTLEMENT_HELD", "message": "Settlement is held; remove hold before releasing" } }
+      '''
+    }
+  }
+}

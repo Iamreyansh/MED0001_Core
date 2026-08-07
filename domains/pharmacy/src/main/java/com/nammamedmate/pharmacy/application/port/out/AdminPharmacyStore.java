@@ -15,6 +15,8 @@ public interface AdminPharmacyStore {
       String businessName,
       String ownerName,
       String phone,
+      String email,
+      UUID zoneId,
       String zoneName,
       String status,
       String plan,
@@ -22,7 +24,15 @@ public interface AdminPharmacyStore {
       Instant submittedAt,
       Instant createdAt,
       Instant ageAnchor,
-      String autoKycStatus) {}
+      String autoKycStatus,
+      BigDecimal rating,
+      int reviewCount,
+      int ordersToday,
+      long gmvTodayPaise,
+      BigDecimal fillRatePct,
+      BigDecimal commissionPct,
+      long netPayoutPaise,
+      Instant metricsAsOf) {}
 
   record AdminDetailRow(
       UUID pharmacyId,
@@ -41,10 +51,13 @@ public interface AdminPharmacyStore {
       String plan,
       BigDecimal commissionPct,
       UUID zoneId,
+      String zoneName,
       boolean online,
       boolean canReapply,
       Instant kycSubmittedAt,
       Instant createdAt,
+      Instant updatedAt,
+      Instant planExpiresAt,
       String rejectionReason,
       String rejectionDetails,
       Instant activatedAt,
@@ -73,7 +86,25 @@ public interface AdminPharmacyStore {
     }
   }
 
+  record DirectorySummary(
+      long totalActive,
+      long pendingKyc,
+      long kycSubmitted,
+      long suspended,
+      long rejected,
+      long currentlyOnline,
+      long ordersToday,
+      long gmvTodayPaise,
+      long commissionTodayPaise,
+      long payoutDuePaise,
+      Instant dataAsOf) {}
+
   PageResult list(ListFilter filter);
+
+  /** Same filters as list, capped at {@code limit} (export uses up to 10_000). */
+  List<AdminListRow> exportRows(ListFilter filter);
+
+  DirectorySummary directorySummary(Instant asOf);
 
   Optional<AdminDetailRow> findDetail(UUID pharmacyId);
 
@@ -100,4 +131,12 @@ public interface AdminPharmacyStore {
   void reactivate(UUID pharmacyId, Instant reactivatedAt, boolean canReapply);
 
   void resetKycSla(UUID pharmacyId, Instant slaResetAt);
+
+  /** Active pharmacies for nightly performance aggregation. */
+  List<UUID> listActivePharmacyIds();
+
+  /** Directory rows for explicit pharmacy IDs (bulk export). */
+  List<AdminListRow> listByIds(List<UUID> pharmacyIds);
+
+  void updateCommissionPct(UUID pharmacyId, BigDecimal commissionPct, Instant updatedAt);
 }
