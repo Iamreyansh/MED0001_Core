@@ -1,0 +1,45 @@
+meta {
+  name: export-csv
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bulk-jobs/{{bulkJobId}}/export.csv
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("bulkJobId")) {
+    throw new Error("bulkJobId missing — run bulk-action EXPORT job first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("csv export", function () {
+    expect(res.getBody()).to.include("code,business_name");
+  });
+}
+
+docs {
+  GET /api/v1/admin/bulk-jobs/{job_id}/export.csv — download EXPORT bulk job CSV.
+}
+
+example {
+  name: 200 CSV
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: text
+      content: '''
+        # Namma MedMate Pharmacy Export | 2026-07-24 | Total rows: 1
+        code,business_name,owner_name,phone,email,zone,status,plan,is_online,rating,orders_today,gmv_today,fill_rate_pct,commission_pct,net_payout,created_at
+        PHM-001,Apollo Pharmacy,Ravi Kumar,+919876543210,ravi@apollo.com,Zone A,ACTIVE,FREE,true,4.50,12,1500.00,92.00,8.00,450.00,2026-01-15T08:00:00Z
+      '''
+    }
+  }
+}

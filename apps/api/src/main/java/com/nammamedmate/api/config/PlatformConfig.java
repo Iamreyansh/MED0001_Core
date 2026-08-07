@@ -177,6 +177,15 @@ public class PlatformConfig {
   }
 
   @Bean
+  @Profile({"prod", "staging"})
+  org.springframework.boot.ApplicationRunner razorpayxWebhookSecretGuard(
+      @Value("${medmate.razorpayx.webhook-secret:}") String webhookSecret) {
+    return args ->
+        com.nammamedmate.pharmacy.application.AdminPharmacySettlementService
+            .validateWebhookSecretForDeployedProfile(webhookSecret, true);
+  }
+
+  @Bean
   @Profile("!prod & !staging")
   Rs256JwtService localJwtService(TokenRevocationStore revocationStore, Clock clock)
       throws Exception {

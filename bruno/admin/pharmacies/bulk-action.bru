@@ -1,0 +1,84 @@
+meta {
+  name: bulk-action
+  type: http
+  seq: 27
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/bulk-action
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "pharmacy_ids": ["{{pharmacyId}}"],
+    "action": "SEND_NOTICE",
+    "payload": {
+      "channel": "WHATSAPP",
+      "message": "Bulk renewal reminder from MedMate ops.",
+      "template_name": "PHARMACY_GENERAL_NOTICE",
+      "priority": "NORMAL"
+    }
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("bulk job accepted", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.job_id).to.be.a("string");
+    expect(body.data.status).to.equal("QUEUED");
+    expect(body.data.poll_url).to.include("/api/v1/admin/bulk-jobs/");
+    bru.setEnvVar("bulkJobId", body.data.job_id);
+  });
+}
+
+docs {
+  POST /api/v1/admin/pharmacies/bulk-action — 202 + job_id. Max 100 pharmacy IDs. Actions: SUSPEND (admin_super), SEND_NOTICE, EXPORT.
+}
+
+example {
+  name: 202 Accepted
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "action": "SEND_NOTICE",
+            "total_pharmacies": 1,
+            "status": "QUEUED",
+            "estimated_completion_seconds": 5,
+            "poll_url": "/api/v1/admin/bulk-jobs/7c9e6679-7425-40de-944b-e07fc1f90ae7"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 TOO_MANY_PHARMACIES
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "TOO_MANY_PHARMACIES", "message": "Maximum 100 pharmacy IDs per request" } }
+      '''
+    }
+  }
+}

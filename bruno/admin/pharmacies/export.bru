@@ -1,0 +1,67 @@
+meta {
+  name: pharmacies-export
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/export?status=SUSPENDED
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run admin login first");
+  }
+}
+
+script:post-response {
+  // CSV body — no JSON vars to chain
+}
+
+tests {
+  test("HTTP 200 CSV", function () {
+    expect(res.getStatus()).to.equal(200);
+    const ct = res.getHeader("content-type") || "";
+    expect(ct.toLowerCase()).to.include("text/csv");
+  });
+  test("header comment with total", function () {
+    const body = res.getBody();
+    expect(String(body)).to.include("# Namma MedMate Pharmacy Export");
+    expect(String(body)).to.include("Total rows:");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/export — CSV stream (max 10k rows).
+  Roles: admin_super, admin_operations, admin_finance only. Rate limit 5/min.
+  admin_compliance → 403 FORBIDDEN.
+}
+
+example {
+  name: 200 OK CSV
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: text
+      content: '''
+        # Namma MedMate Pharmacy Export | 2026-07-24 | Total rows: 7
+        code,business_name,owner_name,phone,email,zone,status,plan,is_online,rating,orders_today,gmv_today,fill_rate_pct,commission_pct,net_payout,created_at
+        PHM-0042,Sharma Medical Store,Rajesh Sharma,+919876543210,rajesh@sharma.com,Koramangala Zone,SUSPENDED,GROWTH,false,4.3,0,0.00,91.2,8.00,0.00,2026-06-01
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN — compliance
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Export not permitted for this role" } }
+      '''
+    }
+  }
+}

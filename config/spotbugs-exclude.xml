@@ -15,6 +15,11 @@
       <Class name="com.nammamedmate.auth.application.port.out.RolePermissionCache$OptionalPermissions"/>
       <Class name="com.nammamedmate.auth.domain.AdminRoleDefinitions$AdminRole"/>
       <Class name="com.nammamedmate.auth.adapter.out.persistence.PharmacyRoleEntity"/>
+      <Class name="com.nammamedmate.pharmacy.adapter.in.web.AdminBulkJobController$BulkActionRequest"/>
+      <Class name="com.nammamedmate.pharmacy.application.port.out.PharmacyNoticeStore$NoticeRow"/>
+      <Class name="com.nammamedmate.pharmacy.application.port.out.BulkActionJobStore$JobRow"/>
+      <Class name="com.nammamedmate.pharmacy.application.AdminPharmacyActionsService$NoticeResult"/>
+      <Class name="com.nammamedmate.pharmacy.application.AdminPharmacyActionsService$NotesListResult"/>
     </Or>
   </Match>
 </FindBugsFilter>

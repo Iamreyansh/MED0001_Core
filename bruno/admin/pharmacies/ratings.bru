@@ -1,0 +1,84 @@
+meta {
+  name: get-pharmacy-ratings
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/ratings?rating=1&page=1&limit=20
+  auth: inherit
+}
+
+params:query {
+  rating: 1
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("ratings envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.ratings).to.be.an("array");
+    expect(body.meta.page).to.be.a("number");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{id}/ratings — customer reviews with masked names (Priya K.).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "avg_rating": 4.3,
+            "review_count": 128,
+            "rating_distribution": { "5": 68, "4": 38, "3": 14, "2": 5, "1": 3 },
+            "ratings": [
+              {
+                "rating_id": "a0000001-0000-4000-8000-000000000001",
+                "order_id": "b0000001-0000-4000-8000-000000000001",
+                "order_number": "ORD-20260724-0042",
+                "customer_name": "Priya K.",
+                "rating": 5,
+                "review_text": "Very fast delivery.",
+                "created_at": "2026-07-23T18:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 128, "total_pages": 7 }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_RATING_FILTER
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "INVALID_RATING_FILTER", "message": "Rating filter must be between 1 and 5" } }
+      '''
+    }
+  }
+}

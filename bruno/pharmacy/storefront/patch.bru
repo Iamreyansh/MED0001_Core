@@ -1,0 +1,67 @@
+meta {
+  name: patch-storefront
+  type: http
+  seq: 30
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/storefront
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "is_online": true
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("storefront toggled", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_online).to.be.a("boolean");
+    expect(body.data.pharmacy_id).to.be.a("string");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/storefront — pharmacy_owner JWT required.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "is_online": true,
+            "admin_forced_offline": false,
+            "changed_at": "2026-07-24T00:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 ADMIN_OVERRIDE_ACTIVE
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "ADMIN_OVERRIDE_ACTIVE", "message": "Admin has forced this pharmacy offline; contact support" } }
+      '''
+    }
+  }
+}
