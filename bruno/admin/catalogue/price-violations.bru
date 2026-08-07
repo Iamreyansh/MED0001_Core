@@ -1,0 +1,87 @@
+meta {
+  name: price-violations
+  type: http
+  seq: 33
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/catalogue/price-violations?medicine_id={{medicineId}}&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  medicine_id: {{medicineId}}
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.violations && body.data.violations[0]) {
+    bru.setEnvVar("violationId", body.data.violations[0].violation_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("price-violations envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.violations).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/catalogue/price-violations — admin_super, admin_compliance, admin_operations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue/price-violations?medicine_id={{medicineId}}
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "violations": [
+              {
+                "violation_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+                "medicine_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "medicine_name": "Amoxicillin 500mg Capsule",
+                "ceiling_price": 72.00,
+                "pharmacy_id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+                "pharmacy_name": "City Medicals",
+                "pharmacy_price": 80.00,
+                "overage_amount": 8.00,
+                "overage_pct": 11.1,
+                "zone": "Indiranagar Zone",
+                "detected_at": "2026-07-24T00:00:00Z",
+                "last_notified_at": null,
+                "status": "OPEN"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 3, "has_next": false }
+        }
+      '''
+    }
+  }
+}

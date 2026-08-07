@@ -1,0 +1,75 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/catalogue-mapping?page=1&limit=20&sort=name&order=asc
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+  sort: name
+  order: asc
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.mappings && body.data.mappings[0]) {
+    bru.setEnvVar("mappingId", body.data.mappings[0].mapping_id);
+    bru.setEnvVar("masterMedicineId", body.data.mappings[0].master_medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pharmacy_id).to.be.a("string");
+    expect(body.data.mappings).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/catalogue-mapping — pharmacy_owner / pharmacy_staff.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/catalogue-mapping
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "mappings": []
+          },
+          "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}

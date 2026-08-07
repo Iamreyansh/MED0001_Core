@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 20 |
+| Phase 1 | 46 | 25 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **20** |
+| **Total** | **129** | **25** |
 
 ---
 
@@ -69,11 +69,11 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-005 | [STORY-001](./EPIC-005-master-catalogue/STORY-001-medicine-master-crud.md) | Medicine Master CRUD | pending | — | — |
-| EPIC-005 | [STORY-002](./EPIC-005-master-catalogue/STORY-002-category-schedule-management.md) | Category & Schedule Management | pending | — | — |
-| EPIC-005 | [STORY-003](./EPIC-005-master-catalogue/STORY-003-medicine-search-discovery.md) | Medicine Search & Discovery | pending | — | — |
-| EPIC-005 | [STORY-004](./EPIC-005-master-catalogue/STORY-004-price-ceiling-management.md) | Price Ceiling Management | pending | — | — |
-| EPIC-005 | [STORY-005](./EPIC-005-master-catalogue/STORY-005-pharmacy-catalogue-mapping.md) | Pharmacy Catalogue Mapping | pending | — | — |
+| EPIC-005 | [STORY-001](./EPIC-005-master-catalogue/STORY-001-medicine-master-crud.md) | Medicine Master CRUD | done | 2026-08-08 | `domains/catalogue`; V023+V026 ban job; stocking_pharmacies from mappings; BanMappingHidePort wired; demand stub until EPIC-010; compliance create forbidden / schedule-only update |
+| EPIC-005 | [STORY-002](./EPIC-005-master-catalogue/STORY-002-category-schedule-management.md) | Category & Schedule Management | done | 2026-08-08 | `domains/catalogue`; V022 medicine_category + seed; Redis 5m; include_deleted+is_deleted; online_delivery_allowed on all schedules |
+| EPIC-005 | [STORY-003](./EPIC-005-master-catalogue/STORY-003-medicine-search-discovery.md) | Medicine Search & Discovery | done | 2026-08-08 | `domains/catalogue`; Redis AC+detail; show_oos + admin include_banned; CUSTOM SKU empty until EPIC-006; lat/lng zone geometry deferred EPIC-011/010 |
+| EPIC-005 | [STORY-004](./EPIC-005-master-catalogue/STORY-004-price-ceiling-management.md) | Price Ceiling Management | done | 2026-08-08 | `domains/catalogue`; V025 violations; outbox notify; nightly detector; PriceCeilingGuard for EPIC-010 |
+| EPIC-005 | [STORY-005](./EPIC-005-master-catalogue/STORY-005-pharmacy-catalogue-mapping.md) | Pharmacy Catalogue Mapping | done | 2026-08-08 | `domains/catalogue`; V024 mappings; BanMappingHidePort real; apps/api bridges CatalogueVisibilityPort+PharmacyCatalogueStatsPort; BULK_MAP on bulk_action_job |
 
 ### EPIC-010 (`EPIC-010-order-management`)
 

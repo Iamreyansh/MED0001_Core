@@ -43,6 +43,9 @@ management:
         enabled: true
 
 medmate:
+  catalogue:
+    jobs:
+      enabled: true
   pharmacy:
     jobs:
       enabled: true

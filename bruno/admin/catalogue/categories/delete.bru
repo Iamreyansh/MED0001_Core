@@ -1,0 +1,66 @@
+meta {
+  name: delete
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/catalogue/categories/{{categoryId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("categoryId")) {
+    throw new Error("categoryId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.deleted).to.equal(true);
+    expect(body.data.deleted_at).to.be.a("string");
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/catalogue/categories/:id — admin_super only; soft-delete when no active medicines.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "category_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "deleted": true,
+            "deleted_at": "2026-08-08T00:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 CATEGORY_HAS_ACTIVE_MEDICINES
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "CATEGORY_HAS_ACTIVE_MEDICINES", "message": "Category has active medicines; move or ban them first" } }
+      '''
+    }
+  }
+}

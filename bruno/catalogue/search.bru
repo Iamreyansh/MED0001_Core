@@ -1,0 +1,124 @@
+meta {
+  name: search
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/catalogue/search?q=augmentin&lat=12.93&lng=77.62&page=1&limit=20
+  body: none
+  auth: none
+}
+
+params:query {
+  q: augmentin
+  lat: 12.93
+  lng: 77.62
+  show_oos: false
+  include_banned: false
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  if (!baseUrl) {
+    bru.setEnvVar("baseUrl", "http://localhost:8080");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.results && body.data.results.length) {
+    bru.setEnvVar("medicineId", body.data.results[0].medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("search envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.query).to.be.a("string");
+    expect(body.data.results).to.be.an("array");
+    expect(body.meta.page).to.be.a("number");
+    expect(body.meta.has_next).to.be.a("boolean");
+  });
+}
+
+docs {
+  GET /api/v1/catalogue/search — public FTS+trigram search. Banned excluded unless admin JWT + include_banned=true. show_oos=true includes out-of-stock best_pharmacy candidates. best_pharmacy = cheapest online visible mapping (zone via zone_id/pincode; lat/lng accepted, geometry EPIC-009).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/catalogue/search?q=augmentin&lat=12.93&lng=77.62
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "query": "augmentin",
+            "results": [
+              {
+                "medicine_id": "11111111-1111-4111-8111-111111111111",
+                "name": "Augmentin 625 Tablet",
+                "salt_composition": "Amoxicillin (500mg) + Clavulanic Acid (125mg)",
+                "manufacturer": "GSK India",
+                "category": { "name": "Antibiotics", "slug": "antibiotics" },
+                "form": "TABLET",
+                "pack_size": 10,
+                "pack_unit": "TABLET",
+                "schedule": "H",
+                "is_rx_only": true,
+                "rx_required": true,
+                "available_online": true,
+                "typical_mrp": 218.50,
+                "relevance_score": 0.98,
+                "best_pharmacy": {
+                  "pharmacy_id": "aaaaaaaa-0009-0009-0009-000000000001",
+                  "pharmacy_name": "Sharma Medical Store",
+                  "price": 215.00,
+                  "in_stock": true,
+                  "distance_km": null,
+                  "estimated_delivery_minutes": null
+                }
+              }
+            ],
+            "total_results": 1,
+            "did_you_mean": null
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 QUERY_TOO_SHORT
+  request: {
+    url: {{baseUrl}}/api/v1/catalogue/search?q=a
+    method: get
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "QUERY_TOO_SHORT", "message": "q must be at least 2 characters" }
+        }
+      '''
+    }
+  }
+}

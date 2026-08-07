@@ -1,0 +1,95 @@
+meta {
+  name: search
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/catalogue/search?q=crocin&source=ALL&page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  q: crocin
+  source: ALL
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  if (!baseUrl) {
+    bru.setEnvVar("baseUrl", "http://localhost:8080");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pharmacy search envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pharmacy_id).to.be.a("string");
+    expect(body.data.results).to.be.an("array");
+    expect(body.meta.has_next).to.be.a("boolean");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/catalogue/search — MASTER + empty CUSTOM until EPIC-006. pharmacy_owner / pharmacy_staff.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/catalogue/search?q=crocin&source=ALL
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "query": "crocin",
+            "pharmacy_id": "aaaaaaaa-0009-0009-0009-000000000001",
+            "results": [
+              {
+                "source": "MASTER",
+                "medicine_id": "11111111-1111-4111-8111-111111111111",
+                "name": "Crocin 500mg Tablet",
+                "salt_composition": "Paracetamol (500mg)",
+                "manufacturer": "GSK India",
+                "form": "TABLET",
+                "pack_size": 20,
+                "schedule": "OTC",
+                "is_rx_only": false,
+                "master_mrp": 22.50,
+                "pharmacy_price": 21.00,
+                "stock_quantity": 150,
+                "mapping_id": "33333333-3333-4333-8333-333333333333",
+                "is_mapped": true,
+                "is_visible": true
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

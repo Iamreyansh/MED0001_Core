@@ -1,0 +1,102 @@
+meta {
+  name: create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/catalogue/categories
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Test Category",
+    "slug": "test-category",
+    "icon_url": "https://cdn.nammamedmate.com/categories/test-category.svg",
+    "is_visible": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin_super or admin_operations first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.category_id) {
+    bru.setEnvVar("categoryId", body.data.category_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.category_id).to.be.a("string");
+    expect(body.data.slug).to.equal("test-category");
+  });
+}
+
+docs {
+  POST /api/v1/admin/catalogue/categories — admin_super, admin_operations.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue/categories
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "name": "Diabetic Care Extra",
+        "slug": "diabetic-care-extra",
+        "icon_url": "https://cdn.nammamedmate.com/categories/diabetic-care-extra.svg",
+        "is_visible": true
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "category_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "name": "Diabetic Care Extra",
+            "slug": "diabetic-care-extra",
+            "icon_url": "https://cdn.nammamedmate.com/categories/diabetic-care-extra.svg",
+            "is_visible": true,
+            "display_order": 49,
+            "medicine_count": 0,
+            "created_at": "2026-08-08T00:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 DUPLICATE_SLUG
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "DUPLICATE_SLUG", "message": "Category slug already exists" } }
+      '''
+    }
+  }
+}

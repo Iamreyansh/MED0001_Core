@@ -1,0 +1,94 @@
+meta {
+  name: delete-price-ceiling
+  type: http
+  seq: 32
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/catalogue/{{medicineId}}/price-ceiling
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "Ceiling lifted after NPPA revision"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin_super first");
+  }
+  if (!bru.getEnvVar("medicineId")) {
+    throw new Error("medicineId missing — run create or set-price-ceiling first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delete ceiling envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.ceiling_removed).to.equal(true);
+    expect(body.data).to.have.property("violations_resolved");
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/catalogue/:id/price-ceiling — admin_super only. Resolves OPEN/NOTIFIED violations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue/{{medicineId}}/price-ceiling
+    method: delete
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "reason": "Ceiling lifted after NPPA revision"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "medicine_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "medicine_name": "Amoxicillin 500mg Capsule",
+            "ceiling_removed": true,
+            "violations_resolved": 3,
+            "removed_at": "2026-07-24T00:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 NO_CEILING_SET
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "NO_CEILING_SET", "message": "Medicine does not have an active price ceiling" } }
+      '''
+    }
+  }
+}

@@ -1,0 +1,69 @@
+meta {
+  name: pharmacy-mappings
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/catalogue/{{medicineId}}/pharmacy-mappings?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin first");
+  }
+  if (!bru.getEnvVar("medicineId")) {
+    throw new Error("medicineId missing — run create first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pharmacy-mappings envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.master_medicine_id).to.be.a("string");
+    expect(body.data.pharmacies).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/catalogue/:master_id/pharmacy-mappings — admin_super/ops/compliance.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "master_medicine_id": "11111111-2222-4333-8444-555555555555",
+            "medicine_name": "Augmentin 625 Tablet",
+            "master_mrp": 218.50,
+            "mrp_ceiling": null,
+            "total_pharmacies_stocking": 0,
+            "pharmacies": []
+          },
+          "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,95 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/catalogue/schedule-rules
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("schedule rules envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.schedules).to.be.an("array");
+    expect(body.data.schedules.length).to.equal(4);
+    const codes = body.data.schedules.map((s) => s.schedule);
+    expect(codes).to.include.members(["OTC", "H", "H1", "X"]);
+  });
+}
+
+docs {
+  GET /api/v1/admin/catalogue/schedule-rules — admin + pharmacy roles; read-only config.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "schedules": [
+              {
+                "schedule": "OTC",
+                "full_name": "Over-the-Counter",
+                "description": "Medicines that can be sold without a prescription.",
+                "prescription_required": false,
+                "special_register_required": false,
+                "examples": ["Paracetamol 500mg", "Antacid tablets", "Vitamin C supplements"],
+                "regulatory_reference": "Drugs and Cosmetics Act, Schedule K"
+              },
+              {
+                "schedule": "H",
+                "full_name": "Schedule H",
+                "description": "Prescription-only medicines including antibiotics, antihypertensives, and antidiabetics.",
+                "prescription_required": true,
+                "special_register_required": false,
+                "examples": ["Augmentin 625", "Metformin 500mg", "Amlodipine 5mg"],
+                "regulatory_reference": "Drugs and Cosmetics Act, Schedule H"
+              },
+              {
+                "schedule": "H1",
+                "full_name": "Schedule H1",
+                "description": "Third-generation cephalosporins, carbapenems, and sulphonamides requiring pharmacist register.",
+                "prescription_required": true,
+                "special_register_required": true,
+                "register_name": "Schedule H1 Dispensing Register",
+                "examples": ["Ceftriaxone 1g Injection", "Imipenem-Cilastatin", "Chloramphenicol"],
+                "regulatory_reference": "Drugs and Cosmetics (Amendment) Rules 2013, Schedule H1"
+              },
+              {
+                "schedule": "X",
+                "full_name": "Schedule X",
+                "description": "Narcotic and psychotropic substances under NDPS Act. Triplicate Rx, patient ID verification. NOT available for online delivery.",
+                "prescription_required": true,
+                "prescription_type": "TRIPLICATE",
+                "special_register_required": true,
+                "register_name": "Narcotic Drugs Register",
+                "patient_id_verification": true,
+                "online_delivery_allowed": false,
+                "examples": ["Morphine Sulphate", "Codeine Phosphate", "Alprazolam"],
+                "regulatory_reference": "NDPS Act 1985, Narcotic Drugs and Psychotropic Substances Rules 1985"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

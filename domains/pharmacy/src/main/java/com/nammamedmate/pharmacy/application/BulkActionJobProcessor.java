@@ -58,6 +58,10 @@ public class BulkActionJobProcessor {
     if (job == null || !"QUEUED".equals(job.status())) {
       return;
     }
+    // BULK_MAP is owned by domains/catalogue BulkMapJobProcessor
+    if ("BULK_MAP".equals(job.action())) {
+      return;
+    }
 
     Instant started = clock.instant();
     jobs.markRunning(jobId, started);

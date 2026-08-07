@@ -1,0 +1,72 @@
+meta {
+  name: reorder
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/catalogue/categories/reorder
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      { "id": "{{categoryId}}", "display_order": 1 }
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("categoryId")) {
+    throw new Error("categoryId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reorder envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.reordered_count).to.be.a("number");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/catalogue/categories/reorder — atomic; rolls back on INVALID_CATEGORY_ID.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "reordered_count": 3,
+            "updated_at": "2026-08-08T00:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_CATEGORY_ID
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "INVALID_CATEGORY_ID", "message": "One or more category IDs are invalid" } }
+      '''
+    }
+  }
+}
