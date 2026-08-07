@@ -1,0 +1,79 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/catalogue/categories
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  if (!baseUrl) {
+    bru.setEnvVar("baseUrl", "http://localhost:8080");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.categories && body.data.categories.length) {
+    bru.setEnvVar("categoryId", body.data.categories[0].category_id);
+    bru.setEnvVar("categorySlug", body.data.categories[0].slug);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("public categories envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.categories).to.be.an("array");
+    expect(body.meta.total).to.be.a("number");
+    expect(body.meta.cached_at).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/catalogue/categories — public, Redis-cached 5m. Returns visible non-deleted categories sorted by display_order. Admin JWT: include_hidden=true and/or include_deleted=true (adds is_deleted).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/catalogue/categories
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "categories": [
+              {
+                "category_id": "c0000001-0000-4000-8000-000000000001",
+                "name": "Antibiotics",
+                "slug": "antibiotics",
+                "icon_url": "https://cdn.nammamedmate.com/categories/antibiotics.svg",
+                "is_visible": true,
+                "display_order": 1,
+                "medicine_count": 0
+              }
+            ]
+          },
+          "meta": {
+            "total": 48,
+            "cached_at": "2026-08-08T00:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

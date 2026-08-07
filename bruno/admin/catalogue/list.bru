@@ -1,0 +1,112 @@
+meta {
+  name: list
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/catalogue?page=1&limit=20&sort=name&order=asc
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+  sort: name
+  order: asc
+  ~category_id: {{categoryId}}
+  ~schedule: H
+  ~gst_pct: 12
+  ~is_rx_only: true
+  ~is_banned: false
+  ~search: Augmentin
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.medicines && body.data.medicines.length) {
+    bru.setEnvVar("medicineId", body.data.medicines[0].medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.medicines).to.be.an("array");
+    expect(body.meta).to.include.keys("page", "limit", "total", "has_next");
+  });
+}
+
+docs {
+  GET /api/v1/admin/catalogue — admin_super, admin_operations, admin_compliance.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "medicines": [
+              {
+                "medicine_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "name": "Augmentin 625 Tablet",
+                "salt_composition": "Amoxicillin (500mg) + Clavulanic Acid (125mg)",
+                "manufacturer": "GSK India",
+                "category": { "category_id": "c0000001-0000-4000-8000-000000000001", "name": "Antibiotics" },
+                "form": "TABLET",
+                "pack_size": 10,
+                "pack_unit": "TABLET",
+                "schedule": "H",
+                "hsn_code": "30041090",
+                "gst_pct": 12,
+                "mrp": 218.50,
+                "is_rx_only": true,
+                "is_banned": false,
+                "monthly_demand": 0,
+                "mapped_pharmacy_count": 0,
+                "created_at": "2026-08-08T00:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_SCHEDULE
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "INVALID_SCHEDULE", "message": "schedule must be OTC, H, H1, or X" } }
+      '''
+    }
+  }
+}

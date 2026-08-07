@@ -1,0 +1,138 @@
+meta {
+  name: create
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/catalogue
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Augmentin 625 Tablet",
+    "salt_composition": "Amoxicillin (500mg) + Clavulanic Acid (125mg)",
+    "manufacturer": "GSK India",
+    "category_id": "{{categoryId}}",
+    "form": "TABLET",
+    "pack_size": 10,
+    "pack_unit": "TABLET",
+    "schedule": "H",
+    "hsn_code": "30041090",
+    "gst_pct": 12,
+    "mrp": 218.50,
+    "is_rx_only": false,
+    "description": "Combination antibiotic for bacterial infections.",
+    "substitutes": []
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin first");
+  }
+  if (!bru.getEnvVar("categoryId")) {
+    bru.setEnvVar("categoryId", "c0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.medicine_id) {
+    bru.setEnvVar("medicineId", body.data.medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.medicine_id).to.be.a("string");
+    expect(body.data.is_rx_only).to.equal(true);
+    expect(body.data.monthly_demand).to.equal(0);
+  });
+}
+
+docs {
+  POST /api/v1/admin/catalogue — H/H1/X force is_rx_only=true; monthly_demand ignored.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "name": "Augmentin 625 Tablet",
+        "salt_composition": "Amoxicillin (500mg) + Clavulanic Acid (125mg)",
+        "manufacturer": "GSK India",
+        "category_id": "c0000001-0000-4000-8000-000000000001",
+        "form": "TABLET",
+        "pack_size": 10,
+        "pack_unit": "TABLET",
+        "schedule": "H",
+        "hsn_code": "30041090",
+        "gst_pct": 12,
+        "mrp": 218.50,
+        "is_rx_only": false,
+        "description": "Combination antibiotic for bacterial infections.",
+        "substitutes": []
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "medicine_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "name": "Augmentin 625 Tablet",
+            "salt_composition": "Amoxicillin (500mg) + Clavulanic Acid (125mg)",
+            "manufacturer": "GSK India",
+            "category_id": "c0000001-0000-4000-8000-000000000001",
+            "form": "TABLET",
+            "pack_size": 10.00,
+            "pack_unit": "TABLET",
+            "schedule": "H",
+            "hsn_code": "30041090",
+            "gst_pct": 12,
+            "mrp": 218.50,
+            "is_rx_only": true,
+            "is_banned": false,
+            "monthly_demand": 0,
+            "mapped_pharmacy_count": 0,
+            "substitutes": [],
+            "created_by": "11111111-1111-4111-8111-111111111111",
+            "created_at": "2026-08-08T00:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 DUPLICATE_MEDICINE
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "DUPLICATE_MEDICINE", "message": "salt_composition + manufacturer + form + pack_size + pack_unit already exists" } }
+      '''
+    }
+  }
+}

@@ -256,6 +256,29 @@ class PharmacyActionsBranchCoverageTest {
     assertThatThrownBy(() -> pollLimited.getJobStatus(ops, jobId))
         .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("RATE_LIMIT_EXCEEDED"));
 
+    UUID bulkMapJob = Ids.newId();
+    jobs.byId.put(
+        bulkMapJob,
+        new JobRow(
+            bulkMapJob,
+            "BULK_MAP",
+            Map.of(),
+            List.of(PID),
+            "QUEUED",
+            1,
+            0,
+            0,
+            0,
+            0,
+            List.of(),
+            Map.of(),
+            ops.subject(),
+            null,
+            null,
+            NOW));
+    processor.processJob(bulkMapJob);
+    assertThat(jobs.byId.get(bulkMapJob).status()).isEqualTo("QUEUED");
+
     UUID badActionJob = Ids.newId();
     jobs.byId.put(
         badActionJob,

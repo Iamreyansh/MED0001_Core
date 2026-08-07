@@ -1,0 +1,72 @@
+meta {
+  name: patch
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/catalogue-mapping/{{mappingId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "pharmacy_price": 210.00,
+    "stock_quantity": 48,
+    "is_visible": false
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+  if (!bru.getEnvVar("mappingId")) {
+    throw new Error("mappingId missing — run create or list first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.mapping_id).to.be.a("string");
+    expect(body.data.updated_fields).to.be.an("array");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/catalogue-mapping/:mapping_id — owner or staff.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "mapping_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "updated_fields": ["pharmacy_price", "is_visible"],
+            "pharmacy_price": 210.00,
+            "stock_quantity": 48,
+            "is_visible": false,
+            "updated_at": "2026-07-24T00:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

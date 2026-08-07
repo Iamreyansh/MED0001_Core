@@ -1,0 +1,109 @@
+meta {
+  name: bulk-map
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/catalogue/bulk-map
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "master_medicine_id": "{{medicineId}}",
+    "pharmacy_ids": ["{{pharmacyId}}"],
+    "auto_price_from_mrp": true,
+    "initial_stock_quantity": 0
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin_super or admin_operations first");
+  }
+  if (!bru.getEnvVar("medicineId")) {
+    throw new Error("medicineId missing — run create first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    bru.setEnvVar("pharmacyId", "7c9e6679-7425-40de-944b-e07fc1f90ae7");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.job_id) {
+    bru.setEnvVar("bulkJobId", body.data.job_id);
+  }
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("bulk-map envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.job_id).to.be.a("string");
+    expect(body.data.status).to.equal("QUEUED");
+    expect(body.data.poll_url).to.include("/api/v1/admin/bulk-jobs/");
+  });
+}
+
+docs {
+  POST /api/v1/admin/catalogue/bulk-map — admin_super / admin_operations; max 200 pharmacies.
+}
+
+example {
+  name: 202 Accepted
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue/bulk-map
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "master_medicine_id": "11111111-2222-4333-8444-555555555555",
+        "pharmacy_ids": ["7c9e6679-7425-40de-944b-e07fc1f90ae7"],
+        "auto_price_from_mrp": true,
+        "initial_stock_quantity": 0
+      }
+    }
+  }
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+            "master_medicine_id": "11111111-2222-4333-8444-555555555555",
+            "medicine_name": "Augmentin 625 Tablet",
+            "total_pharmacies": 1,
+            "status": "QUEUED",
+            "estimated_completion_seconds": 5,
+            "poll_url": "/api/v1/admin/bulk-jobs/bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 TOO_MANY_PHARMACIES
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "TOO_MANY_PHARMACIES", "message": "Maximum 200 pharmacy IDs per bulk map" } }
+      '''
+    }
+  }
+}

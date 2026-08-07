@@ -1,0 +1,107 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/catalogue-mapping
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "master_medicine_id": "{{medicineId}}",
+    "pharmacy_price": 215.00,
+    "stock_quantity": 48
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("medicineId")) {
+    throw new Error("medicineId missing — create a master medicine first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.mapping_id) {
+    bru.setEnvVar("mappingId", body.data.mapping_id);
+    bru.setEnvVar("masterMedicineId", body.data.master_medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.mapping_id).to.be.a("string");
+    expect(body.data.is_visible).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/catalogue-mapping — pharmacy_owner only; price ≤ MRP / ceiling.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/catalogue-mapping
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "master_medicine_id": "11111111-2222-4333-8444-555555555555",
+        "pharmacy_price": 215.00,
+        "stock_quantity": 48
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "mapping_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "pharmacy_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "master_medicine_id": "11111111-2222-4333-8444-555555555555",
+            "medicine_name": "Augmentin 625 Tablet",
+            "pharmacy_price": 215.00,
+            "master_mrp": 218.50,
+            "mrp_ceiling": null,
+            "stock_quantity": 48,
+            "is_visible": true,
+            "created_at": "2026-07-24T00:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 PRICE_ABOVE_MRP
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "PRICE_ABOVE_MRP", "message": "pharmacy_price exceeds master MRP" } }
+      '''
+    }
+  }
+}

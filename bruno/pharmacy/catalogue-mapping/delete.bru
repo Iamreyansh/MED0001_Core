@@ -1,0 +1,61 @@
+meta {
+  name: delete
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/catalogue-mapping/{{mappingId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("mappingId")) {
+    throw new Error("mappingId missing — run create or list first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.deleted).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/catalogue-mapping/:mapping_id — pharmacy_owner only.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "mapping_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "deleted": true,
+            "medicine_name": "Augmentin 625 Tablet",
+            "message": "Medicine removed from your online store. Physical inventory is not affected."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

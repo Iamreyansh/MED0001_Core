@@ -1,0 +1,103 @@
+meta {
+  name: price-ceilings
+  type: http
+  seq: 30
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/catalogue/price-ceilings?has_violations=true&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  has_violations: true
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.price_ceilings && body.data.price_ceilings[0]) {
+    bru.setEnvVar("ceilingMedicineId", body.data.price_ceilings[0].medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("price-ceilings envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.price_ceilings).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/catalogue/price-ceilings — admin_super, admin_compliance, admin_operations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue/price-ceilings?has_violations=true
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "price_ceilings": [
+              {
+                "medicine_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "medicine_name": "Amoxicillin 500mg Capsule",
+                "category": "Antibiotics",
+                "schedule": "H",
+                "current_mrp": 85.00,
+                "ceiling_price": 72.00,
+                "pharmacies_above_ceiling": 3,
+                "effective_from": "2026-07-01",
+                "set_by": {
+                  "admin_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                  "name": "Kavya Reddy",
+                  "role": "admin_super"
+                },
+                "set_at": "2026-07-01T10:00:00Z",
+                "reason": "NLEM price ceiling per NPPA notification NPM/2026/01"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 14, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Caller not an admin role" } }
+      '''
+    }
+  }
+}

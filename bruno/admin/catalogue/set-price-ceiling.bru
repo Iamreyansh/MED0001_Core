@@ -1,0 +1,105 @@
+meta {
+  name: set-price-ceiling
+  type: http
+  seq: 31
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/catalogue/{{medicineId}}/price-ceiling
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "ceiling_price": 72.00,
+    "effective_from": "2026-07-01",
+    "reason": "NLEM price ceiling per NPPA notification NPM/2026/01"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin_super first");
+  }
+  if (!bru.getEnvVar("medicineId")) {
+    throw new Error("medicineId missing — run create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("ceilingMedicineId", body.data.medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("set ceiling envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.new_ceiling_price).to.equal(72);
+    expect(body.data).to.have.property("pharmacies_above_ceiling");
+  });
+}
+
+docs {
+  POST /api/v1/admin/catalogue/:id/price-ceiling — admin_super only. Overwrites existing ceiling.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue/{{medicineId}}/price-ceiling
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "ceiling_price": 72.00,
+        "effective_from": "2026-07-01",
+        "reason": "NLEM price ceiling per NPPA notification NPM/2026/01"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "medicine_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "medicine_name": "Amoxicillin 500mg Capsule",
+            "previous_ceiling": null,
+            "new_ceiling_price": 72.00,
+            "mrp": 85.00,
+            "effective_from": "2026-07-01",
+            "reason": "NLEM price ceiling per NPPA notification NPM/2026/01",
+            "pharmacies_above_ceiling": 3,
+            "set_at": "2026-07-24T00:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 CEILING_ABOVE_MRP
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "CEILING_ABOVE_MRP", "message": "ceiling_price must not exceed medicine MRP" } }
+      '''
+    }
+  }
+}

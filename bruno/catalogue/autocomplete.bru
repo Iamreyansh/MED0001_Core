@@ -1,0 +1,77 @@
+meta {
+  name: autocomplete
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/catalogue/search?q=aug&autocomplete=true
+  body: none
+  auth: none
+}
+
+params:query {
+  q: aug
+  autocomplete: true
+}
+
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  if (!baseUrl) {
+    bru.setEnvVar("baseUrl", "http://localhost:8080");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.suggestions && body.data.suggestions.length) {
+    bru.setEnvVar("medicineId", body.data.suggestions[0].medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("autocomplete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.suggestions).to.be.an("array");
+    expect(body.data.suggestions.length).to.be.at.most(10);
+    expect(body.meta.cached).to.be.a("boolean");
+  });
+}
+
+docs {
+  GET /api/v1/catalogue/search?autocomplete=true — top 10 prefix suggestions; Redis catalogue:ac:{q} TTL 10m.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/catalogue/search?q=aug&autocomplete=true
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "query": "aug",
+            "suggestions": [
+              {
+                "medicine_id": "11111111-1111-4111-8111-111111111111",
+                "name": "Augmentin 625 Tablet",
+                "manufacturer": "GSK India"
+              }
+            ]
+          },
+          "meta": { "cached": false }
+        }
+      '''
+    }
+  }
+}

@@ -20,6 +20,26 @@
       <Class name="com.nammamedmate.pharmacy.application.port.out.BulkActionJobStore$JobRow"/>
       <Class name="com.nammamedmate.pharmacy.application.AdminPharmacyActionsService$NoticeResult"/>
       <Class name="com.nammamedmate.pharmacy.application.AdminPharmacyActionsService$NotesListResult"/>
+      <Class name="com.nammamedmate.catalogue.application.MedicineService$UpdateCommand"/>
+      <Class name="com.nammamedmate.catalogue.application.MedicineService$CreateCommand"/>
+      <Class name="com.nammamedmate.catalogue.adapter.in.web.AdminMedicineController$CreateRequest"/>
+      <Class name="com.nammamedmate.catalogue.adapter.in.web.AdminMedicineController$UpdateRequest"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.MedicineStore$MedicineRow"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.MedicineStore$ListResult"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.AuditLogStore$AuditLogRecord"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.MedicineMappingStore$ListResult"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.MedicineMappingStore$AdminListResult"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.MedicineMappingStore$BulkJobRow"/>
+      <Class name="com.nammamedmate.catalogue.adapter.in.web.AdminCatalogueMappingController$BulkMapRequest"/>
+      <Class name="com.nammamedmate.catalogue.application.MappingService$PageResult"/>
+      <Class name="com.nammamedmate.catalogue.application.MedicineService$PageResult"/>
+      <Class name="com.nammamedmate.catalogue.application.MedicineSearchService$Envelope"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.MedicineSearchStore$SearchPage"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.MedicineSearchStore$PharmacyMasterPage"/>
+      <Class name="com.nammamedmate.catalogue.adapter.in.web.MedicineSearchController$CheckAvailabilityRequest"/>
+      <Class name="com.nammamedmate.catalogue.application.PriceCeilingService$PageResult"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.PriceCeilingStore$CeilingListResult"/>
+      <Class name="com.nammamedmate.catalogue.application.port.out.PriceCeilingViolationStore$ViolationListResult"/>
     </Or>
   </Match>
 </FindBugsFilter>

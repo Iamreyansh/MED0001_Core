@@ -1,0 +1,72 @@
+meta {
+  name: summary
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/catalogue/summary
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — login as admin first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.include.keys("total_skus", "category_count", "banned_count", "avg_mrp", "data_as_of");
+  });
+}
+
+docs {
+  GET /api/v1/admin/catalogue/summary — KPI rollup.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/catalogue/summary
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total_skus": 1,
+            "category_count": 1,
+            "rx_only_count": 1,
+            "otc_count": 0,
+            "banned_count": 0,
+            "schedule_h_count": 1,
+            "schedule_h1_count": 0,
+            "schedule_x_count": 0,
+            "avg_mrp": 218.50,
+            "total_pharmacy_mappings": 0,
+            "data_as_of": "2026-08-08T02:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

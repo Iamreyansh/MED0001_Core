@@ -36,6 +36,10 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.GET, "/api/v1/health")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/catalogue/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/catalogue/check-availability")
+                    .permitAll()
                     .requestMatchers(
                         "/api/v1/auth/customer/send-otp",
                         "/api/v1/auth/customer/verify-otp",
@@ -68,8 +72,25 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/profile/**")
                     .hasRole("PHARMACY_OWNER")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/catalogue/search")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pharmacy/catalogue-mapping")
+                    .hasRole("PHARMACY_OWNER")
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/pharmacy/catalogue-mapping/**")
+                    .hasRole("PHARMACY_OWNER")
+                    .requestMatchers("/api/v1/pharmacy/catalogue-mapping/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/customers/**")
                     .hasRole("CUSTOMER")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/catalogue/schedule-rules")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_COMPLIANCE",
+                        "PHARMACY_OWNER",
+                        "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/admin/catalogue/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_COMPLIANCE")
                     .requestMatchers("/api/v1/admin/roles", "/api/v1/admin/permissions")
                     .hasAnyRole(
                         "ADMIN_SUPER",

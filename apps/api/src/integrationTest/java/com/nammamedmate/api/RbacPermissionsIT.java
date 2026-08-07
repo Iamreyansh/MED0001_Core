@@ -59,6 +59,7 @@ class RbacPermissionsIT extends AbstractApiIT {
         OWNER_ID,
         STAFF_ID);
     jdbc.update("DELETE FROM pharmacy_staff WHERE id IN (?, ?)", OWNER_ID, STAFF_ID);
+    jdbc.update("DELETE FROM pharmacy_catalogue_mapping WHERE pharmacy_id = ?", PHARMACY_ID);
     jdbc.update("DELETE FROM pharmacies WHERE id = ?", PHARMACY_ID);
     jdbc.update("DELETE FROM admin_auth_events WHERE admin_id IN (?, ?)", OPS_ID, SUPPORT_ID);
     jdbc.update("DELETE FROM admin_staff WHERE id IN (?, ?)", OPS_ID, SUPPORT_ID);
