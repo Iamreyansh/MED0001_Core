@@ -1,0 +1,92 @@
+meta {
+  name: rider-location
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/rider-location
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.websocket_channel) bru.setEnvVar("riderLocationChannel", body.data.websocket_channel);
+    if (body.data.eta_minutes != null) bru.setEnvVar("etaMinutes", String(body.data.eta_minutes));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("rider-location envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("lat");
+    expect(body.data).to.have.property("eta_minutes");
+    expect(body.data).to.have.property("websocket_channel");
+  });
+}
+
+docs {
+  GET /api/v1/orders/:order_id/rider-location — customer live GPS + ETA (OUT_FOR_DELIVERY only).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/orders/a1b2c3d4-e5f6-7890-abcd-ef1234567890/rider-location
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "rider_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            "rider_name": "Ravi",
+            "lat": 12.9347,
+            "lng": 77.6251,
+            "heading": 138.0,
+            "speed_kmh": 21.0,
+            "last_updated_at": "2026-07-24T09:20:10Z",
+            "eta_minutes": 8,
+            "distance_remaining_km": 1.9,
+            "websocket_channel": "/api/v1/orders/a1b2c3d4-e5f6-7890-abcd-ef1234567890/rider-location/stream",
+            "is_stale": false
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 LOCATION_NOT_AVAILABLE
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "LOCATION_NOT_AVAILABLE", "message": "Order not in OUT_FOR_DELIVERY state" } }
+      '''
+    }
+  }
+}

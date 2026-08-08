@@ -1,0 +1,101 @@
+meta {
+  name: register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Ravi Kumar",
+    "phone": "{{riderPhone}}",
+    "email": "ravi.kumar@example.com",
+    "vehicle_type": "BIKE",
+    "vehicle_plate_number": "KA01AB1234"
+  }
+}
+
+script:pre-request {
+  const phone = bru.getEnvVar("riderPhone") || "+919999900010";
+  bru.setEnvVar("riderPhone", phone);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rider_id) {
+    bru.setEnvVar("riderId", body.data.rider_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("PENDING_KYC", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("PENDING_KYC");
+    expect(body.data.kyc_status).to.equal("NOT_SUBMITTED");
+  });
+}
+
+docs {
+  POST /api/v1/rider/register — public. Phone accepted as 10-digit or +91 E.164. Magic OTP range +919999900000–099 for login after register.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/rider/register
+    method: post
+    body:json: {
+      {
+        "name": "Ravi Kumar",
+        "phone": "+919999900010",
+        "vehicle_type": "BIKE",
+        "vehicle_plate_number": "KA01AB1234"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "name": "Ravi Kumar",
+            "phone": "+919999900010",
+            "status": "PENDING_KYC",
+            "kyc_status": "NOT_SUBMITTED",
+            "created_at": "2026-07-24T01:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 PHONE_ALREADY_REGISTERED
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "PHONE_ALREADY_REGISTERED", "message": "Phone number already registered" } }
+      '''
+    }
+  }
+}

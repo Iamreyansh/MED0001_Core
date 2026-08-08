@@ -7,7 +7,9 @@ import org.testcontainers.utility.DockerImageName;
 /** Shared Testcontainers entrypoints for story/integration tests. */
 public final class Containers {
 
-  public static final String POSTGRES_IMAGE = "postgres:16-alpine";
+  /** PostGIS-enabled Postgres (EPIC-011 STORY-004 geofences). */
+  public static final String POSTGRES_IMAGE = "postgis/postgis:16-3.4";
+
   public static final String REDIS_IMAGE = "redis:7-alpine";
   public static final String LOCALSTACK_IMAGE = "localstack/localstack:4.0";
 
@@ -19,7 +21,8 @@ public final class Containers {
 
   @SuppressWarnings("resource")
   public static PostgreSQLContainer<?> newPostgres() {
-    return new PostgreSQLContainer<>(DockerImageName.parse(POSTGRES_IMAGE))
+    return new PostgreSQLContainer<>(
+            DockerImageName.parse(POSTGRES_IMAGE).asCompatibleSubstituteFor("postgres"))
         .withDatabaseName("medmate")
         .withUsername("medmate")
         .withPassword("medmate");

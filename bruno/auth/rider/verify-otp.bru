@@ -1,0 +1,120 @@
+meta {
+  name: verify-otp
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/rider/verify-otp
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "session_id": "{{riderSessionId}}",
+    "phone": "{{riderPhone}}",
+    "otp": "123456"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("riderSessionId") && !bru.getEnvVar("sessionId")) {
+    throw new Error("riderSessionId missing — run auth/rider/send-otp first");
+  }
+  if (!bru.getEnvVar("riderSessionId")) {
+    bru.setEnvVar("riderSessionId", bru.getEnvVar("sessionId"));
+  }
+  if (!bru.getEnvVar("riderPhone")) {
+    bru.setEnvVar("riderPhone", "+919999900010");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.access_token) {
+      bru.setEnvVar("accessToken", body.data.access_token);
+      bru.setEnvVar("riderAccessToken", body.data.access_token);
+    }
+    if (body.data.refresh_token) {
+      bru.setEnvVar("refreshToken", body.data.refresh_token);
+    }
+    if (body.data.rider && body.data.rider.id) {
+      bru.setEnvVar("riderId", body.data.rider.id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("rider JWT", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.access_token).to.be.a("string").that.is.not.empty;
+    expect(body.data.rider).to.be.an("object");
+  });
+}
+
+docs {
+  POST /api/v1/auth/rider/verify-otp — issues user_type=rider JWT. BLOCKED riders → 401 UNAUTHORIZED.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/auth/rider/verify-otp
+    method: post
+    body:json: {
+      {
+        "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "phone": "+919999900010",
+        "otp": "123456"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "access_token": "<jwt>",
+            "refresh_token": "<opaque>",
+            "token_type": "Bearer",
+            "access_token_expires_in": 900,
+            "refresh_token_expires_in": 2592000,
+            "rider": {
+              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "phone": "+919999900010",
+              "name": "Ravi Kumar",
+              "status": "PENDING_KYC",
+              "kyc_status": "NOT_SUBMITTED"
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 BLOCKED
+  response: {
+    status: { code: 401 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "UNAUTHORIZED", "message": "Rider account is blocked" } }
+      '''
+    }
+  }
+}

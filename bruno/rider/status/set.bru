@@ -1,0 +1,95 @@
+meta {
+  name: set
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/status
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "status": "ONLINE",
+    "zone_id": "{{zoneId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.shift_id) bru.setEnvVar("shiftId", body.data.shift_id);
+    if (body.data.rider_id) bru.setEnvVar("riderId", body.data.rider_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("ONLINE envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("ONLINE");
+    expect(body.data.shift_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/rider/status — set ONLINE/OFFLINE (BR-001–006).
+}
+
+example {
+  name: 200 OK ONLINE
+  request: {
+    url: {{baseUrl}}/api/v1/rider/status
+    method: post
+    body:json: {
+      {
+        "status": "ONLINE",
+        "zone_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "status": "ONLINE",
+            "zone_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            "shift_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+            "shift_started_at": "2026-07-24T08:00:00Z",
+            "message": "You are now online and ready to receive orders."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 RIDER_NOT_ELIGIBLE
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "RIDER_NOT_ELIGIBLE", "message": "Rider status is not ACTIVE (KYC not approved or blocked)" } }
+      '''
+    }
+  }
+}

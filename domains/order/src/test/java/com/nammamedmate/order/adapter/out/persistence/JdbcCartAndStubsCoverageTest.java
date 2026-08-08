@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
+import com.nammamedmate.order.application.port.out.ZoneMembershipPort;
 import com.nammamedmate.order.domain.Cart;
 import com.nammamedmate.order.domain.CartItem;
 import com.nammamedmate.order.domain.CartStatus;
@@ -310,6 +311,25 @@ class JdbcCartAndStubsCoverageTest {
     StubZoneMembershipAdapter zone = new StubZoneMembershipAdapter();
     assertThat(zone.isInPharmacyZone(UUID.randomUUID(), 1, 2)).isTrue();
     assertThat(zone.isInPharmacyZone(null, 1, 2)).isFalse();
+    ZoneMembershipPort defaults = (pharmacyId, lat, lng) -> true;
+    assertThat(defaults.minOrderValuePaise(UUID.randomUUID(), 1, 2)).isEmpty();
+
+    StubDeliveryFeeAdapter fees = new StubDeliveryFeeAdapter();
+    assertThat(fees.quote(null, 12.9, 77.6, 1000, false)).isEmpty();
+    assertThat(fees.quote(UUID.randomUUID(), null, 77.6, 1000, false)).isEmpty();
+    assertThat(fees.quote(UUID.randomUUID(), 12.9, null, 1000, false)).isEmpty();
+    assertThat(fees.quote(UUID.randomUUID(), 12.9, 77.6, 0, false))
+        .hasValueSatisfying(
+            q -> {
+              assertThat(q.deliveryFeePaise()).isZero();
+              assertThat(q.handlingFeePaise()).isZero();
+            });
+    assertThat(fees.quote(UUID.randomUUID(), 12.9, 77.6, 10_000, true))
+        .hasValueSatisfying(q -> assertThat(q.deliveryFeePaise()).isZero());
+    assertThat(fees.quote(UUID.randomUUID(), 12.9, 77.6, 10_000, false))
+        .hasValueSatisfying(q -> assertThat(q.handlingFeePaise()).isPositive());
+    fees.lockSnapshot(
+        UUID.randomUUID(), fees.quote(UUID.randomUUID(), 12.9, 77.6, 10_000, false).orElseThrow());
   }
 
   private ResultSet mockCartRs() throws Exception {

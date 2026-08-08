@@ -1,0 +1,89 @@
+meta {
+  name: force-status
+  type: http
+  seq: 11
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/riders/{{riderId}}/status
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "status": "OFFLINE",
+    "reason": "Rider unresponsive on phone; removing from dispatch pool."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("riderId")) {
+    throw new Error("riderId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("force status", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("OFFLINE");
+    expect(body.data.reason).to.be.a("string");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/riders/:id/status — force-change with required reason (BR-007).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/riders/a1b2c3d4-e5f6-7890-abcd-ef1234567890/status
+    method: patch
+    body:json: {
+      {
+        "status": "OFFLINE",
+        "reason": "Rider unresponsive on phone; removing from dispatch pool."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "status": "OFFLINE",
+            "force_changed_by": "d4e5f6a7-b8c9-0123-def0-234567890123",
+            "force_changed_at": "2026-07-24T10:30:00Z",
+            "reason": "Rider unresponsive on phone; removing from dispatch pool."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 REASON_REQUIRED
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "REASON_REQUIRED", "message": "reason is missing for admin action" } }
+      '''
+    }
+  }
+}

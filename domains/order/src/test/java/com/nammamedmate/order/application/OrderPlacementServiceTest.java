@@ -14,6 +14,7 @@ import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter;
 import com.nammamedmate.order.application.port.out.CartStore;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
@@ -134,6 +135,7 @@ class OrderPlacementServiceTest {
             wallet,
             prescriptions,
             zones,
+            new StubDeliveryFeeAdapter(),
             new StubPriceCeilingAdapter(),
             razorpay,
             org.mockito.Mockito.mock(RefundService.class),
@@ -362,9 +364,20 @@ class OrderPlacementServiceTest {
     assertThatThrownBy(
             () -> service.placeOrder(customer, cart2.id(), "COD", null, null, "idem-zone"))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("ADDRESS_OUT_OF_ZONE");
+        .isEqualTo("ADDRESS_NOT_SERVICEABLE");
 
     when(zones.isInPharmacyZone(any(), anyDouble(), anyDouble())).thenReturn(true);
+    when(zones.minOrderValuePaise(any(), anyDouble(), anyDouble()))
+        .thenReturn(java.util.OptionalLong.of(999_999_999L));
+    Cart belowMin = readyCart(false);
+    carts.insert(belowMin);
+    assertThatThrownBy(
+            () -> service.placeOrder(customer, belowMin.id(), "COD", null, null, "idem-min"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_BELOW_MINIMUM");
+    when(zones.minOrderValuePaise(any(), anyDouble(), anyDouble()))
+        .thenReturn(java.util.OptionalLong.of(1L));
+
     Cart cart3 = readyCart(false);
     carts.insert(cart3);
     when(pharmacies.findById(PH1))

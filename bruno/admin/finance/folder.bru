@@ -1,0 +1,17 @@
+meta {
+  name: finance
+  seq: 45
+}
+
+auth {
+  mode: bearer
+  bearer {
+    token: {{accessToken}}
+  }
+}
+
+docs {
+  Admin finance COD reconciliation (EPIC-011/STORY-007).
+  Board/remind: admin_operations | admin_finance | admin_super.
+  Mark deposited: admin_finance | admin_super.
+}

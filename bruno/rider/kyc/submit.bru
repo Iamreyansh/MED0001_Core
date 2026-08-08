@@ -1,0 +1,76 @@
+meta {
+  name: submit
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/kyc/submit
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("SUBMITTED", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.kyc_status).to.equal("SUBMITTED");
+  });
+}
+
+docs {
+  POST /api/v1/rider/kyc/submit — requires DRIVING_LICENCE uploaded.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/rider/kyc/submit
+    method: post
+    body:json: { {} }
+  }
+  response: {
+    status: { code: 200 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "kyc_status": "SUBMITTED",
+            "submitted_at": "2026-07-24T01:10:00Z",
+            "documents_submitted": ["DRIVING_LICENCE"],
+            "review_expected_by": "2026-07-25T01:10:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 DRIVING_LICENCE_MISSING
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "DRIVING_LICENCE_MISSING", "message": "Mandatory driving licence not uploaded" } }
+      '''
+    }
+  }
+}

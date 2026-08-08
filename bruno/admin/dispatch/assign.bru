@@ -1,0 +1,106 @@
+meta {
+  name: assign
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/dispatch/orders/{{orderId}}/assign
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "rider_id": "{{riderId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing — run admin/dispatch/queue first");
+  }
+  if (!bru.getEnvVar("riderId")) {
+    throw new Error("riderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("assignmentId", body.data.assignment_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("assign envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.assignment_id).to.be.a("string");
+    expect(body.data.assignment_type).to.equal("MANUAL");
+  });
+}
+
+docs {
+  POST /api/v1/admin/dispatch/orders/:order_id/assign — manual rider assignment.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/dispatch/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/assign
+    method: post
+    body:json: {
+      {
+        "rider_id": "riderrrr-rrrr-4rrr-8rrr-rrrrrrrrrrrr"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "assignment_id": "assiiiii-iiii-4iii-8iii-iiiiiiiiiiii",
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "rider_id": "riderrrr-rrrr-4rrr-8rrr-rrrrrrrrrrrr",
+            "rider_name": "Ravi Kumar",
+            "assignment_type": "MANUAL",
+            "assigned_by": "adminnnn-nnnn-4nnn-8nnn-nnnnnnnnnnnn",
+            "assigned_at": "2026-07-24T09:07:00Z",
+            "accept_deadline": "2026-07-24T09:12:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 RIDER_AT_MAX_LOAD
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RIDER_AT_MAX_LOAD",
+            "message": "Rider already has 2 concurrent active orders"
+          }
+        }
+      '''
+    }
+  }
+}

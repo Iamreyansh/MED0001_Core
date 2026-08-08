@@ -1,0 +1,69 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/rider/cod
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("codInHand", String(body.data.in_hand));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("COD summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("in_hand");
+    expect(body.data).to.have.property("can_accept_cod_orders");
+    expect(body.data).to.have.property("risk_status");
+  });
+}
+
+docs {
+  GET /api/v1/rider/cod — rider COD balance, limits, recent trips.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "collected_today": 2850.00,
+            "deposited_today": 1000.00,
+            "in_hand": 1850.00,
+            "limit": 2000.00,
+            "limit_remaining": 150.00,
+            "risk_status": "SAFE",
+            "can_accept_cod_orders": true,
+            "next_deposit_reminder_at": "2026-07-24T14:30:00Z",
+            "recent_cod_trips": []
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

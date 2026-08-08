@@ -1,0 +1,100 @@
+meta {
+  name: deliver
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/orders/{{orderId}}/deliver
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "delivery_otp_from_customer": "{{deliveryOtp}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+  if (!bru.getEnvVar("deliveryOtp")) {
+    bru.setEnvVar("deliveryOtp", "3942");
+  }
+}
+
+tests {
+  test("HTTP status", function () {
+    expect([200, 422, 409]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.data.order_status).to.equal("DELIVERED");
+      expect(body.data).to.have.property("on_time");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/rider/orders/:order_id/deliver — customer delivery OTP; creates trip earnings stub.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/rider/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/deliver
+    method: post
+    body:json: {
+      {
+        "delivery_otp_from_customer": "3942"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_status": "DELIVERED",
+            "delivered_at": "2026-07-24T09:34:00Z",
+            "delivery_minutes": 14,
+            "on_time": true,
+            "base_pay_earned": 25.00,
+            "tip_earned": 0.00,
+            "total_earned_this_trip": 25.00
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_DELIVERY_OTP
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_DELIVERY_OTP",
+            "message": "OTP from customer does not match"
+          }
+        }
+      '''
+    }
+  }
+}

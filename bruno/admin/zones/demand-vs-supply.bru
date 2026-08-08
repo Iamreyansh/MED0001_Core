@@ -1,0 +1,71 @@
+meta {
+  name: demand-vs-supply
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/zones/demand-vs-supply?zone_id={{zoneId}}&from=2026-07-17&to=2026-07-24
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "a0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("chart envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("chart_data");
+  });
+}
+
+docs {
+  GET /api/v1/admin/zones/demand-vs-supply — hourly demand vs supply (7d).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/demand-vs-supply?zone_id=a0000001-0000-4000-8000-000000000001&from=2026-07-17&to=2026-07-24
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "zone_name": "Koramangala",
+            "chart_data": [
+              {
+                "hour": "2026-07-24T09:00:00Z",
+                "orders": 12,
+                "online_riders": 5,
+                "demand_supply_ratio": 2.4,
+                "strain": true
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

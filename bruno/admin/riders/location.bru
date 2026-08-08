@@ -1,0 +1,78 @@
+meta {
+  name: location
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/riders/{{riderId}}/location
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("riderId")) {
+    throw new Error("riderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.is_stale != null) bru.setEnvVar("riderLocationStale", String(body.data.is_stale));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin location envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("rider_id");
+    expect(body.data).to.have.property("is_stale");
+  });
+}
+
+docs {
+  GET /api/v1/admin/riders/:id/location — live GPS; is_stale when last update > 2 min.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/riders/a1b2c3d4-e5f6-7890-abcd-ef1234567890/location
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "name": "Ravi Kumar",
+            "status": "ON_TRIP",
+            "lat": 12.9347,
+            "lng": 77.6251,
+            "heading": 138.0,
+            "speed_kmh": 21.0,
+            "accuracy_m": 12.1,
+            "last_updated_at": "2026-07-24T09:20:10Z",
+            "is_stale": false,
+            "zone_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            "is_in_zone": true,
+            "active_order_id": "c3d4e5f6-a7b8-9012-cdef-123456789012"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

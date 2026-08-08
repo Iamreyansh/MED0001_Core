@@ -1,0 +1,82 @@
+meta {
+  name: current
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/rider/orders/current
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — rider OTP login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.order_id) {
+    bru.setEnvVar("orderId", body.data.order_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("current envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.order_id).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/rider/orders/current — rider active assignment details.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_number": "MED-20260724-001",
+            "assignment_id": "assiiiii-iiii-4iii-8iii-iiiiiiiiiiii",
+            "assignment_status": "ACCEPTED",
+            "pharmacy": {
+              "name": "Apollo Pharmacy, Koramangala",
+              "address": "100 Feet Road, Koramangala 5th Block, Bengaluru",
+              "lat": 12.9352,
+              "lng": 77.6245,
+              "pharmacy_contact": "9900112233"
+            },
+            "delivery": {
+              "customer_name": "Priya S",
+              "address": "12, 2nd Cross, HSR Layout, Sector 2",
+              "lat": 12.9141,
+              "lng": 77.6382,
+              "customer_contact": "9876501234"
+            },
+            "delivery_otp_hint": "Ask customer for 4-digit OTP",
+            "items_count": 3,
+            "payment_method": "UPI",
+            "is_cod": false,
+            "cod_amount": null,
+            "distance_km": 2.4,
+            "base_pay": 25.00
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

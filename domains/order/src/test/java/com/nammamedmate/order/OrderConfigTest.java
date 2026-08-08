@@ -10,6 +10,7 @@ import com.nammamedmate.order.adapter.out.persistence.JdbcInventoryAvailabilityA
 import com.nammamedmate.order.adapter.out.persistence.JdbcPharmacyCandidateStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcRxBroadcastStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcWalletBalanceAdapter;
+import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPrescriptionAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubZoneMembershipAdapter;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ class OrderConfigTest {
     assertThat(config.walletBalancePort(jdbc)).isInstanceOf(JdbcWalletBalanceAdapter.class);
     assertThat(config.prescriptionPort()).isInstanceOf(StubPrescriptionAdapter.class);
     assertThat(config.zoneMembershipPort()).isInstanceOf(StubZoneMembershipAdapter.class);
+    assertThat(config.deliveryFeePort()).isInstanceOf(StubDeliveryFeeAdapter.class);
     assertThat(config.rxBroadcastStore(jdbc, om)).isInstanceOf(JdbcRxBroadcastStore.class);
     assertThat(config.orderStore(jdbc, om))
         .isInstanceOf(com.nammamedmate.order.adapter.out.persistence.JdbcOrderStore.class);

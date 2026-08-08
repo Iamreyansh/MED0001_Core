@@ -1,0 +1,133 @@
+meta {
+  name: mark-deposited
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/cod/{{codRiderId}}/mark-deposited
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "amount": 2000.00,
+    "deposited_at": "2026-07-24T15:00:00Z",
+    "reference_number": "UPI-REF-20260724-001",
+    "notes": "Deposit received via UPI to platform account."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("codRiderId")) {
+    throw new Error("codRiderId missing — run admin/finance/cod/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("codDepositId", body.data.deposit_id);
+  }
+}
+
+tests {
+  test("HTTP 200 or story error", function () {
+    expect([200, 404, 409, 422]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("deposit_id");
+      expect(body.data).to.have.property("cod_in_hand_after");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/cod/:rider_id/mark-deposited — finance confirms deposit (EPIC-011/STORY-007).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/cod/a0000001-0000-4000-8000-0000000000r1/mark-deposited
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "amount": 2000.00,
+        "deposited_at": "2026-07-24T15:00:00Z",
+        "reference_number": "UPI-REF-20260724-001",
+        "notes": "Deposit received via UPI to platform account."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "deposit_id": "d0000001-0000-4000-8000-0000000000d1",
+            "amount_confirmed": 2000.00,
+            "cod_in_hand_after": 600.00,
+            "risk_status_after": "SAFE",
+            "confirmed_by": "a0000001-0000-4000-8000-0000000000a1",
+            "confirmed_at": "2026-07-24T15:05:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 AMOUNT_EXCEEDS_IN_HAND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/cod/a0000001-0000-4000-8000-0000000000r1/mark-deposited
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "amount": 99999.00,
+        "reference_number": "UPI-TOO-MUCH"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "AMOUNT_EXCEEDS_IN_HAND",
+            "message": "Deposit amount exceeds rider COD in hand"
+          }
+        }
+      '''
+    }
+  }
+}

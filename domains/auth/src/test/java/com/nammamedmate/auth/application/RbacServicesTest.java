@@ -182,6 +182,7 @@ class RbacServicesTest {
             "pharmacies:suspend",
             "riders:*",
             "logistics:*",
+            "finance:read",
             "catalogue:read",
             "customers:read");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_finance"))

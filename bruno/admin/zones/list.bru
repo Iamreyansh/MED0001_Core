@@ -1,33 +1,54 @@
 meta {
-  name: list-zones
+  name: list
   type: http
-  seq: 2
+  seq: 1
 }
 
 get {
-  url: {{baseUrl}}/api/v1/admin/zones?is_active=true
+  url: {{baseUrl}}/api/v1/admin/zones?city=Bengaluru&is_serviceable=true&page=1&limit=20
   body: none
   auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.zones && body.data.zones[0]) {
+    bru.setEnvVar("zoneId", body.data.zones[0].zone_id);
+  }
 }
 
 tests {
   test("HTTP 200", function () {
     expect(res.getStatus()).to.equal(200);
   });
-  test("zones envelope", function () {
+  test("zones envelope with summary chips", function () {
     const body = res.getBody();
     expect(body.success).to.equal(true);
+    expect(body.data.summary_chips).to.have.property("serviceable_zones");
     expect(body.data.zones).to.be.an("array");
-    expect(body.meta.total).to.be.a("number");
+    expect(body.meta).to.have.property("total");
   });
 }
 
 docs {
-  GET /api/v1/admin/zones — requires pharmacies:read.
+  GET /api/v1/admin/zones — delivery zone list + summary KPIs (EPIC-011/STORY-005).
 }
 
 example {
   name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones?city=Bengaluru&is_serviceable=true&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
   response: {
     status: { code: 200 text: OK }
     body: {
@@ -36,22 +57,32 @@ example {
         {
           "success": true,
           "data": {
+            "summary_chips": {
+              "serviceable_zones": 12,
+              "active_riders": 45,
+              "fleet_utilization_pct": 62.2,
+              "live_deliveries": 28,
+              "zones_under_strain": 2,
+              "avg_delivery_minutes": 19.4
+            },
             "zones": [
               {
                 "zone_id": "a0000001-0000-4000-8000-000000000001",
-                "zone_name": "Koramangala Zone",
+                "zone_name": "Koramangala",
                 "city": "Bengaluru",
-                "state": "Karnataka",
-                "is_active": true,
-                "pharmacy_count": 12,
-                "online_pharmacy_count": 9,
-                "coverage_area_sqkm": 8.4,
-                "has_low_pharmacy_warning": false,
-                "created_at": "2026-01-01T00:00:00Z"
+                "pharmacies_count": 8,
+                "riders_online": 5,
+                "live_orders": 9,
+                "base_fee": 25.0,
+                "sla_minutes": 30,
+                "surge_multiplier": 1.0,
+                "is_surge_active": false,
+                "is_serviceable": true,
+                "coverage_status": "UNDER_STRAIN"
               }
             ]
           },
-          "meta": { "total": 1 }
+          "meta": { "page": 1, "limit": 20, "total": 12, "has_next": false }
         }
       '''
     }

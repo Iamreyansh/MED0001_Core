@@ -1,0 +1,15 @@
+meta {
+  name: riders
+  seq: 35
+}
+
+auth {
+  mode: bearer
+  bearer {
+    token: {{adminAccessToken}}
+  }
+}
+
+docs {
+  Admin rider KYC queue. Requires admin_operations / admin_super + riders:read / riders:assign.
+}

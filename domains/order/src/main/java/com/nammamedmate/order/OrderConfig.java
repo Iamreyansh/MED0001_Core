@@ -20,6 +20,8 @@ import com.nammamedmate.order.adapter.out.persistence.JdbcReorderAttemptLogStore
 import com.nammamedmate.order.adapter.out.persistence.JdbcRxBroadcastStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcWalletBalanceAdapter;
 import com.nammamedmate.order.adapter.out.persistence.LocalExportObjectStore;
+import com.nammamedmate.order.adapter.out.persistence.StubCodCollectionAdapter;
+import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPrescriptionAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubRiderLookupAdapter;
@@ -28,7 +30,9 @@ import com.nammamedmate.order.adapter.out.persistence.StubZoneMembershipAdapter;
 import com.nammamedmate.order.application.port.out.AdminOrderExportStore;
 import com.nammamedmate.order.application.port.out.AdminOrderQueryPort;
 import com.nammamedmate.order.application.port.out.CartStore;
+import com.nammamedmate.order.application.port.out.CodCollectionPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
+import com.nammamedmate.order.application.port.out.DeliveryFeePort;
 import com.nammamedmate.order.application.port.out.DeliveryOtpCachePort;
 import com.nammamedmate.order.application.port.out.ExportObjectStore;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
@@ -102,6 +106,18 @@ public class OrderConfig {
   @ConditionalOnMissingBean(ZoneMembershipPort.class)
   ZoneMembershipPort zoneMembershipPort() {
     return new StubZoneMembershipAdapter();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(DeliveryFeePort.class)
+  DeliveryFeePort deliveryFeePort() {
+    return new StubDeliveryFeeAdapter();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(CodCollectionPort.class)
+  CodCollectionPort codCollectionPort() {
+    return new StubCodCollectionAdapter();
   }
 
   @Bean

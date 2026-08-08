@@ -1,0 +1,73 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/rider/performance
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("riderAcceptanceRate", String(body.data.acceptance_rate_pct));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("performance envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("acceptance_rate_pct");
+    expect(body.data).to.have.property("on_time_pct");
+    expect(body.data).to.have.property("badges");
+  });
+}
+
+docs {
+  GET /api/v1/rider/performance — acceptance, on-time, badges.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "trips_total": 1924,
+            "trips_today": 15,
+            "trips_this_week": 75,
+            "on_time_pct": 91.2,
+            "acceptance_rate_pct": 94.5,
+            "avg_rating": 4.72,
+            "avg_pickup_minutes": 6.4,
+            "avg_delivery_minutes": 17.8,
+            "cancel_rate_pct": 1.2,
+            "total_distance_km": 4821.3,
+            "badges": [
+              { "badge": "SPEED_STAR", "earned_at": "2026-07-01" }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

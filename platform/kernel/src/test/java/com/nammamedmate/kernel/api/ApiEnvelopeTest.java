@@ -53,5 +53,9 @@ class ApiEnvelopeTest {
   @Test
   void paginationHasNextFalse() {
     assertThat(PaginationMeta.of(2, 20, 20).hasNext()).isFalse();
+    assertThat(PaginationMeta.of(1, 20, 14).unassignedTotal()).isNull();
+    assertThat(PaginationMeta.of(1, 20, 14, 14).unassignedTotal()).isEqualTo(14L);
+    assertThat(PaginationMeta.of(1, 20, 25, 25).hasNext()).isTrue();
+    assertThat(PaginationMeta.of(2, 20, 20, 20).hasNext()).isFalse();
   }
 }

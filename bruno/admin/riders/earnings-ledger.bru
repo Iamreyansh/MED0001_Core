@@ -1,0 +1,82 @@
+meta {
+  name: earnings-ledger
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/riders/{{riderId}}/earnings-ledger?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken") && !bru.getEnvVar("adminAccessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("accessToken") && bru.getEnvVar("adminAccessToken")) {
+    bru.setEnvVar("accessToken", bru.getEnvVar("adminAccessToken"));
+  }
+  if (!bru.getEnvVar("riderId")) {
+    throw new Error("riderId missing — run admin/riders/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.ledger && body.data.ledger[0]) {
+    bru.setEnvVar("payoutId", body.data.ledger[0].payout_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("ledger envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("ledger");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/riders/:id/earnings-ledger — admin_finance payout ledger.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "rider_name": "Ravi Kumar",
+            "ledger": [
+              {
+                "payout_id": "c0000001-0000-4000-8000-0000000000p1",
+                "cycle_from": "2026-07-14",
+                "cycle_to": "2026-07-20",
+                "base_earnings": 1680.00,
+                "incentives": 150.00,
+                "tips": 70.00,
+                "streak_bonus": 100.00,
+                "cod_deducted": 500.00,
+                "net_payout": 1500.00,
+                "payout_status": "RELEASED",
+                "payout_reference": "RPX-20260721-001",
+                "released_at": "2026-07-21T06:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 12, "has_next": false }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,105 @@
+meta {
+  name: fee-estimate
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/delivery/fee-estimate?pharmacy_id={{pharmacyId}}&lat=12.9300&lng=77.6200&order_value=100
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    bru.setEnvVar("pharmacyId", "b0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.zone_id) {
+    bru.setEnvVar("zoneId", body.data.zone_id);
+  }
+}
+
+tests {
+  test("HTTP 200 or serviceability error", function () {
+    const status = res.getStatus();
+    expect([200, 404, 422]).to.include(status);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body).to.have.property("success");
+    if (body.success) {
+      expect(body.data).to.have.property("delivery_fee");
+      expect(body.data).to.have.property("handling_fee");
+    } else {
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/delivery/fee-estimate — public fee estimate, rate-limited 30/min/IP (EPIC-011/STORY-006).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/delivery/fee-estimate?pharmacy_id=b0000001-0000-4000-8000-000000000001&lat=12.9300&lng=77.6200&order_value=100
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "b0000001-0000-4000-8000-000000000001",
+            "pharmacy_name": "Apollo Pharmacy, Koramangala",
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "zone_name": "Koramangala",
+            "distance_km": 2.4,
+            "delivery_fee": 37.00,
+            "handling_fee": 5.00,
+            "is_free_delivery": false,
+            "free_delivery_from": 199.00,
+            "is_surge_active": false,
+            "surge_multiplier": 1.0,
+            "eta_minutes": 25,
+            "sla_minutes": 30,
+            "is_serviceable": true,
+            "estimated_at": "2026-07-24T12:05:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 ADDRESS_NOT_SERVICEABLE
+  request: {
+    url: {{baseUrl}}/api/v1/delivery/fee-estimate?pharmacy_id=b0000001-0000-4000-8000-000000000001&lat=1.0&lng=1.0
+    method: get
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ADDRESS_NOT_SERVICEABLE",
+            "message": "Delivery address is outside all active zone polygons"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -39,6 +39,7 @@ public final class AdminRoleDefinitions {
                   "pharmacies:suspend",
                   "riders:*",
                   "logistics:*",
+                  "finance:read",
                   "catalogue:read",
                   "customers:read")),
           new AdminRole(

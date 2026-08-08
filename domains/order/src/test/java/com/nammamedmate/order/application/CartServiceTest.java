@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
+import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.application.port.out.CartStore;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort.AddressRow;
@@ -90,6 +91,7 @@ class CartServiceTest {
             wallet,
             prescriptions,
             zones,
+            new StubDeliveryFeeAdapter(),
             rateLimiter,
             clock);
     when(wallet.balancePaise(CUST)).thenReturn(0L);
@@ -294,7 +296,7 @@ class CartServiceTest {
         .thenReturn(Optional.of(new AddressRow(ADDR, CUST, "Home", "x", 12.9, 77.6)));
     assertThatThrownBy(() -> service.setAddress(customer, ADDR))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("ADDRESS_OUT_OF_ZONE");
+        .isEqualTo("ADDRESS_NOT_SERVICEABLE");
 
     assertThatThrownBy(() -> service.switchPharmacy(customer, PH1, false))
         .extracting(ex -> ((AppException) ex).code())
@@ -391,6 +393,7 @@ class CartServiceTest {
             wallet,
             prescriptions,
             zones,
+            new StubDeliveryFeeAdapter(),
             new InMemoryRateLimiter(clock),
             clock);
     limited.getCart(customer);

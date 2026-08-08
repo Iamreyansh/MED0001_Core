@@ -1,0 +1,94 @@
+meta {
+  name: upload-document
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/kyc/documents
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  document_type: DRIVING_LICENCE
+  expiry_date:
+  document_number: KA-2010-0012345
+  file: @file(/path/to/licence.pdf)
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider/send-otp + verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.document_id) {
+    bru.setEnvVar("riderDocumentId", body.data.document_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("success envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.document_id).to.be.a("string").that.is.not.empty;
+    expect(body.data.verification_status).to.equal("PENDING");
+  });
+}
+
+docs {
+  POST /api/v1/rider/kyc/documents — multipart; JPEG/PNG/PDF ≤10MB. expiry_date required for VEHICLE_INSURANCE and PUC_CERTIFICATE.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/rider/kyc/documents
+    method: post
+    mode: multipartForm
+    headers: { Authorization: Bearer {{accessToken}} }
+    body:multipart-form: {
+      document_type: DRIVING_LICENCE
+      file: @file(/path/to/licence.pdf)
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "document_id": "d1b3e9a2-1234-4abc-8def-000000000001",
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "document_type": "DRIVING_LICENCE",
+            "file_url": "https://local.invalid/...",
+            "expiry_date": null,
+            "verification_status": "PENDING",
+            "uploaded_at": "2026-07-24T01:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 DOCUMENT_EXPIRED
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "DOCUMENT_EXPIRED", "message": "Provided expiry_date is in the past" } }
+      '''
+    }
+  }
+}

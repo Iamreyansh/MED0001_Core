@@ -1,0 +1,102 @@
+meta {
+  name: deposit-request
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/cod/deposit-request
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "amount": 2000.00,
+    "deposit_mode": "UPI",
+    "reference_number": "UPI-REF-20260724-001",
+    "notes": "Transferred to platform UPI ID."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("codDepositRequestId", body.data.deposit_request_id);
+  }
+}
+
+tests {
+  test("HTTP 200 or story error", function () {
+    expect([200, 409, 422]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.status).to.equal("PENDING_CONFIRMATION");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/rider/cod/deposit-request — claim deposit; admin must confirm (BR-004).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "deposit_request_id": "d0000001-0000-4000-8000-0000000000d1",
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "amount": 2000.00,
+            "deposit_mode": "UPI",
+            "reference_number": "UPI-REF-20260724-001",
+            "status": "PENDING_CONFIRMATION",
+            "submitted_at": "2026-07-24T15:00:00Z",
+            "message": "Your deposit request has been submitted. Admin will confirm within 2 hours."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 DUPLICATE_REFERENCE
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DUPLICATE_REFERENCE",
+            "message": "Reference number already submitted"
+          }
+        }
+      '''
+    }
+  }
+}

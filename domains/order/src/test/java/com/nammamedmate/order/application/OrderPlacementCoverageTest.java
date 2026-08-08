@@ -14,11 +14,13 @@ import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter;
 import com.nammamedmate.order.application.OrderPlacementServiceTest.InMemoryCartStore;
 import com.nammamedmate.order.application.OrderPlacementServiceTest.InMemoryOrderStore;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort.AddressRow;
+import com.nammamedmate.order.application.port.out.DeliveryFeePort;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.StockLine;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
@@ -123,6 +125,7 @@ class OrderPlacementCoverageTest {
             wallet,
             prescriptions,
             zones,
+            new StubDeliveryFeeAdapter(),
             new StubPriceCeilingAdapter(),
             razorpay,
             refundService,
@@ -163,6 +166,7 @@ class OrderPlacementCoverageTest {
             wallet,
             prescriptions,
             zones,
+            new StubDeliveryFeeAdapter(),
             new StubPriceCeilingAdapter(),
             new StubRazorpayPaymentPort("k", "w", true),
             org.mockito.Mockito.mock(RefundService.class),
@@ -298,6 +302,29 @@ class OrderPlacementCoverageTest {
     assertThatThrownBy(() -> service.collectCod(rider, oddCod.id(), 115.00))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
+
+    // CodCollectionPort null → stub fallback in @Autowired ctor
+    new OrderPlacementService(
+        cartService,
+        carts,
+        orders,
+        new OrderPlacementServiceTest.InMemoryOrderStatusEventStore(),
+        inventory,
+        pharmacies,
+        addresses,
+        walletBalance,
+        wallet,
+        prescriptions,
+        zones,
+        new StubDeliveryFeeAdapter(),
+        new StubPriceCeilingAdapter(),
+        razorpay,
+        org.mockito.Mockito.mock(RefundService.class),
+        null,
+        new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
+        new ObjectMapper(),
+        rateLimiter,
+        Clock.fixed(T0, ZoneOffset.UTC));
 
     // webhook null body + ignored not pending + missing payment id
     String emptySig =
@@ -604,6 +631,59 @@ class OrderPlacementCoverageTest {
     assertThat(OrderPlacementService.text(om.readTree("{\"event\":\"  \"}"), "event")).isNull();
     assertThat(OrderPlacementService.text(om.readTree("{\"event\":\"payment.captured\"}"), "event"))
         .isEqualTo("payment.captured");
+  }
+
+  @Test
+  void emptyDeliveryFeeQuoteFallsBackToCartPricing() {
+    DeliveryFeePort emptyFees =
+        new DeliveryFeePort() {
+          @Override
+          public Optional<FeeQuote> quote(
+              UUID pharmacyId,
+              Double deliveryLat,
+              Double deliveryLng,
+              long itemTotalPaise,
+              boolean freeDeliveryCoupon) {
+            return Optional.empty();
+          }
+
+          @Override
+          public void lockSnapshot(UUID orderId, FeeQuote quote) {}
+        };
+    OrderPlacementService fallback =
+        new OrderPlacementService(
+            cartService,
+            carts,
+            orders,
+            new OrderPlacementServiceTest.InMemoryOrderStatusEventStore(),
+            inventory,
+            pharmacies,
+            addresses,
+            walletBalance,
+            wallet,
+            prescriptions,
+            zones,
+            emptyFees,
+            new StubPriceCeilingAdapter(),
+            razorpay,
+            org.mockito.Mockito.mock(RefundService.class),
+            new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
+            new ObjectMapper(),
+            rateLimiter,
+            Clock.fixed(T0, ZoneOffset.UTC));
+    when(pharmacies.findById(PH1))
+        .thenReturn(
+            Optional.of(
+                new PharmacyRow(
+                    PH1, "Sai", "K", "a", null, null, 12.9, 77.6, true, false, "ACTIVE", 4.5, 1, 90,
+                    10.0)));
+    when(inventory.checkAvailability(eq(PH1), anyList()))
+        .thenReturn(List.of(new StockLine(MED, "M", 100, 8500, 9000, true, null)));
+    Cart c = cart();
+    carts.insert(c);
+    assertThat(
+            fallback.placeOrder(customer, c.id(), "COD", null, null, "fee-fallback").get("status"))
+        .isEqualTo("PENDING_ACCEPTANCE");
   }
 
   private Cart cart() {

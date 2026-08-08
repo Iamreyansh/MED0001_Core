@@ -1,0 +1,82 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/rider/trips?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.trips && body.data.trips[0]) {
+    bru.setEnvVar("lastTripOrderId", body.data.trips[0].order_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("trips envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.trips).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/rider/trips — paginated trip earnings history.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/rider/trips?page=1&limit=20&from=2026-07-01&to=2026-07-24
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "trips": [
+              {
+                "order_id": "b0000001-0000-4000-8000-0000000000o1",
+                "order_number": "MED-20260724-015",
+                "pickup_pharmacy": "Apollo Pharmacy, Koramangala",
+                "delivery_area": "HSR Layout, Sector 2",
+                "distance_km": 2.4,
+                "duration_minutes": 14,
+                "base_pay": 20.00,
+                "tip": 10.00,
+                "incentive_bonus": 0.00,
+                "total_earned": 30.00,
+                "on_time": true,
+                "customer_rating": 5,
+                "completed_at": "2026-07-24T13:48:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1924, "has_next": true }
+        }
+      '''
+    }
+  }
+}

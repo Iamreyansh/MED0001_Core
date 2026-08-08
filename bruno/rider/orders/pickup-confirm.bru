@@ -1,0 +1,100 @@
+meta {
+  name: pickup-confirm
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/orders/{{orderId}}/pickup-confirm
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "pickup_otp": "{{pickupOtp}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+  if (!bru.getEnvVar("pickupOtp")) {
+    bru.setEnvVar("pickupOtp", "7821");
+  }
+}
+
+tests {
+  test("HTTP status", function () {
+    expect([200, 422, 409]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.data.order_status).to.equal("OUT_FOR_DELIVERY");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/rider/orders/:order_id/pickup-confirm — pharmacy-screen pickup OTP.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/rider/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/pickup-confirm
+    method: post
+    body:json: {
+      {
+        "pickup_otp": "7821"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_status": "OUT_FOR_DELIVERY",
+            "pickup_confirmed_at": "2026-07-24T09:20:00Z",
+            "delivery_address": "12, 2nd Cross, HSR Layout, Sector 2",
+            "delivery_lat": 12.9141,
+            "delivery_lng": 77.6382,
+            "customer_name": "Priya S",
+            "customer_contact": "9876501234"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_PICKUP_OTP
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PICKUP_OTP",
+            "message": "OTP does not match",
+            "details": { "remaining_attempts": 4 }
+          }
+        }
+      '''
+    }
+  }
+}

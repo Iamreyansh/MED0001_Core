@@ -6,9 +6,13 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.order.adapter.out.persistence.StubCodCollectionAdapter;
 import com.nammamedmate.order.application.port.out.CartStore;
+import com.nammamedmate.order.application.port.out.CodCollectionPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort.AddressRow;
+import com.nammamedmate.order.application.port.out.DeliveryFeePort;
+import com.nammamedmate.order.application.port.out.DeliveryFeePort.FeeQuote;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.StockLine;
 import com.nammamedmate.order.application.port.out.OrderStatusEventStore;
@@ -50,7 +54,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,9 +78,11 @@ public class OrderPlacementService {
   private final WalletPort wallet;
   private final PrescriptionPort prescriptions;
   private final ZoneMembershipPort zones;
+  private final DeliveryFeePort deliveryFees;
   private final PriceCeilingPort priceCeiling;
   private final RazorpayPaymentPort razorpay;
   private final RefundService refunds;
+  private final CodCollectionPort codCollections;
   private final OutboxPublisher outbox;
   private final ObjectMapper objectMapper;
   private final RateLimiter rateLimiter;
@@ -92,9 +100,55 @@ public class OrderPlacementService {
       WalletPort wallet,
       PrescriptionPort prescriptions,
       ZoneMembershipPort zones,
+      DeliveryFeePort deliveryFees,
       PriceCeilingPort priceCeiling,
       RazorpayPaymentPort razorpay,
       RefundService refunds,
+      OutboxPublisher outbox,
+      ObjectMapper objectMapper,
+      RateLimiter rateLimiter,
+      Clock clock) {
+    this(
+        cartService,
+        carts,
+        orders,
+        statusEvents,
+        inventory,
+        pharmacies,
+        addresses,
+        walletBalance,
+        wallet,
+        prescriptions,
+        zones,
+        deliveryFees,
+        priceCeiling,
+        razorpay,
+        refunds,
+        new StubCodCollectionAdapter(),
+        outbox,
+        objectMapper,
+        rateLimiter,
+        clock);
+  }
+
+  @Autowired
+  public OrderPlacementService(
+      CartService cartService,
+      CartStore carts,
+      OrderStore orders,
+      OrderStatusEventStore statusEvents,
+      InventoryAvailabilityPort inventory,
+      PharmacyCandidatePort pharmacies,
+      CustomerAddressPort addresses,
+      WalletBalancePort walletBalance,
+      WalletPort wallet,
+      PrescriptionPort prescriptions,
+      ZoneMembershipPort zones,
+      DeliveryFeePort deliveryFees,
+      PriceCeilingPort priceCeiling,
+      RazorpayPaymentPort razorpay,
+      RefundService refunds,
+      CodCollectionPort codCollections,
       OutboxPublisher outbox,
       ObjectMapper objectMapper,
       RateLimiter rateLimiter,
@@ -110,9 +164,11 @@ public class OrderPlacementService {
     this.wallet = wallet;
     this.prescriptions = prescriptions;
     this.zones = zones;
+    this.deliveryFees = deliveryFees;
     this.priceCeiling = priceCeiling;
     this.razorpay = razorpay;
     this.refunds = refunds;
+    this.codCollections = codCollections == null ? new StubCodCollectionAdapter() : codCollections;
     this.outbox = outbox;
     this.objectMapper = objectMapper;
     this.rateLimiter = rateLimiter;
@@ -167,8 +223,17 @@ public class OrderPlacementService {
     }
     if (!zones.isInPharmacyZone(cart.pharmacyId(), address.lat(), address.lng())) {
       throw new AppException(
-          "ADDRESS_OUT_OF_ZONE", "Address outside pharmacy serviceable zone", 422);
+          "ADDRESS_NOT_SERVICEABLE", "Address outside pharmacy serviceable zone", 422);
     }
+    zones
+        .minOrderValuePaise(cart.pharmacyId(), address.lat(), address.lng())
+        .ifPresent(
+            minPaise -> {
+              if (cart.itemTotalPaise() < minPaise) {
+                throw new AppException(
+                    "ORDER_BELOW_MINIMUM", "Cart total below zone minimum order value", 422);
+              }
+            });
 
     PharmacyRow pharmacy =
         pharmacies
@@ -190,7 +255,22 @@ public class OrderPlacementService {
             .toList());
 
     long balance = walletBalance.balancePaise(cart.customerId());
-    Bill bill = CartPricing.compute(cart.itemTotalPaise(), cart.couponCode(), balance);
+    boolean freeDel = "FREEDEL".equals(CartPricing.normalize(cart.couponCode()));
+    Optional<FeeQuote> feeQuote =
+        deliveryFees.quote(
+            cart.pharmacyId(), address.lat(), address.lng(), cart.itemTotalPaise(), freeDel);
+    Bill bill =
+        feeQuote
+            .map(
+                q ->
+                    CartPricing.compute(
+                        cart.itemTotalPaise(),
+                        cart.couponCode(),
+                        balance,
+                        q.deliveryFeePaise(),
+                        q.handlingFeePaise()))
+            .orElseGet(
+                () -> CartPricing.compute(cart.itemTotalPaise(), cart.couponCode(), balance));
     long beforeWallet =
         bill.subtotalAfterDiscountPaise() + bill.deliveryFeePaise() + bill.handlingFeePaise();
 
@@ -266,6 +346,7 @@ public class OrderPlacementService {
     }
 
     orders.insert(order);
+    feeQuote.ifPresent(q -> deliveryFees.lockSnapshot(orderId, q));
     cart.setStatus(CartStatus.CHECKED_OUT);
     cart.touch(now);
     carts.update(cart);
@@ -370,6 +451,7 @@ public class OrderPlacementService {
     Instant now = clock.instant();
     order.markCodCollected(now);
     orders.update(order);
+    codCollections.recordCollection(order.riderId(), order.id(), collected, now);
     return codCollectView(order);
   }
 

@@ -1,0 +1,115 @@
+meta {
+  name: pricing-patch
+  type: http
+  seq: 12
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/zones/{{zoneId}}/pricing
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "base_fee": 30.00,
+    "per_km_fee": 6.00,
+    "sla_minutes": 25,
+    "min_order_value": 60.00,
+    "free_delivery_threshold": 249.00
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "a0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pricing patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.base_fee).to.equal(30);
+    expect(body.data).to.have.property("updated_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/zones/:id/pricing — update zone delivery pricing (EPIC-011/STORY-006).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/a0000001-0000-4000-8000-000000000001/pricing
+    method: patch
+    body:json: {
+      {
+        "base_fee": 30.00,
+        "per_km_fee": 6.00,
+        "sla_minutes": 25,
+        "min_order_value": 60.00,
+        "free_delivery_threshold": 249.00
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "zone_name": "Koramangala",
+            "base_fee": 30.00,
+            "per_km_fee": 6.00,
+            "sla_minutes": 25,
+            "min_order_value": 60.00,
+            "free_delivery_threshold": 249.00,
+            "updated_by": "22222222-2222-4222-8222-222222222222",
+            "updated_at": "2026-07-24T12:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_THRESHOLD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/a0000001-0000-4000-8000-000000000001/pricing
+    method: patch
+    body:json: {
+      {
+        "min_order_value": 100.00,
+        "free_delivery_threshold": 50.00
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INVALID_THRESHOLD", "message": "free_delivery_threshold < min_order_value" }
+        }
+      '''
+    }
+  }
+}

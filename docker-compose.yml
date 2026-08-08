@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # PostGIS required for EPIC-011 STORY-004 geofence ST_Within
+    image: postgis/postgis:16-3.4
     environment:
       POSTGRES_DB: medmate
       POSTGRES_USER: medmate
