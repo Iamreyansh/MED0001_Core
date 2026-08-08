@@ -1,0 +1,155 @@
+meta {
+  name: add-item
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/cart/items
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "medicine_id": "{{medicineId}}",
+    "quantity": 1,
+    "lat": 12.9345,
+    "lng": 77.6125
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("medicineId")) {
+    bru.setEnvVar("medicineId", "11111111-1111-4111-8111-111111111111");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data)) {
+    return;
+  }
+  if (body.data.cart_id) {
+    bru.setEnvVar("cartId", body.data.cart_id);
+  }
+  if (body.data.pharmacy && body.data.pharmacy.id) {
+    bru.setEnvVar("pharmacyId", body.data.pharmacy.id);
+  }
+  if (body.data.items && body.data.items[0] && body.data.items[0].item_id) {
+    bru.setEnvVar("cartItemId", body.data.items[0].item_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cart has pharmacy and items", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pharmacy).to.be.an("object");
+    expect(body.data.items).to.be.an("array");
+  });
+}
+
+docs {
+  POST /api/v1/cart/items — first add runs smart-select (lat/lng required unless address set).
+  Optional switch_pharmacy:true clears cart and re-selects on mismatch.
+}
+
+example {
+  name: 200 OK
+  description: First item locks pharmacy via smart-select.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/items
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "medicine_id": "11111111-1111-4111-8111-111111111111",
+        "quantity": 1,
+        "lat": 12.9345,
+        "lng": 77.6125
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cart_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "status": "ACTIVE",
+            "pharmacy": {
+              "id": "aaaaaaaa-0001-4000-8000-000000000001",
+              "name": "Sai Medicals",
+              "area": "Koramangala, Bengaluru",
+              "eta_minutes": 22,
+              "is_open": true,
+              "rating": 4.6
+            },
+            "items": [],
+            "bill": {
+              "item_total": 85.00,
+              "delivery_fee": 25.00,
+              "handling_fee": 5.00,
+              "total_payable": 115.00
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 PHARMACY_MISMATCH
+  description: Item not stocked at locked pharmacy without switch_pharmacy.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/items
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "medicine_id": "22222222-2222-4222-8222-222222222222",
+        "quantity": 1
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PHARMACY_MISMATCH",
+            "message": "Item is from a different pharmacy; set switch_pharmacy=true"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,89 @@
+meta {
+  name: products
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacies/{{pharmacyId}}/products?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing — run pharmacies/nearby first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && Array.isArray(body.data) && body.data.length > 0)) {
+    return;
+  }
+  if (body.data[0].product_id) {
+    bru.setEnvVar("medicineId", body.data[0].product_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("products envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacies/:id/products — visible stock, not banned; category/search/page/limit.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacies/aaaaaaaa-0001-4000-8000-000000000001/products?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "product_id": "11111111-1111-4111-8111-111111111111",
+              "name": "Metformin 500mg (Glycomet)",
+              "brand": "USV Ltd",
+              "category": "Diabetic Care",
+              "pack_size": "10 tablet",
+              "mrp": 28.50,
+              "selling_price": 25.65,
+              "discount_pct": 10,
+              "is_rx_required": true,
+              "quantity_available": 200,
+              "image_url": null
+            }
+          ],
+          "meta": { "page": 1, "limit": 20, "total": 1, "total_pages": 1 }
+        }
+      '''
+    }
+  }
+}

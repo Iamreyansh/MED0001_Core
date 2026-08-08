@@ -1,0 +1,90 @@
+meta {
+  name: detail
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing — run admin/orders/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.order_id) {
+    bru.setEnvVar("orderId", body.data.order_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("status_timeline");
+    expect(body.data).to.have.property("bill");
+    if (body.data.prescription_card) {
+      expect(body.data.prescription_card).to.not.have.property("file_url");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/admin/orders/:order_id — full admin detail; Rx file URL redacted.
+}
+
+example {
+  name: 200 OK
+  description: Detail with redacted Rx card
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_number": "ORD-20260808-00001",
+            "status": "OUT_FOR_DELIVERY",
+            "is_disputed": false,
+            "dispute_banner": null,
+            "bill": { "total_payable": 221.25, "commission_amount": 22.13, "commission_rate_pct": 10.0 },
+            "prescription_card": {
+              "id": "rxrxrxrx-rxrx-4rxr-8rxr-rxrxrxrxrxrx",
+              "type": "E_PRESCRIPTION",
+              "status": "VERIFIED",
+              "note": "Prescription content restricted. View via Compliance Audit (EPIC-008)."
+            }
+          }
+        }
+      '''
+    }
+  }
+}

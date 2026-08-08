@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 25 |
+| Phase 1 | 46 | 33 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **25** |
+| **Total** | **129** | **33** |
 
 ---
 
@@ -79,14 +79,14 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-010 | [STORY-001](./EPIC-010-order-management/STORY-001-cart-management.md) | Customer Cart Lifecycle | pending | — | — |
-| EPIC-010 | [STORY-002](./EPIC-010-order-management/STORY-002-smart-pharmacy-selection.md) | Smart Pharmacy Auto-Selection Engine | pending | — | — |
-| EPIC-010 | [STORY-003](./EPIC-010-order-management/STORY-003-rx-quote-broadcast.md) | Prescription Quote Broadcast to Pharmacies | pending | — | — |
-| EPIC-010 | [STORY-004](./EPIC-010-order-management/STORY-004-order-placement.md) | Order Placement and Payment | pending | — | — |
-| EPIC-010 | [STORY-005](./EPIC-010-order-management/STORY-005-order-status-lifecycle.md) | Order Status Lifecycle | pending | — | — |
-| EPIC-010 | [STORY-006](./EPIC-010-order-management/STORY-006-order-cancellation-refund.md) | Order Cancellation and Refund | pending | — | — |
-| EPIC-010 | [STORY-007](./EPIC-010-order-management/STORY-007-reorder.md) | Customer Reorder | pending | — | — |
-| EPIC-010 | [STORY-008](./EPIC-010-order-management/STORY-008-admin-order-management.md) | Admin Order Management and Oversight | pending | — | — |
+| EPIC-010 | [STORY-001](./EPIC-010-order-management/STORY-001-cart-management.md) | Customer Cart Lifecycle | done | 2026-08-08 | `domains/order`; CartPricing paise; smart-select on first add; 24h abandon; address/Rx/wallet stubs |
+| EPIC-010 | [STORY-002](./EPIC-010-order-management/STORY-002-smart-pharmacy-selection.md) | Smart Pharmacy Auto-Selection Engine | done | 2026-08-08 | `domains/order`; Haversine; multiplicative score; inventory stub until EPIC-006; lat/lng on pharmacies |
+| EPIC-010 | [STORY-003](./EPIC-010-order-management/STORY-003-rx-quote-broadcast.md) | Prescription Quote Broadcast to Pharmacies | done | 2026-08-08 | `domains/order`; 3km/10; select abandons prior cart; outbox notify; Rx stub |
+| EPIC-010 | [STORY-004](./EPIC-010-order-management/STORY-004-order-placement.md) | Order Placement and Payment | done | 2026-08-08 | `domains/order`; Razorpay stub; wallet bridge; Idempotency-Key; inventory/Rx stubs |
+| EPIC-010 | [STORY-005](./EPIC-010-order-management/STORY-005-order-status-lifecycle.md) | Order Status Lifecycle | done | 2026-08-08 | `domains/order`; state machine; OTP hash; 10m timeout cancel; 30m rider alert-only; SLA |
+| EPIC-010 | [STORY-006](./EPIC-010-order-management/STORY-006-order-cancellation-refund.md) | Order Cancellation and Refund | done | 2026-08-08 | `domains/order`; refund routing; Razorpay refund stub+webhook; no-rider auto-cancel deferred EPIC-019; wallet credit bridge |
+| EPIC-010 | [STORY-007](./EPIC-010-order-management/STORY-007-reorder.md) | Customer Reorder | done | 2026-08-08 | `domains/order`; no Rx/coupon reattach; abandon prior cart; smart-select fallback |
+| EPIC-010 | [STORY-008](./EPIC-010-order-management/STORY-008-admin-order-management.md) | Admin Order Management and Oversight | done | 2026-08-08 | `domains/order`; live-feed Redis 10s; async CSV export; Rx redaction; commission display-only |
 
 ### EPIC-011 (`EPIC-011-rider-delivery`)
 

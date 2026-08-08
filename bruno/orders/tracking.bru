@@ -1,0 +1,95 @@
+meta {
+  name: tracking
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/tracking
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("orderStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("tracking envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("steps");
+    expect(body.data).to.have.property("last_updated_at");
+    expect(body.data.steps).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/orders/:order_id/tracking — customer poll (~10s); includes sla_risk.
+}
+
+example {
+  name: 200 OK
+  description: Out for delivery tracking
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/tracking
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_number": "ORD-20260808-00001",
+            "status": "OUT_FOR_DELIVERY",
+            "current_step": "Rider on the way",
+            "steps": [
+              { "name": "Order Confirmed", "completed": true, "timestamp": "2026-08-08T06:00:00Z" },
+              { "name": "Accepted by Pharmacy", "completed": true, "timestamp": "2026-08-08T06:05:00Z" },
+              { "name": "Being Packed", "completed": true, "timestamp": "2026-08-08T06:07:00Z" },
+              { "name": "Ready for Pickup", "completed": true, "timestamp": "2026-08-08T06:12:00Z" },
+              { "name": "Out for Delivery", "completed": true, "timestamp": "2026-08-08T06:15:00Z" },
+              { "name": "Delivered", "completed": false, "timestamp": null }
+            ],
+            "rider": {
+              "name": "Rider dddddddd",
+              "avatar": null,
+              "vehicle_plate": "KA01XXDDDD",
+              "phone": "+91-9000000000"
+            },
+            "eta_minutes": 7,
+            "sla_remaining_minutes": 8,
+            "sla_risk": false,
+            "last_updated_at": "2026-08-08T06:15:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

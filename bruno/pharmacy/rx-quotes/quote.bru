@@ -1,0 +1,97 @@
+meta {
+  name: quote
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/rx-quotes/{{broadcastId}}/quote
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "medicines_available": [
+      { "name": "Metformin 500mg", "qty": 60, "price": 255.00 },
+      { "name": "Glipizide 5mg", "qty": 30, "price": 85.50 }
+    ],
+    "delivery_eta_minutes": 22
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("broadcastId")) {
+    bru.setEnvVar("broadcastId", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.quote_expires_at) {
+    bru.setEnvVar("quoteExpiresAt", body.data.quote_expires_at);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("quoted", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("QUOTED");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/rx-quotes/:broadcast_id/quote — submit quote (15m window).
+}
+
+example {
+  name: 200 OK
+  description: Quote submitted
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rx-quotes/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/quote
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "medicines_available": [
+          { "name": "Metformin 500mg", "qty": 60, "price": 255.00 }
+        ],
+        "delivery_eta_minutes": 22
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "broadcast_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "QUOTED",
+            "quote_expires_at": "2026-07-24T11:28:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

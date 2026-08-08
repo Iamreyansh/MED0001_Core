@@ -40,6 +40,10 @@
       <Class name="com.nammamedmate.catalogue.application.PriceCeilingService$PageResult"/>
       <Class name="com.nammamedmate.catalogue.application.port.out.PriceCeilingStore$CeilingListResult"/>
       <Class name="com.nammamedmate.catalogue.application.port.out.PriceCeilingViolationStore$ViolationListResult"/>
+      <Class name="com.nammamedmate.order.application.port.out.AdminOrderQueryPort$AdminOrderListRow"/>
+      <Class name="com.nammamedmate.order.application.AdminOrderService$ListResult"/>
+      <Class name="com.nammamedmate.order.application.ReorderService$HistoryResult"/>
+      <Class name="com.nammamedmate.order.application.port.out.ReorderAttemptLogStore$ReorderAttemptLog"/>
     </Or>
   </Match>
 </FindBugsFilter>

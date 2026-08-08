@@ -1,0 +1,92 @@
+meta {
+  name: assign-rider
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/orders/{{orderId}}/assign-rider
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "rider_id": "{{riderId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+  if (!bru.getEnvVar("riderId")) {
+    bru.setEnvVar("riderId", "dddddddd-0001-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rider_id) {
+    bru.setEnvVar("riderId", body.data.rider_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("rider assigned", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("rider_id");
+    expect(body.data).to.have.property("assigned_at");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/orders/:order_id/assign-rider — pharmacy dispatch mode.
+}
+
+example {
+  name: 200 OK
+  description: Rider assigned
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/assign-rider
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "rider_id": "dddddddd-0001-4000-8000-000000000001"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "rider_id": "dddddddd-0001-4000-8000-000000000001",
+            "rider_name": "Rider dddddddd",
+            "rider_phone": "+91-9000000000",
+            "rider_vehicle_plate": "KA01XXDDDD",
+            "assigned_at": "2026-08-08T06:12:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

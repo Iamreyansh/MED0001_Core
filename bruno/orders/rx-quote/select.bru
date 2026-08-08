@@ -1,0 +1,143 @@
+meta {
+  name: select
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/orders/rx-quote/{{broadcastId}}/select
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pharmacy_id": "{{quotedPharmacyId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("broadcastId")) {
+    bru.setEnvVar("broadcastId", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  }
+  if (!bru.getEnvVar("quotedPharmacyId")) {
+    bru.setEnvVar("quotedPharmacyId", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.cart_id) {
+    bru.setEnvVar("cartId", body.data.cart_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("selected creates cart", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("SELECTED");
+    expect(body.data.cart_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/orders/rx-quote/:broadcast_id/select — abandon prior ACTIVE cart, create quoted cart.
+}
+
+example {
+  name: 200 OK
+  description: Quote selected
+  request: {
+    url: {{baseUrl}}/api/v1/orders/rx-quote/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/select
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "pharmacy_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "broadcast_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "SELECTED",
+            "cart_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "cart": {
+              "pharmacy": {
+                "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "name": "Sai Medicals"
+              },
+              "items": [
+                { "name": "Metformin 500mg", "quantity": 60, "price": 255.00 }
+              ],
+              "prescription_id": "33333333-3333-4333-8333-333333333333",
+              "bill": {
+                "item_total": 255.00,
+                "delivery_fee": 25.00,
+                "handling_fee": 5.00,
+                "total_payable": 285.00
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 QUOTE_EXPIRED
+  description: Quote TTL elapsed
+  request: {
+    url: {{baseUrl}}/api/v1/orders/rx-quote/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/select
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "pharmacy_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "QUOTE_EXPIRED",
+            "message": "The pharmacy's quote has expired"
+          }
+        }
+      '''
+    }
+  }
+}

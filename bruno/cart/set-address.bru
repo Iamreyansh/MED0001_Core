@@ -1,0 +1,123 @@
+meta {
+  name: set-address
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/cart/address
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "address_id": "{{addressId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("addressId")) {
+    bru.setEnvVar("addressId", "dddddddd-dddd-4ddd-8ddd-dddddddddddd");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("address set", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.delivery_address).to.be.an("object");
+  });
+}
+
+docs {
+  POST /api/v1/cart/address — errors: ADDRESS_NOT_FOUND, ADDRESS_OUT_OF_ZONE.
+}
+
+example {
+  name: 200 OK
+  description: Delivery address set.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/address
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "address_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "delivery_address": {
+              "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+              "label": "Home",
+              "full_address": "42, 5th Cross, Koramangala 4th Block, Bengaluru 560034",
+              "lat": 12.9345,
+              "lng": 77.6125
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ADDRESS_NOT_FOUND
+  description: Address missing from book.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/address
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "address_id": "00000000-0000-4000-8000-000000000099"
+      }
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ADDRESS_NOT_FOUND",
+            "message": "Address not found"
+          }
+        }
+      '''
+    }
+  }
+}

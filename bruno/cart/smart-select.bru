@@ -1,0 +1,145 @@
+meta {
+  name: smart-select
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/cart/smart-select
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "medicine_id": "{{medicineId}}",
+    "lat": 12.9345,
+    "lng": 77.6125
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("medicineId")) {
+    bru.setEnvVar("medicineId", "11111111-1111-4111-8111-111111111111");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data && body.data.selected_pharmacy)) {
+    return;
+  }
+  if (body.data.selected_pharmacy.id) {
+    bru.setEnvVar("pharmacyId", body.data.selected_pharmacy.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("smart-select envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("object");
+    expect(body.data).to.have.property("available");
+    expect(body.data).to.have.property("alternatives");
+  });
+}
+
+docs {
+  POST /api/v1/cart/smart-select — customer JWT; 5km radius; ranked by distance/fill/rating/ETA.
+}
+
+example {
+  name: 200 OK available
+  description: Best pharmacy selected with alternatives.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/smart-select
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "medicine_id": "11111111-1111-4111-8111-111111111111",
+        "lat": 12.9345,
+        "lng": 77.6125
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "available": true,
+            "selected_pharmacy": {
+              "id": "aaaaaaaa-0001-4000-8000-000000000001",
+              "name": "Sai Medicals",
+              "area": "Koramangala, Bengaluru",
+              "distance_km": 1.2,
+              "delivery_eta_minutes": 18,
+              "is_open": true,
+              "rating": 4.6,
+              "score": 0.874
+            },
+            "alternatives": []
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 OK unavailable
+  description: No eligible pharmacy within 5km.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/smart-select
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "medicine_id": "11111111-1111-4111-8111-111111111111",
+        "lat": 12.9345,
+        "lng": 77.6125
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "available": false,
+            "message": "Currently unavailable near you",
+            "selected_pharmacy": null,
+            "alternatives": []
+          }
+        }
+      '''
+    }
+  }
+}

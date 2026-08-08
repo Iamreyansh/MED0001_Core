@@ -1,2 +1,2 @@
-/** Domain module shell for order. Business logic lands via epic stories. */
+/** Domain module for order / cart / pharmacy discovery (EPIC-010). */
 package com.nammamedmate.order;

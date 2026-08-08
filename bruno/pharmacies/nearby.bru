@@ -1,0 +1,87 @@
+meta {
+  name: nearby
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacies/nearby?lat=12.9345&lng=77.6125&radius_km=3&limit=10
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && Array.isArray(body.data) && body.data.length > 0)) {
+    return;
+  }
+  if (body.data[0].id) {
+    bru.setEnvVar("pharmacyId", body.data[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("nearby envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+    expect(body.meta).to.have.property("radius_km");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacies/nearby — customer; radius default 3 max 10; limit default 10 max 30.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacies/nearby?lat=12.9345&lng=77.6125&radius_km=3&limit=10
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "aaaaaaaa-0001-4000-8000-000000000001",
+              "name": "Sai Medicals",
+              "area": "Koramangala, Bengaluru",
+              "distance_km": 1.2,
+              "delivery_eta_minutes": 18,
+              "is_open": true,
+              "rating": 4.6,
+              "review_count": 312,
+              "current_offer": "Free delivery on orders above ₹199",
+              "logo_url": "https://cdn.nammamedmate.com/pharmacies/sai-medicals.png",
+              "categories_available": ["Prescription", "OTC"],
+              "items_count": 1240
+            }
+          ],
+          "meta": { "total": 1, "radius_km": 3 }
+        }
+      '''
+    }
+  }
+}

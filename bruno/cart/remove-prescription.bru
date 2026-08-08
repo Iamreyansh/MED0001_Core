@@ -1,0 +1,66 @@
+meta {
+  name: remove-prescription
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/cart/prescription
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("prescription cleared", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.prescription_id == null).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/cart/prescription — detach prescription from cart.
+}
+
+example {
+  name: 200 OK
+  description: Prescription removed.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/prescription
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "prescription_id": null,
+            "prescription_status": null
+          }
+        }
+      '''
+    }
+  }
+}

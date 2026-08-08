@@ -1,0 +1,118 @@
+meta {
+  name: apply-coupon
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/cart/coupon
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "coupon_code": "NAMMA25"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("coupon applied", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.coupon_code).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/cart/coupon — NAMMA25 / FLAT50 / FREEDEL.
+  Errors: INVALID_COUPON, COUPON_MIN_NOT_MET, COUPON_ALREADY_APPLIED.
+}
+
+example {
+  name: 200 OK
+  description: FLAT50 applied.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/coupon
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "coupon_code": "FLAT50"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "coupon_code": "FLAT50",
+            "discount_type": "FLAT",
+            "discount_amount": 50.00,
+            "message": "Rs 50 discount applied"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 COUPON_MIN_NOT_MET
+  description: FLAT50 below Rs 399 item_total.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/coupon
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "coupon_code": "FLAT50"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "COUPON_MIN_NOT_MET",
+            "message": "FLAT50 requires minimum cart of Rs 399"
+          }
+        }
+      '''
+    }
+  }
+}

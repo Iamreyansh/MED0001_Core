@@ -1,0 +1,135 @@
+meta {
+  name: cancel
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}/cancel
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "reason": "PHARMACY_REJECTED_AFTER_PACKING",
+    "refund_amount": 221.25,
+    "refund_to": "SOURCE"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.refund && body.data.refund.refund_id) {
+    bru.setEnvVar("refundId", body.data.refund.refund_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin cancel envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("CANCELLED");
+    expect(body.data).to.have.property("refund");
+  });
+}
+
+docs {
+  POST /api/v1/admin/orders/:order_id/cancel — admin_super|operations only (not finance).
+}
+
+example {
+  name: 200 OK
+  description: Admin cancel with SOURCE refund
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/cancel
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "reason": "PHARMACY_REJECTED_AFTER_PACKING",
+        "refund_amount": 221.25,
+        "refund_to": "SOURCE"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "status": "CANCELLED",
+            "cancelled_by": "bbbbbbbb-cccc-4ddd-8eee-eeeeeeee0105",
+            "cancelled_at": "2026-08-08T06:00:00Z",
+            "refund": {
+              "refund_id": "refddddd-dddd-4ddd-8ddd-dddddddddddd",
+              "amount": 221.25,
+              "refund_to": "SOURCE",
+              "status": "INITIATED",
+              "initiated": true
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ORDER_DELIVERED
+  description: Cannot cancel delivered order
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/cancel
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "reason": "too late",
+        "refund_amount": 50,
+        "refund_to": "WALLET"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ORDER_DELIVERED",
+            "message": "Cannot cancel a delivered order"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,69 @@
+meta {
+  name: delete-item
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/cart/items/{{cartItemId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("cartItemId")) {
+    bru.setEnvVar("cartItemId", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("success envelope", function () {
+    expect(res.getBody().success).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/cart/items/:item_id — remove one line; clears pharmacy/coupon/rx if cart empty.
+}
+
+example {
+  name: 200 OK
+  description: Item removed.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cart_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "status": "ACTIVE",
+            "pharmacy": null,
+            "items": []
+          }
+        }
+      '''
+    }
+  }
+}

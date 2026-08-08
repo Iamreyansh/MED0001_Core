@@ -173,7 +173,8 @@ class AwsSecretsEnvironmentPostProcessorTest {
     when(client.getSecretValue(any(GetSecretValueRequest.class)))
         .thenReturn(
             GetSecretValueResponse.builder()
-                .secretString("{\"key_id\":\"rzp_test\",\"key_secret\":\"sec\"}")
+                .secretString(
+                    "{\"key_id\":\"rzp_test\",\"key_secret\":\"sec\",\"webhook_secret\":\"whsec\"}")
                 .build());
 
     StandardEnvironment env = new StandardEnvironment();
@@ -187,6 +188,7 @@ class AwsSecretsEnvironmentPostProcessorTest {
 
     assertThat(env.getProperty("medmate.razorpay.key-id")).isEqualTo("rzp_test");
     assertThat(env.getProperty("medmate.razorpay.key-secret")).isEqualTo("sec");
+    assertThat(env.getProperty("medmate.razorpay.webhook-secret")).isEqualTo("whsec");
   }
 
   @Test

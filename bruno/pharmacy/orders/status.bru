@@ -1,0 +1,119 @@
+meta {
+  name: status
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/orders/{{orderId}}/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "status": "PACKING",
+    "notes": "Started packing"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("orderStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("status advanced", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/orders/:order_id/status — ACCEPTED→PACKING→READY_FOR_PICKUP only.
+}
+
+example {
+  name: 200 OK
+  description: Packing
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/status
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "status": "PACKING",
+        "notes": "Started packing"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "status": "PACKING",
+            "updated_at": "2026-08-08T06:07:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_STATUS_TRANSITION
+  description: Pharmacy cannot skip to OUT_FOR_DELIVERY
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/status
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "status": "OUT_FOR_DELIVERY"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_STATUS_TRANSITION",
+            "message": "Transition not allowed for pharmacy role"
+          }
+        }
+      '''
+    }
+  }
+}

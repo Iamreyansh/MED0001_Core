@@ -1,0 +1,96 @@
+meta {
+  name: reassign-rider
+  type: http
+  seq: 13
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}/rider
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "rider_id": "{{riderId}}",
+    "reason": "Original rider unavailable due to accident"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+  if (!bru.getEnvVar("riderId")) {
+    bru.setEnvVar("riderId", "dddddddd-0008-4000-8000-000000000099");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.new_rider_id) {
+    bru.setEnvVar("riderId", body.data.new_rider_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reassign envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("new_rider_id");
+    expect(body.data).to.have.property("reassigned_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/orders/:order_id/rider — admin_super|admin_operations; records OrderStatusEvent ADMIN.
+}
+
+example {
+  name: 200 OK
+  description: Rider reassigned
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/rider
+    method: patch
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "rider_id": "dddddddd-0008-4000-8000-000000000099",
+        "reason": "Original rider unavailable"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "new_rider_id": "dddddddd-0008-4000-8000-000000000099",
+            "new_rider_name": "Rider dddddddd",
+            "previous_rider_id": "dddddddd-0008-4000-8000-000000000001",
+            "reassigned_at": "2026-08-08T06:10:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
