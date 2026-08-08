@@ -15,10 +15,11 @@ PR → main
 
 main push
   deploy-main
-    guard         require AWS_DEPLOY_ROLE_ARN
-    build         make check + make jar → boot-jars artifact
-    staging       push SHA images → tf apply → ECS roll → smoke
-    tag-release   annotated semver tag vMAJOR.MINOR.PATCH (patch bump; does not deploy prod)
+    guard              require AWS_DEPLOY_ROLE_ARN
+    ensure-ci-bucket   targeted staging apply (CI S3 bucket + GHA IAM)
+    build              make check + make jar → s3://med0001-gha-ci-…/artifacts/<sha>/
+    staging            download jars from S3 → push SHA images → tf apply → ECS roll → smoke
+    tag-release        annotated semver tag vMAJOR.MINOR.PATCH (patch bump; does not deploy prod)
 
 manual
   deploy-prod     workflow_dispatch with tag=vX.Y.Z
@@ -44,6 +45,8 @@ gh workflow run deploy-prod.yml -f tag=v0.1.0
 ```
 
 Repo variable: `AWS_DEPLOY_ROLE_ARN` (OIDC). Environments: `staging`, `production`.
+
+CI durable storage is **S3 only** (`med0001-gha-ci-105927215604`) — no GitHub Actions caches or artifacts. See [github-setup.md](github-setup.md).
 
 ## State
 

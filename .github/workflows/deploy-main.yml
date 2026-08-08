@@ -14,6 +14,7 @@ concurrency:
 
 env:
   AWS_REGION: ap-south-1
+  CI_S3_BUCKET: med0001-gha-ci-105927215604
   STAGING_HEALTH_URL: https://core.api.staging.nammamedmate.com/api/v1/health
 
 jobs:
@@ -30,28 +31,52 @@ jobs:
             exit 1
           fi
 
-  build:
+  # Bootstrap / keep CI bucket + GHA IAM before jar upload (full staging apply later).
+  ensure-ci-bucket:
     needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-terraform-aws
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      - name: Apply CI bucket + GHA S3 IAM (staging stack)
+        run: |
+          make tf-init ENV=staging
+          terraform -chdir=infra/terraform/stacks/staging apply -input=false -auto-approve \
+            -target=aws_s3_bucket.gha_ci \
+            -target=aws_s3_bucket_public_access_block.gha_ci \
+            -target=aws_s3_bucket_server_side_encryption_configuration.gha_ci \
+            -target=aws_s3_bucket_lifecycle_configuration.gha_ci \
+            -target=aws_iam_role_policy.gha_deploy
+
+  build:
+    needs: ensure-ci-bucket
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
       - uses: ./.github/actions/setup-java
+        with:
+          restore-s3-cache: "true"
       - name: Quality gates
         run: make check
       - name: Boot jars
         run: make jar
-      - name: Stage jars for artifact
+      - name: Upload boot jars to S3
         run: |
-          mkdir -p boot-jars
-          cp apps/api/build/libs/med0001-api.jar boot-jars/
-          cp apps/worker/build/libs/med0001-worker.jar boot-jars/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: boot-jars
-          retention-days: 3
-          if-no-files-found: error
-          path: boot-jars/
+          DEST="s3://${CI_S3_BUCKET}/artifacts/${GITHUB_SHA}/"
+          aws s3 cp apps/api/build/libs/med0001-api.jar "${DEST}med0001-api.jar"
+          aws s3 cp apps/worker/build/libs/med0001-worker.jar "${DEST}med0001-worker.jar"
+          echo "Jars: ${DEST}"
+      - name: Save Gradle cache to S3
+        if: success()
+        run: scripts/ci-gradle-s3-cache.sh save
 
   deploy-staging:
     needs: build
@@ -60,20 +85,17 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: boot-jars
-          path: boot-jars
-      - name: Place jars for Docker context
-        run: |
-          mkdir -p apps/api/build/libs apps/worker/build/libs
-          cp boot-jars/med0001-api.jar apps/api/build/libs/
-          cp boot-jars/med0001-worker.jar apps/worker/build/libs/
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
       - uses: ./.github/actions/setup-terraform-aws
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      - name: Download boot jars from S3
+        run: |
+          DEST="s3://${CI_S3_BUCKET}/artifacts/${GITHUB_SHA}/"
+          mkdir -p apps/api/build/libs apps/worker/build/libs
+          aws s3 cp "${DEST}med0001-api.jar" apps/api/build/libs/
+          aws s3 cp "${DEST}med0001-worker.jar" apps/worker/build/libs/
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
       - name: Login ECR + push SHA images
         run: |
           ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"

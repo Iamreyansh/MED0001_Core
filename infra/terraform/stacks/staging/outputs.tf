@@ -1,4 +1,5 @@
 output "deploy_role_arn" { value = data.aws_iam_role.gha.arn }
+output "ci_bucket_name" { value = aws_s3_bucket.gha_ci.bucket }
 output "api_domain" { value = local.domain_name }
 output "cdn_domain" { value = local.cdn_domain_name }
 output "cdn_distribution_id" { value = aws_cloudfront_distribution.cdn.id }
