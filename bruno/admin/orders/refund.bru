@@ -1,0 +1,140 @@
+meta {
+  name: refund
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}/refund
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+headers {
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "amount": 50.00,
+    "refund_to": "WALLET",
+    "reason": "Partial refund for missing item",
+    "notes": "Approved by ops"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.refund_id) {
+    bru.setEnvVar("refundId", body.data.refund_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("refund envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("refund_id");
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  POST /api/v1/admin/orders/:order_id/refund — admin_super|operations|finance. Requires Idempotency-Key.
+}
+
+example {
+  name: 200 OK
+  description: Partial wallet refund
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/refund
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+      Idempotency-Key: 11111111-2222-4333-8444-555555555555
+    }
+    body:json: {
+      {
+        "amount": 50.00,
+        "refund_to": "WALLET",
+        "reason": "Partial refund for missing item",
+        "notes": "Approved by ops"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "refund_id": "refddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "amount": 50.00,
+            "refund_to": "WALLET",
+            "status": "PROCESSED",
+            "processed_at": "2026-08-08T06:00:00Z",
+            "issued_by": "bbbbbbbb-cccc-4ddd-8eee-eeeeeeee0105",
+            "razorpay_refund_id": null
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 REFUND_EXCEEDS_REMAINING_REFUNDABLE
+  description: Amount exceeds remaining refundable
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/refund
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+      Idempotency-Key: 11111111-2222-4333-8444-555555555556
+    }
+    body:json: {
+      {
+        "amount": 250.00,
+        "refund_to": "WALLET",
+        "reason": "too much"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "REFUND_EXCEEDS_REMAINING_REFUNDABLE",
+            "message": "Refund exceeds remaining refundable amount"
+          }
+        }
+      '''
+    }
+  }
+}

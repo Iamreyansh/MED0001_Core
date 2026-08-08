@@ -1,0 +1,76 @@
+meta {
+  name: delete-note
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}/notes/{{orderNoteId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+  if (!bru.getEnvVar("orderNoteId")) {
+    bru.setEnvVar("orderNoteId", "notenote-note-4not-8not-notenotenotenote");
+  }
+}
+
+script:post-response {
+  // append-only — no vars to chain
+}
+
+tests {
+  test("HTTP 405", function () {
+    expect(res.getStatus()).to.equal(405);
+  });
+  test("append-only error", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(false);
+    expect(body.error.code).to.equal("METHOD_NOT_ALLOWED");
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/orders/:order_id/notes/:note_id — always 405 (notes append-only).
+}
+
+example {
+  name: 405 Method Not Allowed
+  description: Notes cannot be deleted
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/notes/notenote-note-4not-8not-notenotenotenote
+    method: delete
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 405 text: Method Not Allowed }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "METHOD_NOT_ALLOWED",
+            "message": "Notes are append-only"
+          }
+        }
+      '''
+    }
+  }
+}

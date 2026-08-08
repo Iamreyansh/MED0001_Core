@@ -1,0 +1,81 @@
+meta {
+  name: export
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/orders?segment=ALL&export=true
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+params:query {
+  segment: ALL
+  export: true
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.job_id) {
+    bru.setEnvVar("exportJobId", body.data.job_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("export job envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("job_id");
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  GET /api/v1/admin/orders?export=true — sync CSV when ≤10000 rows; async PROCESSING when larger.
+}
+
+example {
+  name: 200 OK READY
+  description: Small export ready immediately
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders?segment=ALL&export=true
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "export00-0000-4000-8000-000000000001",
+            "status": "READY",
+            "row_count": 12,
+            "download_url": "file:///tmp/medmate-order-exports/exports-admin-orders-export00.csv"
+          }
+        }
+      '''
+    }
+  }
+}

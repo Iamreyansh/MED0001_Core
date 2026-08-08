@@ -1,0 +1,110 @@
+meta {
+  name: availability-check
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacies/availability-check
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pharmacy_id": "{{pharmacyId}}",
+    "medicine_ids": ["{{medicineId}}"]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing — run pharmacies/nearby first");
+  }
+  if (!bru.getEnvVar("medicineId")) {
+    bru.setEnvVar("medicineId", "11111111-1111-4111-8111-111111111111");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("availability envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pharmacy_id).to.be.a("string");
+    expect(body.data.available).to.be.an("array");
+    expect(body.data.unavailable).to.be.an("array");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacies/availability-check — customer; splits available/unavailable medicine IDs.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacies/availability-check
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "pharmacy_id": "aaaaaaaa-0001-4000-8000-000000000001",
+        "medicine_ids": [
+          "11111111-1111-4111-8111-111111111111",
+          "11111111-1111-4111-8111-111111111112"
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "aaaaaaaa-0001-4000-8000-000000000001",
+            "pharmacy_name": "Sai Medicals",
+            "is_open": true,
+            "available": [
+              {
+                "medicine_id": "11111111-1111-4111-8111-111111111111",
+                "name": "Metformin 500mg",
+                "quantity_available": 200,
+                "price": 25.65
+              }
+            ],
+            "unavailable": [
+              {
+                "medicine_id": "11111111-1111-4111-8111-111111111112",
+                "name": "Glipizide 5mg",
+                "reason": "OUT_OF_STOCK"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

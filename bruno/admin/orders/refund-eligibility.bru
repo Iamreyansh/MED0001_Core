@@ -1,0 +1,88 @@
+meta {
+  name: refund-eligibility
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}/refund-eligibility
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("maxRefundable", String(body.data.max_refundable));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("eligibility envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("max_refundable");
+    expect(body.data).to.have.property("recommendation");
+  });
+}
+
+docs {
+  GET /api/v1/admin/orders/:order_id/refund-eligibility — admin_super|operations|finance.
+}
+
+example {
+  name: 200 OK
+  description: Eligible for refund and cancellation
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/refund-eligibility
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_total": 221.25,
+            "already_refunded": 0.00,
+            "max_refundable": 221.25,
+            "eligible": true,
+            "payment_method": "UPI",
+            "original_payment_status": "PAID",
+            "recommendation": {
+              "refund_to": "SOURCE",
+              "message": "Order was paid via UPI. Refund to source recommended (3-5 business days via Razorpay)."
+            },
+            "cancellation_eligible": true,
+            "cancellation_reason": "Order is in ACCEPTED status - eligible for customer or admin cancellation"
+          }
+        }
+      '''
+    }
+  }
+}

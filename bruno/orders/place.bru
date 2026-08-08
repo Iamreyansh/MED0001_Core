@@ -1,0 +1,148 @@
+meta {
+  name: place
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/orders
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "cart_id": "{{cartId}}",
+    "payment_method": "COD",
+    "payment_token": null,
+    "delivery_instructions": "Leave with security guard if not home"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("cartId")) {
+    throw new Error("cartId missing — run cart/get or cart/add-item first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.order_id) {
+      bru.setEnvVar("orderId", body.data.order_id);
+    }
+    if (body.data.order_number) {
+      bru.setEnvVar("orderNumber", body.data.order_number);
+    }
+    if (body.data.payment && body.data.payment.razorpay_order_id) {
+      bru.setEnvVar("razorpayOrderId", body.data.payment.razorpay_order_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("order envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.order_id).to.be.a("string");
+    expect(body.data.order_number).to.match(/^ORD-\d{8}-\d{5}$/);
+  });
+}
+
+docs {
+  POST /api/v1/orders — place order from cart (Idempotency-Key required). COD confirms immediately; UPI/CARD returns PAYMENT_PENDING + razorpay_order_id.
+}
+
+example {
+  name: 201 Created COD
+  description: COD order confirmed to PENDING_ACCEPTANCE
+  request: {
+    url: {{baseUrl}}/api/v1/orders
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: 11111111-1111-4111-8111-111111111111
+    }
+    body:json: {
+      {
+        "cart_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "payment_method": "COD",
+        "delivery_instructions": "Leave with security guard if not home"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_number": "ORD-20260808-00001",
+            "status": "PENDING_ACCEPTANCE",
+            "payment": {
+              "method": "COD",
+              "status": "PENDING_COLLECTION",
+              "transaction_id": null,
+              "razorpay_order_id": null
+            },
+            "created_at": "2026-08-08T06:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 PRESCRIPTION_REQUIRED
+  description: Rx cart without prescription
+  request: {
+    url: {{baseUrl}}/api/v1/orders
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: 22222222-2222-4222-8222-222222222222
+    }
+    body:json: {
+      {
+        "cart_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "payment_method": "COD"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PRESCRIPTION_REQUIRED",
+            "message": "Prescription required for Rx items in cart"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,90 @@
+meta {
+  name: reject
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/orders/{{orderId}}/reject
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "reason": "OUT_OF_STOCK",
+    "message": "Metformin 500mg unavailable"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("orderStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cancelled with refund flag", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("CANCELLED");
+    expect(body.data).to.have.property("refund_initiated");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/orders/:order_id/reject — cancel + refund skeleton outbox.
+}
+
+example {
+  name: 200 OK
+  description: Rejected
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/reject
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "OUT_OF_STOCK",
+        "message": "Metformin 500mg unavailable"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "status": "CANCELLED",
+            "refund_initiated": true,
+            "refund_amount": 221.25,
+            "refund_to": "SOURCE"
+          }
+        }
+      '''
+    }
+  }
+}

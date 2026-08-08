@@ -1,0 +1,114 @@
+meta {
+  name: get
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing — run orders/place first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("orderId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("order detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("order_number");
+    expect(body.data).to.have.property("bill");
+    expect(body.data).to.have.property("payment");
+  });
+}
+
+docs {
+  GET /api/v1/orders/:order_id — customer own order only.
+}
+
+example {
+  name: 200 OK
+  description: Order detail
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_number": "ORD-20260808-00001",
+            "status": "PENDING_ACCEPTANCE",
+            "pharmacy": {
+              "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              "name": "Sai Medicals",
+              "area": "Koramangala",
+              "phone": "+91-8022334455"
+            },
+            "rider": null,
+            "items": [
+              {
+                "name": "Metformin 500mg (Glycomet)",
+                "quantity": 3,
+                "unit_price": 85.00,
+                "line_total": 255.00
+              }
+            ],
+            "bill": {
+              "item_total": 255.00,
+              "coupon_discount": 0.00,
+              "subtotal_after_discount": 255.00,
+              "delivery_fee": 25.00,
+              "handling_fee": 5.00,
+              "wallet_applied": 0.00,
+              "total_payable": 285.00
+            },
+            "prescription_id": null,
+            "delivery_address": {
+              "full_address": "42, 5th Cross, Koramangala 4th Block, Bengaluru 560034"
+            },
+            "delivery_instructions": "Leave with security guard if not home",
+            "payment": {
+              "method": "COD",
+              "status": "PENDING_COLLECTION",
+              "transaction_id": null,
+              "razorpay_order_id": null
+            },
+            "estimated_delivery_at": "2026-08-08T06:22:00Z",
+            "confirmed_at": "2026-08-08T06:00:00Z",
+            "created_at": "2026-08-08T06:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,94 @@
+meta {
+  name: note
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}/note
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "note": "Customer contacted via WhatsApp. Confirmed delivery address is correct.",
+    "is_pinned": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.note_id) {
+    bru.setEnvVar("orderNoteId", body.data.note_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("note envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("note_id");
+    expect(body.data.is_pinned).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/admin/orders/:order_id/note — append-only internal notes.
+}
+
+example {
+  name: 200 OK
+  description: Pinned note added
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/note
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "note": "Customer contacted via WhatsApp.",
+        "is_pinned": true
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "note_id": "notenote-note-4not-8not-notenotenotenote",
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "note": "Customer contacted via WhatsApp.",
+            "is_pinned": true,
+            "added_by": "cccccccc-0008-4000-8000-000000000001",
+            "created_at": "2026-08-08T06:20:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

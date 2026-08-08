@@ -1,0 +1,138 @@
+meta {
+  name: reorder
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/orders/{{pastOrderId}}/reorder
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "confirm_pharmacy_change": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("pastOrderId")) {
+    throw new Error("pastOrderId missing — run orders/history or set from a delivered order");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.cart_id) {
+    bru.setEnvVar("cartId", body.data.cart_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reorder envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("cart_id");
+    expect(body.data).to.have.property("items_added");
+    expect(body.data.prescription_attached).to.equal(false);
+  });
+}
+
+docs {
+  POST /api/v1/orders/:past_order_id/reorder — creates a fresh cart (no Rx/coupon). Abandons prior ACTIVE cart. confirm_pharmacy_change required when fallback pharmacy differs.
+}
+
+example {
+  name: 200 OK same pharmacy
+  description: Original pharmacy open with full stock
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/reorder
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "confirm_pharmacy_change": false
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cart_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "pharmacy": {
+              "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              "name": "Sai Medicals",
+              "area": "Koramangala"
+            },
+            "items_added": [
+              { "name": "Metformin 500mg", "quantity": 3, "price": 85.00 }
+            ],
+            "excluded_items": [],
+            "prescription_required": true,
+            "prescription_attached": false,
+            "message": "Cart created with 1 item. Please attach a prescription to proceed."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 PHARMACY_CHANGE_REQUIRED
+  description: Fallback pharmacy differs; confirm_pharmacy_change false
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/reorder
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "confirm_pharmacy_change": false
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PHARMACY_CHANGE_REQUIRED",
+            "message": "Original pharmacy Sai Medicals is currently closed. Cart will be created at Apollo Pharmacy, BTM Layout.",
+            "details": {
+              "suggested_pharmacy": {
+                "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "name": "Apollo Pharmacy",
+                "area": "BTM Layout"
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

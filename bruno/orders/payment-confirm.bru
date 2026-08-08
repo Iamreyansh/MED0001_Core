@@ -1,0 +1,143 @@
+meta {
+  name: payment-confirm
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/payment/confirm
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "payment_id": "{{razorpayPaymentId}}",
+    "payment_signature": "{{razorpayPaymentSignature}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing — place a UPI/CARD order first");
+  }
+  if (!bru.getEnvVar("razorpayPaymentId")) {
+    bru.setEnvVar("razorpayPaymentId", "pay_Razorpay98765");
+  }
+  if (!bru.getEnvVar("razorpayPaymentSignature")) {
+    throw new Error("razorpayPaymentSignature missing — HMAC of razorpay_order_id|payment_id");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("orderStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("confirm envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("PENDING_ACCEPTANCE");
+    expect(body.data.payment.status).to.equal("PAID");
+  });
+}
+
+docs {
+  POST /api/v1/orders/:order_id/payment/confirm — verify Razorpay HMAC; Idempotency-Key required; idempotent on payment_id.
+}
+
+example {
+  name: 200 OK
+  description: Payment confirmed
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/payment/confirm
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: 33333333-3333-4333-8333-333333333333
+    }
+    body:json: {
+      {
+        "payment_id": "pay_Razorpay98765",
+        "payment_signature": "sha256_hmac_signature_string"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_number": "ORD-20260808-00001",
+            "status": "PENDING_ACCEPTANCE",
+            "payment": {
+              "method": "UPI",
+              "status": "PAID",
+              "transaction_id": "pay_Razorpay98765"
+            },
+            "pharmacy_notified": true,
+            "confirmed_at": "2026-08-08T06:01:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 PAYMENT_SIGNATURE_INVALID
+  description: Bad HMAC
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/payment/confirm
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: 44444444-4444-4444-8444-444444444444
+    }
+    body:json: {
+      {
+        "payment_id": "pay_Razorpay98765",
+        "payment_signature": "invalid"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PAYMENT_SIGNATURE_INVALID",
+            "message": "HMAC verification failed"
+          }
+        }
+      '''
+    }
+  }
+}

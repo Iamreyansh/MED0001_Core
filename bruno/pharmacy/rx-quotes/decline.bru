@@ -1,0 +1,86 @@
+meta {
+  name: decline
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/rx-quotes/{{broadcastId}}/decline
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "reason": "OUT_OF_STOCK"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("broadcastId")) {
+    bru.setEnvVar("broadcastId", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  }
+}
+
+script:post-response {
+  // no-op
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("declined", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("OUT_OF_STOCK");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/rx-quotes/:broadcast_id/decline — decline with OUT_OF_STOCK.
+}
+
+example {
+  name: 200 OK
+  description: Declined
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rx-quotes/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/decline
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "OUT_OF_STOCK"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "broadcast_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "OUT_OF_STOCK"
+          }
+        }
+      '''
+    }
+  }
+}

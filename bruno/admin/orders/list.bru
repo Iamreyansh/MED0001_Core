@@ -1,0 +1,99 @@
+meta {
+  name: list
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/orders?segment=ALL&page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+params:query {
+  segment: ALL
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.orders) && body.data.orders.length) {
+    bru.setEnvVar("orderId", body.data.orders[0].order_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("summary");
+    expect(body.data).to.have.property("orders");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/orders — segmented list + summary chips. Set export=true for CSV job.
+}
+
+example {
+  name: 200 OK
+  description: ALL segment page
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders?segment=ALL&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "summary": {
+              "total_orders": 1,
+              "live_now": 1,
+              "sla_risk": 0,
+              "gmv": 221.25,
+              "commission": 22.13,
+              "aov": 221.25
+            },
+            "orders": [
+              {
+                "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+                "order_number": "ORD-20260808-00001",
+                "customer_name": "Ravi Kumar",
+                "status": "OUT_FOR_DELIVERY",
+                "sla_remaining_minutes": 7,
+                "total": 221.25,
+                "commission": 22.13
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

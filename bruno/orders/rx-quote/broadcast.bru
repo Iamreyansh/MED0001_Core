@@ -1,0 +1,149 @@
+meta {
+  name: broadcast
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/orders/rx-quote/broadcast
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "prescription_id": "{{prescriptionId}}",
+    "delivery_address_id": "{{addressId}}",
+    "patient_name": "Ravi Kumar",
+    "notes": "Please quote for all medicines if possible"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("prescriptionId")) {
+    bru.setEnvVar("prescriptionId", "33333333-3333-4333-8333-333333333333");
+  }
+  if (!bru.getEnvVar("addressId")) {
+    bru.setEnvVar("addressId", "22222222-2222-4222-8222-222222222222");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.broadcast_id) {
+    bru.setEnvVar("broadcastId", body.data.broadcast_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("broadcast envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.broadcast_id).to.be.a("string");
+    expect(body.data.status).to.equal("ACTIVE");
+    expect(body.data.pharmacies_notified).to.be.a("number");
+  });
+}
+
+docs {
+  POST /api/v1/orders/rx-quote/broadcast — notify up to 10 pharmacies within 3km.
+}
+
+example {
+  name: 201 Created
+  description: Broadcast created
+  request: {
+    url: {{baseUrl}}/api/v1/orders/rx-quote/broadcast
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "prescription_id": "33333333-3333-4333-8333-333333333333",
+        "delivery_address_id": "22222222-2222-4222-8222-222222222222",
+        "patient_name": "Ravi Kumar",
+        "notes": "Please quote for all medicines if possible"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "broadcast_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "ACTIVE",
+            "pharmacies_notified": 7,
+            "broadcast_at": "2026-07-24T11:00:00Z",
+            "expires_at": "2026-07-24T11:30:00Z",
+            "pharmacies": [
+              {
+                "pharmacy_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "name": "Sai Medicals",
+                "area": "Koramangala",
+                "distance_km": 1.2,
+                "status": "NOTIFIED"
+              }
+            ],
+            "can_view_quotes": false,
+            "quotes_received": 0
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 NO_PHARMACIES_NEARBY
+  description: No open pharmacies within 3km
+  request: {
+    url: {{baseUrl}}/api/v1/orders/rx-quote/broadcast
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "prescription_id": "33333333-3333-4333-8333-333333333333",
+        "delivery_address_id": "22222222-2222-4222-8222-222222222222",
+        "patient_name": "Ravi Kumar"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "NO_PHARMACIES_NEARBY",
+            "message": "No eligible pharmacies within 3km"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,76 @@
+meta {
+  name: timeline
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/timeline
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("timeline envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.events).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/orders/:order_id/timeline — immutable status events.
+}
+
+example {
+  name: 200 OK
+  description: Full timeline
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/timeline
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "events": [
+              { "status": "PENDING_ACCEPTANCE", "timestamp": "2026-08-08T06:00:00Z", "actor": "system", "notes": null },
+              { "status": "ACCEPTED", "timestamp": "2026-08-08T06:05:00Z", "actor": "pharmacy", "notes": null },
+              { "status": "PACKING", "timestamp": "2026-08-08T06:07:00Z", "actor": "pharmacy", "notes": "Started packing" },
+              { "status": "READY_FOR_PICKUP", "timestamp": "2026-08-08T06:12:00Z", "actor": "pharmacy", "notes": null },
+              { "status": "OUT_FOR_DELIVERY", "timestamp": "2026-08-08T06:15:00Z", "actor": "admin", "notes": "ops" },
+              { "status": "DELIVERED", "timestamp": "2026-08-08T06:25:00Z", "actor": "admin", "notes": "complete" }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

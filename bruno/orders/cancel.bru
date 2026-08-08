@@ -1,0 +1,127 @@
+meta {
+  name: cancel
+  type: http
+  seq: 40
+}
+
+post {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/cancel
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "reason": "CHANGED_MIND"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing — run orders/place first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("orderStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cancel envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("CANCELLED");
+    expect(body.data).to.have.property("refund");
+  });
+}
+
+docs {
+  POST /api/v1/orders/:order_id/cancel — customer self-cancel (PENDING_ACCEPTANCE|ACCEPTED only).
+}
+
+example {
+  name: 200 OK
+  description: Customer cancel with SOURCE refund
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/cancel
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "CHANGED_MIND"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "order_number": "ORD-20260808-00001",
+            "status": "CANCELLED",
+            "cancelled_by": "customer",
+            "cancelled_at": "2026-08-08T06:00:00Z",
+            "refund": {
+              "initiated": true,
+              "amount": 221.25,
+              "refund_to": "SOURCE",
+              "estimated_days": 5,
+              "message": "Refund of Rs 221.25 will be credited to your original payment method in 3-5 business days."
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ORDER_CANNOT_CANCEL
+  description: Customer tries to cancel after packing started
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/cancel
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "CHANGED_MIND"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ORDER_CANNOT_CANCEL",
+            "message": "Customer can cancel only before packing starts"
+          }
+        }
+      '''
+    }
+  }
+}

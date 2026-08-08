@@ -1,0 +1,81 @@
+meta {
+  name: quotes
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/rx-quote/{{broadcastId}}/quotes
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("broadcastId")) {
+    bru.setEnvVar("broadcastId", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && Array.isArray(body.data) && body.data[0]) {
+    bru.setEnvVar("quotedPharmacyId", body.data[0].pharmacy_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("quotes array", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/orders/rx-quote/:broadcast_id/quotes — list quotes with FASTEST / LOWEST_PRICE tags.
+}
+
+example {
+  name: 200 OK
+  description: Quotes with tags
+  request: {
+    url: {{baseUrl}}/api/v1/orders/rx-quote/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/quotes
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "pharmacy_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              "pharmacy_name": "Sai Medicals",
+              "tags": ["LOWEST_PRICE"],
+              "total_payable": 370.50,
+              "delivery_fee": 25.00,
+              "handling_fee": 5.00,
+              "grand_total": 370.50,
+              "is_expired": false
+            }
+          ]
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,95 @@
+meta {
+  name: update-item
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/cart/items/{{cartItemId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "quantity": 2
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("cartItemId")) {
+    bru.setEnvVar("cartItemId", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.items && body.data.items[0]) {
+    bru.setEnvVar("cartItemId", body.data.items[0].item_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("success envelope", function () {
+    expect(res.getBody().success).to.equal(true);
+  });
+}
+
+docs {
+  PATCH /api/v1/cart/items/:item_id — quantity 0 removes item and clears cart if last.
+}
+
+example {
+  name: 200 OK
+  description: Quantity updated.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "quantity": 2
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cart_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "status": "ACTIVE",
+            "items": [
+              {
+                "item_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "quantity": 2,
+                "unit_price": 85.00,
+                "line_total": 170.00
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

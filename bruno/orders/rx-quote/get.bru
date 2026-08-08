@@ -1,0 +1,80 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/rx-quote/{{broadcastId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("broadcastId")) {
+    bru.setEnvVar("broadcastId", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("canViewQuotes", String(body.data.can_view_quotes));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("status envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("can_view_quotes");
+    expect(body.data).to.have.property("quotes_received");
+  });
+}
+
+docs {
+  GET /api/v1/orders/rx-quote/:broadcast_id — poll broadcast status.
+}
+
+example {
+  name: 200 OK
+  description: Poll status
+  request: {
+    url: {{baseUrl}}/api/v1/orders/rx-quote/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "broadcast_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "ACTIVE",
+            "broadcast_at": "2026-07-24T11:00:00Z",
+            "expires_at": "2026-07-24T11:30:00Z",
+            "pharmacies_notified": 7,
+            "quotes_received": 3,
+            "can_view_quotes": true,
+            "pharmacies": []
+          }
+        }
+      '''
+    }
+  }
+}

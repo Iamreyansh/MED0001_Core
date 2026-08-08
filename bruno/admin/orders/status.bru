@@ -1,0 +1,95 @@
+meta {
+  name: status
+  type: http
+  seq: 1
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "status": "OUT_FOR_DELIVERY",
+    "reason": "Rider confirmed pickup; pharmacy dashboard unresponsive",
+    "notes": "Manual advance by ops team"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("orderStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin force status", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("advanced_by");
+    expect(body.data).to.have.property("advanced_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/orders/:order_id/status — force any non-terminal transition.
+}
+
+example {
+  name: 200 OK
+  description: Force OUT_FOR_DELIVERY
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/status
+    method: patch
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "status": "OUT_FOR_DELIVERY",
+        "reason": "Rider confirmed pickup",
+        "notes": "ops"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "status": "OUT_FOR_DELIVERY",
+            "advanced_by": "cccccccc-0001-4000-8000-000000000001",
+            "advanced_at": "2026-08-08T06:15:00Z",
+            "reason": "Rider confirmed pickup"
+          }
+        }
+      '''
+    }
+  }
+}

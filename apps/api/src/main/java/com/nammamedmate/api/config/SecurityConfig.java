@@ -82,6 +82,41 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/customers/**")
                     .hasRole("CUSTOMER")
+                    .requestMatchers("/api/v1/cart/**", "/api/v1/pharmacies/**")
+                    .hasRole("CUSTOMER")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/orders/*/payment/cod-collect")
+                    .hasRole("RIDER")
+                    .requestMatchers("/api/v1/orders/rx-quote/**")
+                    .hasRole("CUSTOMER")
+                    .requestMatchers("/api/v1/orders", "/api/v1/orders/**")
+                    .hasRole("CUSTOMER")
+                    .requestMatchers("/api/v1/pharmacy/orders/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/pharmacy/rx-quotes/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/cancel")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/refund")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders/*/refund-eligibility")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/admin/orders/*/status")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/admin/orders/*/rider")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders/live-feed")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/dispute")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_SUPPORT")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/note")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_SUPPORT", "ADMIN_FINANCE")
+                    .requestMatchers("/api/v1/admin/orders/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
                     .requestMatchers(HttpMethod.GET, "/api/v1/admin/catalogue/schedule-rules")
                     .hasAnyRole(
                         "ADMIN_SUPER",

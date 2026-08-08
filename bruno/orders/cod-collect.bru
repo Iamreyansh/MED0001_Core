@@ -1,0 +1,94 @@
+meta {
+  name: cod-collect
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/payment/cod-collect
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{riderAccessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "amount_collected": {{codAmount}}
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("riderAccessToken")) {
+    throw new Error("riderAccessToken missing — rider JWT with ROLE_RIDER required");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing — run orders/place (COD) first");
+  }
+  if (!bru.getEnvVar("codAmount")) {
+    bru.setEnvVar("codAmount", "285.00");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.payment_status) {
+    bru.setEnvVar("paymentStatus", body.data.payment_status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cod collect envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.payment_status).to.equal("COLLECTED");
+  });
+}
+
+docs {
+  POST /api/v1/orders/:order_id/payment/cod-collect — rider marks COD collected (hasRole RIDER).
+}
+
+example {
+  name: 200 OK
+  description: COD collected
+  request: {
+    url: {{baseUrl}}/api/v1/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/payment/cod-collect
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{riderAccessToken}}
+    }
+    body:json: {
+      {
+        "amount_collected": 285.00
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "payment_status": "COLLECTED",
+            "amount_collected": 285.00,
+            "collected_at": "2026-08-08T06:55:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

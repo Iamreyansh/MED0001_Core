@@ -1,0 +1,98 @@
+meta {
+  name: history
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/history?page=1&limit=20&status=ALL
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  page: 1
+  limit: 20
+  status: ALL
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && Array.isArray(body.data) && body.data.length > 0) {
+    bru.setEnvVar("pastOrderId", body.data[0].order_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("history envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/orders/history — DELIVERED|CANCELLED only. status=ALL|DELIVERED|CANCELLED.
+}
+
+example {
+  name: 200 OK
+  description: Terminal order history
+  request: {
+    url: {{baseUrl}}/api/v1/orders/history?page=1&limit=20&status=ALL
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+              "order_number": "ORD-20260724-00123",
+              "pharmacy": {
+                "name": "Sai Medicals",
+                "logo": "https://cdn.nammamedmate.com/pharmacies/sai-medicals.png"
+              },
+              "items_count": 1,
+              "items_preview": ["Metformin 500mg - 3"],
+              "status": "DELIVERED",
+              "total": 221.25,
+              "payment_method": "UPI",
+              "has_rx_items": true,
+              "created_at": "2026-07-24T11:30:00Z",
+              "delivered_at": "2026-07-24T11:55:00Z"
+            }
+          ],
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}

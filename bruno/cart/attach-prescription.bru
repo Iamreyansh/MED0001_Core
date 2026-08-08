@@ -1,0 +1,89 @@
+meta {
+  name: attach-prescription
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/cart/prescription
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "prescription_id": "{{prescriptionId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("prescriptionId")) {
+    bru.setEnvVar("prescriptionId", "cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.prescription_id) {
+    bru.setEnvVar("prescriptionId", body.data.prescription_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("prescription attached", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.prescription_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/cart/prescription — stub accepts any UUID as VERIFIED until EPIC-008.
+}
+
+example {
+  name: 200 OK
+  description: Prescription attached.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/prescription
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "prescription_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "prescription_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "prescription_status": "VERIFIED"
+          }
+        }
+      '''
+    }
+  }
+}

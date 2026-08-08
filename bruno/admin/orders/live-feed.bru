@@ -1,0 +1,86 @@
+meta {
+  name: live-feed
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/orders/live-feed
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.orders) && body.data.orders.length) {
+    bru.setEnvVar("orderId", body.data.orders[0].order_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("live-feed envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("total_live");
+    expect(body.data).to.have.property("orders");
+  });
+}
+
+docs {
+  GET /api/v1/admin/orders/live-feed — Redis-cached 10s; admin_super|admin_operations.
+}
+
+example {
+  name: 200 OK
+  description: Live fleet sorted by SLA risk
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/live-feed
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total_live": 1,
+            "sla_risk_count": 1,
+            "sla_breached_count": 0,
+            "last_updated_at": "2026-08-08T06:00:00Z",
+            "orders": [
+              {
+                "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+                "order_number": "ORD-20260808-00001",
+                "status": "OUT_FOR_DELIVERY",
+                "sla_remaining_minutes": 2,
+                "sla_risk": true,
+                "total": 221.25
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

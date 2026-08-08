@@ -1,0 +1,98 @@
+meta {
+  name: switch-pharmacy
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/cart/switch-pharmacy
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pharmacy_id": "{{pharmacyId}}",
+    "confirm": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    bru.setEnvVar("pharmacyId", "aaaaaaaa-0001-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.pharmacy && body.data.pharmacy.id) {
+    bru.setEnvVar("pharmacyId", body.data.pharmacy.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("switched", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.items).to.be.an("array").that.is.empty;
+    expect(body.data.message).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/cart/switch-pharmacy — confirm:true required; clears items.
+}
+
+example {
+  name: 200 OK
+  description: Pharmacy switched and items cleared.
+  request: {
+    url: {{baseUrl}}/api/v1/cart/switch-pharmacy
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "pharmacy_id": "aaaaaaaa-0001-4000-8000-000000000002",
+        "confirm": true
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cart_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "pharmacy": {
+              "id": "aaaaaaaa-0001-4000-8000-000000000002",
+              "name": "Apollo Pharmacy",
+              "area": "BTM Layout"
+            },
+            "items": [],
+            "message": "Cart cleared and switched to Apollo Pharmacy"
+          }
+        }
+      '''
+    }
+  }
+}

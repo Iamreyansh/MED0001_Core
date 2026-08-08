@@ -1,0 +1,94 @@
+meta {
+  name: dispute
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/orders/{{orderId}}/dispute
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "reason": "Customer claims medicines were not delivered despite OTP verification",
+    "liable_party": "RIDER"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.order_id) {
+    bru.setEnvVar("orderId", body.data.order_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("dispute envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_disputed).to.equal(true);
+    expect(body.data).to.have.property("liable_party");
+  });
+}
+
+docs {
+  POST /api/v1/admin/orders/:order_id/dispute — admin_super|operations|support.
+}
+
+example {
+  name: 200 OK
+  description: Dispute flagged
+  request: {
+    url: {{baseUrl}}/api/v1/admin/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/dispute
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "reason": "Customer claims medicines were not delivered",
+        "liable_party": "RIDER"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "is_disputed": true,
+            "dispute_reason": "Customer claims medicines were not delivered",
+            "liable_party": "RIDER",
+            "flagged_by": "cccccccc-0008-4000-8000-000000000001",
+            "flagged_at": "2026-08-08T06:15:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
