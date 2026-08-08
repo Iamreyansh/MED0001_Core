@@ -35,7 +35,7 @@ jobs:
           restore-s3-cache: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'true' || 'false' }}
       - name: Pre-pull Testcontainers images
         run: |
-          docker pull postgres:16-alpine &
+          docker pull postgis/postgis:16-3.4 &
           docker pull redis:7-alpine &
           wait
       - name: Spotless, unit + integration tests, JaCoCo 100%, SpotBugs, ArchUnit

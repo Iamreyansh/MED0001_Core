@@ -37,11 +37,28 @@ public final class CartPricing {
     long safeItem = Math.max(itemTotalPaise, 0L);
     boolean empty = safeItem <= 0;
     String code = normalize(couponCode);
-    // couponDiscountPaise already caps at item_total
+    long delivery = deliveryFeePaise(safeItem, code, empty);
+    long handling = empty ? 0L : HANDLING_FEE_PAISE;
+    return compute(safeItem, code, walletBalancePaise, delivery, handling);
+  }
+
+  /** Bill with zone-priced delivery/handling (STORY-006). Coupon discount still from item total. */
+  public static Bill compute(
+      long itemTotalPaise,
+      String couponCode,
+      long walletBalancePaise,
+      long deliveryFeePaise,
+      long handlingFeePaise) {
+    long safeItem = Math.max(itemTotalPaise, 0L);
+    boolean empty = safeItem <= 0;
+    String code = normalize(couponCode);
     long discount = empty ? 0L : couponDiscountPaise(code, safeItem);
     long subtotal = safeItem - discount;
-    long handling = empty ? 0L : HANDLING_FEE_PAISE;
-    long delivery = deliveryFeePaise(safeItem, code, empty);
+    long handling = empty ? 0L : Math.max(handlingFeePaise, 0L);
+    long delivery = empty ? 0L : Math.max(deliveryFeePaise, 0L);
+    if ("FREEDEL".equals(code)) {
+      delivery = 0L;
+    }
     long beforeWallet = subtotal + delivery + handling;
     long wallet = Math.min(Math.max(walletBalancePaise, 0L), Math.max(beforeWallet, 0L));
     long payable = beforeWallet - wallet;

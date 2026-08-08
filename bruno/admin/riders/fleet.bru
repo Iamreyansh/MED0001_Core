@@ -1,0 +1,59 @@
+meta {
+  name: fleet
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/riders/fleet?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — admin login first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("fleet envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.summary).to.be.an("object");
+    expect(body.data.riders).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/riders/fleet — live fleet overview (admin_operations / admin_super).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "summary": {
+              "total_riders": 120,
+              "online": 45,
+              "on_trip": 28,
+              "offline": 47,
+              "stale_gps_count": 3
+            },
+            "riders": []
+          },
+          "meta": { "page": 1, "limit": 20, "total": 120, "has_next": true }
+        }
+      '''
+    }
+  }
+}

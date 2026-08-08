@@ -46,6 +46,12 @@ medmate:
   catalogue:
     jobs:
       enabled: true
+  rider:
+    aadhaar-kyc-enabled: false
+    auto-assign-enabled: true
+    assignment-timeout-delay-ms: 30000
+    jobs:
+      enabled: true
   pharmacy:
     jobs:
       enabled: true

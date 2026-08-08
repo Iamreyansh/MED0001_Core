@@ -10,6 +10,8 @@ import com.nammamedmate.auth.application.port.out.PharmacyRecord;
 import com.nammamedmate.auth.application.port.out.PharmacyStaffRecord;
 import com.nammamedmate.auth.application.port.out.PharmacyStaffStore;
 import com.nammamedmate.auth.application.port.out.PharmacyStore;
+import com.nammamedmate.auth.application.port.out.RiderAccountPort;
+import com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.security.AuthRole;
@@ -29,6 +31,7 @@ public class CurrentUserService {
   private final PharmacyAssignmentStore assignmentStore;
   private final PharmacyStore pharmacyStore;
   private final AdminStaffStore adminStaffStore;
+  private final RiderAccountPort riderAccountPort;
   private final RbacPermissionService rbacPermissionService;
   private final RateLimiter rateLimiter;
 
@@ -38,6 +41,7 @@ public class CurrentUserService {
       PharmacyAssignmentStore assignmentStore,
       PharmacyStore pharmacyStore,
       AdminStaffStore adminStaffStore,
+      RiderAccountPort riderAccountPort,
       RbacPermissionService rbacPermissionService,
       RateLimiter rateLimiter) {
     this.customerStore = customerStore;
@@ -45,6 +49,7 @@ public class CurrentUserService {
     this.assignmentStore = assignmentStore;
     this.pharmacyStore = pharmacyStore;
     this.adminStaffStore = adminStaffStore;
+    this.riderAccountPort = riderAccountPort;
     this.rbacPermissionService = rbacPermissionService;
     this.rateLimiter = rateLimiter;
   }
@@ -139,9 +144,23 @@ public class CurrentUserService {
   }
 
   private Map<String, Object> riderMe(MedmatePrincipal principal) {
+    RiderAccount rider =
+        riderAccountPort
+            .findById(principal.subject())
+            .orElseThrow(() -> new AppException("UNAUTHORIZED", "User not found", 401));
+    if ("BLOCKED".equals(rider.status())) {
+      throw new AppException("UNAUTHORIZED", "Rider account is blocked", 401);
+    }
     Map<String, Object> data = new LinkedHashMap<>();
-    data.put("id", principal.subject());
+    data.put("id", rider.id());
     data.put("role", AuthRole.RIDER.value());
+    data.put("phone", rider.phone());
+    data.put("name", rider.name());
+    data.put("email", rider.email());
+    data.put("status", rider.status());
+    data.put("kyc_status", rider.kycStatus());
+    data.put("kyc_rejection_reason", rider.kycRejectionReason());
+    data.put("kyc_rejection_notes", rider.kycRejectionNotes());
     return data;
   }
 }

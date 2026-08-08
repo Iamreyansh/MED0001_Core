@@ -15,6 +15,7 @@ import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubWalletPort;
 import com.nammamedmate.order.application.OrderPlacementServiceTest.InMemoryCartStore;
@@ -476,6 +477,7 @@ class OrderPlacementServiceGapsTest {
         w,
         prescriptions,
         zones,
+        new StubDeliveryFeeAdapter(),
         new StubPriceCeilingAdapter(),
         rz,
         org.mockito.Mockito.mock(RefundService.class),

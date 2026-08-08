@@ -97,4 +97,17 @@ class CartPricingTest {
     assertThat(CartPricing.couponDiscountPaise("NAMMA25", 0L)).isZero();
     assertThat(CartPricing.compute(-5L, null, -1L).itemTotalPaise()).isZero();
   }
+
+  @Test
+  void zonePricedDeliveryOverrideAndFreedelForcesZero() {
+    Bill bill = CartPricing.compute(10_000L, null, 0L, 4000L, 500L);
+    assertThat(bill.deliveryFeePaise()).isEqualTo(4000L);
+    assertThat(bill.handlingFeePaise()).isEqualTo(500L);
+    Bill freedel = CartPricing.compute(10_000L, "FREEDEL", 0L, 4000L, 500L);
+    assertThat(freedel.deliveryFeePaise()).isZero();
+    assertThat(freedel.handlingFeePaise()).isEqualTo(500L);
+    Bill empty = CartPricing.compute(0L, null, 0L, 4000L, 500L);
+    assertThat(empty.deliveryFeePaise()).isZero();
+    assertThat(empty.handlingFeePaise()).isZero();
+  }
 }

@@ -9,6 +9,8 @@ import com.nammamedmate.auth.application.port.out.PharmacyAssignmentRecord;
 import com.nammamedmate.auth.application.port.out.PharmacyAssignmentStore;
 import com.nammamedmate.auth.application.port.out.PharmacyStaffRecord;
 import com.nammamedmate.auth.application.port.out.PharmacyStaffStore;
+import com.nammamedmate.auth.application.port.out.RiderAccountPort;
+import com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount;
 import com.nammamedmate.auth.domain.RefreshTokens;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
@@ -45,6 +47,7 @@ public class RefreshTokenService {
   private final PharmacyStaffStore pharmacyStaffStore;
   private final PharmacyAssignmentStore assignmentStore;
   private final AdminStaffStore adminStaffStore;
+  private final RiderAccountPort riderAccountPort;
   private final Rs256JwtService jwtService;
   private final RateLimiter rateLimiter;
   private final OutboxPublisher outboxPublisher;
@@ -59,6 +62,7 @@ public class RefreshTokenService {
       PharmacyStaffStore pharmacyStaffStore,
       PharmacyAssignmentStore assignmentStore,
       AdminStaffStore adminStaffStore,
+      RiderAccountPort riderAccountPort,
       Rs256JwtService jwtService,
       RateLimiter rateLimiter,
       OutboxPublisher outboxPublisher,
@@ -70,6 +74,7 @@ public class RefreshTokenService {
         pharmacyStaffStore,
         assignmentStore,
         adminStaffStore,
+        riderAccountPort,
         jwtService,
         rateLimiter,
         outboxPublisher,
@@ -84,6 +89,7 @@ public class RefreshTokenService {
       PharmacyStaffStore pharmacyStaffStore,
       PharmacyAssignmentStore assignmentStore,
       AdminStaffStore adminStaffStore,
+      RiderAccountPort riderAccountPort,
       Rs256JwtService jwtService,
       RateLimiter rateLimiter,
       OutboxPublisher outboxPublisher,
@@ -95,6 +101,7 @@ public class RefreshTokenService {
     this.pharmacyStaffStore = pharmacyStaffStore;
     this.assignmentStore = assignmentStore;
     this.adminStaffStore = adminStaffStore;
+    this.riderAccountPort = riderAccountPort;
     this.jwtService = jwtService;
     this.rateLimiter = rateLimiter;
     this.outboxPublisher = outboxPublisher;
@@ -235,8 +242,19 @@ public class RefreshTokenService {
           throw new AppException("ACCOUNT_SUSPENDED", "Admin account has been suspended", 403);
         }
       }
+      case "rider" -> {
+        RiderAccount rider =
+            riderAccountPort
+                .findById(session.userId())
+                .orElseThrow(
+                    () ->
+                        new AppException("REFRESH_TOKEN_INVALID", "Refresh token not found", 401));
+        if ("BLOCKED".equals(rider.status())) {
+          throw new AppException("UNAUTHORIZED", "Rider account is blocked", 401);
+        }
+      }
       default -> {
-        // rider / unknown: no suspension table yet — allow refresh if session is valid
+        // unknown user_type: allow refresh if session is valid
       }
     }
   }

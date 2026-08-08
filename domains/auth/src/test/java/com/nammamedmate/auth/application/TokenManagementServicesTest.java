@@ -94,6 +94,7 @@ class TokenManagementServicesTest {
             pharmacyStaff,
             assignments,
             admins,
+            emptyRiderAccounts(),
             jwt,
             limiter,
             new OutboxPublisher(outbox, new ObjectMapper()),
@@ -109,7 +110,14 @@ class TokenManagementServicesTest {
             new com.nammamedmate.auth.adapter.out.cache.RedisRolePermissionCache());
     meService =
         new CurrentUserService(
-            customers, pharmacyStaff, assignments, pharmacies, admins, rbac, limiter);
+            customers,
+            pharmacyStaff,
+            assignments,
+            pharmacies,
+            admins,
+            emptyRiderAccounts(),
+            rbac,
+            limiter);
     listService = new SessionListService(sessions, limiter, clock, new ObjectMapper());
   }
 
@@ -424,6 +432,7 @@ class TokenManagementServicesTest {
             pharmacyStaff,
             assignments,
             admins,
+            emptyRiderAccounts(),
             jwt,
             limiter,
             new OutboxPublisher(outbox, new ObjectMapper()),
@@ -636,6 +645,7 @@ class TokenManagementServicesTest {
             pharmacyStaff,
             assignments,
             flaky,
+            emptyRiderAccounts(),
             jwt,
             new InMemoryRateLimiter(clock),
             new OutboxPublisher(outbox, new ObjectMapper()),
@@ -1336,6 +1346,146 @@ class TokenManagementServicesTest {
     Map<String, Object> rider =
         meService.me(new MedmatePrincipal(Ids.newId(), AuthRole.RIDER, null, TokenScope.FULL, "j"));
     assertThat(rider.get("role")).isEqualTo("rider");
+    assertThat(rider.get("status")).isEqualTo("ACTIVE");
+    assertThat(rider).containsKeys("kyc_rejection_reason", "kyc_rejection_notes");
+
+    CurrentUserService blockedMe =
+        new CurrentUserService(
+            customers,
+            pharmacyStaff,
+            assignments,
+            pharmacies,
+            admins,
+            new com.nammamedmate.auth.application.port.out.RiderAccountPort() {
+              @Override
+              public Optional<
+                      com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+                  findByPhone(String phone) {
+                return Optional.empty();
+              }
+
+              @Override
+              public Optional<
+                      com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+                  findById(UUID id) {
+                return Optional.of(
+                    new com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount(
+                        id, "+919999900001", "R", "BLOCKED", "APPROVED", null, null, null));
+              }
+            },
+            rbacPermissionServiceForTest(),
+            limiter);
+    assertThatThrownBy(
+            () ->
+                blockedMe.me(
+                    new MedmatePrincipal(Ids.newId(), AuthRole.RIDER, null, TokenScope.FULL, "j")))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("UNAUTHORIZED");
+
+    String blockedTok = "rider-blocked-refresh-tokxxxx";
+    UUID blockedRiderId = Ids.newId();
+    sessions.save(
+        AuthSessionRecord.active(
+            Ids.newId(),
+            blockedRiderId,
+            "rider",
+            RefreshTokens.sha256Hex(blockedTok),
+            "full",
+            null,
+            "1.1.1.1",
+            null,
+            clock.instant(),
+            clock.instant(),
+            clock.instant().plusSeconds(1000),
+            null));
+    RefreshTokenService blockedRefresh =
+        new RefreshTokenService(
+            sessions,
+            customers,
+            pharmacyStaff,
+            assignments,
+            admins,
+            new com.nammamedmate.auth.application.port.out.RiderAccountPort() {
+              @Override
+              public Optional<
+                      com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+                  findByPhone(String phone) {
+                return Optional.empty();
+              }
+
+              @Override
+              public Optional<
+                      com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+                  findById(UUID id) {
+                return Optional.of(
+                    new com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount(
+                        id, "+919999900001", "R", "BLOCKED", "APPROVED", null, null, null));
+              }
+            },
+            jwt,
+            limiter,
+            new OutboxPublisher(outbox, new ObjectMapper()),
+            clock,
+            new SecureRandom(),
+            reuseTx);
+    assertThatThrownBy(() -> blockedRefresh.refresh(blockedTok, "1.1.1.1"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("UNAUTHORIZED");
+
+    String missingRiderTok = "rider-missing-refresh-tokxxxx";
+    sessions.save(
+        AuthSessionRecord.active(
+            Ids.newId(),
+            Ids.newId(),
+            "rider",
+            RefreshTokens.sha256Hex(missingRiderTok),
+            "full",
+            null,
+            "1.1.1.1",
+            null,
+            clock.instant(),
+            clock.instant(),
+            clock.instant().plusSeconds(1000),
+            null));
+    RefreshTokenService missingRiderRefresh =
+        new RefreshTokenService(
+            sessions,
+            customers,
+            pharmacyStaff,
+            assignments,
+            admins,
+            new com.nammamedmate.auth.application.port.out.RiderAccountPort() {
+              @Override
+              public Optional<
+                      com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+                  findByPhone(String phone) {
+                return Optional.empty();
+              }
+
+              @Override
+              public Optional<
+                      com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+                  findById(UUID id) {
+                return Optional.empty();
+              }
+            },
+            jwt,
+            limiter,
+            new OutboxPublisher(outbox, new ObjectMapper()),
+            clock,
+            new SecureRandom(),
+            reuseTx);
+    assertThatThrownBy(() -> missingRiderRefresh.refresh(missingRiderTok, "1.1.1.1"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("REFRESH_TOKEN_INVALID");
+  }
+
+  private RbacPermissionService rbacPermissionServiceForTest() {
+    return new RbacPermissionService(
+        emptyRoleStore(),
+        assignments,
+        emptyPermissionCatalog(),
+        new com.nammamedmate.auth.adapter.out.cache.RedisRolePermissionCache());
   }
 
   @Test
@@ -1674,6 +1824,25 @@ class TokenManagementServicesTest {
     public Optional<PharmacyRecord> findById(UUID id) {
       return Optional.ofNullable(byId.get(id));
     }
+  }
+
+  private static com.nammamedmate.auth.application.port.out.RiderAccountPort emptyRiderAccounts() {
+    return new com.nammamedmate.auth.application.port.out.RiderAccountPort() {
+      @Override
+      public Optional<com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+          findByPhone(String phone) {
+        return Optional.empty();
+      }
+
+      @Override
+      public Optional<com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+          findById(UUID id) {
+        // Active rider for refresh/me coverage; blocked cases use a dedicated stub.
+        return Optional.of(
+            new com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount(
+                id, "+919999900001", "Rider", "ACTIVE", "APPROVED", null, null, null));
+      }
+    };
   }
 
   private static final class FakeAdminStore implements AdminStaffStore {

@@ -1,0 +1,79 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/rider/earnings
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("riderEarningsWallet", String(body.data.wallet_balance));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("earnings envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("today");
+    expect(body.data).to.have.property("this_week");
+    expect(body.data).to.have.property("next_payout");
+    expect(body.data).to.have.property("streak");
+  });
+}
+
+docs {
+  GET /api/v1/rider/earnings — today / week / lifetime / streak / next payout.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "today": { "base": 375.00, "incentives": 50.00, "tips": 20.00, "total": 445.00, "trips": 15 },
+            "this_week": {
+              "base": 1875.00, "incentives": 200.00, "tips": 85.00, "total": 2160.00, "trips": 75,
+              "cycle_from": "2026-07-21", "cycle_to": "2026-07-27"
+            },
+            "lifetime": { "total_earnings": 48500.00, "total_trips": 1924 },
+            "wallet_balance": 2160.00,
+            "streak": {
+              "current_days": 5,
+              "streak_bonus_at_days": 7,
+              "streak_bonus_amount": 100.00,
+              "days_remaining_for_bonus": 2
+            },
+            "next_payout": {
+              "estimated_amount": 2160.00,
+              "date": "2026-07-28",
+              "cod_deduction_expected": 0.00
+            }
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,82 @@
+meta {
+  name: rider-location-stream
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/rider-location/stream
+  body: none
+  auth: inherit
+}
+
+headers {
+  Accept: text/event-stream
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — customer OTP login first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  // SSE stream; no JSON env chaining
+}
+
+tests {
+  test("SSE accepted or location unavailable", function () {
+    expect([200, 422, 404]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  GET /api/v1/orders/:order_id/rider-location/stream — SSE fan-out of live rider GPS + ETA
+  (STORY-004 WebSocket fallback). Auth: customer JWT; order must be OUT_FOR_DELIVERY and owned
+  by the caller. Connect-time auth only.
+}
+
+example {
+  name: 200 OK SSE
+  description: Event stream of location updates
+  request: {
+    url: {{baseUrl}}/api/v1/orders/{{orderId}}/rider-location/stream
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Accept: text/event-stream
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: text
+      content: '''
+        event: location
+        data: {"order_id":"ordddddd-dddd-4ddd-8ddd-dddddddddddd","lat":12.9352,"lng":77.6245,"eta_minutes":8}
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 LOCATION_NOT_AVAILABLE
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "LOCATION_NOT_AVAILABLE",
+            "message": "Order is not OUT_FOR_DELIVERY or rider has no live location"
+          }
+        }
+      '''
+    }
+  }
+}

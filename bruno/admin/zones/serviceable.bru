@@ -1,0 +1,78 @@
+meta {
+  name: serviceable
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/zones/{{zoneId}}/serviceable
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "is_serviceable": false,
+    "reason": "Flooding in area; deliveries suspended until further notice."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "a0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("serviceable envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_serviceable).to.equal(false);
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/zones/:id/serviceable — take zone online/offline.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/a0000001-0000-4000-8000-000000000001/serviceable
+    method: patch
+    body:json: {
+      {
+        "is_serviceable": false,
+        "reason": "Flooding in area; deliveries suspended until further notice."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "is_serviceable": false,
+            "reason": "Flooding in area; deliveries suspended until further notice.",
+            "updated_by": "22222222-2222-4222-8222-222222222222",
+            "updated_at": "2026-07-24T11:10:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

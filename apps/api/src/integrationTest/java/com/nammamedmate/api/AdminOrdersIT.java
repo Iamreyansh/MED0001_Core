@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nammamedmate.auth.domain.MagicOtp;
 import com.nammamedmate.order.application.AdminOrderService;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -168,17 +171,21 @@ class AdminOrdersIT extends AbstractApiIT {
     mapMedicine(pharmacyToken, med, 85.00, 500);
 
     String orderId = placeCod(customerToken, med);
+    Instant now = Instant.now();
+    // Use JVM clock (matches Clock.systemUTC() in AdminOrderService) — Podman DB NOW() can skew
     jdbc.update(
         "UPDATE orders SET status = 'OUT_FOR_DELIVERY', payment_status = 'PENDING_COLLECTION',"
-            + " confirmed_at = NOW() - INTERVAL '25 minutes',"
-            + " sla_deadline = NOW() + INTERVAL '2 minutes',"
-            + " prescription_id = ? WHERE id = ?::uuid",
+            + " confirmed_at = ?, sla_deadline = ?, prescription_id = ? WHERE id = ?::uuid",
+        Timestamp.from(now.minus(25, ChronoUnit.MINUTES)),
+        Timestamp.from(now.plus(2, ChronoUnit.MINUTES)),
         UUID.randomUUID(),
         orderId);
     String safeOrder = placeCod(customerToken, med);
     jdbc.update(
-        "UPDATE orders SET status = 'OUT_FOR_DELIVERY', confirmed_at = NOW(),"
-            + " sla_deadline = NOW() + INTERVAL '20 minutes' WHERE id = ?::uuid",
+        "UPDATE orders SET status = 'OUT_FOR_DELIVERY', confirmed_at = ?, sla_deadline = ?"
+            + " WHERE id = ?::uuid",
+        Timestamp.from(now),
+        Timestamp.from(now.plus(20, ChronoUnit.MINUTES)),
         safeOrder);
 
     // AC1 SLA_RISK

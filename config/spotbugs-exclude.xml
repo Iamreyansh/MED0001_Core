@@ -44,6 +44,21 @@
       <Class name="com.nammamedmate.order.application.AdminOrderService$ListResult"/>
       <Class name="com.nammamedmate.order.application.ReorderService$HistoryResult"/>
       <Class name="com.nammamedmate.order.application.port.out.ReorderAttemptLogStore$ReorderAttemptLog"/>
+      <Class name="com.nammamedmate.rider.adapter.in.web.AdminRiderLocationController$GeofenceRequest"/>
+      <Class name="com.nammamedmate.rider.adapter.in.web.RiderLocationController$LocationBatchRequest"/>
+      <Class name="com.nammamedmate.rider.adapter.in.web.AdminDeliveryZoneController$CreateZoneRequest"/>
+      <Class name="com.nammamedmate.rider.adapter.in.web.AdminDeliveryZoneController$PatchZoneRequest"/>
+      <Class name="com.nammamedmate.rider.adapter.in.web.AdminDeliveryZoneController$SurgeRequest"/>
+      <Class name="com.nammamedmate.rider.adapter.in.web.AdminDeliveryZoneController$ServiceableRequest"/>
+      <Class name="com.nammamedmate.rider.application.port.out.DeliveryGeofenceStore$GeofenceRecord"/>
+      <Class name="com.nammamedmate.rider.application.port.out.DeliveryZoneStore$ZoneRow"/>
+      <Class name="com.nammamedmate.rider.application.port.out.DeliveryZoneStore$ZoneSummaryRow"/>
+      <Class name="com.nammamedmate.rider.application.port.out.DeliveryZoneStore$DemandHour"/>
+      <Class name="com.nammamedmate.rider.application.port.out.RebalancingSuggestionStore$SuggestionRow"/>
+      <Class name="com.nammamedmate.rider.application.port.out.RebalancingSuggestionStore$SuggestedRider"/>
+      <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$ListResult"/>
+      <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$CreateZoneCommand"/>
+      <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$PatchZoneCommand"/>
     </Or>
   </Match>
 </FindBugsFilter>

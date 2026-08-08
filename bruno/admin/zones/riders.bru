@@ -1,0 +1,64 @@
+meta {
+  name: zone-riders
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/zones/{{zoneId}}/riders
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    throw new Error("zoneId missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("coverage envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.coverage_status).to.be.a("string");
+    expect(body.data.riders).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/zones/:zone_id/riders — zone riders + COVERED/STRETCHED/NO_RIDERS.
+}
+
+example {
+  name: 200 OK STRETCHED
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            "zone_name": "Koramangala",
+            "coverage_status": "STRETCHED",
+            "online_count": 5,
+            "on_trip_count": 4,
+            "offline_count": 8,
+            "live_orders": 9,
+            "coverage_ratio": 1.8,
+            "avg_rating": 4.5,
+            "riders": []
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

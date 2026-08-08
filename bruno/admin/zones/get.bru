@@ -1,0 +1,75 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/zones/{{zoneId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "a0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.zone_id) {
+    bru.setEnvVar("zoneId", body.data.zone_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("polygon");
+    expect(body.data).to.have.property("riders");
+  });
+}
+
+docs {
+  GET /api/v1/admin/zones/:id — zone detail + riders.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/a0000001-0000-4000-8000-000000000001
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "zone_name": "Koramangala Zone",
+            "city": "Bengaluru",
+            "polygon": { "type": "Polygon", "coordinates": [] },
+            "base_fee": 25.0,
+            "per_km_fee": 5.0,
+            "sla_minutes": 30,
+            "is_serviceable": true,
+            "coverage_status": "COVERED",
+            "riders": []
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

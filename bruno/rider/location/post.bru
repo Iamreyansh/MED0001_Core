@@ -1,0 +1,121 @@
+meta {
+  name: post
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/location
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "points": [
+      {
+        "lat": 12.9352,
+        "lng": 77.6245,
+        "accuracy": 10.5,
+        "speed": 22.4,
+        "heading": 135.0,
+        "timestamp": "2026-07-24T09:20:00Z"
+      },
+      {
+        "lat": 12.9347,
+        "lng": 77.6251,
+        "accuracy": 12.1,
+        "speed": 21.0,
+        "heading": 138.0,
+        "timestamp": "2026-07-24T09:20:10Z"
+      }
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider/verify-otp and set ONLINE first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.latest_position) {
+    bru.setEnvVar("riderLat", String(body.data.latest_position.lat));
+    bru.setEnvVar("riderLng", String(body.data.latest_position.lng));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("batch ingest envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.points_received).to.be.at.least(1);
+    expect(body.data.latest_position).to.have.property("lat");
+  });
+}
+
+docs {
+  POST /api/v1/rider/location — batch GPS (≤60 pts); ONLINE/ON_TRIP only (STORY-004).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/rider/location
+    method: post
+    body:json: {
+      {
+        "points": [
+          {
+            "lat": 12.9352,
+            "lng": 77.6245,
+            "accuracy": 10.5,
+            "speed": 22.4,
+            "heading": 135.0,
+            "timestamp": "2026-07-24T09:20:00Z"
+          }
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "points_received": 1,
+            "points_stored": 1,
+            "points_flagged_low_accuracy": 0,
+            "latest_position": {
+              "lat": 12.9352,
+              "lng": 77.6245,
+              "stored_at": "2026-07-24T09:20:00Z"
+            }
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 RIDER_OFFLINE
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "RIDER_OFFLINE", "message": "Rider status is not ONLINE or ON_TRIP; update discarded" } }
+      '''
+    }
+  }
+}

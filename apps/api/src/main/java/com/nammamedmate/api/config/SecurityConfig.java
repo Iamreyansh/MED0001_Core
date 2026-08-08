@@ -40,16 +40,21 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/catalogue/check-availability")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/delivery/fee-estimate")
+                    .permitAll()
                     .requestMatchers(
                         "/api/v1/auth/customer/send-otp",
                         "/api/v1/auth/customer/verify-otp",
+                        "/api/v1/auth/rider/send-otp",
+                        "/api/v1/auth/rider/verify-otp",
                         "/api/v1/auth/pharmacy/login",
                         "/api/v1/auth/pharmacy/pos-pin",
                         "/api/v1/auth/admin/login",
                         "/api/v1/auth/refresh",
                         "/api/v1/pharmacy/register",
                         "/api/v1/pharmacy/register/verify-email",
-                        "/api/v1/pharmacy/register/resend-otp")
+                        "/api/v1/pharmacy/register/resend-otp",
+                        "/api/v1/rider/register")
                     .permitAll()
                     .requestMatchers("/api/v1/webhooks/**", "/api/v1/internal/kyc/**")
                     .permitAll()
@@ -84,6 +89,35 @@ public class SecurityConfig {
                     .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/cart/**", "/api/v1/pharmacies/**")
                     .hasRole("CUSTOMER")
+                    .requestMatchers("/api/v1/rider/kyc/**")
+                    .hasRole("RIDER")
+                    .requestMatchers("/api/v1/rider/status", "/api/v1/rider/status/**")
+                    .hasRole("RIDER")
+                    .requestMatchers("/api/v1/rider/orders", "/api/v1/rider/orders/**")
+                    .hasRole("RIDER")
+                    .requestMatchers("/api/v1/rider/location", "/api/v1/rider/location/**")
+                    .hasRole("RIDER")
+                    .requestMatchers("/api/v1/rider/cod", "/api/v1/rider/cod/**")
+                    .hasRole("RIDER")
+                    .requestMatchers(
+                        "/api/v1/rider/earnings",
+                        "/api/v1/rider/performance",
+                        "/api/v1/rider/trips")
+                    .hasRole("RIDER")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/finance/cod/*/mark-deposited")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers("/api/v1/admin/finance/cod", "/api/v1/admin/finance/cod/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/riders/*/earnings-ledger")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/riders/*/payout/release")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/riders/*/performance")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    .requestMatchers("/api/v1/admin/dispatch", "/api/v1/admin/dispatch/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers("/api/v1/admin/geofences", "/api/v1/admin/geofences/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers(HttpMethod.POST, "/api/v1/orders/*/payment/cod-collect")
                     .hasRole("RIDER")
                     .requestMatchers("/api/v1/orders/rx-quote/**")
@@ -147,6 +181,10 @@ public class SecurityConfig {
                         "ADMIN_FINANCE",
                         "ADMIN_SUPPORT",
                         "ADMIN_COMPLIANCE")
+                    .requestMatchers("/api/v1/admin/riders/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers("/api/v1/admin/zones/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers(
                         "/api/v1/auth/admin/verify-mfa", "/api/v1/auth/admin/setup-mfa")
                     .hasAnyRole(

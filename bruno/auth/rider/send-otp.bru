@@ -1,0 +1,83 @@
+meta {
+  name: send-otp
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/rider/send-otp
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "phone": "{{riderPhone}}",
+    "device_info": {
+      "platform": "bruno",
+      "device_id": "bruno-rider-device",
+      "app_version": "local"
+    }
+  }
+}
+
+script:pre-request {
+  const phone = bru.getEnvVar("riderPhone") || "+919999900010";
+  bru.setEnvVar("riderPhone", phone);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.session_id) {
+    bru.setEnvVar("riderSessionId", body.data.session_id);
+    bru.setEnvVar("sessionId", body.data.session_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("session_id", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.session_id).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  POST /api/v1/auth/rider/send-otp — same OTP session store as customer; magic range +919999900000–099.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/auth/rider/send-otp
+    method: post
+    body:json: {
+      { "phone": "+919999900010" }
+    }
+  }
+  response: {
+    status: { code: 200 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "phone": "+919999900010",
+            "expires_at": "2026-07-24T01:10:00Z",
+            "resend_allowed_at": "2026-07-24T01:01:00Z",
+            "attempts_remaining": 3
+          }
+        }
+      '''
+    }
+  }
+}

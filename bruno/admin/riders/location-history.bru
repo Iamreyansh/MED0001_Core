@@ -1,0 +1,96 @@
+meta {
+  name: location-history
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/riders/{{riderId}}/location-history?order_id={{orderId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("riderId")) {
+    throw new Error("riderId missing");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.total_points != null) {
+    bru.setEnvVar("locationHistoryPoints", String(body.data.total_points));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("history envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("points");
+    expect(body.data).to.have.property("total_points");
+  });
+}
+
+docs {
+  GET /api/v1/admin/riders/:id/location-history?order_id= — GPS trail; 410 HISTORY_EXPIRED after 30d purge.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/riders/a1b2c3d4-e5f6-7890-abcd-ef1234567890/location-history?order_id=c3d4e5f6-a7b8-9012-cdef-123456789012
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "order_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+            "total_points": 48,
+            "distance_km": 2.4,
+            "points": [
+              {
+                "lat": 12.9352,
+                "lng": 77.6245,
+                "accuracy": 10.5,
+                "speed_kmh": 22.4,
+                "heading": 135.0,
+                "low_accuracy": false,
+                "timestamp": "2026-07-24T09:20:00Z"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 410 HISTORY_EXPIRED
+  response: {
+    status: { code: 410 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "HISTORY_EXPIRED", "message": "Location history older than 30 days" } }
+      '''
+    }
+  }
+}

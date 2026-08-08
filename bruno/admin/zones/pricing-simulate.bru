@@ -1,0 +1,119 @@
+meta {
+  name: pricing-simulate
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/zones/pricing/simulate
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "zone_id": "{{zoneId}}",
+    "distance_km": 3.2,
+    "order_value": 150.00
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "a0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("simulate breakdown", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.breakdown).to.have.property("delivery_fee");
+    expect(body.data).to.have.property("rider_delivery_payout");
+  });
+}
+
+docs {
+  POST /api/v1/admin/zones/pricing/simulate — planning-only fee simulator (EPIC-011/STORY-006).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/pricing/simulate
+    method: post
+    body:json: {
+      {
+        "zone_id": "a0000001-0000-4000-8000-000000000001",
+        "distance_km": 3.2,
+        "order_value": 150.00
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "zone_name": "Koramangala",
+            "input": { "distance_km": 3.2, "order_value": 150.00 },
+            "breakdown": {
+              "base_fee": 25.00,
+              "distance_charge": 16.00,
+              "subtotal_before_surge": 41.00,
+              "surge_multiplier": 1.0,
+              "surge_charge": 0.00,
+              "delivery_fee": 41.00,
+              "handling_fee": 5.00,
+              "free_delivery_waiver": false,
+              "total_customer_pays": 46.00
+            },
+            "rider_delivery_payout": 40.30,
+            "rider_payout_note": "delivery_fee - Rs 0.70 = Rs 40.30; above Rs 15 minimum."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ZONE_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/pricing/simulate
+    method: post
+    body:json: {
+      {
+        "zone_id": "00000000-0000-4000-8000-000000000099",
+        "distance_km": 1.0,
+        "order_value": 100.00
+      }
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "ZONE_NOT_FOUND", "message": "zone_id does not exist" }
+        }
+      '''
+    }
+  }
+}

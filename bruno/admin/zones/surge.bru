@@ -1,0 +1,104 @@
+meta {
+  name: surge
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/zones/{{zoneId}}/surge
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "is_surge_active": true,
+    "surge_multiplier": 1.5
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "a0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("surge envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_surge_active).to.equal(true);
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/zones/:id/surge — toggle surge pricing.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/a0000001-0000-4000-8000-000000000001/surge
+    method: patch
+    body:json: {
+      {
+        "is_surge_active": true,
+        "surge_multiplier": 1.5
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "is_surge_active": true,
+            "surge_multiplier": 1.5,
+            "updated_by": "22222222-2222-4222-8222-222222222222",
+            "updated_at": "2026-07-24T11:05:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_MULTIPLIER
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/a0000001-0000-4000-8000-000000000001/surge
+    method: patch
+    body:json: {
+      {
+        "is_surge_active": true,
+        "surge_multiplier": 0.5
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INVALID_MULTIPLIER", "message": "surge_multiplier < 1.0 or > 5.0" }
+        }
+      '''
+    }
+  }
+}

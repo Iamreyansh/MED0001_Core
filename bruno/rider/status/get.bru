@@ -1,0 +1,60 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/rider/status
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("status envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.rider_id).to.be.a("string");
+    expect(body.data.status).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/rider/status — current status, shift, active order, earnings today.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "status": "ONLINE",
+            "zone_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            "zone_name": "Koramangala",
+            "shift_started_at": "2026-07-24T08:00:00Z",
+            "shift_duration_minutes": 147,
+            "active_order": null,
+            "earnings_today": { "base": 0.00, "incentives": 0.00, "tips": 0.00, "total": 0.00 },
+            "daily_streak_days": 5
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

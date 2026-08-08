@@ -1,0 +1,153 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/zones
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "zone_name": "HSR Layout",
+    "city": "Bengaluru",
+    "polygon": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [77.6300, 12.9000],
+          [77.6500, 12.9000],
+          [77.6500, 12.9200],
+          [77.6300, 12.9200],
+          [77.6300, 12.9000]
+        ]
+      ]
+    },
+    "base_fee": 25.00,
+    "per_km_fee": 5.00,
+    "sla_minutes": 30,
+    "min_order_value": 50.00,
+    "free_delivery_threshold": 199.00,
+    "surge_multiplier": 1.5,
+    "is_serviceable": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.zone_id) {
+    bru.setEnvVar("zoneId", body.data.zone_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("zone_id");
+    expect(body.data).to.have.property("area_sq_km");
+  });
+}
+
+docs {
+  POST /api/v1/admin/zones — create GeoJSON [lng,lat] polygon zone.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "zone_name": "HSR Layout",
+        "city": "Bengaluru",
+        "polygon": {
+          "type": "Polygon",
+          "coordinates": [[[77.6300,12.9000],[77.6500,12.9000],[77.6500,12.9200],[77.6300,12.9200],[77.6300,12.9000]]]
+        },
+        "base_fee": 25.00,
+        "per_km_fee": 5.00,
+        "sla_minutes": 30,
+        "min_order_value": 50.00,
+        "free_delivery_threshold": 199.00,
+        "surge_multiplier": 1.5,
+        "is_serviceable": true
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "11111111-1111-4111-8111-111111111111",
+            "zone_name": "HSR Layout",
+            "city": "Bengaluru",
+            "is_serviceable": true,
+            "base_fee": 25.0,
+            "per_km_fee": 5.0,
+            "sla_minutes": 30,
+            "min_order_value": 50.0,
+            "free_delivery_threshold": 199.0,
+            "surge_multiplier": 1.5,
+            "is_surge_active": false,
+            "area_sq_km": 4.5,
+            "created_at": "2026-07-24T10:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ZONE_NAME_DUPLICATE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones
+    method: post
+    body:json: {
+      {
+        "zone_name": "Koramangala Zone",
+        "city": "Bengaluru",
+        "polygon": {
+          "type": "Polygon",
+          "coordinates": [[[77.61,12.92],[77.64,12.92],[77.64,12.945],[77.61,12.945],[77.61,12.92]]]
+        },
+        "base_fee": 25.00,
+        "per_km_fee": 5.00
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "ZONE_NAME_DUPLICATE", "message": "Zone name already exists in the same city" }
+        }
+      '''
+    }
+  }
+}

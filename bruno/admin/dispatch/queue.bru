@@ -1,0 +1,85 @@
+meta {
+  name: queue
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/dispatch/queue?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — admin login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.queue && body.data.queue.length) {
+    bru.setEnvVar("orderId", body.data.queue[0].order_id);
+    if (body.data.queue[0].recommended_rider) {
+      bru.setEnvVar("riderId", body.data.queue[0].recommended_rider.rider_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("queue envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.queue).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/dispatch/queue — unassigned READY_FOR_PICKUP orders (admin_operations / admin_super).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "queue": [
+              {
+                "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+                "order_number": "MED-20260724-001",
+                "pharmacy_id": "pharmaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "pharmacy_name": "Apollo Pharmacy, Koramangala",
+                "zone_id": "zoneeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                "zone_name": "Koramangala",
+                "items_count": 3,
+                "order_value": 450.00,
+                "payment_method": "UPI",
+                "created_at": "2026-07-24T09:00:00Z",
+                "wait_minutes": 7,
+                "recommended_rider": {
+                  "rider_id": "riderrrr-rrrr-4rrr-8rrr-rrrrrrrrrrrr",
+                  "name": "Ravi Kumar",
+                  "vehicle_type": "BIKE",
+                  "avg_rating": 4.7,
+                  "distance_from_pharmacy_km": 0.8,
+                  "trips_today": 12,
+                  "concurrent_active_orders": 0,
+                  "composite_score": 87.4
+                }
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 14, "has_next": false, "unassigned_total": 14 }
+        }
+      '''
+    }
+  }
+}

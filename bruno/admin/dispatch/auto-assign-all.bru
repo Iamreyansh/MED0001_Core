@@ -1,0 +1,94 @@
+meta {
+  name: auto-assign-all
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/dispatch/auto-assign-all
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+tests {
+  test("HTTP 200 or 403", function () {
+    expect([200, 403]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("attempted");
+    } else {
+      expect(body.error.code).to.equal("AUTO_ASSIGN_DISABLED");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/dispatch/auto-assign-all — score ONLINE riders and assign (flag auto_assign_enabled).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "attempted": 14,
+            "assigned": 11,
+            "failed_no_rider": 3,
+            "assignments": [
+              {
+                "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+                "rider_id": "riderrrr-rrrr-4rrr-8rrr-rrrrrrrrrrrr",
+                "rider_name": "Ravi Kumar",
+                "composite_score": 87.4
+              }
+            ],
+            "unassigned_orders": [
+              {
+                "order_id": "ord22222-dddd-4ddd-8ddd-dddddddddddd",
+                "reason": "NO_ELIGIBLE_RIDER"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 AUTO_ASSIGN_DISABLED
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "AUTO_ASSIGN_DISABLED",
+            "message": "auto_assign_enabled is false"
+          }
+        }
+      '''
+    }
+  }
+}

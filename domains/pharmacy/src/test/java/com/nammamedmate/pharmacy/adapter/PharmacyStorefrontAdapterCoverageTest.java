@@ -7,15 +7,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.api.ApiResponse;
-import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyStorefrontController;
 import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyStorefrontController.CataloguePauseRequest;
 import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyStorefrontController.StorefrontRequest;
 import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyStorefrontController.ZoneRequest;
-import com.nammamedmate.pharmacy.adapter.in.web.AdminZoneController;
 import com.nammamedmate.pharmacy.adapter.in.web.PharmacyStorefrontController;
-import com.nammamedmate.pharmacy.application.AdminZoneService;
-import com.nammamedmate.pharmacy.application.AdminZoneService.ZoneListResult;
 import com.nammamedmate.pharmacy.application.CataloguePauseService;
 import com.nammamedmate.pharmacy.application.PharmacyStorefrontService;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -60,19 +56,6 @@ class PharmacyStorefrontAdapterCoverageTest {
     controller.toggleStorefront(principal, PID, null, request);
     controller.reassignZone(principal, PID, null, request);
     controller.pauseCatalogue(principal, PID, null, request);
-  }
-
-  @Test
-  void adminZoneController() {
-    AdminZoneService service = mock(AdminZoneService.class);
-    AdminZoneController controller = new AdminZoneController(service);
-    when(service.list(any(), any(), any()))
-        .thenReturn(
-            new ZoneListResult(Map.of("zones", java.util.List.of()), PaginationMeta.of(1, 0, 0)));
-
-    ApiResponse<Map<String, Object>> resp =
-        controller.list(mock(MedmatePrincipal.class), "Bengaluru", true);
-    assertThat(resp.data()).containsKey("zones");
   }
 
   @Test

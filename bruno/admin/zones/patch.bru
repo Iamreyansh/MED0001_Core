@@ -1,0 +1,77 @@
+meta {
+  name: patch
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/zones/{{zoneId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "sla_minutes": 25,
+    "per_km_fee": 6.00
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "a0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("updated_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/zones/:id — partial zone config update.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/a0000001-0000-4000-8000-000000000001
+    method: patch
+    body:json: {
+      {
+        "sla_minutes": 25,
+        "per_km_fee": 6.00
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "zone_id": "a0000001-0000-4000-8000-000000000001",
+            "sla_minutes": 25,
+            "per_km_fee": 6.0,
+            "updated_at": "2026-07-24T11:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,85 @@
+meta {
+  name: reassign
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/dispatch/orders/{{orderId}}/reassign
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "rider_id": "{{riderId}}",
+    "reason": "RIDER_NO_SHOW"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.assignment_id) {
+    bru.setEnvVar("assignmentId", body.data.assignment_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reassign envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("previous_rider_id");
+    expect(body.data).to.have.property("new_rider_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/dispatch/orders/:order_id/reassign — close prior assignment as REASSIGNED.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/dispatch/orders/ordddddd-dddd-4ddd-8ddd-dddddddddddd/reassign
+    method: post
+    body:json: {
+      {
+        "rider_id": "riderrr2-rrrr-4rrr-8rrr-rrrrrrrrrrrr",
+        "reason": "RIDER_NO_SHOW"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "assignment_id": "assiiiii-iiii-4iii-8iii-iiiiiiiiiiii",
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "previous_rider_id": "riderrrr-rrrr-4rrr-8rrr-rrrrrrrrrrrr",
+            "new_rider_id": "riderrr2-rrrr-4rrr-8rrr-rrrrrrrrrrrr",
+            "reason": "RIDER_NO_SHOW",
+            "reassigned_by": "adminnnn-nnnn-4nnn-8nnn-nnnnnnnnnnnn",
+            "reassigned_at": "2026-07-24T09:15:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

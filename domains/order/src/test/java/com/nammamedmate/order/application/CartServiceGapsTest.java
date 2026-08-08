@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
+import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.application.port.out.CartStore;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort.AddressRow;
@@ -83,6 +84,7 @@ class CartServiceGapsTest {
             wallet,
             prescriptions,
             zones,
+            new StubDeliveryFeeAdapter(),
             rateLimiter,
             clock);
   }

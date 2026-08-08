@@ -1,0 +1,77 @@
+meta {
+  name: rebalancing-suggestions
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/zones/rebalancing-suggestions
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.suggestions && body.data.suggestions[0]) {
+    bru.setEnvVar("suggestionId", body.data.suggestions[0].suggestion_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("suggestions envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.suggestions).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/zones/rebalancing-suggestions — stub AI suggestions (EPIC-015 later).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/rebalancing-suggestions
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "suggestions": [
+              {
+                "suggestion_id": "33333333-3333-4333-8333-333333333333",
+                "from_zone_id": "a0000001-0000-4000-8000-000000000001",
+                "from_zone_name": "Koramangala",
+                "to_zone_id": "a0000002-0000-4000-8000-000000000002",
+                "to_zone_name": "Indiranagar",
+                "riders_to_move": 2,
+                "reason": "Indiranagar has pending orders with low supply.",
+                "confidence_pct": 88.4,
+                "suggested_riders": [
+                  { "rider_id": "44444444-4444-4444-8444-444444444444", "name": "Ravi Kumar", "distance_to_target_km": 1.2 }
+                ],
+                "generated_at": "2026-07-24T11:15:00Z"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

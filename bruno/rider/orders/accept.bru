@@ -1,0 +1,89 @@
+meta {
+  name: accept
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/orders/{{orderId}}/accept
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing");
+  }
+}
+
+script:post-response {
+  // Pickup OTP is pharmacy-screen only; set manually / from pharmacy dashboard for pickup-confirm.
+}
+
+tests {
+  test("HTTP 200 or 410", function () {
+    expect([200, 409, 410]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.assignment_status).to.equal("ACCEPTED");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/rider/orders/:order_id/accept — accept within 5-minute window.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "assignment_id": "assiiiii-iiii-4iii-8iii-iiiiiiiiiiii",
+            "assignment_status": "ACCEPTED",
+            "accepted_at": "2026-07-24T09:08:30Z",
+            "pharmacy_address": "100 Feet Road, Koramangala 5th Block, Bengaluru",
+            "pharmacy_lat": 12.9352,
+            "pharmacy_lng": 77.6245
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 410 ASSIGNMENT_EXPIRED
+  response: {
+    status: { code: 410 text: Gone }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ASSIGNMENT_EXPIRED",
+            "message": "5-minute acceptance window has elapsed"
+          }
+        }
+      '''
+    }
+  }
+}

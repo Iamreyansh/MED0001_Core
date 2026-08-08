@@ -5,6 +5,8 @@ import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.order.application.port.out.CartStore;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort.AddressRow;
+import com.nammamedmate.order.application.port.out.DeliveryFeePort;
+import com.nammamedmate.order.application.port.out.DeliveryFeePort.FeeQuote;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.MedicineDetails;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.StockLine;
@@ -47,6 +49,7 @@ public class CartService {
   private final WalletBalancePort wallet;
   private final PrescriptionPort prescriptions;
   private final ZoneMembershipPort zones;
+  private final DeliveryFeePort deliveryFees;
   private final RateLimiter rateLimiter;
   private final Clock clock;
 
@@ -59,6 +62,7 @@ public class CartService {
       WalletBalancePort wallet,
       PrescriptionPort prescriptions,
       ZoneMembershipPort zones,
+      DeliveryFeePort deliveryFees,
       RateLimiter rateLimiter,
       Clock clock) {
     this.carts = carts;
@@ -69,6 +73,7 @@ public class CartService {
     this.wallet = wallet;
     this.prescriptions = prescriptions;
     this.zones = zones;
+    this.deliveryFees = deliveryFees;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
   }
@@ -286,7 +291,7 @@ public class CartService {
     if (cart.pharmacyId() != null
         && !zones.isInPharmacyZone(cart.pharmacyId(), address.lat(), address.lng())) {
       throw new AppException(
-          "ADDRESS_OUT_OF_ZONE", "Delivery address outside pharmacy serviceable zone", 422);
+          "ADDRESS_NOT_SERVICEABLE", "Delivery address outside pharmacy serviceable zone", 422);
     }
     cart.setDeliveryAddressId(address.id());
     cart.touch(now());
@@ -495,7 +500,7 @@ public class CartService {
 
   private Map<String, Object> toCartView(Cart cart) {
     long walletBal = wallet.balancePaise(cart.customerId());
-    Bill bill = CartPricing.compute(cart.itemTotalPaise(), cart.couponCode(), walletBal);
+    Bill bill = computeBill(cart, walletBal);
     cart.setCoupon(cart.couponCode(), bill.couponDiscountPaise());
 
     Map<String, Object> data = new LinkedHashMap<>();
@@ -627,6 +632,32 @@ public class CartService {
     m.put("wallet_applied", CartPricing.paiseToRupees(bill.walletAppliedPaise()));
     m.put("total_payable", CartPricing.paiseToRupees(bill.totalPayablePaise()));
     return m;
+  }
+
+  Bill computeBill(Cart cart, long walletBal) {
+    Double lat = null;
+    Double lng = null;
+    if (cart.deliveryAddressId() != null) {
+      Optional<AddressRow> addr =
+          addresses.findForCustomer(cart.deliveryAddressId(), cart.customerId());
+      if (addr.isPresent()) {
+        lat = addr.get().lat();
+        lng = addr.get().lng();
+      }
+    }
+    boolean freeDel = "FREEDEL".equals(CartPricing.normalize(cart.couponCode()));
+    Optional<FeeQuote> quote =
+        deliveryFees.quote(cart.pharmacyId(), lat, lng, cart.itemTotalPaise(), freeDel);
+    if (quote.isPresent()) {
+      FeeQuote q = quote.get();
+      return CartPricing.compute(
+          cart.itemTotalPaise(),
+          cart.couponCode(),
+          walletBal,
+          q.deliveryFeePaise(),
+          q.handlingFeePaise());
+    }
+    return CartPricing.compute(cart.itemTotalPaise(), cart.couponCode(), walletBal);
   }
 
   private Instant now() {

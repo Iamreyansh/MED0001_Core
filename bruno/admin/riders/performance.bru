@@ -1,0 +1,82 @@
+meta {
+  name: performance
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/riders/{{riderId}}/performance
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken") && !bru.getEnvVar("adminAccessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("accessToken") && bru.getEnvVar("adminAccessToken")) {
+    bru.setEnvVar("accessToken", bru.getEnvVar("adminAccessToken"));
+  }
+  if (!bru.getEnvVar("riderId")) {
+    throw new Error("riderId missing — run admin/riders/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("riderRiskStatus", String(body.data.risk_status));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin performance envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("acceptance_rate_pct");
+    expect(body.data).to.have.property("cod_in_hand");
+    expect(body.data).to.have.property("alerts");
+  });
+}
+
+docs {
+  GET /api/v1/admin/riders/:id/performance — ops/finance performance profile.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "name": "Ravi Kumar",
+            "zone_name": "Koramangala",
+            "trips_total": 1924,
+            "trips_this_week": 75,
+            "on_time_pct": 91.2,
+            "acceptance_rate_pct": 94.5,
+            "avg_rating": 4.72,
+            "avg_pickup_minutes": 6.4,
+            "avg_delivery_minutes": 17.8,
+            "cancel_rate_pct": 1.2,
+            "total_distance_km": 4821.3,
+            "cod_in_hand": 1850.00,
+            "cod_float_limit": 2000.00,
+            "risk_status": "SAFE",
+            "daily_streak_days": 5,
+            "alerts": []
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

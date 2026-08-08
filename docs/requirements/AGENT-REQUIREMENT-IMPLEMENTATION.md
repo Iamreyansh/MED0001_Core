@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 33 |
+| Phase 1 | 46 | 41 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **33** |
+| **Total** | **129** | **39** |
 
 ---
 
@@ -92,14 +92,14 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-011 | [STORY-001](./EPIC-011-rider-delivery/STORY-001-rider-onboarding-kyc.md) | Rider Onboarding & KYC | pending | — | — |
-| EPIC-011 | [STORY-002](./EPIC-011-rider-delivery/STORY-002-rider-status-shift.md) | Rider Availability & Shift Management | pending | — | — |
-| EPIC-011 | [STORY-003](./EPIC-011-rider-delivery/STORY-003-order-assignment-engine.md) | Order Assignment Engine | pending | — | — |
-| EPIC-011 | [STORY-004](./EPIC-011-rider-delivery/STORY-004-realtime-rider-tracking.md) | Real-Time Rider GPS Tracking | pending | — | — |
-| EPIC-011 | [STORY-005](./EPIC-011-rider-delivery/STORY-005-delivery-zone-management.md) | Delivery Zone Management | pending | — | — |
-| EPIC-011 | [STORY-006](./EPIC-011-rider-delivery/STORY-006-delivery-pricing.md) | Delivery Fee Pricing | pending | — | — |
-| EPIC-011 | [STORY-007](./EPIC-011-rider-delivery/STORY-007-cod-reconciliation.md) | COD Reconciliation (Rider Side) | pending | — | — |
-| EPIC-011 | [STORY-008](./EPIC-011-rider-delivery/STORY-008-rider-incentives-performance.md) | Rider Incentives & Performance | pending | — | — |
+| EPIC-011 | [STORY-001](./EPIC-011-rider-delivery/STORY-001-rider-onboarding-kyc.md) | Rider Onboarding & KYC | done | 2026-08-08 | `domains/rider`; V035; rider OTP auth; KYC under private `kyc/riders/`; multipart story waiver (pharmacy-style); Aadhaar stub+flag; OrderRiderBridgeConfig; session revoke on block |
+| EPIC-011 | [STORY-002](./EPIC-011-rider-delivery/STORY-002-rider-status-shift.md) | Rider Availability & Shift Management | done | 2026-08-08 | `domains/rider`; V036 shifts+audit; Redis status; ActiveDeliveryPort bridge; OFFLINE_DURING_DELIVERY 200+warning; fleet limit default 20 |
+| EPIC-011 | [STORY-003](./EPIC-011-rider-delivery/STORY-003-order-assignment-engine.md) | Order Assignment Engine | done | 2026-08-08 | `domains/rider`; V037 assignments+earnings stub; Redis OTP; timeout requeue; pickup OTP pharmacy-only; meta.unassigned_total; distance stub |
+| EPIC-011 | [STORY-004](./EPIC-011-rider-delivery/STORY-004-realtime-rider-tracking.md) | Real-Time Rider GPS Tracking | done | 2026-08-08 | `domains/rider`; V038 PostGIS+locations+geofences; Redis 5m; SSE afterCommit; 30d purge; Bruno stream |
+| EPIC-011 | [STORY-005](./EPIC-011-rider-delivery/STORY-005-delivery-zone-management.md) | Delivery Zone Management | done | 2026-08-08 | `domains/rider`; V039 zones polygon+fees+surge; rebalancing stub; OrderZoneBridgeConfig ZoneMembershipPort; list limit default 20 |
+| EPIC-011 | [STORY-006](./EPIC-011-rider-delivery/STORY-006-delivery-pricing.md) | Delivery Fee Pricing | done | 2026-08-08 | `domains/rider`; V040 snapshots+platform_pricing; DeliveryFeePort bridge; public fee-estimate 30/min; formula (base+km×perKm)×surge |
+| EPIC-011 | [STORY-007](./EPIC-011-rider-delivery/STORY-007-cod-reconciliation.md) | COD Reconciliation (Rider Side) | done | 2026-08-08 | `domains/rider`; V041 cod_collections/deposits; float ₹2000; finance mark-deposited (`finance:update`); rider COD view/request; no auto-confirm; FLOAT_RISK + 23:00 IST report outbox; OrderCodBridgeConfig |
+| EPIC-011 | [STORY-008](./EPIC-011-rider-delivery/STORY-008-rider-incentives-performance.md) | Rider Incentives & Performance | done | 2026-08-08 | `domains/rider`; V042 earnings/payouts/badges + V043 payout Idempotency-Key; weekly Mon IST cron; Razorpay Route stub + 24h retry; HELD/COD deduct/₹100 carry-forward; Bruno synced; EPIC-015 incentives stub |
 
 ### EPIC-021 (`EPIC-021-settings-admin`)
 

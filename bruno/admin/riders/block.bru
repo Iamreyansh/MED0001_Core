@@ -1,0 +1,79 @@
+meta {
+  name: block
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/riders/{{riderId}}/block
+  body: json
+  auth: inherit
+}
+
+body:json {
+  { "reason": "FRAUD_SUSPECTED", "notes": "Pending investigation" }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("BLOCKED", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("BLOCKED");
+  });
+}
+
+docs {
+  POST /api/v1/admin/riders/{id}/block
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/riders/{{riderId}}/block
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      { "reason": "FRAUD_SUSPECTED", "notes": "Pending investigation" }
+    }
+  }
+  response: {
+    status: { code: 200 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "status": "BLOCKED"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 RIDER_NOT_FOUND
+  response: {
+    status: { code: 404 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "RIDER_NOT_FOUND", "message": "rider_id does not exist" } }
+      '''
+    }
+  }
+}

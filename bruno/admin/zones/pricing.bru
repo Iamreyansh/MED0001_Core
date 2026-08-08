@@ -1,0 +1,83 @@
+meta {
+  name: pricing
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/zones/pricing
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.zones && body.data.zones[0]) {
+    bru.setEnvVar("zoneId", body.data.zones[0].zone_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pricing table envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("handling_fee");
+    expect(body.data.zones).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/zones/pricing — per-zone delivery fee structure (EPIC-011/STORY-006).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/zones/pricing
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "handling_fee": 5.00,
+            "zones": [
+              {
+                "zone_id": "a0000001-0000-4000-8000-000000000001",
+                "zone_name": "Koramangala",
+                "city": "Bengaluru",
+                "base_fee": 25.00,
+                "per_km_fee": 5.00,
+                "sla_minutes": 30,
+                "min_order_value": 50.00,
+                "free_delivery_threshold": 199.00,
+                "surge_multiplier": 1.5,
+                "is_surge_active": false,
+                "effective_surge": 1.0,
+                "sample_fee_2km": 35.00,
+                "sample_fee_5km": 50.00
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
