@@ -15,6 +15,30 @@ What it configures:
 | IAM role | `arn:aws:iam::105927215604:role/med0001-gha-deploy` |
 | Repo variable | `AWS_DEPLOY_ROLE_ARN` |
 | Environments | `staging`, `production` (needs **repo admin** on `gh`; else first workflow run creates them) |
+| CI S3 bucket | `med0001-gha-ci-105927215604` (Gradle cache, boot jars, reports, tf plans — **not** GitHub Actions storage) |
+
+## CI S3 storage (no GitHub Actions cache/artifacts)
+
+All durable CI blobs go to the shared bucket owned by the **staging** Terraform stack (account `105927215604`). Quota for Actions caches/artifacts is on the **repo owner** account; this design keeps that usage at zero.
+
+| Prefix | Contents | Lifecycle |
+|--------|----------|-----------|
+| `gradle-cache/` | tar of `~/.gradle/{caches,wrapper}` | 14 days |
+| `artifacts/<sha>/` | boot jars between `deploy-main` jobs | 3 days |
+| `reports/<run_id>/` | JaCoCo/SpotBugs/test reports on failure | 7 days |
+| `tfplans/<run_id>/` | terraform plan text from quality-gates | 7 days |
+
+Bootstrap: `deploy-main` runs a targeted staging apply (`aws_s3_bucket.gha_ci` + lifecycle/encryption/PAB + `gha_deploy` IAM) before uploading jars. Full staging apply still runs in `deploy-staging`. Break-glass locally:
+
+```bash
+make tf-init ENV=staging
+terraform -chdir=infra/terraform/stacks/staging apply -auto-approve \
+  -target=aws_s3_bucket.gha_ci \
+  -target=aws_s3_bucket_public_access_block.gha_ci \
+  -target=aws_s3_bucket_server_side_encryption_configuration.gha_ci \
+  -target=aws_s3_bucket_lifecycle_configuration.gha_ci \
+  -target=aws_iam_role_policy.gha_deploy
+```
 
 ## OIDC subject claim (important)
 

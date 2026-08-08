@@ -17,9 +17,11 @@ locals {
   api_image       = "${local.account_id}.dkr.ecr.ap-south-1.amazonaws.com/${local.name}-api:${var.image_tag}"
   worker_image    = "${local.account_id}.dkr.ecr.ap-south-1.amazonaws.com/${local.name}-worker:${var.image_tag}"
   state_bucket    = "terraform-locks-105927215604"
-  github_org      = "Iamreyansh"
-  github_repo     = "MED0001_Core"
-  deploy_role     = "med0001-gha-deploy"
+  # Shared CI cache/artifacts (not app uploads). Owned by staging stack.
+  ci_bucket   = "med0001-gha-ci-105927215604"
+  github_org  = "Iamreyansh"
+  github_repo = "MED0001_Core"
+  deploy_role = "med0001-gha-deploy"
   # Public media only — private keys (kyc/, prescriptions/, …) stay presigned-S3.
   cdn_public_prefixes = ["avatars/", "products/", "pharmacies/", "doctors/", "riders/", "banners/"]
 }

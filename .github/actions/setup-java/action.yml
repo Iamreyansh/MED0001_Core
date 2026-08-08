@@ -1,5 +1,11 @@
 name: Setup Java 21
-description: Temurin 21 + Gradle User Home cache
+description: Temurin 21 + Gradle (no GitHub Actions cache; S3 restore optional)
+
+inputs:
+  restore-s3-cache:
+    description: Restore Gradle caches from CI_S3_BUCKET (AWS creds must already be configured)
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -10,11 +16,18 @@ runs:
         java-version: "21"
     - uses: gradle/actions/setup-gradle@v4
       with:
-        # Warm cache on same-repo PRs; read-only only for fork PRs (untrusted).
-        cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-        gradle-home-cache-cleanup: true
+        # All durable CI blobs live in S3 — never write GitHub Actions cache.
+        cache-disabled: true
     - name: CI Gradle workers
       shell: bash
       run: |
         mkdir -p ~/.gradle
         echo 'org.gradle.workers.max=4' >> ~/.gradle/gradle.properties
+    - name: Restore Gradle cache from S3
+      if: inputs.restore-s3-cache == 'true'
+      shell: bash
+      env:
+        CI_S3_BUCKET: med0001-gha-ci-105927215604
+      run: |
+        chmod +x scripts/ci-gradle-s3-cache.sh
+        scripts/ci-gradle-s3-cache.sh restore
