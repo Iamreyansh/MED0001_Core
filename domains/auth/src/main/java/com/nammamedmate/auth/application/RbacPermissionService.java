@@ -52,7 +52,12 @@ public class RbacPermissionService {
 
   public void requirePermission(MedmatePrincipal principal, String required) {
     if (!hasPermission(principal, required)) {
-      throw new AppException("FORBIDDEN", "Insufficient permissions", 403);
+      throw new AppException(
+          "INSUFFICIENT_PERMISSIONS",
+          "Insufficient permissions",
+          403,
+          null,
+          Map.of("required_permission", required));
     }
   }
 
@@ -65,7 +70,8 @@ public class RbacPermissionService {
       return true;
     }
     if (isAdmin(role)) {
-      return PermissionMatcher.allows(AdminRoleDefinitions.permissionsFor(role.value()), required);
+      return PermissionMatcher.allows(
+          AdminRoleDefinitions.enforcementPermissionsFor(role.value()), required);
     }
     if (role == AuthRole.PHARMACY_OWNER || role == AuthRole.PHARMACY_STAFF) {
       return hasPharmacyPermission(principal, required);

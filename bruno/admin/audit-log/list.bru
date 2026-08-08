@@ -1,0 +1,98 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/audit-log?page=1&limit=20&sort=timestamp&order=desc
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && Array.isArray(body.data) && body.data.length)) {
+    return;
+  }
+  if (body.data[0].id) {
+    bru.setEnvVar("auditLogId", body.data[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/admin/audit-log — list audit entries (any admin). Filters: actor_id, actor_type, resource_type, resource_id, action, from, to. export=true queues CSV.
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/audit-log?page=1&limit=20&resource_type=pharmacy
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "a1000001-0000-4000-8000-0000000000a1",
+              "actor": {
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "name": "Ayesha Siddiqui",
+                "role": "admin_super",
+                "type": "ADMIN"
+              },
+              "action": "pharmacy.suspend",
+              "resource_type": "pharmacy",
+              "resource_id": "b1000001-0000-4000-8000-0000000000b1",
+              "before_state": { "status": "ACTIVE" },
+              "after_state": { "status": "SUSPENDED" },
+              "metadata": { "method": "PATCH", "url": "/api/v1/admin/pharmacies/b1000001-0000-4000-8000-0000000000b1/suspend", "status_code": 200 },
+              "ip_address": "106.51.0.1",
+              "user_agent": "Mozilla/5.0",
+              "timestamp": "2026-07-24T01:00:00Z"
+            }
+          ],
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Admin access required" } }
+      '''
+    }
+  }
+}

@@ -58,8 +58,57 @@ class JdbcCatalogueAuditLogStoreTest {
             Map.of(),
             null,
             Instant.parse("2026-08-08T00:00:00Z")));
-    verify(jdbc, org.mockito.Mockito.times(3))
-        .update(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    store.append(
+        new AuditLogRecord(
+            UUID.randomUUID(),
+            null,
+            UUID.randomUUID(),
+            "X",
+            UUID.randomUUID(),
+            "R",
+            Map.of("before", Map.of("a", 1), "after", Map.of("a", 2)),
+            "1.1.1.1",
+            Instant.parse("2026-08-08T00:00:00Z")));
+    store.append(
+        new AuditLogRecord(
+            UUID.randomUUID(),
+            "MEDICINE",
+            UUID.randomUUID(),
+            "X",
+            UUID.randomUUID(),
+            "R",
+            Map.of("before", Map.of("a", 1)),
+            "1.1.1.1",
+            Instant.parse("2026-08-08T00:00:00Z")));
+    store.append(
+        new AuditLogRecord(
+            UUID.randomUUID(),
+            "MEDICINE",
+            UUID.randomUUID(),
+            "X",
+            UUID.randomUUID(),
+            "R",
+            Map.of("after", Map.of("a", 2)),
+            "1.1.1.1",
+            Instant.parse("2026-08-08T00:00:00Z")));
+    verify(jdbc, org.mockito.Mockito.atLeast(3))
+        .update(
+            anyString(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any());
   }
 
   @Test

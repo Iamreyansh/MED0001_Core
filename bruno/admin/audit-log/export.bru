@@ -1,0 +1,66 @@
+meta {
+  name: export
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/audit-log?export=true&from=2026-01-01&to=2026-12-31
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.export_job_id) {
+    bru.setEnvVar("auditExportJobId", body.data.export_job_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("queued export", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("QUEUED");
+    expect(body.data.export_job_id).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/admin/audit-log?export=true — always queues async CSV export (presigned URL emailed, 1h expiry stub).
+}
+
+example {
+  name: 200 QUEUED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/audit-log?export=true
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "export_job_id": "e1000001-0000-4000-8000-0000000000e1",
+            "status": "QUEUED",
+            "message": "CSV export is being generated. You will receive an email with the download link."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

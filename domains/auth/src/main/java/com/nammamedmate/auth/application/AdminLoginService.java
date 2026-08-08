@@ -151,7 +151,9 @@ public class AdminLoginService {
       throw locked(admin.lockedUntil());
     }
 
-    if (!staffPasswordEncoder.matches(password, admin.passwordHash())) {
+    if (admin.passwordHash() == null
+        || admin.passwordHash().isBlank()
+        || !staffPasswordEncoder.matches(password, admin.passwordHash())) {
       AdminStaffRecord updated = applyFailure(admin, now);
       staffStore.save(updated);
       audit(

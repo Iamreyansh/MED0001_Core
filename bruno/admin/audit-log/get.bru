@@ -1,0 +1,97 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/audit-log/{{auditLogId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("auditLogId")) {
+    throw new Error("auditLogId missing — run admin/audit-log/list first");
+  }
+}
+
+script:post-response {
+  // no-op
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope with diff", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("object");
+    expect(body.data.diff).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/audit-log/:id — detail with computed JSON Patch diff.
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 AUDIT_LOG_NOT_FOUND
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/audit-log/a1000001-0000-4000-8000-0000000000a1
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1000001-0000-4000-8000-0000000000a1",
+            "actor": {
+              "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+              "name": "Ayesha Siddiqui",
+              "role": "admin_super",
+              "type": "ADMIN"
+            },
+            "action": "pharmacy.suspend",
+            "resource_type": "pharmacy",
+            "resource_id": "b1000001-0000-4000-8000-0000000000b1",
+            "before_state": { "status": "ACTIVE" },
+            "after_state": { "status": "SUSPENDED", "suspended_reason": "Non-compliance" },
+            "diff": [
+              { "path": "/status", "op": "replace", "from": "ACTIVE", "to": "SUSPENDED" },
+              { "path": "/suspended_reason", "op": "add", "value": "Non-compliance" }
+            ],
+            "metadata": { "method": "PATCH", "status_code": 200 },
+            "ip_address": "106.51.0.1",
+            "user_agent": "Mozilla/5.0",
+            "timestamp": "2026-07-24T01:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 AUDIT_LOG_NOT_FOUND
+  response: {
+    status: { code: 404 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "AUDIT_LOG_NOT_FOUND", "message": "Audit log entry not found" } }
+      '''
+    }
+  }
+}

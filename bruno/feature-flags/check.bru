@@ -1,0 +1,88 @@
+meta {
+  name: check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/feature-flags/check?flags=cod_enabled,new_checkout_flow,ai_rx_auto_fill&environment=production
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  if (!baseUrl) {
+    bru.setEnvVar("baseUrl", "http://localhost:8080");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Cache-Control public max-age=60", function () {
+    const cc = res.getHeader("Cache-Control") || "";
+    expect(cc.toLowerCase()).to.include("max-age=60");
+    expect(cc.toLowerCase()).to.include("public");
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("object");
+    expect(body.meta.cache_max_age).to.equal(60);
+    expect(body.meta.evaluated_at).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/feature-flags/check — public unauthenticated base flag states (no user cohort). Rate 100/min/IP.
+  Errors: 400 VALIDATION_ERROR
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/feature-flags/check?flags=cod_enabled,new_checkout_flow,ai_rx_auto_fill
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    headers: {
+      Cache-Control: public, max-age=60
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cod_enabled": true,
+            "new_checkout_flow": true,
+            "ai_rx_auto_fill": false
+          },
+          "meta": {
+            "evaluated_at": "2026-07-24T02:00:00Z",
+            "cache_max_age": 60
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 VALIDATION_ERROR
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "VALIDATION_ERROR", "message": "flags param is required" } }
+      '''
+    }
+  }
+}

@@ -25,7 +25,7 @@ public class AdminStaffEntity {
   @Column(name = "email", nullable = false, length = 255)
   private String email;
 
-  @Column(name = "password_hash", nullable = false, length = 60)
+  @Column(name = "password_hash", length = 60)
   private String passwordHash;
 
   @Column(name = "role", nullable = false, length = 30)

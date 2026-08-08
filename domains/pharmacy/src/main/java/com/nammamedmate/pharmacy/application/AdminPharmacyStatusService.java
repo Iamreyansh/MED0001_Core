@@ -599,11 +599,26 @@ public class AdminPharmacyStatusService {
     boolean canReapply = !"PERMANENT".equals(suspendType);
     Instant now = clock.instant();
     store.suspend(pharmacyId, suspendType, canReapply, now);
+    Map<String, Object> before = Map.of("status", row.status());
+    Map<String, Object> after =
+        Map.of(
+            "status",
+            "SUSPENDED",
+            "suspended_reason",
+            reason.trim(),
+            "suspend_type",
+            suspendType,
+            "can_reapply",
+            canReapply);
     audit(
         principal,
         pharmacyId,
-        "PHARMACY_SUSPENDED",
+        "pharmacy.suspend",
         Map.of(
+            "before",
+            before,
+            "after",
+            after,
             "reason",
             reason.trim(),
             "suspend_type",

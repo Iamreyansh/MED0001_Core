@@ -1,0 +1,100 @@
+meta {
+  name: patch
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/staff/{{adminStaffId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Sundar Rajan",
+    "status": "SUSPENDED"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin_super required");
+  }
+  if (!bru.getEnvVar("adminStaffId")) {
+    throw new Error("adminStaffId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string");
+    expect(body.data.updated_at).to.be.a("string");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/staff/:id — update name/role/status (admin_super). Suspend revokes sessions.
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 STAFF_NOT_FOUND, 422 LAST_SUPER_ADMIN, 422 CANNOT_MODIFY_SELF
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/staff/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+    method: patch
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "status": "SUSPENDED"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "name": "Sundar Rajan",
+            "role": "admin_operations",
+            "status": "SUSPENDED",
+            "updated_at": "2026-07-24T02:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 LAST_SUPER_ADMIN
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "LAST_SUPER_ADMIN", "message": "Cannot remove the last active admin_super" } }
+      '''
+    }
+  }
+}

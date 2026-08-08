@@ -1,0 +1,77 @@
+meta {
+  name: delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/staff/{{adminStaffId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin_super required");
+  }
+  if (!bru.getEnvVar("adminStaffId")) {
+    throw new Error("adminStaffId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.message).to.include("revoked");
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/staff/:id — soft delete + revoke sessions (admin_super).
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 STAFF_NOT_FOUND, 422 LAST_SUPER_ADMIN, 422 CANNOT_MODIFY_SELF
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/staff/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+    method: delete
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "message": "Admin staff member removed. All active sessions have been revoked."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 CANNOT_MODIFY_SELF
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "CANNOT_MODIFY_SELF", "message": "Cannot delete yourself" } }
+      '''
+    }
+  }
+}

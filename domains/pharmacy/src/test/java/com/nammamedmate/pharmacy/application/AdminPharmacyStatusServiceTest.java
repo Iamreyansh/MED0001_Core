@@ -358,7 +358,7 @@ class AdminPharmacyStatusServiceTest {
     assertThat(data.get("status")).isEqualTo("SUSPENDED");
     assertThat(data.get("is_online")).isEqualTo(false);
     assertThat(data.get("can_reapply")).isEqualTo(false);
-    assertThat(audit.actions).contains("PHARMACY_SUSPENDED");
+    assertThat(audit.actions).contains("pharmacy.suspend");
   }
 
   @Test

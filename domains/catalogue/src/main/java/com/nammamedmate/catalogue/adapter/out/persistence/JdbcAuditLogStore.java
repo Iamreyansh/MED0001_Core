@@ -3,6 +3,8 @@ package com.nammamedmate.catalogue.adapter.out.persistence;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.catalogue.application.port.out.AuditLogStore;
 import java.sql.Timestamp;
+import java.util.Locale;
+import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -20,29 +22,58 @@ public class JdbcAuditLogStore implements AuditLogStore {
   @Override
   public void append(AuditLogRecord record) {
     String payloadJson;
+    String beforeJson;
+    String afterJson;
     try {
-      payloadJson = objectMapper.writeValueAsString(record.payload());
+      Map<String, Object> payload = record.payload();
+      payloadJson = objectMapper.writeValueAsString(payload);
+      if (payload.containsKey("before") || payload.containsKey("after")) {
+        Object before = payload.get("before");
+        Object after = payload.get("after");
+        beforeJson = before == null ? null : objectMapper.writeValueAsString(before);
+        afterJson = after == null ? null : objectMapper.writeValueAsString(after);
+      } else {
+        beforeJson = null;
+        afterJson = payload.isEmpty() ? null : payloadJson;
+      }
     } catch (Exception ex) {
       throw new IllegalStateException(ex);
     }
+    String entityType = record.entityType();
+    String resourceType =
+        entityType == null ? "unknown" : entityType.trim().toLowerCase(Locale.ROOT);
     jdbc.update(
         """
         INSERT INTO audit_log (
-          id, entity_type, entity_id, action, actor_id, actor_role, payload, ip_address, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, CAST(? AS inet), ?)
+          id, entity_type, entity_id, action, actor_id, actor_role, payload, ip_address, created_at,
+          actor_name, actor_type, resource_type, resource_id, before_state, after_state, metadata,
+          user_agent, "timestamp"
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?::jsonb, CAST(? AS inet), ?,
+          ?, 'ADMIN', ?, ?, ?::jsonb, ?::jsonb, NULL, NULL, ?
+        )
         """,
         record.id(),
-        record.entityType(),
+        entityType,
         record.entityId(),
         record.action(),
         record.actorId(),
         record.actorRole(),
         payloadJson,
-        blankToNull(record.ipAddress()),
+        blankToDefaultIp(record.ipAddress()),
+        Timestamp.from(record.createdAt()),
+        "unknown",
+        resourceType,
+        record.entityId(),
+        beforeJson,
+        afterJson,
         Timestamp.from(record.createdAt()));
   }
 
-  private static String blankToNull(String value) {
-    return value == null || value.isBlank() ? null : value.trim();
+  private static String blankToDefaultIp(String value) {
+    if (value == null || value.isBlank()) {
+      return "0.0.0.0";
+    }
+    return value.trim();
   }
 }

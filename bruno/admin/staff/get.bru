@@ -1,0 +1,94 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/staff/{{adminStaffId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing");
+  }
+  if (!bru.getEnvVar("adminStaffId")) {
+    throw new Error("adminStaffId missing — run list or invite first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope detail", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string");
+    expect(body.data.audit_trail).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/staff/:id — staff detail with invited_by + audit_trail.
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 STAFF_NOT_FOUND
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/staff/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "name": "Sundar Rajan",
+            "email": "sundar@nammamedmate.com",
+            "role": "admin_operations",
+            "status": "ACTIVE",
+            "mfa_enabled": false,
+            "last_active_at": "2026-07-23T18:00:00Z",
+            "invited_by": { "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "name": "Ayesha Siddiqui" },
+            "created_at": "2025-07-10T11:00:00Z",
+            "audit_trail": [
+              {
+                "action": "staff.role_changed",
+                "from": "admin_support",
+                "to": "admin_operations",
+                "by": "Ayesha Siddiqui",
+                "at": "2026-02-01T10:00:00Z"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 STAFF_NOT_FOUND
+  response: {
+    status: { code: 404 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "STAFF_NOT_FOUND", "message": "No staff with given ID" } }
+      '''
+    }
+  }
+}

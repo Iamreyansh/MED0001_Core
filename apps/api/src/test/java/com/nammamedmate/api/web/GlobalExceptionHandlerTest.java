@@ -9,8 +9,10 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
 class GlobalExceptionHandlerTest {
@@ -86,5 +88,33 @@ class GlobalExceptionHandlerTest {
 
     var response = handler.handleValidation(ex);
     assertThat(response.getBody().error().message()).isEqualTo("Validation failed");
+  }
+
+  @Test
+  void mapsMethodNotAllowedForAdminRoles() {
+    MockHttpServletRequest rolesReq =
+        new MockHttpServletRequest("POST", "/api/v1/admin/roles/x/permissions");
+    var roles =
+        handler.handleMethodNotSupported(
+            new HttpRequestMethodNotSupportedException("POST"), rolesReq);
+    assertThat(roles.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    assertThat(roles.getBody().error().code()).isEqualTo("METHOD_NOT_ALLOWED");
+    assertThat(roles.getBody().error().message()).contains("not customisable");
+
+    MockHttpServletRequest otherReq =
+        new MockHttpServletRequest("DELETE", "/api/v1/orders/1/note/2");
+    var other =
+        handler.handleMethodNotSupported(
+            new HttpRequestMethodNotSupportedException("DELETE"), otherReq);
+    assertThat(other.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    assertThat(other.getBody().error().message()).isEqualTo("Method not allowed");
+
+    jakarta.servlet.http.HttpServletRequest nullUri =
+        mock(jakarta.servlet.http.HttpServletRequest.class);
+    org.mockito.Mockito.when(nullUri.getRequestURI()).thenReturn(null);
+    var nullPath =
+        handler.handleMethodNotSupported(
+            new HttpRequestMethodNotSupportedException("POST"), nullUri);
+    assertThat(nullPath.getBody().error().message()).isEqualTo("Method not allowed");
   }
 }

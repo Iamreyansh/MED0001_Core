@@ -132,7 +132,7 @@ class CustomerWalletIT extends AbstractApiIT {
                 "wallet-it-support"),
             Map.class);
     assertThat(forbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-    assertThat(errorCode(forbidden)).isEqualTo("FORBIDDEN");
+    assertThat(errorCode(forbidden)).isEqualTo("INSUFFICIENT_PERMISSIONS");
 
     ResponseEntity<Map> txs =
         rest.exchange(

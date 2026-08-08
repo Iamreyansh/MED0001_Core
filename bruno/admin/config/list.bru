@@ -1,0 +1,95 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/config?domain=
+  body: none
+  auth: inherit
+}
+
+params:query {
+  domain:
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data)) {
+    return;
+  }
+  if (body.data.orders && body.data.orders.delivery_fee) {
+    bru.setEnvVar("platformConfigKey", "orders.delivery_fee");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/admin/config — list platform config grouped by domain (any admin).
+  Optional query domain=orders|payments|commissions|kyc|rider.
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 400 VALIDATION_ERROR
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/config?domain=payments
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "payments": {
+              "cod_available": {
+                "key": "payments.cod_available",
+                "value": true,
+                "type": "boolean",
+                "unit": null,
+                "immutable": false,
+                "description": "Global toggle for Cash on Delivery payment option",
+                "updated_at": "2025-06-01T09:00:00Z"
+              }
+            }
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  response: {
+    status: { code: 401 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "UNAUTHORIZED", "message": "Authentication required" } }
+      '''
+    }
+  }
+}

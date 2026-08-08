@@ -80,12 +80,116 @@ class RbacServicesTest {
     assertThat(list).hasSize(5);
     assertThat(list.get(0).get("role")).isEqualTo("admin_super");
     assertThat(list.get(0).get("permissions")).isEqualTo(List.of("*:*"));
+    assertThat(list.get(0).get("is_customizable")).isEqualTo(false);
+    assertThat(list.get(0).get("permission_count")).isNull();
+    assertThat(list.get(0).get("notes")).isEqualTo(AdminRoleDefinitions.SUPER_NOTES);
     for (var def : AdminRoleDefinitions.ALL) {
       Map<String, Object> row =
           list.stream().filter(m -> def.role().equals(m.get("role"))).findFirst().orElseThrow();
       assertThat(row.get("permissions")).isEqualTo(def.permissions());
       assertThat(row.get("display_name")).isEqualTo(def.displayName());
+      assertThat(row.get("is_customizable")).isEqualTo(false);
+      assertThat(row.get("permission_count")).isEqualTo(def.permissionCount());
     }
+  }
+
+  @Test
+  void ac1SupportRoleMatrixHasFlagAndOrdersReadNotReleasePayout() {
+    MedmatePrincipal support =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPPORT, null, TokenScope.FULL, "j");
+    List<Map<String, Object>> list = adminRoles.listRoles(support);
+    assertThat(list).hasSize(5);
+    @SuppressWarnings("unchecked")
+    List<String> perms =
+        (List<String>)
+            list.stream()
+                .filter(m -> "admin_support".equals(m.get("role")))
+                .findFirst()
+                .orElseThrow()
+                .get("permissions");
+    assertThat(perms).contains("customers:flag", "orders:read");
+    assertThat(perms).doesNotContain("finance:release-payout");
+  }
+
+  @Test
+  void ac2SuperRolePermissionsExactWildcard() {
+    MedmatePrincipal principal =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPER, null, TokenScope.FULL, "j");
+    Map<String, Object> data = adminRoles.getRolePermissions(principal, "admin_super");
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> perms = (List<Map<String, Object>>) data.get("permissions");
+    assertThat(perms).hasSize(1);
+    assertThat(perms.get(0).get("permission")).isEqualTo("*:*");
+    assertThat(data.get("notes")).isEqualTo(AdminRoleDefinitions.SUPER_NOTES);
+  }
+
+  @Test
+  void ac3FinanceRolePermissionsExactlyThirteen() {
+    MedmatePrincipal principal =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_FINANCE, null, TokenScope.FULL, "j");
+    Map<String, Object> data = adminRoles.getRolePermissions(principal, "admin_finance");
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> perms = (List<Map<String, Object>>) data.get("permissions");
+    assertThat(perms).hasSize(13);
+    assertThat(data.get("permission_count")).isEqualTo(13);
+    assertThat(perms.stream().map(m -> m.get("permission")).toList())
+        .contains("finance:release-payout", "wallet:credit");
+  }
+
+  @Test
+  void ac4PostRolePermissionsMethodNotAllowed() {
+    assertThatThrownBy(() -> adminRoles.rejectRoleMutation())
+        .isInstanceOf(AppException.class)
+        .satisfies(
+            ex -> {
+              AppException ae = (AppException) ex;
+              assertThat(ae.code()).isEqualTo("METHOD_NOT_ALLOWED");
+              assertThat(ae.httpStatus()).isEqualTo(405);
+              assertThat(ae.getMessage()).containsIgnoringCase("not customisable");
+            });
+  }
+
+  @Test
+  void ac5UnknownRoleNotFound() {
+    MedmatePrincipal principal =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPPORT, null, TokenScope.FULL, "j");
+    assertThatThrownBy(() -> adminRoles.getRolePermissions(principal, "admin_billing"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ROLE_NOT_FOUND");
+  }
+
+  @Test
+  void ac6InsufficientPermissionsIncludesRequiredPermission() {
+    MedmatePrincipal support =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPPORT, null, TokenScope.FULL, "j");
+    assertThatThrownBy(() -> rbac.requirePermission(support, "finance:release-payout"))
+        .isInstanceOf(AppException.class)
+        .satisfies(
+            ex -> {
+              AppException ae = (AppException) ex;
+              assertThat(ae.code()).isEqualTo("INSUFFICIENT_PERMISSIONS");
+              assertThat(ae.httpStatus()).isEqualTo(403);
+              assertThat(ae.details())
+                  .containsEntry("required_permission", "finance:release-payout");
+            });
+  }
+
+  @Test
+  void ac7PermissionCheckUnderTwoMs() {
+    MedmatePrincipal support =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPPORT, null, TokenScope.FULL, "j");
+    for (int i = 0; i < 2_000; i++) {
+      rbac.hasPermission(support, "orders:read");
+      rbac.hasPermission(support, "finance:release-payout");
+    }
+    int n = 20_000;
+    long start = System.nanoTime();
+    for (int i = 0; i < n; i++) {
+      rbac.hasPermission(support, "orders:read");
+      rbac.hasPermission(support, "finance:release-payout");
+    }
+    double avgMsPerCheck = ((System.nanoTime() - start) / (double) (n * 2)) / 1_000_000.0;
+    assertThat(avgMsPerCheck).isLessThan(2.0);
   }
 
   @Test
@@ -104,11 +208,32 @@ class RbacServicesTest {
     assertThat(rbac.hasPermission(support, "pharmacies:suspend")).isFalse();
     assertThatThrownBy(() -> rbac.requirePermission(support, "pharmacies:suspend"))
         .isInstanceOf(AppException.class)
-        .extracting(e -> ((AppException) e).code())
-        .isEqualTo("FORBIDDEN");
+        .satisfies(
+            ex -> {
+              AppException ae = (AppException) ex;
+              assertThat(ae.code()).isEqualTo("INSUFFICIENT_PERMISSIONS");
+              assertThat(ae.details()).containsEntry("required_permission", "pharmacies:suspend");
+            });
     MedmatePrincipal superAdmin =
         new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPER, null, TokenScope.FULL, "j");
     assertThat(rbac.hasPermission(superAdmin, "pharmacies:suspend")).isTrue();
+  }
+
+  @Test
+  void enforcementUnionKeepsLiveExtras() {
+    MedmatePrincipal ops =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_OPERATIONS, null, TokenScope.FULL, "j");
+    assertThat(rbac.hasPermission(ops, "pharmacies:suspend")).isTrue();
+    assertThat(rbac.hasPermission(ops, "orders:dispatch")).isTrue();
+    assertThat(AdminRoleDefinitions.permissionsFor("admin_operations"))
+        .doesNotContain("pharmacies:suspend", "orders:dispatch");
+
+    MedmatePrincipal finance =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_FINANCE, null, TokenScope.FULL, "j");
+    assertThat(rbac.hasPermission(finance, "finance:update")).isTrue();
+    assertThat(rbac.hasPermission(finance, "finance:*")).isTrue();
+    assertThat(AdminRoleDefinitions.permissionsFor("admin_finance"))
+        .doesNotContain("finance:update", "finance:*");
   }
 
   @Test
@@ -176,41 +301,78 @@ class RbacServicesTest {
     assertThat(AdminRoleDefinitions.permissionsFor("admin_super")).containsExactly("*:*");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_operations"))
         .containsExactly(
-            "orders:*",
+            "orders:read",
+            "orders:write",
+            "orders:cancel",
+            "orders:assign-rider",
             "pharmacies:read",
             "pharmacies:update",
-            "pharmacies:suspend",
-            "riders:*",
-            "logistics:*",
-            "finance:read",
-            "catalogue:read",
-            "customers:read");
+            "riders:read",
+            "riders:write",
+            "riders:assign",
+            "riders:suspend",
+            "logistics:read",
+            "logistics:update",
+            "catalogue:read");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_finance"))
         .containsExactly(
-            "finance:*",
-            "settlements:*",
-            "refunds:*",
-            "taxes:*",
+            "finance:read",
+            "finance:write",
+            "finance:release-payout",
+            "settlements:read",
+            "settlements:process",
+            "refunds:read",
+            "refunds:approve",
+            "refunds:reject",
+            "taxes:read",
+            "taxes:export",
             "analytics:finance",
             "customers:read",
-            "pharmacies:read");
+            "wallet:credit");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_support"))
         .containsExactly(
-            "tickets:*",
-            "disputes:*",
+            "tickets:read",
+            "tickets:write",
+            "tickets:close",
+            "disputes:read",
+            "disputes:write",
+            "disputes:resolve",
             "customers:read",
             "customers:notify",
-            "orders:read",
-            "pharmacies:read");
+            "customers:flag",
+            "orders:read");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_compliance"))
         .containsExactly(
-            "prescriptions:*",
-            "compliance:*",
+            "prescriptions:read",
+            "prescriptions:review",
+            "prescriptions:approve",
+            "prescriptions:reject",
+            "compliance:read",
+            "compliance:audit",
+            "compliance:flag",
+            "catalogue:read",
             "catalogue:update",
             "pharmacies:read",
-            "pharmacies:update",
-            "customers:read");
+            "kyc:read",
+            "kyc:approve",
+            "kyc:reject");
+    assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_operations"))
+        .contains("pharmacies:suspend", "orders:dispatch", "orders:*");
+    assertThat(AdminRoleDefinitions.liveExtras()).containsKey("admin_finance");
+    assertThat(AdminRoleDefinitions.find("admin_super")).isPresent();
+    assertThat(AdminRoleDefinitions.find("nope")).isEmpty();
+    assertThat(AdminRoleDefinitions.descriptionFor("finance:release-payout")).contains("payout");
+    assertThat(AdminRoleDefinitions.descriptionFor("unknown:x")).contains("unknown:x");
+    assertThat(AdminRoleDefinitions.allApiPermissions()).contains("*:*", "wallet:credit");
+    assertThat(AdminRoleDefinitions.toPermissionObject("nocolon"))
+        .containsEntry("resource", "nocolon")
+        .containsEntry("action", "");
+    assertThat(AdminRoleDefinitions.toPermissionObject("a:b"))
+        .containsEntry("resource", "a")
+        .containsEntry("action", "b");
     assertThatThrownBy(() -> AdminRoleDefinitions.require("nope"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> AdminRoleDefinitions.enforcementPermissionsFor("nope"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -452,7 +614,7 @@ class RbacServicesTest {
                 pharmacyRoles.updatePermissions(
                     staff, created.get("id").toString(), List.of("orders:read")))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("FORBIDDEN");
+        .isEqualTo("INSUFFICIENT_PERMISSIONS");
 
     // rate limit write
     InMemoryRateLimiter tight = new InMemoryRateLimiter(clock);

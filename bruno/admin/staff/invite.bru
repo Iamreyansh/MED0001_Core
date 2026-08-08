@@ -1,0 +1,110 @@
+meta {
+  name: invite
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/staff
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Meera Krishnan",
+    "email": "meera+{{$timestamp}}@nammamedmate.com",
+    "role": "admin_support",
+    "send_invite_email": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin_super login required");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("adminStaffId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("envelope INVITED", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("INVITED");
+    expect(body.data.invite_expires_at).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/admin/staff — invite staff (admin_super only). Role cannot be admin_super.
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 409 EMAIL_ALREADY_EXISTS
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/staff
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "name": "Meera Krishnan",
+        "email": "meera@nammamedmate.com",
+        "role": "admin_support",
+        "send_invite_email": true
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c1d2e3f4-a5b6-7890-cdef-012345678901",
+            "name": "Meera Krishnan",
+            "email": "meera@nammamedmate.com",
+            "role": "admin_support",
+            "status": "INVITED",
+            "mfa_enabled": false,
+            "invited_by": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "invite_expires_at": "2026-07-26T02:00:00Z",
+            "created_at": "2026-07-24T02:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 EMAIL_ALREADY_EXISTS
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "EMAIL_ALREADY_EXISTS", "message": "Admin account with this email already exists" } }
+      '''
+    }
+  }
+}

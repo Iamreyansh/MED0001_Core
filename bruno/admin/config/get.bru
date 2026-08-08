@@ -1,0 +1,95 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/config/{{platformConfigKey}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("platformConfigKey")) {
+    bru.setEnvVar("platformConfigKey", "orders.delivery_fee");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.key).to.be.a("string");
+    expect(body.data.type).to.be.a("string");
+    expect(body.data.history).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/config/:key — single key with history (dotted keys via path, e.g. orders.delivery_fee).
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CONFIG_KEY_NOT_FOUND
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/config/orders.delivery_fee
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "key": "orders.delivery_fee",
+            "value": 25,
+            "type": "integer",
+            "unit": "INR",
+            "immutable": false,
+            "description": "Standard delivery fee per order",
+            "history": [
+              {
+                "old_value": 20,
+                "new_value": 25,
+                "changed_by": {
+                  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "name": "Ayesha Siddiqui"
+                },
+                "changed_at": "2025-06-01T09:00:00Z",
+                "notes": "Adjusted to cover last-mile cost increase"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 CONFIG_KEY_NOT_FOUND
+  response: {
+    status: { code: 404 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "CONFIG_KEY_NOT_FOUND", "message": "Config key does not exist" } }
+      '''
+    }
+  }
+}

@@ -137,6 +137,63 @@ class AdminLoginServiceTest {
   }
 
   @Test
+  void loginRejectsNullPasswordHashForInvited() {
+    UUID invitedId = Ids.newId();
+    AdminStaffRecord invited =
+        new AdminStaffRecord(
+            invitedId,
+            "Invited",
+            "invited@test.in",
+            null,
+            "admin_support",
+            "INVITED",
+            false,
+            null,
+            List.of(),
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            NOW,
+            NOW);
+    staffStore.byEmail.put("invited@test.in", invited);
+    assertThatThrownBy(() -> service.login("invited@test.in", PASSWORD, "127.0.0.1", "ua"))
+        .isInstanceOf(AppException.class)
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("INVALID_CREDENTIALS");
+  }
+
+  @Test
+  void loginRejectsBlankPasswordHash() {
+    UUID invitedId = Ids.newId();
+    staffStore.byEmail.put(
+        "blankhash@test.in",
+        new AdminStaffRecord(
+            invitedId,
+            "Invited",
+            "blankhash@test.in",
+            "   ",
+            "admin_support",
+            "INVITED",
+            false,
+            null,
+            List.of(),
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            NOW,
+            NOW));
+    assertThatThrownBy(() -> service.login("blankhash@test.in", PASSWORD, "127.0.0.1", "ua"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("INVALID_CREDENTIALS");
+  }
+
+  @Test
   void loginHappyPathNoMfa() {
     AdminLoginResult result = service.login("ops@test.in", PASSWORD, "1.1.1.1", "ua");
 

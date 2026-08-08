@@ -2,9 +2,11 @@ package com.nammamedmate.api.web;
 
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.kernel.error.AppException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -47,6 +49,18 @@ public class GlobalExceptionHandler {
       MethodArgumentTypeMismatchException ex) {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .body(ApiResponse.fail("VALIDATION_ERROR", ex.getName() + " is invalid"));
+  }
+
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
+      HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+    String uri = request.getRequestURI();
+    if (uri != null && uri.contains("/api/v1/admin/roles")) {
+      return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+          .body(ApiResponse.fail("METHOD_NOT_ALLOWED", "Admin roles are not customisable"));
+    }
+    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+        .body(ApiResponse.fail("METHOD_NOT_ALLOWED", "Method not allowed"));
   }
 
   @ExceptionHandler(Exception.class)
