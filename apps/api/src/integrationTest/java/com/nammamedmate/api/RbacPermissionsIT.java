@@ -140,7 +140,40 @@ class RbacPermissionsIT extends AbstractApiIT {
     @SuppressWarnings("unchecked")
     Map<String, Object> error =
         (Map<String, Object>) Objects.requireNonNull(response.getBody()).get("error");
-    assertThat(error.get("code")).isEqualTo("FORBIDDEN");
+    assertThat(error.get("code")).isEqualTo("INSUFFICIENT_PERMISSIONS");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> details = (Map<String, Object>) error.get("details");
+    assertThat(details).containsEntry("required_permission", "pharmacies:suspend");
+  }
+
+  @Test
+  void adminRolePermissionsAndMethodNotAllowed() {
+    String token = adminToken("ops-rbac@test.in");
+    ResponseEntity<Map> financePerms = get("/api/v1/admin/roles/admin_finance/permissions", token);
+    assertThat(financePerms.getStatusCode()).isEqualTo(HttpStatus.OK);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data =
+        (Map<String, Object>) Objects.requireNonNull(financePerms.getBody()).get("data");
+    assertThat(data.get("permission_count")).isEqualTo(13);
+
+    ResponseEntity<Map> missing = get("/api/v1/admin/roles/admin_billing/permissions", token);
+    assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> missingErr =
+        (Map<String, Object>) Objects.requireNonNull(missing.getBody()).get("error");
+    assertThat(missingErr.get("code")).isEqualTo("ROLE_NOT_FOUND");
+
+    ResponseEntity<Map> write =
+        exchange(
+            HttpMethod.POST,
+            "/api/v1/admin/roles/admin_operations/permissions",
+            token,
+            Map.of("permissions", List.of("orders:read")));
+    assertThat(write.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> writeErr =
+        (Map<String, Object>) Objects.requireNonNull(write.getBody()).get("error");
+    assertThat(writeErr.get("code")).isEqualTo("METHOD_NOT_ALLOWED");
   }
 
   @Test

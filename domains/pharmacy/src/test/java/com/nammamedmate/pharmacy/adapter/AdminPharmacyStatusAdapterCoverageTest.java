@@ -371,8 +371,57 @@ class AdminPharmacyStatusAdapterCoverageTest {
     audit.append(
         new AuditLogRecord(
             Ids.newId(), "PHARMACY", PID, "KYC_REJECTED", null, "ADMIN_SUPER", null, null, NOW));
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(),
+            null,
+            PID,
+            "X",
+            null,
+            "ADMIN_SUPER",
+            Map.of("before", Map.of("status", "ACTIVE"), "after", Map.of("status", "SUSPENDED")),
+            "1.1.1.1",
+            NOW));
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(),
+            "PHARMACY",
+            PID,
+            "X",
+            null,
+            "ADMIN_SUPER",
+            Map.of("before", Map.of("status", "ACTIVE")),
+            "1.1.1.1",
+            NOW));
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(),
+            "PHARMACY",
+            PID,
+            "X",
+            null,
+            "ADMIN_SUPER",
+            Map.of("after", Map.of("status", "SUSPENDED")),
+            "1.1.1.1",
+            NOW));
     verify(jdbc, org.mockito.Mockito.atLeast(2))
-        .update(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        .update(
+            anyString(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any());
   }
 
   @Test

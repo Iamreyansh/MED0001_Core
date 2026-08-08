@@ -1,0 +1,71 @@
+meta {
+  name: summary
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/feature-flags/summary
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.total).to.be.a("number");
+    expect(body.data.enabled).to.be.a("number");
+    expect(body.data.disabled).to.be.a("number");
+    expect(body.data.partial_rollout).to.be.a("number");
+    expect(body.data.environments).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/admin/feature-flags/summary — counts for enabled/disabled/partial_rollout (any admin).
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/feature-flags/summary
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total": 3,
+            "enabled": 2,
+            "disabled": 1,
+            "partial_rollout": 1,
+            "environments": {
+              "production": { "total": 3, "enabled": 2 },
+              "staging": { "total": 3, "enabled": 3 },
+              "development": { "total": 3, "enabled": 3 }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

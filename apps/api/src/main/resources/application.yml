@@ -43,6 +43,11 @@ management:
         enabled: true
 
 medmate:
+  feature-flags:
+    write-environment: production
+  platform-config:
+    # Immutable keys blocked when this is production (STORY-004).
+    environment: production
   catalogue:
     jobs:
       enabled: true

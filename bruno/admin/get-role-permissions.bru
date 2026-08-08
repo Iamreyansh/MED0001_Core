@@ -1,0 +1,142 @@
+meta {
+  name: get-role-permissions
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/roles/admin_finance/permissions
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.role) {
+    bru.setEnvVar("adminRoleSample", body.data.role);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("finance role has 13 expanded permissions", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.role).to.equal("admin_finance");
+    expect(body.data.permission_count).to.equal(13);
+    expect(body.data.permissions).to.be.an("array").with.lengthOf(13);
+    const keys = body.data.permissions.map((p) => p.permission);
+    expect(keys).to.include("finance:release-payout");
+    expect(keys).to.include("wallet:credit");
+    body.data.permissions.forEach((p) => {
+      expect(p).to.have.property("resource");
+      expect(p).to.have.property("action");
+      expect(p).to.have.property("description");
+    });
+  });
+}
+
+docs {
+  GET /api/v1/admin/roles/:role/permissions — expanded permission objects for a fixed admin role.
+}
+
+example {
+  name: 200 OK
+  description: admin_finance expanded permissions (13).
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/roles/admin_finance/permissions
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "role": "admin_finance",
+            "display_name": "Finance Manager",
+            "permissions": [
+              {
+                "permission": "finance:read",
+                "resource": "finance",
+                "action": "read",
+                "description": "View financial reports, summaries, and P&L data"
+              },
+              {
+                "permission": "finance:release-payout",
+                "resource": "finance",
+                "action": "release-payout",
+                "description": "Trigger pharmacy payout releases to bank accounts"
+              },
+              {
+                "permission": "wallet:credit",
+                "resource": "wallet",
+                "action": "credit",
+                "description": "Manually credit customer wallets for refunds or goodwill"
+              }
+            ],
+            "permission_count": 13
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ROLE_NOT_FOUND
+  description: Unknown admin role slug.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/roles/admin_billing/permissions
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 404
+      text: Not Found
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ROLE_NOT_FOUND",
+            "message": "Admin role not found"
+          }
+        }
+      '''
+    }
+  }
+}

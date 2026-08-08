@@ -1,0 +1,85 @@
+meta {
+  name: roles-method-not-allowed
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/roles/admin_operations/permissions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "permissions": ["orders:read"]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 405", function () {
+    expect(res.getStatus()).to.equal(405);
+  });
+
+  test("METHOD_NOT_ALLOWED — roles not customisable", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(false);
+    expect(body.error.code).to.equal("METHOD_NOT_ALLOWED");
+    expect(body.error.message.toLowerCase()).to.include("not customisable");
+  });
+}
+
+docs {
+  POST /api/v1/admin/roles/:role/permissions — rejected; admin roles are fixed in code (EPIC-021 STORY-005).
+}
+
+example {
+  name: 405 METHOD_NOT_ALLOWED
+  description: Write attempts on admin role permissions are rejected.
+
+  request: {
+    url: {{baseUrl}}/api/v1/admin/roles/admin_operations/permissions
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "permissions": ["orders:read"]
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 405
+      text: Method Not Allowed
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "METHOD_NOT_ALLOWED",
+            "message": "Admin roles are not customisable"
+          }
+        }
+      '''
+    }
+  }
+}

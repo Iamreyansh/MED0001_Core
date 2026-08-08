@@ -32,17 +32,30 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 
-  test("five admin roles with admin_super wildcard", function () {
+  test("five admin roles with STORY-005 matrix fields", function () {
     const body = res.getBody();
     expect(body.success).to.equal(true);
     expect(body.data).to.be.an("array").with.lengthOf(5);
     expect(body.data[0].role).to.equal("admin_super");
     expect(body.data[0].permissions).to.deep.equal(["*:*"]);
+    expect(body.data[0].is_customizable).to.equal(false);
+    expect(body.data[0].permission_count).to.equal(null);
+    expect(body.data[0].notes).to.include("wildcard");
+
+    const support = body.data.find((r) => r.role === "admin_support");
+    expect(support.permissions).to.include("customers:flag");
+    expect(support.permissions).to.include("orders:read");
+    expect(support.permissions).to.not.include("finance:release-payout");
+    expect(support.permission_count).to.equal(10);
+
+    const finance = body.data.find((r) => r.role === "admin_finance");
+    expect(finance.permission_count).to.equal(13);
+    expect(finance.permissions).to.include("wallet:credit");
   });
 }
 
 docs {
-  GET /api/v1/admin/roles — any admin role. Returns immutable built-in admin role matrix.
+  GET /api/v1/admin/roles — any admin role. Returns immutable EPIC-021 STORY-005 admin role matrix.
 }
 
 example {
@@ -72,39 +85,104 @@ example {
             {
               "role": "admin_super",
               "display_name": "Super Administrator",
-              "description": "Full platform access with no restrictions. Required for MFA.",
+              "description": "Full platform access. MFA required on every login.",
               "is_system": true,
-              "permissions": ["*:*"]
+              "is_customizable": false,
+              "permissions": ["*:*"],
+              "permission_count": null,
+              "notes": "Implicit wildcard - grants all current and future permissions."
             },
             {
               "role": "admin_operations",
               "display_name": "Operations Manager",
-              "description": "Manages orders, logistics, pharmacies, and riders.",
+              "description": "Manages day-to-day order fulfilment, pharmacy operations, and logistics.",
               "is_system": true,
-              "permissions": ["orders:*", "pharmacies:read", "pharmacies:update", "riders:*", "logistics:*", "catalogue:read", "customers:read"]
+              "is_customizable": false,
+              "permissions": [
+                "orders:read",
+                "orders:write",
+                "orders:cancel",
+                "orders:assign-rider",
+                "pharmacies:read",
+                "pharmacies:update",
+                "riders:read",
+                "riders:write",
+                "riders:assign",
+                "riders:suspend",
+                "logistics:read",
+                "logistics:update",
+                "catalogue:read"
+              ],
+              "permission_count": 13
             },
             {
               "role": "admin_finance",
               "display_name": "Finance Manager",
               "description": "Manages settlements, refunds, payouts, and financial analytics.",
               "is_system": true,
-              "permissions": ["finance:*", "settlements:*", "refunds:*", "taxes:*", "analytics:finance", "customers:read"]
+              "is_customizable": false,
+              "permissions": [
+                "finance:read",
+                "finance:write",
+                "finance:release-payout",
+                "settlements:read",
+                "settlements:process",
+                "refunds:read",
+                "refunds:approve",
+                "refunds:reject",
+                "taxes:read",
+                "taxes:export",
+                "analytics:finance",
+                "customers:read",
+                "wallet:credit"
+              ],
+              "permission_count": 13
             },
             {
               "role": "admin_support",
-              "display_name": "Customer Support",
-              "description": "Handles tickets, disputes, and customer-facing issues.",
+              "display_name": "Customer Support Agent",
+              "description": "Handles tickets, disputes, and customer communication.",
               "is_system": true,
-              "permissions": ["tickets:*", "disputes:*", "customers:read", "customers:notify", "orders:read"]
+              "is_customizable": false,
+              "permissions": [
+                "tickets:read",
+                "tickets:write",
+                "tickets:close",
+                "disputes:read",
+                "disputes:write",
+                "disputes:resolve",
+                "customers:read",
+                "customers:notify",
+                "customers:flag",
+                "orders:read"
+              ],
+              "permission_count": 10
             },
             {
               "role": "admin_compliance",
               "display_name": "Compliance Officer",
               "description": "Oversees prescription validation, catalogue compliance, and pharmacy KYC.",
               "is_system": true,
-              "permissions": ["prescriptions:*", "compliance:*", "catalogue:update", "pharmacies:read", "customers:read"]
+              "is_customizable": false,
+              "permissions": [
+                "prescriptions:read",
+                "prescriptions:review",
+                "prescriptions:approve",
+                "prescriptions:reject",
+                "compliance:read",
+                "compliance:audit",
+                "compliance:flag",
+                "catalogue:read",
+                "catalogue:update",
+                "pharmacies:read",
+                "kyc:read",
+                "kyc:approve",
+                "kyc:reject"
+              ],
+              "permission_count": 13
             }
-          ]
+          ],
+          "meta": {}
         }
       '''
     }

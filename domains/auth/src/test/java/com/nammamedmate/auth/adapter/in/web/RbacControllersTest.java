@@ -66,8 +66,12 @@ class RbacControllersTest {
     when(adminRolesService.listRoles(admin)).thenReturn(List.of(Map.of("role", "admin_super")));
     when(adminRolesService.listPermissions(admin, "orders"))
         .thenReturn(List.of(Map.of("permission", "orders:read")));
+    when(adminRolesService.getRolePermissions(admin, "admin_finance"))
+        .thenReturn(Map.of("role", "admin_finance", "permission_count", 13));
     assertThat(adminRolesController.listRoles(admin).data()).hasSize(1);
     assertThat(adminRolesController.listPermissions(admin, "orders").data()).hasSize(1);
+    assertThat(adminRolesController.getRolePermissions(admin, "admin_finance").data())
+        .containsEntry("permission_count", 13);
   }
 
   @Test
@@ -106,14 +110,22 @@ class RbacControllersTest {
         new MedmatePrincipal(UUID.randomUUID(), AuthRole.ADMIN_SUPPORT, null, TokenScope.FULL, "j");
     SecurityContextHolder.getContext()
         .setAuthentication(new UsernamePasswordAuthenticationToken(support, null, List.of()));
-    org.mockito.Mockito.doThrow(new AppException("FORBIDDEN", "no", 403))
+    org.mockito.Mockito.doThrow(
+            new AppException(
+                "INSUFFICIENT_PERMISSIONS",
+                "no",
+                403,
+                null,
+                Map.of("required_permission", "pharmacies:suspend")))
         .when(rbacPermissionService)
         .requirePermission(support, "pharmacies:suspend");
     assertThatThrownBy(
             () ->
                 interceptor.preHandle(
                     new MockHttpServletRequest(), new MockHttpServletResponse(), method))
-        .isInstanceOf(AppException.class);
+        .isInstanceOf(AppException.class)
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("INSUFFICIENT_PERMISSIONS");
   }
 
   @Test

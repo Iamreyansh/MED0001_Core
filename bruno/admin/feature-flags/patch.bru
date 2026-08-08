@@ -1,0 +1,119 @@
+meta {
+  name: patch
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/feature-flags/{{featureFlagName}}?environment=production
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "enabled": true,
+    "rollout_percentage": 100,
+    "notes": "Rolled out to 100% - checkout A/B test complete"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — admin_super required for production");
+  }
+  if (!bru.getEnvVar("featureFlagName")) {
+    bru.setEnvVar("featureFlagName", "new_checkout_flow");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.name).to.be.a("string");
+    expect(body.data.rollout_percentage).to.be.a("number");
+    expect(body.data.updated_at).to.be.a("string");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/feature-flags/:name — update kill-switch/rollout/notes.
+  Production (medmate.feature-flags.write-environment): admin_super only. Staging/dev: any admin.
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 FLAG_NOT_FOUND
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/feature-flags/new_checkout_flow?environment=production
+    method: patch
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "enabled": true,
+        "rollout_percentage": 100,
+        "notes": "Rolled out to 100%"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "name": "new_checkout_flow",
+            "enabled": true,
+            "rollout_percentage": 100,
+            "environment": "production",
+            "updated_by": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "updated_at": "2026-07-24T02:00:00Z",
+            "notes": "Rolled out to 100%"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Only admin_super can modify flags in production" } }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 VALIDATION_ERROR
+  response: {
+    status: { code: 400 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "VALIDATION_ERROR", "message": "rollout_percentage must be between 0 and 100" } }
+      '''
+    }
+  }
+}

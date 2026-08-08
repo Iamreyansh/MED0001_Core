@@ -1,0 +1,91 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/feature-flags?environment=production
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && Array.isArray(body.data) && body.data.length)) {
+    return;
+  }
+  if (body.data[0].name) {
+    bru.setEnvVar("featureFlagName", body.data[0].name);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/feature-flags — list flags for environment (any admin). Default environment=production.
+  Errors: 401 UNAUTHORIZED, 403 FORBIDDEN
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/feature-flags?environment=production
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "name": "new_checkout_flow",
+              "description": "Enables the redesigned 3-step checkout experience",
+              "enabled": true,
+              "environment": "production",
+              "rollout_percentage": 50,
+              "updated_by": {
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "name": "Ayesha Siddiqui"
+              },
+              "updated_at": "2026-07-20T10:00:00Z",
+              "notes": "Gradual rollout to 50%"
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Admin access required" } }
+      '''
+    }
+  }
+}

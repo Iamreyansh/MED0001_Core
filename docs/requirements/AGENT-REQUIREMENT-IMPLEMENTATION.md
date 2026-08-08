@@ -14,11 +14,11 @@
 
 | Phase | Total | Done |
 |-------|-------|------|
-| Phase 1 | 46 | 41 |
+| Phase 1 | 46 | 46 |
 | Phase 2 | 34 | 0 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **39** |
+| **Total** | **129** | **46** |
 
 ---
 
@@ -105,11 +105,11 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-021 | [STORY-001](./EPIC-021-settings-admin/STORY-001-admin-staff-management.md) | Admin Staff Management | pending | — | — |
-| EPIC-021 | [STORY-002](./EPIC-021-settings-admin/STORY-002-feature-flags.md) | Feature Flag Management | pending | — | — |
-| EPIC-021 | [STORY-003](./EPIC-021-settings-admin/STORY-003-platform-audit-log.md) | Platform Audit Log | pending | — | — |
-| EPIC-021 | [STORY-004](./EPIC-021-settings-admin/STORY-004-platform-configuration.md) | Platform Configuration | pending | — | — |
-| EPIC-021 | [STORY-005](./EPIC-021-settings-admin/STORY-005-rbac-admin-roles.md) | Admin RBAC Role-Permission Matrix | pending | — | — |
+| EPIC-021 | [STORY-001](./EPIC-021-settings-admin/STORY-001-admin-staff-management.md) | Admin Staff Management | done | 2026-08-08 | `domains/settings`; V044 invite/reset cols; session revoke via SettingsAuthBridgeConfig; email logging stub (ids/tokenLen only); BR-9 INVITED re-send; audit append stub until STORY-003; password-set public endpoint deferred to auth |
+| EPIC-021 | [STORY-002](./EPIC-021-settings-admin/STORY-002-feature-flags.md) | Feature Flag Management | done | 2026-08-08 | `domains/settings`; V045 feature_flags+seed; Redis 60s+invalidate; public check base enabled only; prod PATCH admin_super; seed-only (no POST/DELETE); cohort helper unit-tested |
+| EPIC-021 | [STORY-003](./EPIC-021-settings-admin/STORY-003-platform-audit-log.md) | Platform Audit Log | done | 2026-08-08 | `domains/settings`; V046 enrich audit_log (not audit_logs); immutability+archived_at; middleware async; export always QUEUED; role filter deferred; pharmacy/catalogue writers adapted; export email logs urlLen only |
+| EPIC-021 | [STORY-004](./EPIC-021-settings-admin/STORY-004-platform-configuration.md) | Platform Configuration | done | 2026-08-08 | `domains/settings`; V047 platform_config+config_history+seed (incl. orders.order_id_prefix immutable); Redis `platform_config` 60s; PlatformConfigReadPort exposed (customer wallet max-credit wiring deferred — no domain→domain deps); any-admin read all domains |
+| EPIC-021 | [STORY-005](./EPIC-021-settings-admin/STORY-005-rbac-admin-roles.md) | Admin RBAC Role-Permission Matrix | done | 2026-08-08 | `domains/auth` matrix+`GET /roles/{role}/permissions`; API lists=STORY-005 exact; enforcement=`enforcementPermissionsFor`∪live extras (ops:`pharmacies:suspend`/`orders:dispatch`/`orders:*`/`riders:*`/`logistics:*`/`customers:read`/`finance:read`; finance:`finance:update`/`finance:*`/`pharmacies:read`; support:`pharmacies:read`; compliance:`pharmacies:update`/`customers:read`); `INSUFFICIENT_PERMISSIONS`+details; 405 via GlobalExceptionHandler; `domains/settings/PERMISSIONS.md` |
 
 ---
 

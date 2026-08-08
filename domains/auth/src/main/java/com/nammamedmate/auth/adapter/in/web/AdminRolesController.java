@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,6 +30,13 @@ public class AdminRolesController {
   public ApiResponse<List<Map<String, Object>>> listRoles(
       @AuthenticationPrincipal MedmatePrincipal principal) {
     return ApiResponse.ok(adminRolesService.listRoles(principal));
+  }
+
+  @GetMapping("/roles/{role}/permissions")
+  @Operation(summary = "Get expanded permissions for a fixed admin role")
+  public ApiResponse<Map<String, Object>> getRolePermissions(
+      @AuthenticationPrincipal MedmatePrincipal principal, @PathVariable("role") String role) {
+    return ApiResponse.ok(adminRolesService.getRolePermissions(principal, role));
   }
 
   @GetMapping("/permissions")

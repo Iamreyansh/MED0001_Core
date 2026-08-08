@@ -31,6 +31,25 @@ public class AdminRolesService {
     return AdminRoleDefinitions.ALL.stream().map(AdminRolesService::toRoleMap).toList();
   }
 
+  public Map<String, Object> getRolePermissions(MedmatePrincipal principal, String role) {
+    requireAdmin(principal);
+    rateLimit(principal, "role-permissions");
+    AdminRoleDefinitions.AdminRole def =
+        AdminRoleDefinitions.find(role)
+            .orElseThrow(() -> new AppException("ROLE_NOT_FOUND", "Admin role not found", 404));
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("role", def.role());
+    data.put("display_name", def.displayName());
+    data.put(
+        "permissions",
+        def.permissions().stream().map(AdminRoleDefinitions::toPermissionObject).toList());
+    data.put("permission_count", def.permissionCount());
+    if (def.notes() != null) {
+      data.put("notes", def.notes());
+    }
+    return data;
+  }
+
   public List<Map<String, Object>> listPermissions(MedmatePrincipal principal, String resource) {
     requireAdmin(principal);
     rateLimit(principal, "permissions");
@@ -39,6 +58,10 @@ public class AdminRolesService {
             ? permissionCatalogStore.listByDomain("admin")
             : permissionCatalogStore.listByDomainAndResource("admin", resource.trim());
     return rows.stream().map(AdminRolesService::toPermissionMap).toList();
+  }
+
+  public void rejectRoleMutation() {
+    throw new AppException("METHOD_NOT_ALLOWED", "Admin roles are not customisable", 405);
   }
 
   private void rateLimit(MedmatePrincipal principal, String bucket) {
@@ -67,7 +90,12 @@ public class AdminRolesService {
     map.put("display_name", role.displayName());
     map.put("description", role.description());
     map.put("is_system", role.system());
+    map.put("is_customizable", role.customizable());
     map.put("permissions", role.permissions());
+    map.put("permission_count", role.permissionCount());
+    if (role.notes() != null) {
+      map.put("notes", role.notes());
+    }
     return map;
   }
 

@@ -42,6 +42,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/delivery/fee-estimate")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/feature-flags/check")
+                    .permitAll()
                     .requestMatchers(
                         "/api/v1/auth/customer/send-otp",
                         "/api/v1/auth/customer/verify-otp",
@@ -160,7 +162,10 @@ public class SecurityConfig {
                         "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/admin/catalogue/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_COMPLIANCE")
-                    .requestMatchers("/api/v1/admin/roles", "/api/v1/admin/permissions")
+                    .requestMatchers(
+                        "/api/v1/admin/roles",
+                        "/api/v1/admin/roles/**",
+                        "/api/v1/admin/permissions")
                     .hasAnyRole(
                         "ADMIN_SUPER",
                         "ADMIN_OPERATIONS",
@@ -185,6 +190,35 @@ public class SecurityConfig {
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers("/api/v1/admin/zones/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers("/api/v1/admin/staff", "/api/v1/admin/staff/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        "/api/v1/admin/feature-flags", "/api/v1/admin/feature-flags/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
+                    .requestMatchers("/api/v1/admin/config", "/api/v1/admin/config/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
+                    .requestMatchers("/api/v1/admin/audit-log", "/api/v1/admin/audit-log/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_FINANCE",
+                        "ADMIN_SUPPORT",
+                        "ADMIN_COMPLIANCE")
                     .requestMatchers(
                         "/api/v1/auth/admin/verify-mfa", "/api/v1/auth/admin/setup-mfa")
                     .hasAnyRole(

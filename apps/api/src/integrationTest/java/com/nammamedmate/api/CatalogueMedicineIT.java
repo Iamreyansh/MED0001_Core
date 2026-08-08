@@ -34,7 +34,7 @@ class CatalogueMedicineIT extends AbstractApiIT {
 
   @BeforeEach
   void seedAdmin() {
-    jdbc.update("DELETE FROM audit_log WHERE actor_id IN (?, ?)", OPS_ID, COMPLIANCE_ID);
+    // audit_log is append-only (EPIC-021 STORY-003); do not DELETE rows.
     jdbc.update("DELETE FROM price_ceiling_violation");
     jdbc.update("DELETE FROM medicine_ban_job");
     jdbc.update("DELETE FROM pharmacy_catalogue_mapping");
