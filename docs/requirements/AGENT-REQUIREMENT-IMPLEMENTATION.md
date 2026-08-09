@@ -15,10 +15,10 @@
 | Phase | Total | Done |
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
-| Phase 2 | 34 | 28 |
+| Phase 2 | 34 | 34 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **74** |
+| **Total** | **129** | **80** |
 
 ---
 
@@ -168,12 +168,12 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-022 | [STORY-001](./EPIC-022-external-integrations/STORY-001-razorpay-integration.md) | Razorpay Integration | pending | — | — |
-| EPIC-022 | [STORY-002](./EPIC-022-external-integrations/STORY-002-maps-geolocation.md) | Maps & Geolocation | pending | — | — |
-| EPIC-022 | [STORY-003](./EPIC-022-external-integrations/STORY-003-government-api-integration.md) | Government API Integration | pending | — | — |
-| EPIC-022 | [STORY-004](./EPIC-022-external-integrations/STORY-004-einvoicing-irn.md) | E-Invoicing IRN | pending | — | — |
-| EPIC-022 | [STORY-005](./EPIC-022-external-integrations/STORY-005-accounting-integration.md) | Accounting Integration | pending | — | — |
-| EPIC-022 | [STORY-006](./EPIC-022-external-integrations/STORY-006-communication-integrations.md) | Communication Integrations | pending | — | — |
+| EPIC-022 | [STORY-001](./EPIC-022-external-integrations/STORY-001-razorpay-integration.md) | Razorpay Integration | done | 2026-08-10 | `domains/integration`; V074; S2S X-Internal-Token; stub\|live; webhook HMAC+idempotency; payout retry 1h; payment-domain bridges deferred |
+| EPIC-022 | [STORY-002](./EPIC-022-external-integrations/STORY-002-maps-geolocation.md) | Maps & Geolocation | done | 2026-08-10 | `domains/integration`; V075; Redis\|DB cache; zone ray-cast; GeocodePort+DistanceMatrixPort bridges |
+| EPIC-022 | [STORY-003](./EPIC-022-external-integrations/STORY-003-government-api-integration.md) | Government API Integration | done | 2026-08-10 | `domains/integration`; V076; GSTN/DigiLocker/drug/FSSAI; pharmacy KYC bridges; rider Aadhaar deferred |
+| EPIC-022 | [STORY-004](./EPIC-022-external-integrations/STORY-004-einvoicing-irn.md) | E-Invoicing IRN | done | 2026-08-10 | `domains/integration`; V077; GSP stub\|live; EinvoicePort bridge; POS finalize hook deferred |
+| EPIC-022 | [STORY-005](./EPIC-022-external-integrations/STORY-005-accounting-integration.md) | Accounting Integration | done | 2026-08-10 | `domains/integration`; V078; Zoho stub\|live + Tally XML; CRM plan gate; in-process sync; Bruno accounting/ |
+| EPIC-022 | [STORY-006](./EPIC-022-external-integrations/STORY-006-communication-integrations.md) | Communication Integrations | done | 2026-08-10 | `domains/integration`; V079; admin control plane; health 5m; CommunicationChannelLookupPort for EPIC-017 |
 
 ---
 

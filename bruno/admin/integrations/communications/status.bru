@@ -1,0 +1,89 @@
+meta {
+  name: status
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/integrations/communications/status
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.overall_status) {
+    bru.setEnvVar("commsOverallStatus", body.data.overall_status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.channels).to.be.an("array");
+    expect(body.data.overall_status).to.be.a("string");
+    expect(body.data.as_of).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/admin/integrations/communications/status
+  Auth: admin_super, admin_operations
+}
+
+example {
+  name: 200 OK
+  description: Channel health snapshot
+  request: {
+    url: {{baseUrl}}/api/v1/admin/integrations/communications/status
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "channels": [
+              {
+                "channel": "PUSH",
+                "provider": "FIREBASE_FCM",
+                "fallback_provider": null,
+                "status": "HEALTHY",
+                "last_successful_send": "2026-07-24T10:40:00Z",
+                "error_rate_pct_24h": 0.8,
+                "delivery_rate_pct_24h": 94.2,
+                "last_health_check_at": "2026-07-24T10:40:00Z"
+              }
+            ],
+            "overall_status": "HEALTHY",
+            "as_of": "2026-07-24T10:41:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

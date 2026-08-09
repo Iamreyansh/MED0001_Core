@@ -84,6 +84,7 @@ medmate:
   s3:
     # Local only. Staging/prod: MEDMATE_S3_BUCKET=med0001-{env}-uploads-105927215604
     bucket: med0001-local-uploads
+    accounting-exports-enabled: false
   cdn:
     # Public CDN fronting uploads prefixes (avatars/, products/, …). Staging uses
     # https://cdn.staging.nammamedmate.com; prod uses https://cdn.nammamedmate.com.
@@ -102,15 +103,80 @@ medmate:
   wallet:
     # Rs 1,000 — platform config key max_wallet_credit_per_transaction (EPIC-021 STORY-004 later)
     max-credit-paise: 100000
+  internal:
+    # Blank → S2S endpoints fail closed. Local: application-local.yml.
+    service-token: ""
   razorpay:
-    # Blank → StubRazorpayVpaClient (local/CI). Staging/prod: ECS secret env
+    # Blank keys → StubRazorpayClient (local/CI). Staging/prod: ECS secret env
     # MEDMATE_RAZORPAY_{KEY_ID,KEY_SECRET,WEBHOOK_SECRET} (see stacks/*/api.tf).
     key-id: ""
     key-secret: ""
     webhook-secret: ""
+    # TEST|LIVE — live keys still hit api.razorpay.com/v1; mode is an audit flag (AC-008).
+    mode: TEST
   razorpayx:
+    # Blank keys → StubRazorpayXClient. Staging/prod: MEDMATE_RAZORPAYX_*.
+    key-id: ""
+    key-secret: ""
     # Local: application-local.yml. Staging/prod: MEDMATE_RAZORPAYX_WEBHOOK_SECRET.
     webhook-secret: ""
+  maps:
+    # Segregated Google Maps keys (AC-008). Blank → StubMapsClient for that capability.
+    geocode:
+      api-key: ""
+    distance-matrix:
+      api-key: ""
+    directions:
+      api-key: ""
+  gstn:
+    # Blank → StubGstnClient. Staging/prod: MEDMATE_GSTN_API_KEY.
+    api-key: ""
+    base-url: https://gstn.example.invalid/v1
+  digilocker:
+    # Blank client-id/secret → StubDigiLockerClient.
+    client-id: ""
+    client-secret: ""
+    authorize-url: https://api.digitallocker.gov.in/public/oauth2/1/authorize
+    token-url: https://api.digitallocker.gov.in/public/oauth2/1/token
+  drug-registry:
+    api-key: ""
+    base-url: https://drug-registry.example.invalid/v1
+  fssai:
+    api-key: ""
+    base-url: https://fssai.example.invalid/v1
+  gsp:
+    # Blank client-id/secret → StubGspClient (local/CI). Staging/prod: MEDMATE_GSP_*.
+    client-id: ""
+    client-secret: ""
+    base-url: https://gsp.example.invalid/v1
+  zoho:
+    # Blank → StubZohoBooksClient. Staging/prod: MEDMATE_ZOHO_CLIENT_*.
+    client-id: ""
+    client-secret: ""
+    accounts-base-url: https://accounts.zoho.in
+    books-base-url: https://www.zohoapis.in/books/v3
+  accounting:
+    # Hex (64 chars) or Base64 AES-256 key for Zoho OAuth token ciphertext. Blank → local zero key.
+    token-cipher-key: ""
+  integration:
+    payout-retry:
+      enabled: true
+    payout-retry-delay-ms: 300000
+    gsp-token-refresh:
+      enabled: true
+    gsp-token-refresh-delay-ms: 3600000
+    accounting-auto-sync:
+      enabled: true
+    accounting-auto-sync-delay-ms: 60000
+    comms-health-check:
+      enabled: true
+    comms-health-check-delay-ms: 300000
+    comms-daily-reset:
+      enabled: true
+    accounting:
+      sync-poller:
+        enabled: true
+      sync-poll-delay-ms: 2000
   kyc:
     # ponytail: feature flag via property, not EPIC-021 settings service (simpler for now)
     auto-verification-enabled: false

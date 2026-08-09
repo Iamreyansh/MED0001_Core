@@ -1,0 +1,67 @@
+meta {
+  name: verification
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/integrations/drug-registry/verification/{{drugVerificationId}}
+  body: none
+  auth: none
+}
+
+headers {
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+script:pre-request {
+  // Poll async drug verification — set drugVerificationId from verify-licence
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("lastDrugVerificationStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200 or 404", function () {
+    expect([200, 404]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  GET /api/v1/integrations/drug-registry/verification/:id — poll async drug licence verification.
+}
+
+example {
+  name: 200 OK
+  description: Poll completed
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/drug-registry/verification/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+    method: get
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "licence_number": "OD/DRUG/2019/1",
+            "valid": true,
+            "status": "ACTIVE",
+            "cache_hit": false,
+            "verified_at": "2026-07-24T10:22:30Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

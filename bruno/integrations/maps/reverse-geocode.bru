@@ -1,0 +1,95 @@
+meta {
+  name: reverse-geocode
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/maps/reverse-geocode
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+  X-Calling-Service: customer
+}
+
+body:json {
+  {
+    "lat": 12.9716,
+    "lng": 77.6412
+  }
+}
+
+script:pre-request {
+  const lat = bru.getEnvVar("geocodeLat");
+  const lng = bru.getEnvVar("geocodeLng");
+  if (lat && lng) {
+    // prefer chained coords from geocode when present
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.formatted_address) {
+    bru.setEnvVar("reverseFormattedAddress", body.data.formatted_address);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reverse-geocode envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("formatted_address");
+    expect(body.data).to.have.property("cache_hit");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/maps/reverse-geocode — S2S reverse geocode. Errors: GEOCODE_NO_RESULTS, MAPS_API_UNAVAILABLE.
+}
+
+example {
+  name: 200 OK
+  description: Reverse geocode success
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/maps/reverse-geocode
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "lat": 12.9716,
+        "lng": 77.6412
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "formatted_address": "12, 5th Cross Rd, Indiranagar, Bengaluru, Karnataka 560038, India",
+            "area_locality": "Indiranagar",
+            "city": "Bengaluru",
+            "state": "Karnataka",
+            "pincode": "560038",
+            "place_id": "ChIJ_stub_indir",
+            "cache_hit": false
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

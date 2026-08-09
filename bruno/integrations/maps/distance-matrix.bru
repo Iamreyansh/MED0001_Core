@@ -1,0 +1,133 @@
+meta {
+  name: distance-matrix
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/maps/distance-matrix
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+  X-Calling-Service: dispatch
+}
+
+body:json {
+  {
+    "origins": [{ "lat": 12.9716, "lng": 77.6412 }],
+    "destinations": [
+      { "lat": 12.9784, "lng": 77.6408 },
+      { "lat": 12.9652, "lng": 77.648 }
+    ],
+    "mode": "DRIVING"
+  }
+}
+
+script:pre-request {
+  // distance matrix for pharmacy scoring / ETA
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.matrix && body.data.matrix[0]) {
+    bru.setEnvVar("matrixDistanceMeters", String(body.data.matrix[0].distance_meters));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("distance-matrix envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.matrix).to.be.an("array");
+    expect(body.data.matrix[0]).to.have.property("duration_seconds");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/maps/distance-matrix — S2S distance matrix. Errors: TOO_MANY_ORIGINS, MAPS_API_UNAVAILABLE.
+}
+
+example {
+  name: 200 OK
+  description: Matrix success
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/maps/distance-matrix
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "origins": [{ "lat": 12.9716, "lng": 77.6412 }],
+        "destinations": [{ "lat": 12.9784, "lng": 77.6408 }],
+        "mode": "DRIVING"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "matrix": [
+              {
+                "origin_index": 0,
+                "destination_index": 0,
+                "distance_meters": 1240,
+                "duration_seconds": 312,
+                "status": "OK"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 TOO_MANY_ORIGINS
+  description: More than 25 origins
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/maps/distance-matrix
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "origins": [],
+        "destinations": [{ "lat": 12.97, "lng": 77.64 }],
+        "mode": "DRIVING"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "TOO_MANY_ORIGINS",
+            "message": "origins must be at most 25 (Google Distance Matrix limit)"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,132 @@
+meta {
+  name: geocode
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/maps/geocode
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+  X-Calling-Service: order_management
+}
+
+body:json {
+  {
+    "address": "12, 5th Cross, Indiranagar 1st Stage",
+    "city": "Bangalore",
+    "pincode": "560038"
+  }
+}
+
+script:pre-request {
+  // S2S maps geocode — uses collection env internalServiceToken
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.lat != null) bru.setEnvVar("geocodeLat", String(body.data.lat));
+    if (body.data.lng != null) bru.setEnvVar("geocodeLng", String(body.data.lng));
+    if (body.data.place_id) bru.setEnvVar("geocodePlaceId", body.data.place_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("geocode envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("lat");
+    expect(body.data).to.have.property("lng");
+    expect(body.data).to.have.property("cache_hit");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/maps/geocode — S2S forward geocode. Errors: GEOCODE_NO_RESULTS, GEOCODE_AMBIGUOUS, MAPS_API_UNAVAILABLE.
+}
+
+example {
+  name: 200 OK
+  description: Geocode success
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/maps/geocode
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+      X-Calling-Service: order_management
+    }
+    body:json: {
+      {
+        "address": "12, 5th Cross, Indiranagar 1st Stage",
+        "city": "Bangalore",
+        "pincode": "560038"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "lat": 12.9716,
+            "lng": 77.6412,
+            "formatted_address": "12, 5th Cross Rd, Indiranagar Stage 1, Indiranagar, Bengaluru, Karnataka 560038, India",
+            "place_id": "ChIJ_stub_indir",
+            "accuracy": "ROOFTOP",
+            "cache_hit": false,
+            "cached_at": null
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 GEOCODE_NO_RESULTS
+  description: Google ZERO_RESULTS
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/maps/geocode
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "address": "zzzzz nowhere street",
+        "city": "Bangalore",
+        "pincode": "000000"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "GEOCODE_NO_RESULTS",
+            "message": "Google returned ZERO_RESULTS; use last known address as fallback"
+          }
+        }
+      '''
+    }
+  }
+}

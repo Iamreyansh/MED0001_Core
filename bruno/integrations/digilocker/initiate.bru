@@ -1,0 +1,91 @@
+meta {
+  name: initiate
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/digilocker/initiate
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "phone": "+919876543210",
+    "purpose": "PHARMACY_KYC",
+    "entity_id": "11111111-1111-1111-1111-111111111111",
+    "redirect_uri": "https://app.nammamedmate.in/kyc/digilocker/callback"
+  }
+}
+
+script:pre-request {
+  // S2S DigiLocker initiate
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.state) bru.setEnvVar("digilockerState", body.data.state);
+    if (body.data.auth_url) bru.setEnvVar("digilockerAuthUrl", body.data.auth_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("auth_url present", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("auth_url");
+    expect(body.data).to.have.property("state");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/digilocker/initiate — start DigiLocker OAuth for pharmacy KYC.
+}
+
+example {
+  name: 200 OK
+  description: Auth URL issued
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/digilocker/initiate
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "phone": "+919876543210",
+        "purpose": "PHARMACY_KYC",
+        "entity_id": "11111111-1111-1111-1111-111111111111",
+        "redirect_uri": "https://app.nammamedmate.in/kyc/digilocker/callback"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "auth_url": "https://api.digitallocker.gov.in/public/oauth2/1/authorize?response_type=code&client_id=NM_CLIENT&state=abc&redirect_uri=https%3A%2F%2Fapp.nammamedmate.in%2Fkyc%2Fdigilocker%2Fcallback",
+            "state": "abc",
+            "expires_in_seconds": 600
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

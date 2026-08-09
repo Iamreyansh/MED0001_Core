@@ -1,0 +1,198 @@
+meta {
+  name: generate-irn
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/einvoice/generate-irn
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "invoice_data": {
+      "seller_gstin": "29ABCDE1234F1ZW",
+      "buyer_gstin": "27AAPFU0939F1ZV",
+      "invoice_number": "INV-2026-07-001",
+      "invoice_date": "2026-07-24",
+      "supply_type": "B2B",
+      "invoice_type": "INV",
+      "items": [
+        {
+          "sl_no": 1,
+          "product_name": "Metformin 500mg Tablet",
+          "hsn_code": "30049099",
+          "qty": 100,
+          "unit": "NOS",
+          "unit_price": 8.40,
+          "discount": 0,
+          "assbl_value": 840.00,
+          "gst_rate": 12,
+          "igst_amount": 0,
+          "cgst_amount": 50.40,
+          "sgst_amount": 50.40,
+          "total": 940.80
+        }
+      ],
+      "tax_amounts": {
+        "taxable_value": 840.00,
+        "igst": 0,
+        "cgst": 50.40,
+        "sgst": 50.40,
+        "total_invoice_value": 940.80
+      }
+    }
+  }
+}
+
+script:pre-request {
+  // S2S generate IRN — uses collection env internalServiceToken
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.irn) {
+    bru.setEnvVar("lastIrn", body.data.irn);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("generate-irn envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("irn");
+    expect(body.data).to.have.property("already_existed");
+    expect(body.data).to.have.property("signed_invoice_json");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/einvoice/generate-irn — S2S IRN generation. Errors: INVALID_INVOICE_SCHEMA, SELLER_GSTIN_NOT_REGISTERED, DUPLICATE_IRN, NIC_PORTAL_UNAVAILABLE. Optional pharmacy_id skips when e_invoicing_enabled=false (irn null).
+}
+
+example {
+  name: 200 OK
+  description: IRN generated
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/einvoice/generate-irn
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "invoice_data": {
+          "seller_gstin": "29ABCDE1234F1ZW",
+          "buyer_gstin": "27AAPFU0939F1ZV",
+          "invoice_number": "INV-2026-07-001",
+          "invoice_date": "2026-07-24",
+          "supply_type": "B2B",
+          "invoice_type": "INV",
+          "items": [
+            {
+              "sl_no": 1,
+              "product_name": "Metformin 500mg Tablet",
+              "hsn_code": "30049099",
+              "qty": 100,
+              "unit": "NOS",
+              "unit_price": 8.40,
+              "discount": 0,
+              "assbl_value": 840.00,
+              "gst_rate": 12,
+              "igst_amount": 0,
+              "cgst_amount": 50.40,
+              "sgst_amount": 50.40,
+              "total": 940.80
+            }
+          ],
+          "tax_amounts": {
+            "taxable_value": 840.00,
+            "igst": 0,
+            "cgst": 50.40,
+            "sgst": 50.40,
+            "total_invoice_value": 940.80
+          }
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "irn": "a85e9a93af0ed3c3f1c7e2fd4b08e3a7f4c2a1b0c9d3e5f8a7b6c4d2e1f0a9b8",
+            "ack_number": "232410141234567",
+            "ack_date": "2026-07-24T10:30:00Z",
+            "qr_code_url": "data:image/png;base64,iVBORw0KGgo...",
+            "signed_invoice_json": "{\"Version\":\"1.1\",\"Irn\":\"a85e9a93...\",\"Signature\":\"MEUCIQ...\"}",
+            "already_existed": false,
+            "generated_at": "2026-07-24T10:30:02Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_INVOICE_SCHEMA
+  description: Local SCHEMA 1.1 validation failed
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/einvoice/generate-irn
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "invoice_data": {
+          "seller_gstin": "29ABCDE1234F1ZW",
+          "buyer_gstin": "27AAPFU0939F1ZV",
+          "invoice_date": "2026-07-24",
+          "supply_type": "B2B",
+          "invoice_type": "INV",
+          "items": [],
+          "tax_amounts": {
+            "taxable_value": 0,
+            "total_invoice_value": 0
+          }
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_INVOICE_SCHEMA",
+            "message": "invoice_number is required",
+            "details": {
+              "field": "invoice_number"
+            }
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,143 @@
+meta {
+  name: create-order
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/razorpay/create-order
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "amount_paise": 50400,
+    "currency": "INR",
+    "receipt": "ORD-8821",
+    "notes": {
+      "platform_order_id": "{{orderId}}",
+      "customer_id": "{{customerId}}",
+      "pharmacy_id": "{{pharmacyId}}"
+    }
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("orderId")) {
+    bru.setEnvVar("orderId", crypto.randomUUID());
+  }
+  if (!bru.getEnvVar("customerId")) {
+    bru.setEnvVar("customerId", crypto.randomUUID());
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    bru.setEnvVar("pharmacyId", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.razorpay_order_id) {
+    bru.setEnvVar("razorpayOrderId", body.data.razorpay_order_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("create-order envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("razorpay_order_id");
+    expect(body.data).to.have.property("amount_paise");
+    expect(body.data.status).to.equal("created");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/razorpay/create-order — S2S Razorpay order. Errors: AMOUNT_TOO_SMALL, RAZORPAY_UNAVAILABLE.
+}
+
+example {
+  name: 200 OK
+  description: Order created
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/razorpay/create-order
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "amount_paise": 50400,
+        "currency": "INR",
+        "receipt": "ORD-8821",
+        "notes": {
+          "platform_order_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "razorpay_order_id": "order_abc123",
+            "amount_paise": 50400,
+            "currency": "INR",
+            "receipt": "ORD-8821",
+            "status": "created",
+            "created_at": "2026-07-24T10:10:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 AMOUNT_TOO_SMALL
+  description: Below Rs 1 minimum
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/razorpay/create-order
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "amount_paise": 50,
+        "currency": "INR",
+        "receipt": "ORD-TINY"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "AMOUNT_TOO_SMALL",
+            "message": "amount_paise must be at least 100 (Rs 1)"
+          }
+        }
+      '''
+    }
+  }
+}

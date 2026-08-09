@@ -1,0 +1,121 @@
+meta {
+  name: test
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/integrations/communications/test
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{adminAccessToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "channel": "SMS",
+    "recipient": "+919876543210",
+    "test_template": "OTP_VERIFICATION"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.log_id) {
+    bru.setEnvVar("commsTestLogId", body.data.log_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_test).to.equal(true);
+    expect(body.data.status).to.equal("SENT");
+    expect(body.data.log_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/admin/integrations/communications/test
+  Auth: admin_super, admin_operations
+  Errors: 400 INVALID_CHANNEL, 422 TEMPLATE_NOT_FOUND, 503 PROVIDER_UNAVAILABLE
+}
+
+example {
+  name: 200 OK
+  description: Test SMS sent via stub provider
+  request: {
+    url: {{baseUrl}}/api/v1/admin/integrations/communications/test
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channel": "SMS",
+        "recipient": "+919876543210",
+        "test_template": "OTP_VERIFICATION"
+      }
+    }
+  }
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "channel": "SMS",
+            "provider": "MSG91",
+            "recipient": "+919876543210",
+            "status": "SENT",
+            "is_test": true,
+            "log_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "sent_at": "2026-07-24T10:42:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 TEMPLATE_NOT_FOUND
+  response: {
+    status: {
+      code: 422
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "TEMPLATE_NOT_FOUND",
+            "message": "test_template not found for this channel"
+          }
+        }
+      '''
+    }
+  }
+}

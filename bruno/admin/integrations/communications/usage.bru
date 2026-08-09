@@ -1,0 +1,89 @@
+meta {
+  name: usage
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/integrations/communications/usage?channel=SMS
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{adminAccessToken}}
+}
+
+params:query {
+  channel: SMS
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  // no-op
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.usage).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/integrations/communications/usage
+  Auth: admin_super, admin_operations
+  Query: channel (optional)
+}
+
+example {
+  name: 200 OK
+  description: SMS usage and cost
+  request: {
+    url: {{baseUrl}}/api/v1/admin/integrations/communications/usage?channel=SMS
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "usage": [
+              {
+                "channel": "SMS",
+                "provider": "MSG91",
+                "sent_today": 2840,
+                "sent_month": 48200,
+                "cost_today_rs": 340.80,
+                "cost_month_rs": 5784.00,
+                "daily_limit": 50000,
+                "daily_limit_pct_used": 5.7,
+                "delivery_rate_pct": 89.1,
+                "fallback_sent_today": 42
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

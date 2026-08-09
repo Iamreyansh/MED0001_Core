@@ -65,6 +65,7 @@
       <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$ListResult"/>
       <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$CreateZoneCommand"/>
       <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$PatchZoneCommand"/>
+      <Class name="com.nammamedmate.integration.domain.CommunicationConfigAudit"/>
     </Or>
   </Match>
 </FindBugsFilter>

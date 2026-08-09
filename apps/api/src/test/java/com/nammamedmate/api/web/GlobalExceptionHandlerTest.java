@@ -28,6 +28,7 @@ class GlobalExceptionHandlerTest {
     assertThat(limited.getBody().error()).isNotNull();
     assertThat(limited.getBody().error().retryAfterSeconds()).isEqualTo(30);
     assertThat(limited.getBody().error().details()).isNull();
+    assertThat(limited.getHeaders().getFirst("Retry-After")).isEqualTo("30");
     assertThat(handler.handleIllegalArgument(new IllegalArgumentException("bad")).getStatusCode())
         .isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(handler.handleGeneric(new RuntimeException("boom")).getStatusCode())
