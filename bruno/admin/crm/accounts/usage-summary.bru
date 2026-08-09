@@ -1,0 +1,105 @@
+meta {
+  name: usage-summary
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/usage-summary
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — run admin/crm/plans/get or leads flow first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmAdoptionScore", String(body.data.adoption_score));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("usage-summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("seat_usage");
+    expect(body.data).to.have.property("invoice_usage_this_month");
+    expect(body.data).to.have.property("adoption_score");
+    expect(body.data).to.have.property("module_event_counts");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/accounts/:account_id/usage-summary — seats, invoices, adoption score.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/usage-summary
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "pharmacy_name": "Apollo Pharmacy HSR",
+            "seat_usage": { "used": 2, "limit": 2 },
+            "invoice_usage_this_month": { "used": 187, "limit": 500 },
+            "active_users": ["Ramesh Kumar", "Priya Devi"],
+            "last_active_at": "2026-07-24T10:00:00Z",
+            "adoption_score": 62,
+            "module_event_counts": [
+              { "module": "BILLING", "events": 312, "last_active_at": "2026-07-24T10:00:00Z" }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ACCOUNT_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/00000000-0000-4000-8000-000000000099/usage-summary
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ACCOUNT_NOT_FOUND",
+            "message": "Account not found"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,116 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/modules
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~group:
+  ~tier:
+  ~sort: adoption_pct
+  ~order: desc
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.modules) && body.data.modules.length) {
+    bru.setEnvVar("crmModuleId", body.data.modules[0].module_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("modules envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("chips");
+    expect(body.data).to.have.property("modules");
+    expect(body.data.chips).to.have.property("low_adoption_count");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/modules — feature adoption overview (EPIC-014/STORY-006).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/modules
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "chips": {
+              "module_count": 15,
+              "avg_adoption_pct": 54.2,
+              "top_module": "BILLING",
+              "low_adoption_count": 4
+            },
+            "modules": [
+              {
+                "module_id": "mod_billing",
+                "module_name": "Billing / POS",
+                "group": "CORE",
+                "tier": "FREE",
+                "accounts_using": 540,
+                "accounts_eligible": 600,
+                "adoption_pct": 90.0,
+                "low_adoption": false
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 INSUFFICIENT_PERMISSIONS
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/modules
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INSUFFICIENT_PERMISSIONS",
+            "message": "Insufficient permissions"
+          }
+        }
+      '''
+    }
+  }
+}

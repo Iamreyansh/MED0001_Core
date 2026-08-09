@@ -1,0 +1,107 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/plans
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.plans) && body.data.plans.length) {
+    const starter = body.data.plans.find(p => p.name === "STARTER") || body.data.plans[0];
+    bru.setEnvVar("crmPlanId", starter.plan_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("plans envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("plans");
+    expect(body.data.plans.length).to.be.above(0);
+    expect(body.data.plans[0]).to.have.property("price_annual_rs");
+    expect(body.data.plans[0]).to.have.property("subscriber_count");
+    expect(body.data.plans[0]).to.have.property("mrr_rs");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/plans — list SaaS plans with subscriber_count and MRR (EPIC-014/STORY-001).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/plans
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "plans": [
+              {
+                "plan_id": "a1000000-0000-4000-8000-000000000002",
+                "name": "STARTER",
+                "price_monthly_rs": 699.00,
+                "price_annual_rs": 6990.00,
+                "seat_limit": 2,
+                "invoice_cap_monthly": 500,
+                "module_count": 9,
+                "subscriber_count": 0,
+                "mrr_rs": 0.00
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 INSUFFICIENT_PERMISSIONS
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/plans
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INSUFFICIENT_PERMISSIONS",
+            "message": "Insufficient permissions"
+          }
+        }
+      '''
+    }
+  }
+}

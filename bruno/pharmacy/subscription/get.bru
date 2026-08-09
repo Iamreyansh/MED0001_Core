@@ -1,0 +1,78 @@
+meta {
+  name: get
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/subscription
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner/staff login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmSubscriptionId", body.data.subscription_id);
+    bru.setEnvVar("crmCurrentPlan", body.data.plan);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("subscription envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("subscription_id");
+    expect(body.data).to.have.property("plan");
+    expect(body.data).to.have.property("auto_renew");
+    expect(body.data).to.have.property("modules_unlocked");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/subscription — current subscription for owner|staff.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/subscription
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "subscription_id": "b1000000-0000-4000-8000-000000000001",
+            "plan": "STARTER",
+            "status": "ACTIVE",
+            "billing_cycle": "MONTHLY",
+            "price_monthly_rs": 699.00,
+            "renewal_date": "2026-08-24T00:00:00Z",
+            "auto_renew": true,
+            "seat_usage": { "used": 0, "limit": 2 },
+            "invoice_usage": { "used": 0, "limit": 500 },
+            "modules_unlocked": ["INVENTORY", "BILLING"],
+            "addons": []
+          }
+        }
+      '''
+    }
+  }
+}

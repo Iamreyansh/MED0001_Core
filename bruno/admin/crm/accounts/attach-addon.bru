@@ -1,0 +1,102 @@
+meta {
+  name: attach-addon
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/addons/{{crmAddonId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — set from crm_account row for a pharmacy");
+  }
+  if (!bru.getEnvVar("crmAddonId")) {
+    bru.setEnvVar("crmAddonId", "a2000000-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmAccountId", body.data.account_id);
+    bru.setEnvVar("crmAddonId", body.data.addon_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("attach envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("effective_from");
+    expect(body.data).to.have.property("next_billing_amount_rs");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/accounts/:account_id/addons/:addon_id — attach add-on immediately.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/22222222-2222-4222-8222-222222222222/addons/a2000000-0000-4000-8000-000000000001
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "account_id": "22222222-2222-4222-8222-222222222222",
+            "addon_id": "a2000000-0000-4000-8000-000000000001",
+            "effective_from": "2026-07-24T00:00:00Z",
+            "next_billing_amount_rs": 199.00,
+            "message": "Add-on activated immediately. Billed on next invoice cycle."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ADDON_ALREADY_ATTACHED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/22222222-2222-4222-8222-222222222222/addons/a2000000-0000-4000-8000-000000000001
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ADDON_ALREADY_ATTACHED",
+            "message": "Add-on already active on account"
+          }
+        }
+      '''
+    }
+  }
+}

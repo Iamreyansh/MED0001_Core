@@ -1,0 +1,89 @@
+meta {
+  name: upcoming
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/renewals/upcoming?days=30&risk_level=HIGH&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  days: 30
+  risk_level: HIGH
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.upcoming_renewals && body.data.upcoming_renewals[0]) {
+    bru.setEnvVar("crmRenewalAccountId", body.data.upcoming_renewals[0].account_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("upcoming renewals envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("upcoming_renewals");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/renewals/upcoming — filterable renewal list (EPIC-014/STORY-007).
+  Auth: admin_super | admin_operations | admin_finance (crm:read).
+  Query: days (default 30, max 90), risk_level, csm_id, page, limit.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/renewals/upcoming?days=30&risk_level=HIGH&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "upcoming_renewals": [
+              {
+                "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "pharmacy_name": "Apollo Pharmacy HSR",
+                "plan": "RETAIL_PRO",
+                "mrr_rs": 1499,
+                "renewal_date": "2026-08-05",
+                "days_until_renewal": 12,
+                "auto_renew": true,
+                "risk_level": "HIGH",
+                "health_score": 42,
+                "last_save_play_at": "2026-07-24T14:00:00Z",
+                "assigned_csm": null
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 42, "has_next": true }
+        }
+      '''
+    }
+  }
+}

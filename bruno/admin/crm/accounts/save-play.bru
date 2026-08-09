@@ -1,0 +1,127 @@
+meta {
+  name: save-play
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/health/save-play
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "action_type": "CALL",
+    "outcome": "Pharmacy owner agreed to a training session next week.",
+    "notes": "CSM spoke with owner for 25 minutes."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — run admin/crm/plans/get or leads flow first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.save_play_id) {
+    bru.setEnvVar("crmSavePlayId", body.data.save_play_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("save-play envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("save_play_id");
+    expect(body.data.action_type).to.equal("CALL");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/accounts/:id/health/save-play — log CSM save play (EPIC-014/STORY-005).
+  Auth: admin_super | admin_operations (crm:write).
+  Errors: ACCOUNT_NOT_FOUND, INVALID_ACTION_TYPE.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/health/save-play
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "action_type": "CALL",
+        "outcome": "Pharmacy owner agreed to a training session next week.",
+        "notes": "CSM spoke with owner for 25 minutes."
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "save_play_id": "sp000000-0000-4000-8000-000000000001",
+            "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "action_type": "CALL",
+            "logged_by": "admin000-0000-4000-8000-000000000002",
+            "logged_at": "2026-07-24T14:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_ACTION_TYPE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/health/save-play
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "action_type": "SMS",
+        "outcome": "nope"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_ACTION_TYPE",
+            "message": "invalid action_type"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,116 @@
+meta {
+  name: plans
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/subscription/plans
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmCurrentPlan", body.data.current_plan);
+    if (Array.isArray(body.data.plans) && body.data.plans.length) {
+      bru.setEnvVar("crmPlanId", body.data.plans[0].plan_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pharmacy plans envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("current_plan");
+    expect(body.data).to.have.property("plans");
+    expect(body.data.plans[0]).to.have.property("is_current");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/subscription/plans — pharmacy owner plan catalogue with upgrade CTAs.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/subscription/plans
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "current_plan": "STARTER",
+            "plans": [
+              {
+                "plan_id": "a1000000-0000-4000-8000-000000000002",
+                "name": "STARTER",
+                "price_monthly_rs": 699.00,
+                "price_annual_rs": 6990.00,
+                "seat_limit": 2,
+                "included_modules": ["INVENTORY", "BILLING"],
+                "is_current": true
+              },
+              {
+                "plan_id": "a1000000-0000-4000-8000-000000000003",
+                "name": "RETAIL_PRO",
+                "price_monthly_rs": 1499.00,
+                "price_annual_rs": 14990.00,
+                "seat_limit": 5,
+                "included_modules": ["INVENTORY", "BILLING", "ADVANCED_ANALYTICS"],
+                "is_current": false,
+                "upgrade_cta": "Upgrade Now"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/subscription/plans
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Pharmacy owner access required"
+          }
+        }
+      '''
+    }
+  }
+}

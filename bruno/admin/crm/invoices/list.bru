@@ -1,0 +1,101 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/invoices?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~status:
+  ~plan:
+  ~account_id:
+  ~from:
+  ~to:
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.invoices) && body.data.invoices.length) {
+    bru.setEnvVar("crmInvoiceId", body.data.invoices[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("invoice list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("chips");
+    expect(body.data).to.have.property("invoices");
+    expect(body.data.chips).to.have.property("collection_rate_pct");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/invoices — billing dashboard with KPI chips (EPIC-014/STORY-003).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/invoices?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "chips": {
+              "collected_rs": 428640.00,
+              "due_rs": 62340.00,
+              "overdue_rs": 18900.00,
+              "collection_rate_pct": 87.4,
+              "dso_days": 4.2,
+              "in_dunning_count": 28
+            },
+            "collected_by_plan": [
+              { "plan": "STARTER", "collected_rs": 201000.00 }
+            ],
+            "invoices": [
+              {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "account_id": "22222222-2222-4222-8222-222222222222",
+                "pharmacy_name": "Apollo Pharmacy HSR",
+                "plan": "STARTER",
+                "amount_incl_gst_rs": 824.82,
+                "billing_period": "2026-07-01 to 2026-07-31",
+                "status": "PAID",
+                "due_date": "2026-07-01",
+                "paid_at": "2026-07-03T10:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 612, "has_next": true }
+        }
+      '''
+    }
+  }
+}

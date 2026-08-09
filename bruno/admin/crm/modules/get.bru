@@ -1,0 +1,102 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/modules/{{crmModuleId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmModuleId")) {
+    bru.setEnvVar("crmModuleId", "mod_analytics_adv");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.module_id) {
+    bru.setEnvVar("crmModuleId", body.data.module_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("module detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("eligible_not_using");
+    expect(body.data).to.have.property("per_account_event_counts");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/modules/:module_id — module adoption detail (admin_super|admin_operations).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/modules/mod_analytics_adv
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "module_id": "mod_analytics_adv",
+            "module_name": "Advanced Analytics",
+            "group": "ANALYTICS",
+            "tier": "RETAIL_PRO",
+            "accounts_eligible": 180,
+            "accounts_using": 28,
+            "adoption_pct": 15.6,
+            "eligible_not_using": [],
+            "per_account_event_counts": []
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 MODULE_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/modules/mod_missing
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MODULE_NOT_FOUND",
+            "message": "Module not found"
+          }
+        }
+      '''
+    }
+  }
+}

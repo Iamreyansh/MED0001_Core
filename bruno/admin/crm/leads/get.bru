@@ -1,0 +1,85 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/leads/{{crmLeadId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmLeadId")) {
+    throw new Error("crmLeadId missing — run admin/crm/leads/create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("crmLeadId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("activity_timeline");
+    expect(body.data).to.have.property("next_best_action");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/leads/:id — lead detail + timeline (EPIC-014/STORY-004).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/leads/c4000000-0000-4000-8000-000000000001
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c4000000-0000-4000-8000-000000000001",
+            "pharmacy_name": "Sri Ram Medical",
+            "contact_name": "Ramesh Kumar",
+            "phone": "+919876543210",
+            "email": "ramesh@srirammedical.com",
+            "source": "MARKETPLACE",
+            "stage": "DEMO",
+            "win_probability": 30,
+            "estimated_mrr_rs": 1499.00,
+            "target_plan": "RETAIL_PRO",
+            "assigned_rep": { "id": "a0000000-0000-4000-8000-000000000002", "name": "Sneha Rao" },
+            "next_best_action": "Follow up on demo feedback; offer 14-day trial.",
+            "activity_timeline": [
+              { "event": "CREATED", "at": "2026-07-10T09:00:00Z", "actor": "SYSTEM" },
+              { "event": "STAGE_CHANGE", "from": "CONTACTED", "to": "DEMO", "at": "2026-07-15T14:00:00Z", "actor": "Sneha Rao", "notes": "Demo scheduled." }
+            ],
+            "notes": "Pharmacy owner interested in billing + inventory modules.",
+            "created_at": "2026-07-10T09:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

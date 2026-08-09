@@ -1,0 +1,130 @@
+meta {
+  name: override
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/subscription/override
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "plan_id": "{{crmRetailProPlanId}}",
+    "override_reason": "Partner deal - complimentary RETAIL_PRO",
+    "override_expires_at": "2026-10-24T00:00:00Z"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — set from crm_account row");
+  }
+  if (!bru.getEnvVar("crmRetailProPlanId")) {
+    bru.setEnvVar("crmRetailProPlanId", "a1000000-0000-4000-8000-000000000003");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmOverridePlan", body.data.override_plan);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("override envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("override_plan");
+    expect(body.data).to.have.property("override_expires_at");
+    expect(body.data).to.have.property("override_by");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/accounts/:account_id/subscription/override — admin_super only, max 90 days.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/22222222-2222-4222-8222-222222222222/subscription/override
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "plan_id": "a1000000-0000-4000-8000-000000000003",
+        "override_reason": "Partner deal - 3-month complimentary RETAIL_PRO",
+        "override_expires_at": "2026-10-24T00:00:00Z"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "account_id": "22222222-2222-4222-8222-222222222222",
+            "override_plan": "RETAIL_PRO",
+            "override_expires_at": "2026-10-24T00:00:00Z",
+            "override_by": "11111111-1111-4111-8111-111111111111",
+            "override_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 OVERRIDE_DURATION_EXCEEDED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/22222222-2222-4222-8222-222222222222/subscription/override
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "plan_id": "a1000000-0000-4000-8000-000000000003",
+        "override_reason": "too long",
+        "override_expires_at": "2027-01-01T00:00:00Z"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "OVERRIDE_DURATION_EXCEEDED",
+            "message": "override_expires_at more than 90 days from now"
+          }
+        }
+      '''
+    }
+  }
+}

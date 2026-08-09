@@ -1,0 +1,121 @@
+meta {
+  name: advance
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/leads/{{crmLeadId}}/advance
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "notes": "Demo completed; pharmacy owner impressed with billing module."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmLeadId")) {
+    throw new Error("crmLeadId missing — run admin/crm/leads/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("crmLeadId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("advance envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("previous_stage");
+    expect(body.data).to.have.property("new_stage");
+    expect(body.data).to.have.property("win_probability");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/leads/:id/advance — move one stage forward (EPIC-014/STORY-004).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/leads/c4000000-0000-4000-8000-000000000001/advance
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "notes": "Demo completed; pharmacy owner impressed with billing module."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c4000000-0000-4000-8000-000000000001",
+            "previous_stage": "DEMO",
+            "new_stage": "TRIAL",
+            "win_probability": 60,
+            "advanced_at": "2026-07-24T11:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 LEAD_ALREADY_WON
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/leads/c4000000-0000-4000-8000-000000000001/advance
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "notes": "noop"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "LEAD_ALREADY_WON",
+            "message": "Cannot advance a WON lead"
+          }
+        }
+      '''
+    }
+  }
+}

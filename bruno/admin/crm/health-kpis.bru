@@ -1,0 +1,74 @@
+meta {
+  name: health-kpis
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/health-kpis
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmAtRiskCount", String(body.data.at_risk_count));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("health-kpis envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("avg_health_score");
+    expect(body.data).to.have.property("at_risk_count");
+    expect(body.data).to.have.property("mrr_at_risk_rs");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/health-kpis — platform health KPIs (EPIC-014/STORY-005).
+  Auth: admin_super | admin_operations | admin_finance (crm:read).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/health-kpis
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "avg_health_score": 68.4,
+            "healthy_pct": 62.0,
+            "moderate_pct": 24.0,
+            "at_risk_count": 32,
+            "churning_count": 8,
+            "mrr_at_risk_rs": 48270,
+            "accounts_with_open_save_plays": 18,
+            "computed_at": "2026-07-24T03:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,87 @@
+meta {
+  name: at-risk
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/at-risk?health_band=AT_RISK&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  health_band: AT_RISK
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.accounts && body.data.accounts[0]) {
+    bru.setEnvVar("crmAtRiskAccountId", body.data.accounts[0].account_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("at-risk envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("total_mrr_at_risk_rs");
+    expect(body.data).to.have.property("accounts");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/at-risk — accounts with score < 50, sorted by MRR desc (EPIC-014/STORY-005).
+  Auth: admin_super | admin_operations | admin_finance (crm:read).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/at-risk?health_band=AT_RISK&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total_mrr_at_risk_rs": 48270,
+            "accounts": [
+              {
+                "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "pharmacy_name": "Apollo Pharmacy HSR",
+                "plan": "RETAIL_PRO",
+                "mrr_rs": 1499,
+                "overall_score": 42,
+                "health_band": "AT_RISK",
+                "renewal_date": "2026-08-15",
+                "last_save_play_at": null,
+                "assigned_csm": null
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 32, "has_next": true }
+        }
+      '''
+    }
+  }
+}

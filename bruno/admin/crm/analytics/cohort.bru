@@ -1,0 +1,78 @@
+meta {
+  name: cohort
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/analytics/cohort?cohort_from=2026-01&cohort_to=2026-07
+  body: none
+  auth: inherit
+}
+
+params:query {
+  cohort_from: 2026-01
+  cohort_to: 2026-07
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.cohort_retention && body.data.cohort_retention[0]) {
+    bru.setEnvVar("crmCohortMonth", body.data.cohort_retention[0].cohort_month);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cohort envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("cohort_retention");
+    expect(body.data).to.have.property("months_since_labels");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/analytics/cohort — cohort retention grid (EPIC-014/STORY-008).
+  Auth: admin_super | admin_finance (crm:analytics).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/analytics/cohort?cohort_from=2026-01&cohort_to=2026-07
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cohort_retention": [
+              {
+                "cohort_month": "2026-01",
+                "starting_accounts": 48,
+                "retention_pcts": [100, 95.8, 93.7, 91.6, 89.5, 87.5, 85.4]
+              }
+            ],
+            "months_since_labels": [0, 1, 2, 3, 4, 5, 6]
+          }
+        }
+      '''
+    }
+  }
+}

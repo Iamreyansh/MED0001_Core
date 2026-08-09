@@ -226,6 +226,19 @@ public class SecurityConfig {
                         "/api/v1/pharmacy/finance/settlements",
                         "/api/v1/pharmacy/finance/settlements/**")
                     .hasRole("PHARMACY_OWNER")
+                    // EPIC-014 CRM SaaS — pharmacy subscription/billing + admin CRM.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/subscription")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(
+                        "/api/v1/pharmacy/subscription", "/api/v1/pharmacy/subscription/**")
+                    .hasRole("PHARMACY_OWNER")
+                    .requestMatchers("/api/v1/pharmacy/billing", "/api/v1/pharmacy/billing/**")
+                    .hasRole("PHARMACY_OWNER")
+                    .requestMatchers(
+                        "/api/v1/admin/crm/analytics", "/api/v1/admin/crm/analytics/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers("/api/v1/admin/crm", "/api/v1/admin/crm/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
                     .requestMatchers(HttpMethod.GET, "/api/v1/admin/riders/*/earnings-ledger")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/riders/*/payout/release")

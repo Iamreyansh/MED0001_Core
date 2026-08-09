@@ -1,0 +1,124 @@
+meta {
+  name: nudge-ineligible
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/modules/nudge-ineligible
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "module_id": "{{crmModuleId}}",
+    "channel": "EMAIL"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmModuleId")) {
+    bru.setEnvVar("crmModuleId", "mod_analytics_adv");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmNudgeSentCount", String(body.data.nudge_sent_count || 0));
+  }
+}
+
+tests {
+  test("HTTP 200 or 422", function () {
+    const status = res.getStatus();
+    expect([200, 422].includes(status)).to.equal(true);
+  });
+  test("nudge envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("nudge_sent_count");
+      expect(body.data).to.have.property("channel");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error.code).to.equal("NO_ELIGIBLE_ACCOUNTS");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/modules/nudge-ineligible — nudge plan-eligible accounts with 0 events in 30d.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/modules/nudge-ineligible
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "module_id": "mod_analytics_adv",
+        "channel": "EMAIL"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "module_id": "mod_analytics_adv",
+            "module_name": "Advanced Analytics",
+            "eligible_not_using_count": 152,
+            "nudge_sent_count": 152,
+            "channel": "EMAIL",
+            "sent_at": "2026-07-24T10:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 NO_ELIGIBLE_ACCOUNTS
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/modules/nudge-ineligible
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "module_id": "mod_analytics_adv",
+        "channel": "EMAIL"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "NO_ELIGIBLE_ACCOUNTS",
+            "message": "No accounts qualify for nudge"
+          }
+        }
+      '''
+    }
+  }
+}

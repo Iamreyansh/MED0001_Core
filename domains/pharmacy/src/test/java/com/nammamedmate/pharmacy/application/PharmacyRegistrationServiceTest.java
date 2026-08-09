@@ -123,6 +123,24 @@ class PharmacyRegistrationServiceTest {
   }
 
   @Test
+  void registerInvokesCrmBootstrapWhenWired() {
+    java.util.concurrent.atomic.AtomicReference<java.util.UUID> bootstrapped =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    service.crmAccountBootstrap = bootstrapped::set;
+    Map<String, Object> data =
+        service.register(
+            validCmd(
+                "owner-crm@nammamedmate.test",
+                "+919811109999",
+                "DL-CRM-99",
+                "29AABPP1235F1ZY",
+                "ABCPA1234A"),
+            "9.9.9.9");
+    assertThat(bootstrapped.get()).isNotNull();
+    assertThat(data.get("pharmacy_id")).isEqualTo(bootstrapped.get().toString());
+  }
+
+  @Test
   void registerRejectsInvalidGstinWithoutPersist() {
     RegisterCommand cmd =
         new RegisterCommand(

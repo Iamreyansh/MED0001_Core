@@ -15,10 +15,10 @@
 | Phase | Total | Done |
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
-| Phase 2 | 34 | 20 |
+| Phase 2 | 34 | 28 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **66** |
+| **Total** | **129** | **74** |
 
 ---
 
@@ -155,14 +155,14 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-014 | [STORY-001](./EPIC-014-crm-saas/STORY-001-saas-plan-management.md) | SaaS Plan Management | pending | — | — |
-| EPIC-014 | [STORY-002](./EPIC-014-crm-saas/STORY-002-subscription-management.md) | Subscription Management | pending | — | — |
-| EPIC-014 | [STORY-003](./EPIC-014-crm-saas/STORY-003-saas-billing-invoicing.md) | SaaS Billing and Invoicing | pending | — | — |
-| EPIC-014 | [STORY-004](./EPIC-014-crm-saas/STORY-004-lead-pipeline.md) | Lead Pipeline | pending | — | — |
-| EPIC-014 | [STORY-005](./EPIC-014-crm-saas/STORY-005-account-health-scoring.md) | Account Health Scoring | pending | — | — |
-| EPIC-014 | [STORY-006](./EPIC-014-crm-saas/STORY-006-feature-adoption-metering.md) | Feature Adoption Metering | pending | — | — |
-| EPIC-014 | [STORY-007](./EPIC-014-crm-saas/STORY-007-renewal-churn-management.md) | Renewal and Churn Management | pending | — | — |
-| EPIC-014 | [STORY-008](./EPIC-014-crm-saas/STORY-008-saas-revenue-analytics.md) | SaaS Revenue Analytics | pending | — | — |
+| EPIC-014 | [STORY-001](./EPIC-014-crm-saas/STORY-001-saas-plan-management.md) | SaaS Plan Management | done | 2026-08-09 | `domains/crm`; V065 plans/addons/matrix/crm_account; annual×10; paise DB→*_rs API; CrmPlanBridgeConfig Pos/Inventory; module filter opt-in; GROWTH↔RETAIL_PRO backfill |
+| EPIC-014 | [STORY-002](./EPIC-014-crm-saas/STORY-002-subscription-management.md) | Subscription Management | done | 2026-08-09 | `domains/crm`; V066 saas_subscription; FREE bootstrap bridge; override≤90d; auto-renew T-3 IST; EXPIRED→FREE plan lookup; V073 Idempotency-Key on subscribe/upgrade + period-scoped auto-renew |
+| EPIC-014 | [STORY-003](./EPIC-014-crm-saas/STORY-003-saas-billing-invoicing.md) | SaaS Billing and Invoicing | done | 2026-08-09 | `domains/crm`; V067 saas_invoice+lines; GST18% SAC9983; dunning Day3–14 outbox; Razorpay pay stub; Idempotency-Key; Bruno invoices+billing |
+| EPIC-014 | [STORY-004](./EPIC-014-crm-saas/STORY-004-lead-pipeline.md) | Lead Pipeline | done | 2026-08-09 | `domains/crm`; V068 leads+activity+rr; weighted forecast; marketplace auto-lead; mark-won→subscribe; Bruno leads/ |
+| EPIC-014 | [STORY-005](./EPIC-014-crm-saas/STORY-005-account-health-scoring.md) | Account Health Scoring | done | 2026-08-10 | `domains/crm`; V070 health+snapshot+save_play; bands+&lt;40 auto save-play; nightly 03:00 IST; support/GMV stubs; Bruno health/ |
+| EPIC-014 | [STORY-006](./EPIC-014-crm-saas/STORY-006-feature-adoption-metering.md) | Feature Adoption Metering | done | 2026-08-10 | `domains/crm`; V069 module_usage+overrides; CrmUsageMeteringFilter DB upsert; nudge outbox; Bruno modules/ |
+| EPIC-014 | [STORY-007](./EPIC-014-crm-saas/STORY-007-renewal-churn-management.md) | Renewal and Churn Management | done | 2026-08-10 | `domains/crm`; V071 churn_survey+cohorts; renewals pipeline; manual renew 7d; win-back/at-risk/monthly outbox; Bruno renewals/ |
+| EPIC-014 | [STORY-008](./EPIC-014-crm-saas/STORY-008-saas-revenue-analytics.md) | SaaS Revenue Analytics | done | 2026-08-10 | `domains/crm`; V072 metrics_cache+cohort_retention+sm_spend; crm:analytics finance/super only; monthly batch+on-miss; Bruno analytics/ |
 
 ### EPIC-022 (`EPIC-022-external-integrations`)
 

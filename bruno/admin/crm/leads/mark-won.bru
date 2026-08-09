@@ -1,0 +1,95 @@
+meta {
+  name: mark-won
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/leads/{{crmLeadId}}/mark-won
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "plan_id": "{{crmPlanId}}",
+    "billing_cycle": "MONTHLY"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmLeadId")) {
+    throw new Error("crmLeadId missing — run admin/crm/leads/create first");
+  }
+  if (!bru.getEnvVar("crmPlanId")) {
+    throw new Error("crmPlanId missing — run admin/crm/plans/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.id) bru.setEnvVar("crmLeadId", body.data.id);
+    if (body.data.subscription_id) bru.setEnvVar("crmSubscriptionId", body.data.subscription_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("mark-won envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.stage).to.equal("WON");
+    expect(body.data).to.have.property("subscription_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/leads/:id/mark-won — convert lead to subscription (EPIC-014/STORY-004).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/leads/c4000000-0000-4000-8000-000000000001/mark-won
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "plan_id": "a1000000-0000-4000-8000-000000000003",
+        "billing_cycle": "MONTHLY"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c4000000-0000-4000-8000-000000000001",
+            "stage": "WON",
+            "subscription_created": true,
+            "subscription_id": "b2000000-0000-4000-8000-000000000002",
+            "sales_cycle_days": 14,
+            "won_at": "2026-07-24T11:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

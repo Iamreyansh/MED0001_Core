@@ -1,0 +1,83 @@
+meta {
+  name: report
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/analytics/report?period=MONTH&month={{crmAnalyticsMonth}}&format=PDF
+  body: none
+  auth: inherit
+}
+
+params:query {
+  period: MONTH
+  month: {{crmAnalyticsMonth}}
+  format: PDF
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAnalyticsMonth")) {
+    const d = new Date();
+    bru.setEnvVar(
+      "crmAnalyticsMonth",
+      d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0")
+    );
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.report_url) {
+    bru.setEnvVar("crmAnalyticsReportUrl", body.data.report_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("report envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("report_url");
+    expect(body.data).to.have.property("expires_at");
+    expect(body.data).to.have.property("format");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/analytics/report — signed PDF|CSV URL (1h TTL) (EPIC-014/STORY-008).
+  Auth: admin_super | admin_finance (crm:analytics).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/analytics/report?period=MONTH&month=2026-07&format=PDF
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "report_url": "https://cdn.nammamedmate.com/reports/saas-analytics-2026-07.pdf",
+            "expires_at": "2026-07-24T11:00:00Z",
+            "format": "PDF",
+            "period": "2026-07"
+          }
+        }
+      '''
+    }
+  }
+}

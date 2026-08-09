@@ -1,0 +1,22 @@
+meta {
+  name: crm
+  seq: 70
+}
+
+auth {
+  mode: bearer
+  bearer {
+    token: {{accessToken}}
+  }
+}
+
+docs {
+  Admin CRM SaaS plans + billing + lead pipeline + feature adoption + account health + renewals/churn + revenue analytics (EPIC-014).
+  Auth: admin_super | admin_finance | admin_operations (crm:read).
+  Mutations: admin_super (crm:update) / admin_super|admin_operations (crm:write).
+  Invoices mark-paid: admin_super | admin_finance (crm:update).
+  Leads mutate: admin_super | admin_operations (crm:write).
+  Module toggle / nudge / save-play / usage chart / renew / churn-survey: admin_super | admin_operations (crm:write).
+  Adoption + health + renewals + churn analysis: admin_super | admin_finance | admin_operations (crm:read).
+  Revenue analytics (/analytics/*): admin_super | admin_finance only (crm:analytics); admin_operations → 403.
+}

@@ -1,0 +1,71 @@
+meta {
+  name: reopen
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/leads/{{crmLeadId}}/reopen
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmLeadId")) {
+    throw new Error("crmLeadId missing — run admin/crm/leads/mark-lost first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("crmLeadId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reopen envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.stage).to.equal("CONTACTED");
+    expect(body.data.win_probability).to.equal(10);
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/leads/:id/reopen — reopen LOST lead to CONTACTED (EPIC-014/STORY-004).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/leads/c4000000-0000-4000-8000-000000000001/reopen
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c4000000-0000-4000-8000-000000000001",
+            "stage": "CONTACTED",
+            "win_probability": 10,
+            "reopened_at": "2026-07-24T12:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

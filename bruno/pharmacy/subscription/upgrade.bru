@@ -1,0 +1,131 @@
+meta {
+  name: upgrade
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/subscription/upgrade
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+  Idempotency-Key: {{$uuid}}
+}
+
+body:json {
+  {
+    "new_plan_id": "{{crmRetailProPlanId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+  if (!bru.getEnvVar("crmRetailProPlanId")) {
+    bru.setEnvVar("crmRetailProPlanId", "a1000000-0000-4000-8000-000000000003");
+  }
+  if (!bru.getRequestHeader("Idempotency-Key")) {
+    bru.setHeader("Idempotency-Key", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmInvoiceId", body.data.invoice_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("upgrade envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("previous_plan");
+    expect(body.data).to.have.property("new_plan");
+    expect(body.data).to.have.property("prorated_credit_rs");
+    expect(body.data).to.have.property("amount_charged_rs");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/subscription/upgrade — mid-cycle upgrade with proration.
+  Idempotency-Key required (max 128). Replay returns the cached success body.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/subscription/upgrade
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+      Idempotency-Key: 33333333-3333-4333-8333-333333333333
+    }
+    body:json: {
+      {
+        "new_plan_id": "a1000000-0000-4000-8000-000000000003"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "previous_plan": "STARTER",
+            "new_plan": "RETAIL_PRO",
+            "effective_immediately": true,
+            "prorated_credit_rs": 233.00,
+            "amount_charged_rs": 1266.00,
+            "invoice_id": "c1000000-0000-4000-8000-000000000002",
+            "new_renewal_date": "2026-08-24T00:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 DOWNGRADE_NOT_ALLOWED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/subscription/upgrade
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+      Idempotency-Key: 44444444-4444-4444-8444-444444444444
+    }
+    body:json: {
+      {
+        "new_plan_id": "a1000000-0000-4000-8000-000000000002"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DOWNGRADE_NOT_ALLOWED",
+            "message": "Use downgrade endpoint instead"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,79 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/module-matrix
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.modules) && body.data.modules.length) {
+    bru.setEnvVar("crmModuleId", body.data.modules[0].module_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("module-matrix envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("modules");
+    expect(body.data.modules[0]).to.have.property("available_on");
+    expect(body.data.modules[0]).to.have.property("group");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/module-matrix — ERP modules available per plan (EPIC-014/STORY-001).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/module-matrix
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "modules": [
+              {
+                "module_id": "mod_inventory",
+                "module_name": "Inventory Management",
+                "group": "CORE",
+                "available_on": ["FREE", "STARTER", "RETAIL_PRO", "ENTERPRISE"]
+              },
+              {
+                "module_id": "mod_analytics_adv",
+                "module_name": "Advanced Analytics",
+                "group": "ANALYTICS",
+                "available_on": ["RETAIL_PRO", "ENTERPRISE"]
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

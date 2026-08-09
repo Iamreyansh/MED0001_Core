@@ -1,0 +1,123 @@
+meta {
+  name: patch
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/crm/plans/{{crmPlanId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "price_monthly_rs": 799,
+    "seat_limit": 3,
+    "invoice_cap_monthly": 600
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first (admin_super)");
+  }
+  if (!bru.getEnvVar("crmPlanId")) {
+    bru.setEnvVar("crmPlanId", "a1000000-0000-4000-8000-000000000002");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.plan_id) {
+    bru.setEnvVar("crmPlanId", body.data.plan_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("update envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("plan_id");
+    expect(body.data).to.have.property("updated_at");
+    expect(body.data).to.have.property("updated_by");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/crm/plans/:id — update plan pricing/limits (admin_super only). Audited.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/plans/a1000000-0000-4000-8000-000000000002
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "price_monthly_rs": 799,
+        "seat_limit": 3,
+        "invoice_cap_monthly": 600
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "plan_id": "a1000000-0000-4000-8000-000000000002",
+            "updated_at": "2026-07-24T10:00:00Z",
+            "updated_by": "11111111-1111-4111-8111-111111111111"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 CANNOT_MODIFY_FREE_PLAN_PRICE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/plans/a1000000-0000-4000-8000-000000000001
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "price_monthly_rs": 99
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CANNOT_MODIFY_FREE_PLAN_PRICE",
+            "message": "FREE plan price must remain 0"
+          }
+        }
+      '''
+    }
+  }
+}

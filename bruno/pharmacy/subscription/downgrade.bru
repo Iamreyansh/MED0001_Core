@@ -1,0 +1,87 @@
+meta {
+  name: downgrade
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/subscription/downgrade
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "new_plan_id": "{{crmStarterPlanId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+  if (!bru.getEnvVar("crmStarterPlanId")) {
+    bru.setEnvVar("crmStarterPlanId", "a1000000-0000-4000-8000-000000000002");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmScheduledPlan", body.data.scheduled_plan);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("downgrade envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("scheduled_plan");
+    expect(body.data).to.have.property("effective_date");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/subscription/downgrade — schedule downgrade at renewal.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/subscription/downgrade
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "new_plan_id": "a1000000-0000-4000-8000-000000000002"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "current_plan": "RETAIL_PRO",
+            "scheduled_plan": "STARTER",
+            "effective_date": "2026-08-24T00:00:00Z",
+            "message": "Your plan will downgrade to STARTER at the end of your current billing cycle."
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,89 @@
+meta {
+  name: mark-lost
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/leads/{{crmLeadId}}/mark-lost
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "lost_reason": "PRICE",
+    "notes": "Pharmacy owner moved to a competitor; found lower pricing."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmLeadId")) {
+    throw new Error("crmLeadId missing — run admin/crm/leads/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("crmLeadId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("mark-lost envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.stage).to.equal("LOST");
+    expect(body.data.lost_reason).to.equal("PRICE");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/leads/:id/mark-lost — mark lead lost (EPIC-014/STORY-004).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/leads/c4000000-0000-4000-8000-000000000001/mark-lost
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "lost_reason": "PRICE",
+        "notes": "Pharmacy owner moved to a competitor; found lower pricing."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c4000000-0000-4000-8000-000000000001",
+            "stage": "LOST",
+            "lost_reason": "PRICE",
+            "lost_at": "2026-07-24T11:45:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

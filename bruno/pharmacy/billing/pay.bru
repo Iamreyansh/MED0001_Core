@@ -1,0 +1,130 @@
+meta {
+  name: pay
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/billing/pay
+  body: json
+  auth: inherit
+}
+
+headers {
+  Idempotency-Key: {{$uuid}}
+}
+
+body:json {
+  {
+    "invoice_id": "{{pharmacyInvoiceId}}",
+    "payment_method": "UPI"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+  if (!bru.getEnvVar("pharmacyInvoiceId")) {
+    throw new Error("pharmacyInvoiceId missing — run pharmacy/billing/list-invoices first");
+  }
+  if (!bru.getRequestHeader("Idempotency-Key")) {
+    bru.setHeader("Idempotency-Key", `crm-pay-${Date.now()}`);
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.checkout_url) {
+    bru.setEnvVar("saasCheckoutUrl", body.data.checkout_url);
+  }
+}
+
+tests {
+  test("HTTP 200 or 400", function () {
+    expect([200, 400]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.payment_gateway).to.equal("Razorpay");
+      expect(body.data).to.have.property("checkout_url");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(["INVOICE_ALREADY_PAID", "VALIDATION_ERROR"]).to.include(body.error.code);
+    }
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/billing/pay — Razorpay checkout stub; Idempotency-Key required.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/billing/pay
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: 55555555-5555-4555-8555-555555555555
+    }
+    body:json: {
+      {
+        "invoice_id": "11111111-1111-4111-8111-111111111112",
+        "payment_method": "UPI"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "invoice_id": "11111111-1111-4111-8111-111111111112",
+            "payment_gateway": "Razorpay",
+            "checkout_url": "https://razorpay.com/checkout/pay_abc123",
+            "expires_at": "2026-07-24T10:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVOICE_ALREADY_PAID
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/billing/pay
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: 55555555-5555-4555-8555-555555555556
+    }
+    body:json: {
+      {
+        "invoice_id": "11111111-1111-4111-8111-111111111111",
+        "payment_method": "UPI"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVOICE_ALREADY_PAID",
+            "message": "Invoice already in PAID status"
+          }
+        }
+      '''
+    }
+  }
+}

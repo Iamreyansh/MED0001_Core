@@ -1,0 +1,125 @@
+meta {
+  name: revenue
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/analytics/revenue?period=MONTH
+  body: none
+  auth: inherit
+}
+
+params:query {
+  period: MONTH
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.reference_month) {
+    bru.setEnvVar("crmAnalyticsMonth", body.data.reference_month);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("revenue envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpi_grid");
+    expect(body.data.kpi_grid).to.have.property("mrr_rs");
+    expect(body.data.kpi_grid).to.have.property("arr_rs");
+    expect(body.data).to.have.property("mrr_movement");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/analytics/revenue — SaaS revenue KPI dashboard (EPIC-014/STORY-008).
+  Auth: admin_super | admin_finance (crm:analytics).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/analytics/revenue?period=MONTH
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "MONTH",
+            "reference_month": "2026-07",
+            "kpi_grid": {
+              "mrr_rs": 612480,
+              "arr_rs": 7349760,
+              "mrr_growth_pct": 8.4,
+              "nrr_pct": 112.4,
+              "grr_pct": 94.8,
+              "quick_ratio": 3.2,
+              "magic_number": 1.8,
+              "ltv_cac_ratio": 5.6,
+              "arpa_rs": 1024
+            },
+            "mrr_trend": [
+              { "month": "2026-07", "mrr_rs": 612480 }
+            ],
+            "mrr_by_plan": [
+              { "plan": "STARTER", "mrr_rs": 293580, "account_count": 420 }
+            ],
+            "mrr_movement": {
+              "new_mrr_rs": 38640,
+              "expansion_mrr_rs": 11200,
+              "contraction_mrr_rs": 3800,
+              "churn_mrr_rs": 8760,
+              "net_new_mrr_rs": 37280,
+              "end_mrr_rs": 612480
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  description: admin_operations lacks crm:analytics
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/analytics/revenue?period=MONTH
+    method: get
+    headers: {
+      Authorization: Bearer {{opsAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Missing permission: crm:analytics"
+          }
+        }
+      '''
+    }
+  }
+}

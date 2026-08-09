@@ -1,0 +1,80 @@
+meta {
+  name: usage
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/usage
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — run admin/crm/plans/get or leads flow first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.modules) {
+    bru.setEnvVar("crmUsageModuleCount", String(body.data.modules.length));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("usage envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("modules");
+    expect(body.data).to.have.property("overall_last_active_at");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/accounts/:id/usage — per-module events last 30 days (EPIC-014/STORY-005).
+  Auth: admin_super | admin_operations (crm:write).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/usage
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "modules": [
+              {
+                "module": "BILLING",
+                "events_per_day": [
+                  { "date": "2026-07-23", "count": 45 },
+                  { "date": "2026-07-24", "count": 38 }
+                ],
+                "last_active_at": "2026-07-24T10:00:00Z"
+              }
+            ],
+            "overall_last_active_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
