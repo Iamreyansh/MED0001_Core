@@ -1,0 +1,82 @@
+meta {
+  name: auto-renew
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/subscription/auto-renew
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "enabled": false
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmAutoRenew", String(body.data.auto_renew));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("auto-renew envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("auto_renew");
+    expect(body.data).to.have.property("message");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/subscription/auto-renew — toggle auto-renew without immediate cancel.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/subscription/auto-renew
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "enabled": false
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "auto_renew": false,
+            "message": "Auto-renew disabled. Your subscription will expire on 2026-08-24T00:00:00Z."
+          }
+        }
+      '''
+    }
+  }
+}

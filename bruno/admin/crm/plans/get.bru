@@ -1,0 +1,113 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/plans/{{crmPlanId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmPlanId")) {
+    bru.setEnvVar("crmPlanId", "a1000000-0000-4000-8000-000000000002");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.plan_id) {
+    bru.setEnvVar("crmPlanId", body.data.plan_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("plan detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("pricing");
+    expect(body.data.pricing).to.have.property("annual_savings_pct");
+    expect(body.data).to.have.property("included_modules");
+    expect(body.data).to.have.property("subscriber_list");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/plans/:id — plan detail with modules and subscribers (EPIC-014/STORY-001).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/plans/a1000000-0000-4000-8000-000000000002
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "plan_id": "a1000000-0000-4000-8000-000000000002",
+            "name": "STARTER",
+            "pricing": {
+              "monthly_rs": 699.00,
+              "annual_rs": 6990.00,
+              "annual_savings_pct": 16.7
+            },
+            "limits": {
+              "seats": 2,
+              "invoices_per_month": 500
+            },
+            "included_modules": ["INVENTORY", "BILLING"],
+            "upgrade_path": "RETAIL_PRO",
+            "subscriber_count": 0,
+            "subscriber_list": {
+              "data": [],
+              "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 PLAN_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/plans/00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PLAN_NOT_FOUND",
+            "message": "Plan not found"
+          }
+        }
+      '''
+    }
+  }
+}

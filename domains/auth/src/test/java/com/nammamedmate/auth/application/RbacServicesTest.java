@@ -363,6 +363,11 @@ class RbacServicesTest {
     assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_support"))
         .contains("pharmacies:read", "finance:read");
     assertThat(AdminRoleDefinitions.liveExtras()).containsKey("admin_finance");
+    assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_finance"))
+        .contains("crm:analytics");
+    assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_operations"))
+        .doesNotContain("crm:analytics");
+    assertThat(AdminRoleDefinitions.descriptionFor("crm:analytics")).contains("revenue analytics");
     assertThat(AdminRoleDefinitions.find("admin_super")).isPresent();
     assertThat(AdminRoleDefinitions.find("nope")).isEmpty();
     assertThat(AdminRoleDefinitions.descriptionFor("finance:release-payout")).contains("payout");

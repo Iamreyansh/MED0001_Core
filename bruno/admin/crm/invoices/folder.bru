@@ -1,0 +1,10 @@
+meta {
+  name: invoices
+  seq: 5
+}
+
+docs {
+  Admin CRM SaaS invoicing (EPIC-014/STORY-003).
+  Auth: admin_super | admin_finance | admin_operations (crm:read).
+  Mark paid: admin_super | admin_finance (crm:update) + Idempotency-Key.
+}

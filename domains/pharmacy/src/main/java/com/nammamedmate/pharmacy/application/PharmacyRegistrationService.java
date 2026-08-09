@@ -98,6 +98,10 @@ public class PharmacyRegistrationService {
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   KycDocumentStore kycDocumentStore;
 
+  // Optional: CRM FREE subscription bootstrap (EPIC-014 STORY-002)
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  com.nammamedmate.pharmacy.application.port.out.CrmAccountBootstrapPort crmAccountBootstrap;
+
   @Autowired
   public PharmacyRegistrationService(
       PharmacyRegistrationStore pharmacies,
@@ -304,6 +308,9 @@ public class PharmacyRegistrationService {
             pharmacyId,
             PharmacyOwnerAccountStore.OWNER_ROLE_ID,
             now));
+    if (crmAccountBootstrap != null) {
+      crmAccountBootstrap.ensureFreeSubscription(pharmacyId);
+    }
 
     String otp = nextOtp(v.email());
     OtpRecord otpRecord =

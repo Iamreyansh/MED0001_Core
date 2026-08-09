@@ -1,0 +1,68 @@
+meta {
+  name: cancel
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/subscription/cancel
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmCancelsAt", body.data.cancels_at);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cancel envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("cancels_at");
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/subscription/cancel — end-of-period cancel + churn survey outbox.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/subscription/cancel
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "subscription_id": "b1000000-0000-4000-8000-000000000001",
+            "status": "ACTIVE",
+            "cancels_at": "2026-08-24T00:00:00Z",
+            "message": "Your subscription will remain active until 2026-08-24T00:00:00Z. No further charges."
+          }
+        }
+      '''
+    }
+  }
+}

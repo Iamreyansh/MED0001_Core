@@ -1,0 +1,81 @@
+meta {
+  name: list-invoices
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/billing/invoices?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.invoices) && body.data.invoices.length) {
+    bru.setEnvVar("pharmacyInvoiceId", body.data.invoices[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pharmacy invoices envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("invoices");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/billing/invoices — list own SaaS invoices.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/billing/invoices?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "invoices": [
+              {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "invoice_number": "NMM-INV-2026-07-001234",
+                "billing_period": "July 2026",
+                "total_amount_rs": 824.82,
+                "status": "PAID",
+                "due_date": "2026-07-01",
+                "paid_at": "2026-07-03T10:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 7, "has_next": false }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,101 @@
+meta {
+  name: detach-addon
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/addons/{{crmAddonId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — run attach-addon first");
+  }
+  if (!bru.getEnvVar("crmAddonId")) {
+    bru.setEnvVar("crmAddonId", "a2000000-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmProratedCreditRs", String(body.data.prorated_credit_rs));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detach envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("detached_at");
+    expect(body.data).to.have.property("prorated_credit_rs");
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/crm/accounts/:account_id/addons/:addon_id — detach with prorated credit.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/22222222-2222-4222-8222-222222222222/addons/a2000000-0000-4000-8000-000000000001
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "account_id": "22222222-2222-4222-8222-222222222222",
+            "addon_id": "a2000000-0000-4000-8000-000000000001",
+            "detached_at": "2026-07-24T10:30:00Z",
+            "prorated_credit_rs": 89.00,
+            "message": "Add-on detached. Prorated credit of Rs 89.00 applied to next invoice."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ACCOUNT_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/00000000-0000-4000-8000-000000000099/addons/a2000000-0000-4000-8000-000000000001
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ACCOUNT_NOT_FOUND",
+            "message": "Account not found"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,76 @@
+meta {
+  name: unit-economics
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/analytics/unit-economics
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.ltv_cac_ratio != null) {
+    bru.setEnvVar("crmLtvCacRatio", String(body.data.ltv_cac_ratio));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("unit-economics envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("arpa_rs");
+    expect(body.data).to.have.property("avg_ltv_rs");
+    expect(body.data).to.have.property("avg_cac_rs");
+    expect(body.data).to.have.property("ltv_cac_ratio");
+    expect(body.data).to.have.property("gross_margin_pct");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/analytics/unit-economics — LTV/CAC unit economics (EPIC-014/STORY-008).
+  Auth: admin_super | admin_finance (crm:analytics).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/analytics/unit-economics
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "arpa_rs": 1024,
+            "avg_ltv_rs": 32768,
+            "avg_cac_rs": 5850,
+            "ltv_cac_ratio": 5.6,
+            "payback_months": 5.7,
+            "gross_margin_pct": 72.0,
+            "monthly_revenue_churn_pct": 1.43,
+            "computed_at": "2026-07-01T00:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

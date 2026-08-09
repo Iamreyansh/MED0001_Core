@@ -1,0 +1,137 @@
+meta {
+  name: renew
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/renew
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+  Idempotency-Key: {{$uuid}}
+}
+
+body:json {
+  {
+    "waive_fee": false,
+    "reason": "Customer requested early renewal to switch to annual billing."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId") && !bru.getEnvVar("crmRenewalAccountId")) {
+    throw new Error("crmAccountId missing — run renewals/dashboard or plans flow first");
+  }
+  if (!bru.getEnvVar("crmAccountId") && bru.getEnvVar("crmRenewalAccountId")) {
+    bru.setEnvVar("crmAccountId", bru.getEnvVar("crmRenewalAccountId"));
+  }
+  if (!bru.getRequestHeader("Idempotency-Key")) {
+    bru.setHeader("Idempotency-Key", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.invoice_id) {
+    bru.setEnvVar("crmInvoiceId", body.data.invoice_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("manual renew envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("invoice_id");
+    expect(body.data).to.have.property("new_renewal_date");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/accounts/:id/renew — admin manual renewal (EPIC-014/STORY-007).
+  Auth: admin_super | admin_operations (crm:write).
+  Idempotency-Key required when charging.
+  Errors: SUBSCRIPTION_NOT_DUE, ACCOUNT_NOT_FOUND, VALIDATION_ERROR.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/renew
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+      Idempotency-Key: 66666666-6666-4666-8666-666666666666
+    }
+    body:json: {
+      {
+        "waive_fee": false,
+        "reason": "Customer requested early renewal to switch to annual billing."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "invoice_id": "inv00000-0000-4000-8000-000000000003",
+            "amount_charged_rs": 1768.82,
+            "new_renewal_date": "2026-09-05",
+            "waive_fee": false,
+            "renewed_by": "admin000-0000-4000-8000-000000000001",
+            "renewed_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 SUBSCRIPTION_NOT_DUE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/renew
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+      Idempotency-Key: 77777777-7777-4777-8777-777777777777
+    }
+    body:json: {
+      {
+        "waive_fee": false,
+        "reason": "too early"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "SUBSCRIPTION_NOT_DUE",
+            "message": "Renewal date is not within 7 days"
+          }
+        }
+      '''
+    }
+  }
+}

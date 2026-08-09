@@ -1,0 +1,114 @@
+meta {
+  name: health
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/health
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — run admin/crm/plans/get or leads flow first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmHealthScore", String(body.data.overall_score));
+    bru.setEnvVar("crmHealthBand", String(body.data.health_band));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("health envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("overall_score");
+    expect(body.data).to.have.property("health_band");
+    expect(body.data).to.have.property("components");
+    expect(body.data).to.have.property("computed_at");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/accounts/:id/health — account health score (EPIC-014/STORY-005).
+  Auth: admin_super | admin_operations | admin_finance (crm:read).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/health
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "pharmacy_name": "Apollo Pharmacy HSR",
+            "overall_score": 42,
+            "health_band": "AT_RISK",
+            "components": {
+              "product_usage": 55,
+              "billing_health": 70,
+              "support_satisfaction": 30,
+              "business_performance": 20
+            },
+            "risk_factors": [
+              "Low module adoption (only 3 of 8 modules used in last 30 days)"
+            ],
+            "recommended_actions": [
+              "Schedule a training session on underused modules"
+            ],
+            "computed_at": "2026-07-24T03:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ACCOUNT_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/00000000-0000-4000-8000-000000000099/health
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ACCOUNT_NOT_FOUND",
+            "message": "Account not found"
+          }
+        }
+      '''
+    }
+  }
+}

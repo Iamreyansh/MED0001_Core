@@ -1,0 +1,18 @@
+meta {
+  name: analytics
+  seq: 80
+}
+
+auth {
+  mode: bearer
+  bearer {
+    token: {{accessToken}}
+  }
+}
+
+docs {
+  Admin CRM SaaS revenue analytics (EPIC-014/STORY-008).
+  Auth: admin_super | admin_finance only (crm:analytics).
+  admin_operations → 403.
+  Rate limit: 10 req/min/admin.
+}

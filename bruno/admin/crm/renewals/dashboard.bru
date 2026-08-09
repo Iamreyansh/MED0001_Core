@@ -1,0 +1,95 @@
+meta {
+  name: dashboard
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/renewals
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.upcoming_renewals && body.data.upcoming_renewals[0]) {
+    bru.setEnvVar("crmRenewalAccountId", body.data.upcoming_renewals[0].account_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("renewals dashboard envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("chips");
+    expect(body.data).to.have.property("save_play_banner");
+    expect(body.data).to.have.property("upcoming_renewals");
+    expect(body.data.chips).to.have.property("logo_churn_pct");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/renewals — renewal pipeline dashboard (EPIC-014/STORY-007).
+  Auth: admin_super | admin_operations | admin_finance (crm:read).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/renewals
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "chips": {
+              "renewing_in_30d": 42,
+              "mrr_at_risk_rs": 58380,
+              "churned_logos_this_month": 8,
+              "logo_churn_pct": 1.32,
+              "mrr_churned_this_month_rs": 10194
+            },
+            "save_play_banner": {
+              "active_save_plays": 12,
+              "message": "12 active save plays in progress - track outcomes in account health."
+            },
+            "churn_reasons_chart": [
+              { "reason": "PRICE", "count": 3 }
+            ],
+            "upcoming_renewals": [
+              {
+                "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "pharmacy_name": "Apollo Pharmacy HSR",
+                "plan": "RETAIL_PRO",
+                "mrr_rs": 1499,
+                "renewal_date": "2026-08-05",
+                "auto_renew": true,
+                "risk_level": "HIGH",
+                "health_score": 42,
+                "assigned_csm": null
+              }
+            ],
+            "churn_log": []
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,78 @@
+meta {
+  name: get-invoice
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/billing/invoices/{{pharmacyInvoiceId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+  if (!bru.getEnvVar("pharmacyInvoiceId")) {
+    throw new Error("pharmacyInvoiceId missing — run pharmacy/billing/list-invoices first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.download_url) {
+    bru.setEnvVar("pharmacyInvoiceDownloadUrl", body.data.download_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("signed download_url", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("download_url");
+    expect(body.data).to.have.property("download_expires_at");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/billing/invoices/:id — detail + signed PDF URL (1h).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/billing/invoices/11111111-1111-4111-8111-111111111111
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "11111111-1111-4111-8111-111111111111",
+            "invoice_number": "NMM-INV-2026-07-001234",
+            "download_url": "file:///tmp/medmate-saas-invoices/NMM-INV-2026-07-001234.pdf?expires=1721818800",
+            "download_expires_at": "2026-07-24T11:00:00Z",
+            "line_items": [
+              { "description": "STARTER Plan - Monthly", "amount_rs": 699.00 }
+            ],
+            "subtotal_rs": 699.00,
+            "gst_amount_rs": 125.82,
+            "total_amount_rs": 824.82,
+            "status": "PAID"
+          }
+        }
+      '''
+    }
+  }
+}

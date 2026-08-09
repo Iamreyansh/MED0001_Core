@@ -1,0 +1,91 @@
+meta {
+  name: churn-analysis
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/churn-analysis?period=last_90d
+  body: none
+  auth: inherit
+}
+
+params:query {
+  period: last_90d
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.period) {
+    bru.setEnvVar("crmChurnPeriod", body.data.period);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("churn analysis envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("churn_reasons_chart");
+    expect(body.data).to.have.property("cohort_churn_rates");
+    expect(body.data).to.have.property("at_risk_indicators");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/churn-analysis — churn reasons, cohorts, at-risk indicators (EPIC-014/STORY-007).
+  Auth: admin_super | admin_operations | admin_finance (crm:read).
+  Query: period = last_30d | last_90d | last_6m.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/churn-analysis?period=last_90d
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "last_90d",
+            "churn_reasons_chart": [
+              { "reason": "PRICE", "count": 12, "pct": 37.5 },
+              { "reason": "FEATURES", "count": 8, "pct": 25.0 }
+            ],
+            "cohort_churn_rates": [
+              {
+                "cohort_month": "2026-01",
+                "month_1_churn_pct": 2.1,
+                "month_3_churn_pct": 5.8,
+                "month_6_churn_pct": 9.2
+              }
+            ],
+            "at_risk_indicators": [
+              {
+                "indicator": "Low module adoption (<20%)",
+                "churned_with_this": 22,
+                "pct_of_churned": 68.75
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

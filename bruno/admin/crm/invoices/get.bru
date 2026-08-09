@@ -1,0 +1,114 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/invoices/{{crmInvoiceId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmInvoiceId")) {
+    throw new Error("crmInvoiceId missing — run admin/crm/invoices/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.invoice_number) {
+    bru.setEnvVar("crmInvoiceNumber", body.data.invoice_number);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("invoice detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("invoice_number");
+    expect(body.data).to.have.property("line_items");
+    expect(body.data).to.have.property("gst_rate_pct");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/invoices/:id — SaaS invoice detail with GST line items.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/invoices/11111111-1111-4111-8111-111111111111
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "11111111-1111-4111-8111-111111111111",
+            "invoice_number": "NMM-INV-2026-07-001234",
+            "account_id": "22222222-2222-4222-8222-222222222222",
+            "pharmacy_name": "Apollo Pharmacy HSR",
+            "billing_address": "123 HSR Layout, Bangalore - 560102",
+            "gstin": "29ABCDE1234F1Z5",
+            "billing_period": { "from": "2026-07-01", "to": "2026-07-31" },
+            "line_items": [
+              { "description": "STARTER Plan - Monthly", "amount_rs": 699.00, "sac_code": "9983" }
+            ],
+            "subtotal_rs": 699.00,
+            "gst_rate_pct": 18.00,
+            "gst_amount_rs": 125.82,
+            "total_amount_rs": 824.82,
+            "status": "PAID",
+            "due_date": "2026-07-01",
+            "paid_at": "2026-07-03T10:00:00Z",
+            "payment_mode": "UPI",
+            "reference_number": "UPI-TXN-98765432",
+            "next_cycle_addons": []
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 INVOICE_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/invoices/00000000-0000-4000-8000-000000000000
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVOICE_NOT_FOUND",
+            "message": "Invoice ID does not exist"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,125 @@
+meta {
+  name: churn-survey
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/churn-survey
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "reason": "PRICE",
+    "notes": "Pharmacy found a cheaper alternative at Rs 499/month. Unwilling to negotiate."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — run renewals/dashboard or plans flow first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.churn_survey_id) {
+    bru.setEnvVar("crmChurnSurveyId", body.data.churn_survey_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("churn survey envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("churn_survey_id");
+    expect(body.data.reason).to.equal("PRICE");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/accounts/:id/churn-survey — log churn reason (EPIC-014/STORY-007).
+  Auth: admin_super | admin_operations (crm:write).
+  Errors: ACCOUNT_NOT_FOUND.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/churn-survey
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "reason": "PRICE",
+        "notes": "Pharmacy found a cheaper alternative at Rs 499/month."
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "churn_survey_id": "cs000000-0000-4000-8000-000000000001",
+            "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "reason": "PRICE",
+            "logged_by": "admin000-0000-4000-8000-000000000002",
+            "logged_at": "2026-07-24T11:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ACCOUNT_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/00000000-0000-4000-8000-000000000099/churn-survey
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "reason": "OTHER",
+        "notes": "unknown account"
+      }
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ACCOUNT_NOT_FOUND",
+            "message": "Account not found"
+          }
+        }
+      '''
+    }
+  }
+}

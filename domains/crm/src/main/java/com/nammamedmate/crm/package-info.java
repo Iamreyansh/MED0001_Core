@@ -1,2 +1,2 @@
-/** Domain module shell for crm. Business logic lands via epic stories. */
+/** EPIC-014 CRM SaaS — plans, subscriptions, invoices, leads, adoption, health. */
 package com.nammamedmate.crm;

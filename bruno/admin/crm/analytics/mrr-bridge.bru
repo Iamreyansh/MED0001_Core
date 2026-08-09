@@ -1,0 +1,89 @@
+meta {
+  name: mrr-bridge
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/crm/analytics/mrr-bridge?month={{crmAnalyticsMonth}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  month: {{crmAnalyticsMonth}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAnalyticsMonth")) {
+    const d = new Date();
+    bru.setEnvVar(
+      "crmAnalyticsMonth",
+      d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0")
+    );
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.month) {
+    bru.setEnvVar("crmAnalyticsMonth", body.data.month);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("mrr-bridge envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("start_mrr_rs");
+    expect(body.data).to.have.property("end_mrr_rs");
+    expect(body.data).to.have.property("net_new_mrr_rs");
+  });
+}
+
+docs {
+  GET /api/v1/admin/crm/analytics/mrr-bridge — MRR movement bridge (EPIC-014/STORY-008).
+  Auth: admin_super | admin_finance (crm:analytics).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/analytics/mrr-bridge?month=2026-07
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "month": "2026-07",
+            "start_mrr_rs": 575200,
+            "new_mrr_rs": 38640,
+            "expansion_mrr_rs": 11200,
+            "contraction_mrr_rs": 3800,
+            "churn_mrr_rs": 8760,
+            "net_new_mrr_rs": 37280,
+            "end_mrr_rs": 612480,
+            "new_logos": 55,
+            "churned_logos": 8,
+            "expansion_accounts": 22,
+            "contraction_accounts": 6
+          }
+        }
+      '''
+    }
+  }
+}

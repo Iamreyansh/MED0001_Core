@@ -1,0 +1,123 @@
+meta {
+  name: toggle-module
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/crm/accounts/{{crmAccountId}}/modules/{{crmModuleId}}/toggle
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "enabled": true,
+    "reason": "Beta access granted for Advanced Analytics pilot program"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("crmAccountId")) {
+    throw new Error("crmAccountId missing — run admin/crm/plans/get or leads flow first");
+  }
+  if (!bru.getEnvVar("crmModuleId")) {
+    bru.setEnvVar("crmModuleId", "mod_analytics_adv");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("crmModuleOverrideEnabled", String(body.data.enabled));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("toggle envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.override).to.equal(true);
+    expect(body.data).to.have.property("reason");
+    expect(body.data).to.have.property("toggled_by");
+  });
+}
+
+docs {
+  POST /api/v1/admin/crm/accounts/:account_id/modules/:module_id/toggle — override plan matrix.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/modules/mod_analytics_adv/toggle
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "enabled": true,
+        "reason": "Beta access granted for Advanced Analytics pilot program"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "account_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "module_id": "mod_analytics_adv",
+            "enabled": true,
+            "override": true,
+            "reason": "Beta access granted for Advanced Analytics pilot program",
+            "toggled_by": "11111111-2222-4333-8444-555555555555",
+            "toggled_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 MODULE_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/crm/accounts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/modules/mod_missing/toggle
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "enabled": true,
+        "reason": "test"
+      }
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MODULE_NOT_FOUND",
+            "message": "Module not found"
+          }
+        }
+      '''
+    }
+  }
+}

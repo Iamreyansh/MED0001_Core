@@ -140,11 +140,19 @@ public final class AdminRoleDefinitions {
               "orders:dispatch",
               "customers:read",
               "finance:read",
+              "crm:read",
+              "crm:write",
               "orders:*",
               "riders:*",
               "logistics:*"),
           "admin_finance",
-          List.of("finance:update", "finance:*", "pharmacies:read"),
+          List.of(
+              "finance:update",
+              "finance:*",
+              "pharmacies:read",
+              "crm:read",
+              "crm:update",
+              "crm:analytics"),
           "admin_support",
           List.of("pharmacies:read", "finance:read"),
           "admin_compliance",
@@ -274,6 +282,16 @@ public final class AdminRoleDefinitions {
     m.put("kyc:read", "View pharmacy KYC documents");
     m.put("kyc:approve", "Approve pharmacy KYC");
     m.put("kyc:reject", "Reject pharmacy KYC");
+    m.put(
+        "crm:read",
+        "View SaaS plans, add-ons, invoices, leads, module matrix, adoption, account health, renewals, and churn analysis");
+    m.put(
+        "crm:write",
+        "Manage leads, add-ons, modules, adoption nudges, CSM save plays, manual renewals, and churn surveys");
+    m.put("crm:update", "Update SaaS plan pricing/limits and mark invoices paid");
+    m.put(
+        "crm:analytics",
+        "Access SaaS revenue analytics (MRR/ARR/NRR/GRR, cohorts, unit economics, reports)");
     return Map.copyOf(m);
   }
 
