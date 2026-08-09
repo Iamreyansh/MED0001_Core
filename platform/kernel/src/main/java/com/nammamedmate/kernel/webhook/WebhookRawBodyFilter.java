@@ -20,7 +20,8 @@ public final class WebhookRawBodyFilter extends OncePerRequestFilter {
     }
     return !path.startsWith("/api/v1/webhooks")
         && !path.startsWith("/api/v1/internal/kyc/")
-        && !path.startsWith("/api/v1/payments/webhook");
+        && !path.startsWith("/api/v1/payments/webhook")
+        && !path.startsWith("/api/v1/integrations/");
   }
 
   @Override

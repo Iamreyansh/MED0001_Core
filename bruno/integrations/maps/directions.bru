@@ -1,0 +1,98 @@
+meta {
+  name: directions
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/maps/directions
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+  X-Calling-Service: rider
+}
+
+body:json {
+  {
+    "origin": { "lat": 12.9716, "lng": 77.6412 },
+    "destination": { "lat": 12.9784, "lng": 77.6408 },
+    "mode": "DRIVING"
+  }
+}
+
+script:pre-request {
+  // rider navigation directions
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.route_polyline) {
+    bru.setEnvVar("routePolyline", body.data.route_polyline);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("directions envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("duration_seconds");
+    expect(body.data).to.have.property("duration_in_traffic_seconds");
+    expect(body.data).to.have.property("route_polyline");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/maps/directions — S2S directions. Returns duration_in_traffic_seconds (AC-006).
+}
+
+example {
+  name: 200 OK
+  description: Directions with traffic duration
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/maps/directions
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "origin": { "lat": 12.9716, "lng": 77.6412 },
+        "destination": { "lat": 12.9784, "lng": 77.6408 },
+        "mode": "DRIVING"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "route_polyline": "a~l~Fjk~uOwHJy@P",
+            "distance_meters": 1240,
+            "duration_seconds": 312,
+            "duration_in_traffic_seconds": 380,
+            "steps": [
+              {
+                "instruction": "Head north on 5th Cross Rd",
+                "distance_meters": 420,
+                "duration_seconds": 84
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

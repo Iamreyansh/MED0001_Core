@@ -3,6 +3,7 @@ package com.nammamedmate.api.web;
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.kernel.error.AppException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -17,8 +18,12 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(AppException.class)
   public ResponseEntity<ApiResponse<Void>> handleApp(AppException ex) {
-    return ResponseEntity.status(ex.httpStatus())
-        .body(ApiResponse.fail(ex.code(), ex.getMessage(), ex.retryAfterSeconds(), ex.details()));
+    ResponseEntity.BodyBuilder builder = ResponseEntity.status(ex.httpStatus());
+    if (ex.retryAfterSeconds() != null) {
+      builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.retryAfterSeconds()));
+    }
+    return builder.body(
+        ApiResponse.fail(ex.code(), ex.getMessage(), ex.retryAfterSeconds(), ex.details()));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

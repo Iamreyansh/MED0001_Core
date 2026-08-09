@@ -58,8 +58,18 @@ public class SecurityConfig {
                         "/api/v1/pharmacy/register/resend-otp",
                         "/api/v1/rider/register")
                     .permitAll()
+                    // Accounting is pharmacy/admin JWT (not X-Internal-Token); match before
+                    // integrations/** permitAll.
                     .requestMatchers(
-                        "/api/v1/webhooks/**", "/api/v1/internal/kyc/**", "/api/v1/wallet/**")
+                        HttpMethod.GET, "/api/v1/integrations/accounting/sync-status/**")
+                    .hasAnyRole("PHARMACY_OWNER", "ADMIN_OPERATIONS", "ADMIN_SUPER")
+                    .requestMatchers("/api/v1/integrations/accounting/**")
+                    .hasRole("PHARMACY_OWNER")
+                    .requestMatchers(
+                        "/api/v1/webhooks/**",
+                        "/api/v1/internal/kyc/**",
+                        "/api/v1/wallet/**",
+                        "/api/v1/integrations/**")
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook/razorpay")
                     .permitAll()
@@ -341,6 +351,11 @@ public class SecurityConfig {
                         "ADMIN_FINANCE",
                         "ADMIN_SUPPORT",
                         "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        HttpMethod.PATCH, "/api/v1/admin/integrations/communications/config/**")
+                    .hasRole("ADMIN_SUPER")
+                    .requestMatchers("/api/v1/admin/integrations/communications/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers("/api/v1/admin/audit-log", "/api/v1/admin/audit-log/**")
                     .hasAnyRole(
                         "ADMIN_SUPER",

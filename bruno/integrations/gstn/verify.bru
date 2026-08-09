@@ -1,0 +1,126 @@
+meta {
+  name: verify
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/gstn/verify
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "gstin": "29ABCDE1234F1ZW"
+  }
+}
+
+script:pre-request {
+  // S2S GSTN verify — uses collection env internalServiceToken
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.gstin) {
+    bru.setEnvVar("lastGstin", body.data.gstin);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("gstn envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("gstin");
+    expect(body.data).to.have.property("cache_hit");
+    expect(body.data).to.have.property("valid");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/gstn/verify — S2S GSTIN verification. Errors: INVALID_GSTIN_FORMAT, GSTIN_NOT_FOUND, GSTN_RATE_LIMIT, GSTN_API_UNAVAILABLE.
+}
+
+example {
+  name: 200 OK
+  description: GSTIN verified
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/gstn/verify
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "gstin": "29ABCDE1234F1ZW"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "gstin": "29ABCDE1234F1ZW",
+            "valid": true,
+            "trade_name": "Apollo Pharmacy India Ltd",
+            "legal_name": "Apollo Hospitals Enterprise Limited",
+            "registration_status": "ACTIVE",
+            "filing_status": "REGULAR",
+            "state": "Karnataka",
+            "state_code": "29",
+            "registered_at": "2018-04-01",
+            "cache_hit": false,
+            "verified_at": "2026-07-24T10:20:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_GSTIN_FORMAT
+  description: Local checksum failed
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/gstn/verify
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "gstin": "29ABCDE1234F1Z0"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_GSTIN_FORMAT",
+            "message": "GSTIN checksum validation failed"
+          }
+        }
+      '''
+    }
+  }
+}

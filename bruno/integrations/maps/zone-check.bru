@@ -1,0 +1,101 @@
+meta {
+  name: zone-check
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/maps/zone-check
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+  X-Calling-Service: dispatch
+}
+
+body:json {
+  {
+    "point": { "lat": 12.9716, "lng": 77.6412 },
+    "polygon_coordinates": [
+      [12.96, 77.62],
+      [12.96, 77.66],
+      [12.99, 77.66],
+      [12.99, 77.62],
+      [12.96, 77.62]
+    ],
+    "zone_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+  }
+}
+
+script:pre-request {
+  // local ray-casting — no Google Maps call
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("zoneCheckInside", String(body.data.inside));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("zone-check envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("inside");
+    expect(body.data.inside).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/integrations/maps/zone-check — server-side ray-casting, no Google API (AC-002).
+}
+
+example {
+  name: 200 OK
+  description: Point inside polygon
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/maps/zone-check
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "point": { "lat": 12.9716, "lng": 77.6412 },
+        "polygon_coordinates": [
+          [12.96, 77.62],
+          [12.96, 77.66],
+          [12.99, 77.66],
+          [12.99, 77.62],
+          [12.96, 77.62]
+        ],
+        "zone_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "inside": true,
+            "zone_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "distance_to_boundary_meters": null
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

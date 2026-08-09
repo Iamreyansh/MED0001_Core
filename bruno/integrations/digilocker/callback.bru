@@ -1,0 +1,115 @@
+meta {
+  name: callback
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/digilocker/callback
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "code": "auth_code_from_digilocker",
+    "state": "{{digilockerState}}"
+  }
+}
+
+script:pre-request {
+  // DigiLocker callback — state validated; no X-Internal-Token
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.entity_id) {
+    bru.setEnvVar("digilockerEntityId", body.data.entity_id);
+  }
+}
+
+tests {
+  test("HTTP 200 or 400", function () {
+    expect([200, 400]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body).to.have.property("success");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/digilocker/callback — DigiLocker OAuth callback (INVALID_STATE when state unknown).
+}
+
+example {
+  name: 200 OK
+  description: Documents fetched
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/digilocker/callback
+    method: post
+    mode: json
+    body:json: {
+      {
+        "code": "auth_code_from_digilocker",
+        "state": "abc"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "entity_id": "11111111-1111-1111-1111-111111111111",
+            "aadhaar_verified": true,
+            "name_on_aadhaar": "Rajesh Kumar",
+            "dob": "1985-03-15",
+            "address": "12, MG Road, Bangalore - 560001",
+            "documents_fetched": ["AADHAAR", "DRIVING_LICENCE"],
+            "verified_at": "2026-07-24T10:25:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_STATE
+  description: Unknown or expired state
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/digilocker/callback
+    method: post
+    mode: json
+    body:json: {
+      {
+        "code": "auth_code_from_digilocker",
+        "state": "bad-state"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_STATE",
+            "message": "DigiLocker state is invalid or expired"
+          }
+        }
+      '''
+    }
+  }
+}
