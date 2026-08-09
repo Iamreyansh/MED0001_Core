@@ -67,9 +67,17 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.mfa.arn, data.aws_secretsmanager_secret.maps_geocode.arn]
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          aws_secretsmanager_secret.db.arn,
+          aws_secretsmanager_secret.jwt.arn,
+          aws_secretsmanager_secret.mfa.arn,
+          aws_secretsmanager_secret.razorpay.arn,
+          aws_secretsmanager_secret.razorpayx.arn,
+          aws_secretsmanager_secret.kyc.arn,
+          data.aws_secretsmanager_secret.maps_geocode.arn
+        ]
       },
       {
         Effect   = "Allow"
@@ -117,9 +125,17 @@ resource "aws_iam_role_policy" "ecs_task" {
         Resource = [aws_s3_bucket.uploads.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.db.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.mfa.arn, data.aws_secretsmanager_secret.maps_geocode.arn]
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          aws_secretsmanager_secret.db.arn,
+          aws_secretsmanager_secret.jwt.arn,
+          aws_secretsmanager_secret.mfa.arn,
+          aws_secretsmanager_secret.razorpay.arn,
+          aws_secretsmanager_secret.razorpayx.arn,
+          aws_secretsmanager_secret.kyc.arn,
+          data.aws_secretsmanager_secret.maps_geocode.arn
+        ]
       },
       {
         Effect   = "Allow"
@@ -202,6 +218,9 @@ locals {
     { name = "MEDMATE_SECRETS_DB_ARN", value = aws_secretsmanager_secret.db.arn },
     { name = "MEDMATE_SECRETS_JWT_ARN", value = aws_secretsmanager_secret.jwt.arn },
     { name = "MEDMATE_SECRETS_MFA_ARN", value = aws_secretsmanager_secret.mfa.arn },
+    { name = "MEDMATE_SECRETS_RAZORPAY_ARN", value = aws_secretsmanager_secret.razorpay.arn },
+    { name = "MEDMATE_SECRETS_RAZORPAYX_ARN", value = aws_secretsmanager_secret.razorpayx.arn },
+    { name = "MEDMATE_SECRETS_KYC_ARN", value = aws_secretsmanager_secret.kyc.arn },
     { name = "AWS_REGION", value = data.aws_region.current.region },
     { name = "JAVA_TOOL_OPTIONS", value = "-XX:MaxRAMPercentage=75.0" }
   ]
