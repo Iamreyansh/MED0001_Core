@@ -1,0 +1,98 @@
+meta {
+  name: list-batches
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/{{inventoryProductId}}/batches?include_inactive=false
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+  if (!bru.getEnvVar("inventoryProductId")) {
+    throw new Error("inventoryProductId missing — run inventory list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.batches && body.data.batches.length > 0) {
+    bru.setEnvVar("inventoryBatchId", body.data.batches[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("batches envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.batches).to.be.an("array");
+    expect(body.data).to.have.property("total_active_units");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/inventory/:product_id/batches
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/batches
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "product_id": "11111111-2222-4333-8444-555555555555",
+            "product_name": "Paracetamol 500mg Tab",
+            "batches": [],
+            "total_active_units": 0
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 PRODUCT_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/00000000-0000-4000-8000-000000000099/batches
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PRODUCT_NOT_FOUND",
+            "message": "Product not found"
+          }
+        }
+      '''
+    }
+  }
+}

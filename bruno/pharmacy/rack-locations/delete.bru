@@ -1,0 +1,97 @@
+meta {
+  name: delete
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/rack-locations/{{rackCode}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — pharmacy_owner required");
+  }
+  if (!bru.getEnvVar("rackCode")) {
+    bru.setEnvVar("rackCode", "Z99-99");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.rack_code).to.be.a("string");
+    expect(body.data.deleted_at).to.be.a("string");
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/rack-locations/:rack_code — owner only; fails RACK_NOT_EMPTY when products assigned.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations/Z99-99
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rack_code": "Z99-99",
+            "deleted_at": "2026-08-09T10:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 RACK_NOT_EMPTY
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations/A1-01
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RACK_NOT_EMPTY",
+            "message": "Rack still has medicines assigned",
+            "details": {
+              "medicine_count": 1,
+              "products": [
+                {
+                  "product_id": "11111111-2222-4333-8444-555555555555",
+                  "name": "Amoxicillin 250mg Cap"
+                }
+              ]
+            }
+          }
+        }
+      '''
+    }
+  }
+}

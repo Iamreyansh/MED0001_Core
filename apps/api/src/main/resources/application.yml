@@ -48,6 +48,15 @@ medmate:
   platform-config:
     # Immutable keys blocked when this is production (STORY-004).
     environment: production
+  inventory:
+    # Free/Starter default; local profile enables Growth features for online visibility.
+    growth-features-enabled: false
+    jobs:
+      enabled: true
+    po-dispatch:
+      # Stub channel availability until EPIC-017 notification consumer is live.
+      whatsapp-enabled: true
+      email-enabled: true
   catalogue:
     jobs:
       enabled: true

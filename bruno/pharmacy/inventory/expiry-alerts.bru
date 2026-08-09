@@ -1,0 +1,94 @@
+meta {
+  name: expiry-alerts
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/expiry-alerts
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("alerts envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.summary).to.be.an("object");
+    expect(body.data.groups).to.be.an("array");
+    expect(body.data.groups.length).to.equal(3);
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/inventory/expiry-alerts
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/expiry-alerts
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "summary": {
+              "total_expiring_products": 1,
+              "total_expiring_units": 30,
+              "total_value_at_risk": 255.00
+            },
+            "groups": [
+              {
+                "bucket": "UNDER_1_MONTH",
+                "label": "Expiring in < 1 month",
+                "product_count": 1,
+                "units": 30,
+                "value_at_risk": 255.00,
+                "items": []
+              },
+              {
+                "bucket": "1_TO_2_MONTHS",
+                "label": "Expiring in 1-2 months",
+                "product_count": 0,
+                "units": 0,
+                "value_at_risk": 0.00,
+                "items": []
+              },
+              {
+                "bucket": "2_TO_4_MONTHS",
+                "label": "Expiring in 2-4 months",
+                "product_count": 0,
+                "units": 0,
+                "value_at_risk": 0.00,
+                "items": []
+              }
+            ]
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

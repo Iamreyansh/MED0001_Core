@@ -1,0 +1,63 @@
+meta {
+  name: confirm-import
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/purchases/{{grnId}}/confirm-import
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("grnId")) {
+    throw new Error("grnId missing — run import-csv first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("confirm envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("items_created");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/purchases/:grn_id/confirm-import — step 2 create unmatched as new products.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases/11111111-2222-4333-8444-555555555555/confirm-import
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "grn_id": "11111111-2222-4333-8444-555555555555",
+            "items_created": 4,
+            "status": "DRAFT"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

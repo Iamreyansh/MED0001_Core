@@ -1,0 +1,116 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/rack-locations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "rack_code": "Z99-99",
+    "zone_name": "Zone Z",
+    "description": "OTC vitamins section"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rack_code) {
+    bru.setEnvVar("rackCode", body.data.rack_code);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.rack_code).to.be.a("string");
+    expect(body.data.medicine_count).to.equal(0);
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/rack-locations — pharmacy_owner only. Errors: INVALID_RACK_CODE_FORMAT, RACK_CODE_EXISTS.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "rack_code": "Z99-99",
+        "zone_name": "Zone Z",
+        "description": "OTC vitamins section"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rack_code": "Z99-99",
+            "zone_name": "Zone Z",
+            "description": "OTC vitamins section",
+            "medicine_count": 0,
+            "created_at": "2026-08-09T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_RACK_CODE_FORMAT
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "rack_code": "invalid_code",
+        "zone_name": "Zone A"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_RACK_CODE_FORMAT",
+            "message": "rack_code must match [A-Z]{1,2}[0-9]{1,2}-[0-9]{2}"
+          }
+        }
+      '''
+    }
+  }
+}

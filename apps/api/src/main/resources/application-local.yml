@@ -19,6 +19,13 @@ logging:
     root: INFO
 
 medmate:
+  inventory:
+    growth-features-enabled: true
+    jobs:
+      enabled: true
+    po-dispatch:
+      whatsapp-enabled: true
+      email-enabled: true
   kyc:
     webhook-secret: local-kyc-webhook-secret
   razorpay:

@@ -1,2 +1,2 @@
-/** Domain module shell for inventory. Business logic lands via epic stories. */
+/** Pharmacy inventory domain (EPIC-006). */
 package com.nammamedmate.inventory;

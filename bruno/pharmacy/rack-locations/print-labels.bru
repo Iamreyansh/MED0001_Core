@@ -1,0 +1,106 @@
+meta {
+  name: print-labels
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/rack-locations/print-labels
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "rack_codes": ["{{rackCode}}"]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("rackCode")) {
+    bru.setEnvVar("rackCode", "A1-01");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("print-labels envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.pdf_url).to.be.a("string");
+    expect(body.data).to.have.property("expires_at");
+    expect(body.data).to.have.property("label_count");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/rack-locations/print-labels — max 120. Errors: EMPTY_RACK_CODES, TOO_MANY_LABELS, RACK_CODES_NOT_FOUND.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations/print-labels
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "rack_codes": ["A1-01", "B2-03"]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pdf_url": "data:application/pdf;base64,JVBERi0x",
+            "expires_at": "2026-08-09T12:00:00Z",
+            "label_count": 2
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 TOO_MANY_LABELS
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations/print-labels
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "rack_codes": ["A1-01"]
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "TOO_MANY_LABELS",
+            "message": "Maximum 120 labels per request"
+          }
+        }
+      '''
+    }
+  }
+}

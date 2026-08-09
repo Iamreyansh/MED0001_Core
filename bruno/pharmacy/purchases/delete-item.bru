@@ -1,0 +1,62 @@
+meta {
+  name: delete-item
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/purchases/{{grnId}}/items/{{grnItemId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("grnId") || !bru.getEnvVar("grnItemId")) {
+    throw new Error("grnId/grnItemId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("deleted", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.deleted).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/purchases/:grn_id/items/:item_id
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases/11111111-2222-4333-8444-555555555555/items/dddddddd-0001-4000-8000-000000000001
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "item_id": "dddddddd-0001-4000-8000-000000000001",
+            "deleted": true
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

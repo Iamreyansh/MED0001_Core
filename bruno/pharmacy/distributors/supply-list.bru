@@ -1,0 +1,91 @@
+meta {
+  name: supply-list
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/distributors/{{distributorId}}/supply-list?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+  if (!bru.getEnvVar("distributorId")) {
+    throw new Error("distributorId missing — run create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.supply_items && body.data.supply_items[0]) {
+    bru.setEnvVar("productId", body.data.supply_items[0].product_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("supply list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.distributor).to.be.an("object");
+    expect(body.data.supply_items).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/distributors/:id/supply-list — includes effective_landed_cost.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/distributors/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/supply-list?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "distributor": {
+              "id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+              "firm_name": "Medico Pharma Distributors"
+            },
+            "supply_items": [
+              {
+                "product_id": "11111111-2222-4333-8444-555555555555",
+                "product_name": "Paracetamol 500mg Tab",
+                "manufacturer": "Cipla Ltd",
+                "purchase_price": 13.00,
+                "scheme_free_qty": "1 free on 10",
+                "effective_landed_cost": 11.82,
+                "mrp": 22.50,
+                "margin_pct": 47.5,
+                "price_rank": 1,
+                "is_preferred_source": true
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

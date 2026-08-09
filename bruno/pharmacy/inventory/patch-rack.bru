@@ -1,0 +1,79 @@
+meta {
+  name: patch-rack
+  type: http
+  seq: 13
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/{{inventoryProductId}}/rack
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "rack_code": "{{rackCode}}",
+    "action": "ADD"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("inventoryProductId")) {
+    throw new Error("inventoryProductId missing — run inventory list first");
+  }
+  if (!bru.getEnvVar("rackCode")) {
+    bru.setEnvVar("rackCode", "A1-01");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch rack envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.product_id).to.be.a("string");
+    expect(body.data.rack_locations).to.be.an("array");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/inventory/:product_id/rack — ADD|REMOVE (default ADD). Owner/staff.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/rack
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "rack_code": "A1-01",
+        "action": "ADD"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "product_id": "11111111-2222-4333-8444-555555555555",
+            "rack_locations": ["A1-01"],
+            "updated_at": "2026-08-09T10:10:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

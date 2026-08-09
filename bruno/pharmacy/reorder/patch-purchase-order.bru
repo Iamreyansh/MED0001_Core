@@ -1,0 +1,116 @@
+meta {
+  name: patch-purchase-order
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/{{poId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "add_items": [
+      { "product_id": "{{productId}}", "quantity": 10 }
+    ],
+    "remove_item_ids": [],
+    "update_items": []
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("poId")) {
+    throw new Error("poId missing — create-po first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patched envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.po_id).to.be.a("string");
+    expect(body.data.items_count).to.be.a("number");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/reorder/purchase-orders/:poId — DRAFT only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/dddddddd-0001-4000-8000-000000000001
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "add_items": [{ "product_id": "cccccccc-0001-4000-8000-000000000001", "quantity": 10 }],
+        "remove_item_ids": [],
+        "update_items": []
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "po_id": "dddddddd-0001-4000-8000-000000000001",
+            "items_count": 14,
+            "estimated_total": 42800.00,
+            "updated_at": "2026-07-24T11:45:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 PO_NOT_EDITABLE
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/dddddddd-0001-4000-8000-000000000001
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "add_items": []
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PO_NOT_EDITABLE",
+            "message": "PO status is SENT or RECEIVED"
+          }
+        }
+      '''
+    }
+  }
+}

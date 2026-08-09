@@ -1,0 +1,92 @@
+meta {
+  name: delete
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/distributors/{{distributorId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("distributorId")) {
+    throw new Error("distributorId missing — run create or list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("deactivated", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_active).to.equal(false);
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/distributors/:id — soft deactivate (is_active=false). GRNs preserved.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/distributors/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "is_active": false,
+            "deactivated_at": "2026-07-24T11:15:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 DISTRIBUTOR_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/distributors/00000000-0000-4000-8000-000000000000
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DISTRIBUTOR_NOT_FOUND",
+            "message": "Distributor not found"
+          }
+        }
+      '''
+    }
+  }
+}

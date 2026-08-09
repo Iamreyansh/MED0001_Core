@@ -1,0 +1,67 @@
+meta {
+  name: set-preferred
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/distributors/{{distributorId}}/supply-list/{{productId}}/set-preferred
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("distributorId") || !bru.getEnvVar("productId")) {
+    throw new Error("distributorId/productId missing — run supply-list after GRN stock first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("preferred set", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_preferred_source).to.equal(true);
+  });
+}
+
+docs {
+  PATCH .../supply-list/:product_id/set-preferred — clears other preferred sources for the product.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/distributors/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/supply-list/11111111-2222-4333-8444-555555555555/set-preferred
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "distributor_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "product_id": "11111111-2222-4333-8444-555555555555",
+            "is_preferred_source": true,
+            "previous_preferred_distributor_id": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

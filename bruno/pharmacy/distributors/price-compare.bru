@@ -1,0 +1,85 @@
+meta {
+  name: price-compare
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/distributors/price-compare?only_multi_source=true&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  only_multi_source: true
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("price-compare envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.products).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/distributors/price-compare — literal path before /{id}. Growth+, owner only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/distributors/price-compare?only_multi_source=true&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "products": [
+              {
+                "product_id": "11111111-2222-4333-8444-555555555555",
+                "product_name": "Paracetamol 500mg Tab",
+                "manufacturer": "Cipla Ltd",
+                "distributor_prices": [
+                  {
+                    "distributor_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                    "distributor_name": "Medico Pharma",
+                    "purchase_price": 13.00,
+                    "effective_landed_cost": 11.82,
+                    "mrp": 22.50,
+                    "is_preferred_source": true,
+                    "price_rank": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

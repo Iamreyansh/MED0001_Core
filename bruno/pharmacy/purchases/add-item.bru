@@ -1,0 +1,109 @@
+meta {
+  name: add-item
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/purchases/{{grnId}}/items
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "product_id": "{{inventoryProductId}}",
+    "batch_number": "BN-GRN-001",
+    "expiry_date": "2027-06-30",
+    "quantity": 100,
+    "free_quantity": 20,
+    "purchase_price_per_unit": 13.00,
+    "mrp_per_unit": 22.50,
+    "gst_pct": 12
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("grnId")) {
+    throw new Error("grnId missing — run purchases create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.item_id) {
+    bru.setEnvVar("grnItemId", body.data.item_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("line totals on paid qty only", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.quantity_total).to.equal(120);
+    expect(body.data.taxable_amount).to.equal(1300);
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/purchases/:grn_id/items
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases/11111111-2222-4333-8444-555555555555/items
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "product_id": "cccccccc-0001-4000-8000-000000000001",
+        "batch_number": "BN25100",
+        "expiry_date": "2027-06-30",
+        "quantity": 200,
+        "free_quantity": 0,
+        "purchase_price_per_unit": 13.00,
+        "mrp_per_unit": 22.50,
+        "gst_pct": 12
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "item_id": "dddddddd-0001-4000-8000-000000000001",
+            "grn_id": "11111111-2222-4333-8444-555555555555",
+            "product_id": "cccccccc-0001-4000-8000-000000000001",
+            "product_name": "Paracetamol 500mg Tab",
+            "is_new_product": false,
+            "batch_number": "BN25100",
+            "expiry_date": "2027-06-30",
+            "quantity": 200,
+            "free_quantity": 0,
+            "quantity_total": 200,
+            "purchase_price_per_unit": 13.00,
+            "mrp_per_unit": 22.50,
+            "gst_pct": 12,
+            "taxable_amount": 2600.00,
+            "gst_amount": 312.00,
+            "line_total": 2912.00
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

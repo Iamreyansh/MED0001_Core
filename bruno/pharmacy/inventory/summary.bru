@@ -1,0 +1,72 @@
+meta {
+  name: summary
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/summary
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.total_skus).to.be.a("number");
+    expect(body.data.as_of).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/inventory/summary — KPI cards.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/summary
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total_skus": 0,
+            "total_units": 0,
+            "stock_value_at_cost": 0.00,
+            "retail_value_mrp": 0.00,
+            "low_stock_count": 0,
+            "expiring_count": 0,
+            "dead_stock_count": 0,
+            "out_of_stock_count": 0,
+            "unallocated_count": 0,
+            "as_of": "2026-08-09T00:00:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
