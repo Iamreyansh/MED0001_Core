@@ -62,6 +62,7 @@ class AwsSecretsEnvironmentPostProcessorTest {
     props.put("MEDMATE_SECRETS_JWT_ARN", "");
     props.put("MEDMATE_SECRETS_MFA_ARN", " ");
     props.put("MEDMATE_SECRETS_RAZORPAY_ARN", " ");
+    props.put("MEDMATE_SECRETS_RAZORPAYX_ARN", " ");
     props.put("MEDMATE_SECRETS_KYC_ARN", " ");
     env.getPropertySources().addFirst(new MapPropertySource("test", props));
 
@@ -189,6 +190,29 @@ class AwsSecretsEnvironmentPostProcessorTest {
     assertThat(env.getProperty("medmate.razorpay.key-id")).isEqualTo("rzp_test");
     assertThat(env.getProperty("medmate.razorpay.key-secret")).isEqualTo("sec");
     assertThat(env.getProperty("medmate.razorpay.webhook-secret")).isEqualTo("whsec");
+  }
+
+  @Test
+  void loadsRazorpayxWebhookSecretFromSecretsManager() {
+    SecretsManagerClient client = mock(SecretsManagerClient.class);
+    when(client.getSecretValue(any(GetSecretValueRequest.class)))
+        .thenReturn(
+            GetSecretValueResponse.builder()
+                .secretString("{\"webhook_secret\":\"prod-razorpayx-hmac-secret\"}")
+                .build());
+
+    StandardEnvironment env = new StandardEnvironment();
+    env.setActiveProfiles("staging");
+    env.getPropertySources()
+        .addFirst(
+            new MapPropertySource(
+                "test", Map.of("MEDMATE_SECRETS_RAZORPAYX_ARN", "arn:razorpayx")));
+
+    new AwsSecretsEnvironmentPostProcessor(() -> client)
+        .postProcessEnvironment(env, new SpringApplication());
+
+    assertThat(env.getProperty("medmate.razorpayx.webhook-secret"))
+        .isEqualTo("prod-razorpayx-hmac-secret");
   }
 
   @Test

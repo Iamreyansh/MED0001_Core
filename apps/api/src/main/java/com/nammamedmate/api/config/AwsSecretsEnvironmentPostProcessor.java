@@ -15,8 +15,8 @@ import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
 
 /**
- * For staging/prod: load DB + JWT + MFA material from Secrets Manager ARNs set on the ECS task.
- * Avoids stuffing PEMs / keys into task environment variables.
+ * For staging/prod: load DB + JWT + MFA + Razorpay/KYC webhook material from Secrets Manager ARNs
+ * set on the ECS task. Avoids stuffing PEMs / keys into task environment variables.
  */
 public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
 
@@ -71,6 +71,11 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
         props.put("medmate.razorpay.key-id", text(razorpay, "key_id"));
         props.put("medmate.razorpay.key-secret", text(razorpay, "key_secret"));
         props.put("medmate.razorpay.webhook-secret", text(razorpay, "webhook_secret"));
+      }
+      String razorpayxArn = environment.getProperty("MEDMATE_SECRETS_RAZORPAYX_ARN");
+      if (razorpayxArn != null && !razorpayxArn.isBlank()) {
+        JsonNode razorpayx = MAPPER.readTree(getSecret(client, razorpayxArn));
+        props.put("medmate.razorpayx.webhook-secret", text(razorpayx, "webhook_secret"));
       }
       String kycArn = environment.getProperty("MEDMATE_SECRETS_KYC_ARN");
       if (kycArn != null && !kycArn.isBlank()) {

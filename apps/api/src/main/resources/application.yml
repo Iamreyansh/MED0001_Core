@@ -81,17 +81,17 @@ medmate:
     # Rs 1,000 — platform config key max_wallet_credit_per_transaction (EPIC-021 STORY-004 later)
     max-credit-paise: 100000
   razorpay:
-    # Blank → StubRazorpayVpaClient (local/CI). Staging/prod: inject via MEDMATE_SECRETS_RAZORPAY_ARN
-    # (Secrets Manager JSON key_id / key_secret) or ECS valueFrom when EPIC-022 secret exists.
+    # Blank → StubRazorpayVpaClient (local/CI). Staging/prod: MEDMATE_SECRETS_RAZORPAY_ARN
+    # (Secrets Manager JSON key_id / key_secret / webhook_secret).
     key-id: ""
     key-secret: ""
   razorpayx:
-    # Local/dev only — staging/prod must inject via Secrets Manager
+    # Local/dev only — staging/prod: MEDMATE_SECRETS_RAZORPAYX_ARN (JSON webhook_secret)
     webhook-secret: local-razorpayx-webhook-secret
   kyc:
     # ponytail: feature flag via property, not EPIC-021 settings service (simpler for now)
     auto-verification-enabled: false
-    # Local/dev only — staging/prod must inject via MEDMATE_SECRETS_KYC_ARN
+    # Local/dev only — staging/prod: MEDMATE_SECRETS_KYC_ARN (JSON webhook_secret)
     webhook-secret: local-kyc-webhook-secret
     jobs:
       enabled: true
