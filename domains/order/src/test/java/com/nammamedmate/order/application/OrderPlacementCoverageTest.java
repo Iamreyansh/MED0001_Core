@@ -686,6 +686,29 @@ class OrderPlacementCoverageTest {
         .isEqualTo("PENDING_ACCEPTANCE");
   }
 
+  @Test
+  void applyExternalPaymentCaptureAndFailure() {
+    service.applyExternalPaymentCapture(null, null);
+    service.applyExternalPaymentCapture(UUID.randomUUID(), "pay_x");
+    service.applyExternalPaymentFailure(UUID.randomUUID(), "declined");
+
+    Cart c = cart();
+    carts.insert(c);
+    Map<String, Object> placed =
+        service.placeOrder(customer, c.id(), "UPI", null, null, "ext-pay-1");
+    UUID orderId = UUID.fromString(placed.get("order_id").toString());
+    service.applyExternalPaymentCapture(orderId, "pay_ext_1");
+    Order updated = orders.findById(orderId).orElseThrow();
+    assertThat(updated.status()).isEqualTo(OrderStatus.PENDING_ACCEPTANCE);
+    assertThat(updated.paymentStatus()).isEqualTo(PaymentStatus.PAID);
+    // idempotent
+    service.applyExternalPaymentCapture(orderId, "pay_ext_1");
+    // PAID + null payment id still idempotent
+    service.applyExternalPaymentCapture(orderId, null);
+    // PAID + different payment id ignored when not PAYMENT_PENDING
+    service.applyExternalPaymentCapture(orderId, "pay_other");
+  }
+
   private Cart cart() {
     Cart cart = Cart.empty(CUST, T0);
     cart.setPharmacyId(PH1);

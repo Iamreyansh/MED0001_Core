@@ -56,7 +56,8 @@ public class OrderCustomerBridgeConfig {
                 amountPaise,
                 description,
                 orderId == null ? null : orderId.toString(),
-                idempotencyKey);
+                idempotencyKey,
+                "REFUND");
         Object tx = result.get("transaction_id");
         if (tx instanceof UUID u) {
           return u;

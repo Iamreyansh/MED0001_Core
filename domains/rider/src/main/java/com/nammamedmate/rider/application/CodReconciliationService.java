@@ -8,10 +8,12 @@ import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.rider.application.port.out.CodCollectionStore;
 import com.nammamedmate.rider.application.port.out.CodCollectionStore.CollectionRecord;
 import com.nammamedmate.rider.application.port.out.CodCollectionStore.CollectionView;
+import com.nammamedmate.rider.application.port.out.CodDepositConfirmedPort;
 import com.nammamedmate.rider.application.port.out.CodDepositStore;
 import com.nammamedmate.rider.application.port.out.CodDepositStore.BoardPage;
 import com.nammamedmate.rider.application.port.out.CodDepositStore.CodBoardRow;
 import com.nammamedmate.rider.application.port.out.CodDepositStore.DepositRecord;
+import com.nammamedmate.rider.application.port.out.FinanceCodDailyReconciliationPort;
 import com.nammamedmate.rider.application.port.out.PlatformPricingConfigStore;
 import com.nammamedmate.rider.application.port.out.RiderFleetStore;
 import com.nammamedmate.rider.application.port.out.RiderStore;
@@ -31,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +55,8 @@ public class CodReconciliationService {
   private final RiderFleetStore fleet;
   private final OutboxPublisher outbox;
   private final Clock clock;
+  private final CodDepositConfirmedPort depositConfirmed;
+  private final FinanceCodDailyReconciliationPort financeDaily;
 
   public CodReconciliationService(
       RiderStore riders,
@@ -60,6 +66,20 @@ public class CodReconciliationService {
       RiderFleetStore fleet,
       OutboxPublisher outbox,
       Clock clock) {
+    this(riders, collections, deposits, pricingConfig, fleet, outbox, clock, null, null);
+  }
+
+  @Autowired
+  public CodReconciliationService(
+      RiderStore riders,
+      CodCollectionStore collections,
+      CodDepositStore deposits,
+      PlatformPricingConfigStore pricingConfig,
+      RiderFleetStore fleet,
+      OutboxPublisher outbox,
+      Clock clock,
+      @Nullable CodDepositConfirmedPort depositConfirmed,
+      @Nullable FinanceCodDailyReconciliationPort financeDaily) {
     this.riders = riders;
     this.collections = collections;
     this.deposits = deposits;
@@ -67,6 +87,9 @@ public class CodReconciliationService {
     this.fleet = fleet;
     this.outbox = outbox;
     this.clock = clock;
+    this.depositConfirmed =
+        depositConfirmed == null ? (id, riderId, amount) -> {} : depositConfirmed;
+    this.financeDaily = financeDaily;
   }
 
   public record BoardResult(Map<String, Object> data, PaginationMeta meta) {
@@ -243,6 +266,7 @@ public class CodReconciliationService {
 
     long after = riders.adjustCodInHand(riderId, -amountPaise, now);
     collections.markDepositedFifo(riderId, depositId, amountPaise);
+    depositConfirmed.onDepositConfirmed(depositId, riderId, amountPaise);
     long limit = floatLimitPaise();
 
     Map<String, Object> data = new LinkedHashMap<>();
@@ -401,11 +425,19 @@ public class CodReconciliationService {
     return data;
   }
 
-  /** AC-007: daily 11 PM IST report → outbox for EPIC-012 finance stub. */
+  /**
+   * AC-007 / EPIC-012 STORY-006: daily 11 PM IST reconciliation. When finance port is wired
+   * (apps/api), delegates to {@link FinanceCodDailyReconciliationPort}; otherwise publishes the
+   * legacy outbox stub payload (unit tests).
+   */
   @Transactional
   public void publishDailyReport() {
     Instant now = clock.instant();
     DayWindow day = istDay(now);
+    if (financeDaily != null) {
+      financeDaily.runForDate(day.date());
+      return;
+    }
     long limit = floatLimitPaise();
     long deposited = deposits.sumDepositedTodayAll(day.start(), day.end());
     long collected = collections.sumCollectedTodayAll(day.start(), day.end());

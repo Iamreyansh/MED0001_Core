@@ -1,0 +1,148 @@
+meta {
+  name: initiate
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/payments/initiate
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "order_id": "{{orderId}}",
+    "amount_paise": {{orderAmountPaise}},
+    "currency": "INR",
+    "method": "UPI"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing — place a UPI/CARD order first");
+  }
+  if (!bru.getEnvVar("orderAmountPaise")) {
+    bru.setEnvVar("orderAmountPaise", "49500");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.payment_id) bru.setEnvVar("paymentId", body.data.payment_id);
+    if (body.data.razorpay_order_id) bru.setEnvVar("razorpayOrderId", body.data.razorpay_order_id);
+    if (body.data.razorpay_key_id) bru.setEnvVar("razorpayKeyId", body.data.razorpay_key_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("initiate envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.payment_id).to.be.a("string");
+    expect(body.data.razorpay_order_id).to.be.a("string");
+    expect(body.data.razorpay_key_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/payments/initiate — create Razorpay order; returns SDK credentials. Errors: ORDER_NOT_FOUND, ORDER_NOT_YOURS, PAYMENT_ALREADY_INITIATED, COD_ORDER_NO_PAYMENT, INVALID_AMOUNT, RAZORPAY_ERROR.
+}
+
+example {
+  name: 201 Created
+  description: Happy path UPI initiate
+  request: {
+    url: {{baseUrl}}/api/v1/payments/initiate
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "amount_paise": 49500,
+        "currency": "INR",
+        "method": "UPI"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "payment_id": "paymmmmm-mmmm-4mmm-8mmm-mmmmmmmmmmmm",
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "razorpay_order_id": "order_XXXXXXXXXXXX",
+            "razorpay_key_id": "rzp_test_stub",
+            "amount_paise": 49500,
+            "amount_rupees": 495.00,
+            "currency": "INR",
+            "method": "UPI",
+            "wallet_deducted": 50.00,
+            "gateway_amount_paise": 44500,
+            "expires_at": "2026-07-24T13:20:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 COD_ORDER_NO_PAYMENT
+  description: COD orders cannot initiate gateway payment
+  request: {
+    url: {{baseUrl}}/api/v1/payments/initiate
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "amount_paise": 22125,
+        "currency": "INR",
+        "method": "COD"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "COD_ORDER_NO_PAYMENT",
+            "message": "COD orders do not use the payment gateway"
+          }
+        }
+      '''
+    }
+  }
+}

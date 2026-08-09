@@ -64,7 +64,7 @@ tests {
 docs {
   POST /api/v1/admin/customers/:id/wallet/credit — manual credit (finance:*).
   Requires Idempotency-Key header (replay returns the original credit).
-  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND, 422 EXCEEDS_CREDIT_LIMIT
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 CUSTOMER_NOT_FOUND, 422 ADMIN_CREDIT_EXCEEDS_LIMIT, 422 INVALID_REASON
 }
 
 example {
@@ -116,7 +116,7 @@ example {
 }
 
 example {
-  name: 422 EXCEEDS_CREDIT_LIMIT
+  name: 422 ADMIN_CREDIT_EXCEEDS_LIMIT
   description: Amount exceeds max_wallet_credit_per_transaction.
 
   request: {
@@ -148,7 +148,7 @@ example {
         {
           "success": false,
           "error": {
-            "code": "EXCEEDS_CREDIT_LIMIT",
+            "code": "ADMIN_CREDIT_EXCEEDS_LIMIT",
             "message": "Amount exceeds max_wallet_credit_per_transaction"
           }
         }

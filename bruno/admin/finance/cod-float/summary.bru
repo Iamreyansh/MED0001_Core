@@ -1,0 +1,88 @@
+meta {
+  name: summary
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/cod-float?risk_only=false&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.riders && body.data.riders[0]) {
+    bru.setEnvVar("codFloatRiderId", body.data.riders[0].rider_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cod-float summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.summary).to.have.property("total_cod_in_transit");
+    expect(body.data.summary).to.have.property("float_risk_threshold");
+    expect(body.data.riders).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/cod-float — platform COD float summary (EPIC-012/STORY-006).
+  Ops + finance read. Distinct from /admin/finance/cod board.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/cod-float?risk_only=true&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "summary": {
+              "total_cod_in_transit": 28450.00,
+              "collected_today": 18200.00,
+              "deposited_today": 15200.00,
+              "float_risk_amount": 8600.00,
+              "float_risk_riders_count": 4,
+              "float_risk_threshold": 2000.00
+            },
+            "riders": [
+              {
+                "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+                "rider_name": "Suresh M",
+                "zone_name": "Indiranagar",
+                "collected": 3600.00,
+                "deposited": 0.00,
+                "in_hand": 3600.00,
+                "risk_status": "FLOAT_RISK",
+                "last_deposit_at": null
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 4, "has_next": false }
+        }
+      '''
+    }
+  }
+}

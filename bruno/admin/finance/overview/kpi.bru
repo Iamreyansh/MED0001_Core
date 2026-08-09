@@ -1,0 +1,108 @@
+meta {
+  name: kpi
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/kpi
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.as_of) {
+    bru.setEnvVar("financeKpiAsOf", body.data.as_of);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("kpi envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("as_of");
+    expect(body.data).to.have.property("gmv_today");
+    expect(body.data).to.have.property("platform_revenue_today");
+    expect(body.data).to.have.property("pharmacy_payout_due");
+    expect(body.data).to.have.property("rider_payout_due");
+    expect(body.data).to.have.property("refunds_pending");
+    expect(body.data).to.have.property("cod_in_hand");
+    expect(body.data).to.have.property("active_wallet_balance_total");
+    expect(body.data).to.have.property("gateway_fees_today");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/kpi — real-time KPI chips (Redis-cached ≤60s). EPIC-012/STORY-009.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/kpi
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "as_of": "2026-07-24T16:00:00Z",
+            "gmv_today": 185000.00,
+            "platform_revenue_today": 14800.00,
+            "pharmacy_payout_due": 420500.00,
+            "rider_payout_due": 72400.00,
+            "refunds_pending": 12,
+            "refunds_pending_value": 8450.00,
+            "cod_in_hand": 28450.00,
+            "active_wallet_balance_total": 1250000.00,
+            "gateway_fees_today": 2736.00
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/kpi
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Finance access required"
+          }
+        }
+      '''
+    }
+  }
+}

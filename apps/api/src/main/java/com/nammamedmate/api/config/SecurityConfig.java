@@ -58,10 +58,20 @@ public class SecurityConfig {
                         "/api/v1/pharmacy/register/resend-otp",
                         "/api/v1/rider/register")
                     .permitAll()
-                    .requestMatchers("/api/v1/webhooks/**", "/api/v1/internal/kyc/**")
+                    .requestMatchers(
+                        "/api/v1/webhooks/**", "/api/v1/internal/kyc/**", "/api/v1/wallet/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook/razorpay")
                     .permitAll()
                     .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**")
                     .permitAll()
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/payments/initiate", "/api/v1/payments/verify")
+                    .hasRole("CUSTOMER")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/payments/**")
+                    .hasAnyRole("CUSTOMER", "ADMIN_FINANCE", "ADMIN_SUPER")
+                    .requestMatchers("/api/v1/payments/**")
+                    .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/auth/pharmacy/switch-pharmacy")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/registration-status")
@@ -171,12 +181,51 @@ public class SecurityConfig {
                     .requestMatchers(
                         "/api/v1/rider/earnings",
                         "/api/v1/rider/performance",
-                        "/api/v1/rider/trips")
+                        "/api/v1/rider/trips",
+                        "/api/v1/rider/payouts",
+                        "/api/v1/rider/payouts/**")
                     .hasRole("RIDER")
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/finance/cod/*/mark-deposited")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
                     .requestMatchers("/api/v1/admin/finance/cod", "/api/v1/admin/finance/cod/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/finance/cod-float/auto-reconcile")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers(
+                        "/api/v1/admin/finance/cod-float/reconciliation-report",
+                        "/api/v1/admin/finance/cod-float/reconciliation-report/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers("/api/v1/admin/finance/cod-float")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    .requestMatchers(
+                        "/api/v1/admin/finance/taxes", "/api/v1/admin/finance/taxes/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE", "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        "/api/v1/admin/finance/ledger", "/api/v1/admin/finance/ledger/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers(
+                        "/api/v1/admin/finance/kpi",
+                        "/api/v1/admin/finance/pnl",
+                        "/api/v1/admin/finance/cash-position",
+                        "/api/v1/admin/finance/ratios")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers(
+                        "/api/v1/admin/finance/settlements", "/api/v1/admin/finance/settlements/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/finance/refunds/*/process")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers(
+                        "/api/v1/admin/finance/refunds", "/api/v1/admin/finance/refunds/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE", "ADMIN_SUPPORT")
+                    .requestMatchers(
+                        "/api/v1/admin/finance/rider-payouts",
+                        "/api/v1/admin/finance/rider-payouts/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    .requestMatchers(
+                        "/api/v1/pharmacy/finance/settlements",
+                        "/api/v1/pharmacy/finance/settlements/**")
+                    .hasRole("PHARMACY_OWNER")
                     .requestMatchers(HttpMethod.GET, "/api/v1/admin/riders/*/earnings-ledger")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/riders/*/payout/release")

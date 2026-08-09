@@ -71,7 +71,8 @@ class CancelRefundBranchCoverageTest {
                     .filter(r -> r.orderId().equals(inv.getArgument(0)))
                     .filter(
                         r ->
-                            r.status() == RefundStatus.INITIATED
+                            r.status() == RefundStatus.PENDING
+                                || r.status() == RefundStatus.INITIATED
                                 || r.status() == RefundStatus.PROCESSED)
                     .mapToLong(Refund::amountPaise)
                     .sum());
@@ -149,7 +150,7 @@ class CancelRefundBranchCoverageTest {
             null,
             T0);
     saved.add(failed);
-    refunds.issueManual(upi, 100, RefundTo.SOURCE, "ok", null, UUID.randomUUID(), "src-ok");
+    refunds.issueManual(upi, 100, RefundTo.SOURCE, "ok", "notes", UUID.randomUUID(), "src-ok");
 
     // webhook text branches
     ObjectMapper om = new ObjectMapper();
@@ -214,7 +215,7 @@ class CancelRefundBranchCoverageTest {
     assertThatThrownBy(
             () ->
                 refunds.issueManual(
-                    blankPay, 50, RefundTo.SOURCE, null, null, UUID.randomUUID(), "blank-pay"))
+                    blankPay, 50, RefundTo.SOURCE, null, "notes", UUID.randomUUID(), "blank-pay"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
 
@@ -279,7 +280,7 @@ class CancelRefundBranchCoverageTest {
             null,
             null,
             T0));
-    refunds.issueManual(upi3, 50, RefundTo.SOURCE, "ok", null, UUID.randomUUID(), "src-i");
+    refunds.issueManual(upi3, 50, RefundTo.SOURCE, "ok", "notes", UUID.randomUUID(), "src-i");
 
     // isAutoRefundDue false path evaluates walletApplied==0 on non-COD
     Order awaitingBare = order(PaymentMethod.UPI, PaymentStatus.AWAITING_PAYMENT, 100, 0, null);

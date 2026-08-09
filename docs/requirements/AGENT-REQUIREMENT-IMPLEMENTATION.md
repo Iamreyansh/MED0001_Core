@@ -15,10 +15,10 @@
 | Phase | Total | Done |
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
-| Phase 2 | 34 | 11 |
+| Phase 2 | 34 | 20 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **57** |
+| **Total** | **129** | **66** |
 
 ---
 
@@ -141,15 +141,15 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-012 | [STORY-001](./EPIC-012-payments-finance/STORY-001-payment-processing.md) | Payment Processing (UPI / Card / COD) | pending | — | — |
-| EPIC-012 | [STORY-002](./EPIC-012-payments-finance/STORY-002-wallet-operations.md) | Namma Money Wallet Operations | pending | — | — |
-| EPIC-012 | [STORY-003](./EPIC-012-payments-finance/STORY-003-pharmacy-settlements.md) | Pharmacy Settlements | pending | — | — |
-| EPIC-012 | [STORY-004](./EPIC-012-payments-finance/STORY-004-rider-payouts.md) | Rider Payouts | pending | — | — |
-| EPIC-012 | [STORY-005](./EPIC-012-payments-finance/STORY-005-refund-processing.md) | Refund Processing | pending | — | — |
-| EPIC-012 | [STORY-006](./EPIC-012-payments-finance/STORY-006-cod-float-management.md) | COD Float Management (Finance Side) | pending | — | — |
-| EPIC-012 | [STORY-007](./EPIC-012-payments-finance/STORY-007-tax-gst-management.md) | Tax & GST Management | pending | — | — |
-| EPIC-012 | [STORY-008](./EPIC-012-payments-finance/STORY-008-financial-ledger.md) | Financial Ledger | pending | — | — |
-| EPIC-012 | [STORY-009](./EPIC-012-payments-finance/STORY-009-financial-overview-dashboard.md) | Financial Overview Dashboard | pending | — | — |
+| EPIC-012 | [STORY-001](./EPIC-012-payments-finance/STORY-001-payment-processing.md) | Payment Processing (UPI / Card / COD) | done | 2026-08-09 | `domains/payment`; money BIGINT paise; Razorpay live/stub; thin financial_ledger writer; order PAYMENT_FAILED deferred (schema has no status) |
+| EPIC-012 | [STORY-002](./EPIC-012-payments-finance/STORY-002-wallet-operations.md) | Namma Money Wallet Operations | done | 2026-08-09 | `domains/payment` façade + bridge to customer WalletService; no new wallet tables; `/wallet/debit|credit` permitAll like internal kyc; `GET .../wallet/balance` alias; `balance_before` derived from `balance_after`±amount (no V058); admin cap code `ADMIN_CREDIT_EXCEEDS_LIMIT`; story reasons ADMIN_CREDIT/CASHBACK→GOODWILL/PROMOTIONAL |
+| EPIC-012 | [STORY-003](./EPIC-012-payments-finance/STORY-003-pharmacy-settlements.md) | Pharmacy Settlements | done | 2026-08-09 | `domains/payment` façades + V059 (reuse V019 `settlement`); API status `PENDING`↔storage `PENDING_RELEASE`; line items derived from orders (no `settlement_line_item`); RazorpayX live\|stub in payment, bridged to pharmacy port; ledger `PAYOUT_PHARMACY`+`TCS_COLLECTED`; Mon 06:00 cron reused; Bruno `admin/finance/settlements` + `pharmacy/finance/settlements`; legacy `/admin/pharmacies/{id}/settlements` unchanged |
+| EPIC-012 | [STORY-004](./EPIC-012-payments-finance/STORY-004-rider-payouts.md) | Rider Payouts | done | 2026-08-09 | `domains/payment` façades + bridge on V042 `rider_payouts` (no V060); Mon cron+retry reused in rider; RazorpayX live\|stub bridged as rider Route; ledger `PAYOUT_RIDER` on finance release; API status `BELOW_THRESHOLD_CARRIED`↔storage `…_FORWARD`; no rider UPI/bank table — ACTIVE/ONLINE/OFFLINE/ON_TRIP treated Route-ready; legacy `/admin/riders/{id}/payout/release` unchanged (no ledger); Bruno `admin/finance/rider-payouts` + `rider/payouts/history` |
+| EPIC-012 | [STORY-005](./EPIC-012-payments-finance/STORY-005-refund-processing.md) | Refund Processing | done | 2026-08-09 | `domains/payment` façade + `PaymentRefundBridgeConfig`; V061 PENDING/auto_processed/expected_by/processed_by/completed_at on shared `refund`; webhook `refund.processed`→complete; order threshold ≤₹500 auto else PENDING; COD/wallet→COMPLETED; ledger `REFUND`; Bruno `admin/finance/refunds` + `customers/me/refunds` |
+| EPIC-012 | [STORY-006](./EPIC-012-payments-finance/STORY-006-cod-float-management.md) | COD Float Management (Finance Side) | done | 2026-08-09 | `domains/payment` façades + `PaymentCodFloatBridgeConfig`; V062 `cod_reconciliation_report`; reuse V041 COD tables; `/admin/finance/cod-float` (+ report/export/auto-reconcile) distinct from `/admin/finance/cod`; 23:00 IST via rider `FinanceCodDailyReconciliationPort` bridge; ledger `COD_DEPOSIT` on mark-deposited; Bruno `admin/finance/cod-float/` |
+| EPIC-012 | [STORY-007](./EPIC-012-payments-finance/STORY-007-tax-gst-management.md) | Tax & GST Management | done | 2026-08-09 | `domains/payment`; V063 tax_filing+tcs_register (BIGINT paise); read-only panel; TCS register on settlement release; GSTR-8/TDS export local\|S3; admin_compliance via LIVE_EXTRA taxes:read/export; overdue via display overlay + daily job; other_input_gst=0 until STORY-008; Bruno `admin/finance/taxes/` |
+| EPIC-012 | [STORY-008](./EPIC-012-payments-finance/STORY-008-financial-ledger.md) | Financial Ledger | done | 2026-08-09 | `domains/payment`; V064 append-only UPDATE/DELETE triggers + COD_DEPOSIT unique (STORY-006 FLAG); browse/export APIs + running_balance window; COMMISSION capture writer fixed to credit (AC-001); TCS_COLLECTED aliased as TCS in API; wallet credit/debit direction left as STORY-002; reuse TaxFilingObjectStore for CSV; Bruno `admin/finance/ledger/`; FinancialLedgerIT |
+| EPIC-012 | [STORY-009](./EPIC-012-payments-finance/STORY-009-financial-overview-dashboard.md) | Financial Overview Dashboard | done | 2026-08-09 | `domains/payment`; read-only KPI/P&L/cash-position/ratios; Redis KPI TTL 60s; aggregates from payment+ledger+settlement+rider_payouts+refund+wallets+cod_collections (no V065); BR-006 ratios use ×100 (story −100 typo); AC-003 chart: hourly TODAY / daily 7D+; platform_net per AC-004 (excludes wallet); Bruno `admin/finance/overview/`; FinanceOverviewIT |
 
 ### EPIC-014 (`EPIC-014-crm-saas`)
 

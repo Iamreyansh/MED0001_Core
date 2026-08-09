@@ -5,7 +5,9 @@ import com.nammamedmate.order.domain.Refund;
 import com.nammamedmate.order.domain.RefundIssuedByType;
 import com.nammamedmate.order.domain.RefundStatus;
 import com.nammamedmate.order.domain.RefundTo;
+import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,25 +17,35 @@ import org.springframework.jdbc.core.RowMapper;
 public class JdbcRefundStore implements RefundStore {
 
   private static final RowMapper<Refund> MAPPER =
-      (rs, rowNum) ->
-          new Refund(
-              (UUID) rs.getObject("id"),
-              (UUID) rs.getObject("order_id"),
-              rs.getLong("amount_paise"),
-              RefundTo.valueOf(rs.getString("refund_to")),
-              rs.getString("reason"),
-              rs.getString("notes"),
-              RefundStatus.valueOf(rs.getString("status")),
-              (UUID) rs.getObject("issued_by"),
-              RefundIssuedByType.valueOf(rs.getString("issued_by_type")),
-              rs.getString("razorpay_refund_id"),
-              (UUID) rs.getObject("wallet_transaction_id"),
-              rs.getTimestamp("processed_at") == null
-                  ? null
-                  : rs.getTimestamp("processed_at").toInstant(),
-              rs.getString("failed_reason"),
-              rs.getString("idempotency_key"),
-              rs.getTimestamp("created_at").toInstant());
+      (rs, rowNum) -> {
+        Refund refund =
+            new Refund(
+                (UUID) rs.getObject("id"),
+                (UUID) rs.getObject("order_id"),
+                rs.getLong("amount_paise"),
+                RefundTo.valueOf(rs.getString("refund_to")),
+                rs.getString("reason"),
+                rs.getString("notes"),
+                RefundStatus.valueOf(rs.getString("status")),
+                (UUID) rs.getObject("issued_by"),
+                RefundIssuedByType.valueOf(rs.getString("issued_by_type")),
+                rs.getString("razorpay_refund_id"),
+                (UUID) rs.getObject("wallet_transaction_id"),
+                rs.getTimestamp("processed_at") == null
+                    ? null
+                    : rs.getTimestamp("processed_at").toInstant(),
+                rs.getString("failed_reason"),
+                rs.getString("idempotency_key"),
+                rs.getTimestamp("created_at").toInstant());
+        refund.setAutoProcessed(rs.getBoolean("auto_processed"));
+        LocalDate expected = rs.getObject("expected_by", LocalDate.class);
+        refund.setExpectedBy(expected);
+        if (rs.getTimestamp("completed_at") != null) {
+          refund.setCompletedAt(rs.getTimestamp("completed_at").toInstant());
+        }
+        refund.setProcessedBy((UUID) rs.getObject("processed_by"));
+        return refund;
+      };
 
   private final JdbcTemplate jdbc;
 
@@ -48,8 +60,9 @@ public class JdbcRefundStore implements RefundStore {
         INSERT INTO refund (
           id, order_id, amount_paise, refund_to, reason, notes, status,
           issued_by, issued_by_type, razorpay_refund_id, wallet_transaction_id,
-          processed_at, failed_reason, idempotency_key, created_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          processed_at, failed_reason, idempotency_key, created_at,
+          auto_processed, processed_by, expected_by, completed_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
         refund.id(),
         refund.orderId(),
@@ -65,7 +78,11 @@ public class JdbcRefundStore implements RefundStore {
         refund.processedAt() == null ? null : Timestamp.from(refund.processedAt()),
         refund.failedReason(),
         refund.idempotencyKey(),
-        Timestamp.from(refund.createdAt()));
+        Timestamp.from(refund.createdAt()),
+        refund.autoProcessed(),
+        refund.processedBy(),
+        refund.expectedBy() == null ? null : Date.valueOf(refund.expectedBy()),
+        refund.completedAt() == null ? null : Timestamp.from(refund.completedAt()));
   }
 
   @Override
@@ -77,7 +94,11 @@ public class JdbcRefundStore implements RefundStore {
           razorpay_refund_id = ?,
           wallet_transaction_id = ?,
           processed_at = ?,
-          failed_reason = ?
+          failed_reason = ?,
+          auto_processed = ?,
+          processed_by = ?,
+          expected_by = ?,
+          completed_at = ?
         WHERE id = ?
         """,
         refund.status().name(),
@@ -85,6 +106,10 @@ public class JdbcRefundStore implements RefundStore {
         refund.walletTransactionId(),
         refund.processedAt() == null ? null : Timestamp.from(refund.processedAt()),
         refund.failedReason(),
+        refund.autoProcessed(),
+        refund.processedBy(),
+        refund.expectedBy() == null ? null : Date.valueOf(refund.expectedBy()),
+        refund.completedAt() == null ? null : Timestamp.from(refund.completedAt()),
         refund.id());
   }
 
@@ -127,7 +152,7 @@ public class JdbcRefundStore implements RefundStore {
             """
             SELECT COALESCE(SUM(amount_paise), 0)
             FROM refund
-            WHERE order_id = ? AND status IN ('INITIATED', 'PROCESSED')
+            WHERE order_id = ? AND status IN ('PENDING', 'INITIATED', 'PROCESSED')
             """,
             Long.class,
             orderId);

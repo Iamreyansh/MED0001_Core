@@ -1,0 +1,106 @@
+meta {
+  name: ratios
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/ratios?period=30D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("financeTakeRatePct", String(body.data.take_rate_pct));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("ratios envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("take_rate_pct");
+    expect(body.data).to.have.property("payout_ratio_pct");
+    expect(body.data).to.have.property("refund_rate_pct");
+    expect(body.data).to.have.property("cod_share_pct");
+    expect(body.data).to.have.property("weekly_gmv_trend");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/ratios — financial health ratios for period. EPIC-012/STORY-009.
+  Ratios are (amount / GMV) * 100 (story BR-006 minus-sign is a typo vs sample).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/ratios?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "30D",
+            "from": "2026-06-24",
+            "to": "2026-07-24",
+            "take_rate_pct": 8.0,
+            "payout_ratio_pct": 79.3,
+            "refund_rate_pct": 2.2,
+            "cod_share_pct": 38.5,
+            "gateway_fee_rate_pct": 1.48,
+            "net_revenue_margin_pct": 10.1,
+            "weekly_gmv_trend": "UP",
+            "weekly_gmv_change_pct": 4.7
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_PERIOD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/ratios?period=YEAR
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PERIOD",
+            "message": "period not in allowed enum"
+          }
+        }
+      '''
+    }
+  }
+}

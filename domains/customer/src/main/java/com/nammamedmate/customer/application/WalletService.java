@@ -68,6 +68,22 @@ public class WalletService {
     return toBalanceView(wallet);
   }
 
+  /** EPIC-012 story shape for {@code GET /customers/me/wallet/balance}. */
+  @Transactional(readOnly = true)
+  public Map<String, Object> getMyWalletBalance(MedmatePrincipal principal) {
+    UUID customerId = requireCustomerId(principal);
+    rateLimit("customer:wallet:balance:" + customerId, BALANCE_LIMIT, MINUTE);
+    return toStoryBalanceView(customerId, requireWallet(customerId));
+  }
+
+  @Transactional(readOnly = true)
+  public Map<String, Object> getBalanceForCustomer(UUID customerId) {
+    if (customerId == null || profiles.findById(customerId).isEmpty()) {
+      throw new AppException("CUSTOMER_NOT_FOUND", "Customer not found", 404);
+    }
+    return toStoryBalanceView(customerId, requireWallet(customerId));
+  }
+
   @Transactional(readOnly = true)
   public TxPage listMyTransactions(
       MedmatePrincipal principal,
@@ -105,6 +121,31 @@ public class WalletService {
     return new TxPage(items, PaginationMeta.of(pageReq.page(), pageReq.limit(), total));
   }
 
+  @Transactional(readOnly = true)
+  public TxPage listTransactionsForCustomer(
+      UUID customerId, Integer page, Integer limit, String type) {
+    if (customerId == null || profiles.findById(customerId).isEmpty()) {
+      throw new AppException("CUSTOMER_NOT_FOUND", "Customer not found", 404);
+    }
+    WalletRecord wallet = requireWallet(customerId);
+    PageRequest pageReq = PageRequest.normalize(page, limit, "created_at", "desc");
+    WalletTxType filter = WalletTxType.parseOptional(type);
+    List<Map<String, Object>> items =
+        wallets
+            .listTransactions(
+                wallet.id(),
+                filter,
+                pageReq.sort(),
+                pageReq.order(),
+                pageReq.limit(),
+                pageReq.offset())
+            .stream()
+            .map(WalletService::toTxView)
+            .toList();
+    long total = wallets.countTransactions(wallet.id(), filter);
+    return new TxPage(items, PaginationMeta.of(pageReq.page(), pageReq.limit(), total));
+  }
+
   @Transactional
   public Map<String, Object> adminCredit(
       MedmatePrincipal principal, UUID customerId, AdminCreditCommand cmd) {
@@ -121,13 +162,13 @@ public class WalletService {
     String idempotencyKey = requireIdempotencyKey(cmd.idempotencyKey());
     Optional<WalletTxRecord> replay = wallets.findByIdempotencyKey(idempotencyKey);
     if (replay.isPresent()) {
-      return toCreditView(customerId, replay.get());
+      return toCreditView(customerId, replay.get(), true);
     }
 
     long amountPaise = parsePositiveAmountPaise(cmd.amount());
     if (amountPaise > maxCreditPaise) {
       throw new AppException(
-          "EXCEEDS_CREDIT_LIMIT", "Amount exceeds max_wallet_credit_per_transaction", 422);
+          "ADMIN_CREDIT_EXCEEDS_LIMIT", "Amount exceeds max_wallet_credit_per_transaction", 422);
     }
     WalletCreditReason reason = WalletCreditReason.require(cmd.reason());
     String note = requireNote(cmd.note());
@@ -140,7 +181,7 @@ public class WalletService {
     // Re-check under wallet lock (same-wallet serialization); cross-wallet races hit unique index.
     Optional<WalletTxRecord> lockedReplay = wallets.findByIdempotencyKey(idempotencyKey);
     if (lockedReplay.isPresent()) {
-      return toCreditView(customerId, lockedReplay.get());
+      return toCreditView(customerId, lockedReplay.get(), true);
     }
 
     long newBalance = locked.balancePaise() + amountPaise;
@@ -168,7 +209,7 @@ public class WalletService {
     } catch (DuplicateKeyException ex) {
       return wallets
           .findByIdempotencyKey(idempotencyKey)
-          .map(tx -> toCreditView(customerId, tx))
+          .map(tx -> toCreditView(customerId, tx, true))
           .orElseThrow(() -> ex);
     }
 
@@ -185,12 +226,12 @@ public class WalletService {
     wallets.updateWallet(updated, locked.version());
     wallets.syncCustomerBalancePaise(customerId, newBalance);
 
-    return toCreditView(customerId, credit);
+    return toCreditView(customerId, credit, false);
   }
 
   /**
-   * System credit (referral rewards, etc.). Idempotent via idempotencyKey. Not exposed on admin
-   * credit API — reason may be {@link WalletCreditReason#REFERRAL}.
+   * System credit (referral rewards, refunds, etc.). Idempotent via idempotencyKey. Not exposed on
+   * admin credit API — reason may be {@link WalletCreditReason#REFERRAL}.
    */
   @Transactional
   public Map<String, Object> systemCredit(
@@ -199,20 +240,38 @@ public class WalletService {
       String description,
       String referenceId,
       String idempotencyKey) {
+    return systemCredit(
+        customerId,
+        amountPaise,
+        description,
+        referenceId,
+        idempotencyKey,
+        WalletCreditReason.REFERRAL.name());
+  }
+
+  @Transactional
+  public Map<String, Object> systemCredit(
+      UUID customerId,
+      long amountPaise,
+      String description,
+      String referenceId,
+      String idempotencyKey,
+      String reason) {
     if (customerId == null) {
       throw new AppException("VALIDATION_ERROR", "customer_id is required", 400);
     }
     if (amountPaise <= 0) {
-      throw new AppException("VALIDATION_ERROR", "amount must be positive", 400);
+      throw new AppException("INVALID_AMOUNT", "amount must be positive", 422);
     }
     if (amountPaise > maxCreditPaise) {
       throw new AppException(
-          "EXCEEDS_CREDIT_LIMIT", "Amount exceeds max_wallet_credit_per_transaction", 422);
+          "ADMIN_CREDIT_EXCEEDS_LIMIT", "Amount exceeds max_wallet_credit_per_transaction", 422);
     }
+    WalletCreditReason creditReason = WalletCreditReason.requireSystem(reason);
     String key = requireIdempotencyKey(idempotencyKey);
     Optional<WalletTxRecord> replay = wallets.findByIdempotencyKey(key);
     if (replay.isPresent()) {
-      return toCreditView(customerId, replay.get());
+      return toCreditView(customerId, replay.get(), true);
     }
     if (profiles.findById(customerId).isEmpty()) {
       throw new AppException("CUSTOMER_NOT_FOUND", "Customer not found", 404);
@@ -224,7 +283,7 @@ public class WalletService {
 
     Optional<WalletTxRecord> lockedReplay = wallets.findByIdempotencyKey(key);
     if (lockedReplay.isPresent()) {
-      return toCreditView(customerId, lockedReplay.get());
+      return toCreditView(customerId, lockedReplay.get(), true);
     }
 
     long newBalance = locked.balancePaise() + amountPaise;
@@ -243,7 +302,7 @@ public class WalletService {
             WalletTxType.CREDIT,
             amountPaise,
             newBalance,
-            WalletCreditReason.REFERRAL.name(),
+            creditReason.name(),
             desc,
             ref,
             key,
@@ -256,7 +315,7 @@ public class WalletService {
     } catch (DuplicateKeyException ex) {
       return wallets
           .findByIdempotencyKey(key)
-          .map(tx -> toCreditView(customerId, tx))
+          .map(tx -> toCreditView(customerId, tx, true))
           .orElseThrow(() -> ex);
     }
 
@@ -272,7 +331,7 @@ public class WalletService {
             now);
     wallets.updateWallet(updated, locked.version());
     wallets.syncCustomerBalancePaise(customerId, newBalance);
-    return toCreditView(customerId, credit);
+    return toCreditView(customerId, credit, false);
   }
 
   /**
@@ -342,6 +401,90 @@ public class WalletService {
     data.put("amount_debited", paiseToRupees(debitPaise));
     data.put("new_balance", paiseToRupees(newBalance));
     return data;
+  }
+
+  /**
+   * Strict checkout debit (EPIC-012): rejects when amount exceeds balance; idempotent per key.
+   * Unlike {@link #debitForOrder}, does not cap to available balance.
+   */
+  @Transactional
+  public Map<String, Object> debitStrict(
+      UUID customerId, UUID orderId, long amountPaise, String idempotencyKey, String description) {
+    if (customerId == null) {
+      throw new AppException("CUSTOMER_NOT_FOUND", "Customer not found", 404);
+    }
+    if (amountPaise <= 0) {
+      throw new AppException("INVALID_AMOUNT", "amount must be > 0", 422);
+    }
+    String key = requireIdempotencyKey(idempotencyKey);
+    Optional<WalletTxRecord> replay = wallets.findByIdempotencyKey(key);
+    if (replay.isPresent()) {
+      return toDebitView(customerId, replay.get(), key, true);
+    }
+    if (profiles.findById(customerId).isEmpty()) {
+      throw new AppException("CUSTOMER_NOT_FOUND", "Customer not found", 404);
+    }
+
+    Instant now = clock.instant();
+    WalletRecord locked =
+        wallets.lockByCustomerId(customerId).orElseGet(() -> createWallet(customerId, now));
+
+    Optional<WalletTxRecord> lockedReplay = wallets.findByIdempotencyKey(key);
+    if (lockedReplay.isPresent()) {
+      return toDebitView(customerId, lockedReplay.get(), key, true);
+    }
+
+    if (amountPaise > locked.balancePaise()) {
+      throw new AppException("INSUFFICIENT_BALANCE", "Wallet balance insufficient for debit", 422);
+    }
+
+    consumeCreditsFifo(locked.id(), amountPaise);
+
+    long balanceBefore = locked.balancePaise();
+    long newBalance = balanceBefore - amountPaise;
+    UUID txId = Ids.newId();
+    WalletRecord updated =
+        new WalletRecord(
+            locked.id(),
+            locked.customerId(),
+            newBalance,
+            locked.lifetimeCreditedPaise(),
+            locked.lifetimeDebitedPaise() + amountPaise,
+            locked.version() + 1,
+            locked.createdAt(),
+            now);
+    wallets.updateWallet(updated, locked.version());
+    wallets.syncCustomerBalancePaise(customerId, newBalance);
+
+    String desc =
+        description == null || description.isBlank()
+            ? "Auto-applied at checkout"
+            : truncate(description, 500);
+    WalletTxRecord debit =
+        new WalletTxRecord(
+            txId,
+            locked.id(),
+            WalletTxType.DEBIT,
+            amountPaise,
+            newBalance,
+            "ORDER_PAYMENT",
+            desc,
+            orderId == null ? null : orderId.toString(),
+            key,
+            null,
+            null,
+            null,
+            now);
+    try {
+      wallets.insertTransaction(debit);
+    } catch (DuplicateKeyException ex) {
+      return wallets
+          .findByIdempotencyKey(key)
+          .map(tx -> toDebitView(customerId, tx, key, true))
+          .orElseThrow(() -> ex);
+    }
+
+    return toDebitView(customerId, debit, key, false);
   }
 
   /** Nightly job: mark expired open credits and decrement wallet balance. */
@@ -474,36 +617,82 @@ public class WalletService {
     Map<String, Object> expiringSoon = new LinkedHashMap<>();
     expiringSoon.put("amount", paiseToRupees(expiringAmount));
     expiringSoon.put("expires_before", expiresBefore);
+    expiringSoon.put("expires_within_days", EXPIRING_SOON_DAYS);
     data.put("expiring_soon", expiringSoon);
     data.put("currency", "INR");
     return data;
   }
 
+  private Map<String, Object> toStoryBalanceView(UUID customerId, WalletRecord wallet) {
+    Instant soon = clock.instant().plus(EXPIRING_SOON_DAYS, ChronoUnit.DAYS);
+    long expiringAmount = wallets.sumRemainingExpiringBefore(wallet.id(), soon);
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("customer_id", customerId);
+    data.put("balance", paiseToRupees(wallet.balancePaise()));
+    Map<String, Object> expiringSoon = new LinkedHashMap<>();
+    expiringSoon.put("amount", paiseToRupees(expiringAmount));
+    expiringSoon.put("expires_within_days", EXPIRING_SOON_DAYS);
+    data.put("expiring_soon", expiringSoon);
+    return data;
+  }
+
   private static Map<String, Object> toTxView(WalletTxRecord tx) {
+    long balanceBefore = balanceBeforePaise(tx);
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("id", tx.id());
+    data.put("transaction_id", tx.id());
     data.put("type", tx.type().name());
     data.put("amount", paiseToRupees(tx.amountPaise()));
+    data.put("balance_before", paiseToRupees(balanceBefore));
     data.put("balance_after", paiseToRupees(tx.balanceAfterPaise()));
     data.put("reason", tx.reason());
     data.put("description", tx.description());
+    data.put("note", tx.description());
     data.put("reference_id", tx.referenceId());
     data.put("expires_at", tx.expiresAt());
     data.put("created_at", tx.createdAt());
     return data;
   }
 
-  private static Map<String, Object> toCreditView(UUID customerId, WalletTxRecord tx) {
+  private static Map<String, Object> toCreditView(
+      UUID customerId, WalletTxRecord tx, boolean alreadyProcessed) {
+    long balanceBefore = tx.balanceAfterPaise() - tx.amountPaise();
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("transaction_id", tx.id());
     data.put("customer_id", customerId);
     data.put("amount_credited", paiseToRupees(tx.amountPaise()));
+    data.put("amount", paiseToRupees(tx.amountPaise()));
+    data.put("balance_before", paiseToRupees(balanceBefore));
     data.put("new_balance", paiseToRupees(tx.balanceAfterPaise()));
     data.put("reason", tx.reason());
+    data.put("note", tx.description());
+    data.put("reference_id", tx.referenceId());
     data.put("expires_at", tx.expiresAt());
     data.put("credited_by", tx.creditedBy());
     data.put("created_at", tx.createdAt());
+    data.put("already_processed", alreadyProcessed);
     return data;
+  }
+
+  private static Map<String, Object> toDebitView(
+      UUID customerId, WalletTxRecord tx, String idempotencyKey, boolean alreadyProcessed) {
+    long balanceBefore = tx.balanceAfterPaise() + tx.amountPaise();
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("transaction_id", tx.id());
+    data.put("customer_id", customerId);
+    data.put("deducted_amount", paiseToRupees(tx.amountPaise()));
+    data.put("balance_before", paiseToRupees(balanceBefore));
+    data.put("remaining_balance", paiseToRupees(tx.balanceAfterPaise()));
+    data.put("idempotency_key", idempotencyKey);
+    data.put("already_processed", alreadyProcessed);
+    return data;
+  }
+
+  private static long balanceBeforePaise(WalletTxRecord tx) {
+    return switch (tx.type()) {
+      case CREDIT -> tx.balanceAfterPaise() - tx.amountPaise();
+      case DEBIT, EXPIRED -> tx.balanceAfterPaise() + tx.amountPaise();
+    };
   }
 
   private WalletRecord requireWallet(UUID customerId) {

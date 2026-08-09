@@ -58,6 +58,13 @@ public class SettlementGenerationService {
       long gmvPaise = orderMetrics.gmvForPeriodPaise(pharmacyId, periodStart, periodEnd);
       long annualGmvYtd = orderMetrics.annualGmvYtdPaise(pharmacyId);
       var amounts = SettlementCalculator.compute(gmvPaise, pharmacy.commissionPct(), annualGmvYtd);
+      long carryPaise = settlements.sumUnconsumedCarryForwardPaise(pharmacyId);
+      long netPaid = amounts.netPaidPaise() + carryPaise;
+
+      // Skip zero-GMV pharmacies with nothing carried forward (STORY-003 notes).
+      if (gmvPaise == 0L && carryPaise == 0L) {
+        continue;
+      }
 
       settlements.insert(
           new SettlementRow(
@@ -70,7 +77,7 @@ public class SettlementGenerationService {
               amounts.commissionEarnedPaise(),
               amounts.tcsRatePct(),
               amounts.tcsDeductedPaise(),
-              amounts.netPaidPaise(),
+              netPaid,
               "PENDING_RELEASE",
               null,
               null,
@@ -82,6 +89,9 @@ public class SettlementGenerationService {
               null,
               now,
               now));
+      if (carryPaise > 0) {
+        settlements.markCarryForwardConsumed(pharmacyId, now);
+      }
       created++;
     }
     return created;

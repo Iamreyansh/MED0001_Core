@@ -1,0 +1,97 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/settlements?status=PENDING&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.settlements && body.data.settlements[0]) {
+    bru.setEnvVar("financeSettlementId", body.data.settlements[0].settlement_id);
+    bru.setEnvVar("financeSettlementPharmacyId", body.data.settlements[0].pharmacy_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("settlements list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.kpi_chips).to.have.property("payout_due_total");
+    expect(body.data.settlements).to.be.an("array");
+    expect(body.data.totals).to.have.property("total_net_payable");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/settlements — KPI chips + filterable settlement list (EPIC-012/STORY-003).
+  Storage status PENDING_RELEASE is normalised to PENDING in responses.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/settlements?status=PENDING&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpi_chips": {
+              "gmv_today": 185000.00,
+              "commission_today": 14800.00,
+              "payout_due_total": 420500.00,
+              "payout_released_today": 95000.00
+            },
+            "settlements": [
+              {
+                "settlement_id": "a0000001-0000-4000-8000-0000000000s1",
+                "pharmacy_id": "a0000001-0000-4000-8000-0000000000p1",
+                "pharmacy_name": "Apollo Pharmacy, Koramangala",
+                "cycle_from": "2026-07-14",
+                "cycle_to": "2026-07-20",
+                "gmv": 52000.00,
+                "commission_pct": 8.0,
+                "commission_earned": 4160.00,
+                "tcs_deducted": 520.00,
+                "net_payable": 47320.00,
+                "status": "PENDING",
+                "released_at": null
+              }
+            ],
+            "totals": {
+              "total_gmv": 420000.00,
+              "total_commission": 33600.00,
+              "total_tcs": 4200.00,
+              "total_net_payable": 382200.00
+            }
+          },
+          "meta": { "page": 1, "limit": 20, "total": 24 }
+        }
+      '''
+    }
+  }
+}

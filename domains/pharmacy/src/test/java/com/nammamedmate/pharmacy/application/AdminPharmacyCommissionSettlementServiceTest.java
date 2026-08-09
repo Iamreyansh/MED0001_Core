@@ -740,10 +740,79 @@ class AdminPharmacyCommissionSettlementServiceTest {
   }
 
   @Test
+  void settlementGeneration_carryOnlyWhenZeroGmv() {
+    orderMetrics.gmvForPeriod = 0L;
+    settlements.byId.put(
+        Ids.newId(),
+        new SettlementRow(
+            Ids.newId(),
+            PID,
+            LocalDate.parse("2026-07-07"),
+            LocalDate.parse("2026-07-13"),
+            0L,
+            new BigDecimal("8.00"),
+            0L,
+            new BigDecimal("0.00"),
+            0L,
+            8_000L,
+            "BELOW_THRESHOLD_CARRIED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            NOW,
+            NOW));
+    assertThat(generationService.generateWeeklySettlements()).isEqualTo(1);
+    assertThat(settlements.inserted.getFirst().netPaidPaise()).isEqualTo(8_000L);
+  }
+
+  @Test
+  void settlementGeneration_skipsZeroGmvWithoutCarry() {
+    orderMetrics.gmvForPeriod = 0L;
+    assertThat(generationService.generateWeeklySettlements()).isZero();
+  }
+
+  @Test
+  void settlementGeneration_appliesCarryForward() {
+    orderMetrics.gmvForPeriod = 1_000_000L;
+    settlements.byId.put(
+        Ids.newId(),
+        new SettlementRow(
+            Ids.newId(),
+            PID,
+            LocalDate.parse("2026-07-07"),
+            LocalDate.parse("2026-07-13"),
+            5_000L,
+            new BigDecimal("8.00"),
+            400L,
+            new BigDecimal("0.00"),
+            0L,
+            5_000L,
+            "BELOW_THRESHOLD_CARRIED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            NOW,
+            NOW));
+    assertThat(generationService.generateWeeklySettlements()).isEqualTo(1);
+    assertThat(settlements.inserted.getFirst().netPaidPaise()).isGreaterThan(1_000_000L - 80_000L);
+  }
+
+  @Test
   void settlementGeneration_skipsMissingPharmacyDetail() {
     UUID ghost = Ids.newId();
     pharmacies.listActiveIdsOverride = List.of(PID, ghost);
     pharmacies.missingDetailId = ghost;
+    orderMetrics.gmvForPeriod = 5_000_000L;
     assertThat(generationService.generateWeeklySettlements()).isEqualTo(1);
   }
 
@@ -2041,6 +2110,26 @@ class AdminPharmacyCommissionSettlementServiceTest {
                       && r.periodStart().equals(periodStart)
                       && r.periodEnd().equals(periodEnd));
     }
+
+    @Override
+    public long sumUnconsumedCarryForwardPaise(UUID pharmacyId) {
+      return byId.values().stream()
+          .filter(
+              r ->
+                  r.pharmacyId().equals(pharmacyId) && "BELOW_THRESHOLD_CARRIED".equals(r.status()))
+          .mapToLong(SettlementRow::netPaidPaise)
+          .sum();
+    }
+
+    @Override
+    public void markCarryForwardConsumed(UUID pharmacyId, Instant consumedAt) {
+      // ponytail: fake store drops carried rows so sum becomes 0
+      byId.entrySet()
+          .removeIf(
+              e ->
+                  e.getValue().pharmacyId().equals(pharmacyId)
+                      && "BELOW_THRESHOLD_CARRIED".equals(e.getValue().status()));
+    }
   }
 
   static final class SeedableOrderMetrics implements PharmacyOrderMetricsPort {
@@ -2353,6 +2442,16 @@ class AdminPharmacyCommissionSettlementServiceTest {
     public boolean existsForPeriod(UUID pharmacyId, LocalDate periodStart, LocalDate periodEnd) {
       return delegate.existsForPeriod(pharmacyId, periodStart, periodEnd);
     }
+
+    @Override
+    public long sumUnconsumedCarryForwardPaise(UUID pharmacyId) {
+      return delegate.sumUnconsumedCarryForwardPaise(pharmacyId);
+    }
+
+    @Override
+    public void markCarryForwardConsumed(UUID pharmacyId, Instant consumedAt) {
+      delegate.markCarryForwardConsumed(pharmacyId, consumedAt);
+    }
   }
 
   static final class ReplayAfterClaimStore implements SettlementStore {
@@ -2464,6 +2563,16 @@ class AdminPharmacyCommissionSettlementServiceTest {
     public boolean existsForPeriod(UUID pharmacyId, LocalDate periodStart, LocalDate periodEnd) {
       return delegate.existsForPeriod(pharmacyId, periodStart, periodEnd);
     }
+
+    @Override
+    public long sumUnconsumedCarryForwardPaise(UUID pharmacyId) {
+      return delegate.sumUnconsumedCarryForwardPaise(pharmacyId);
+    }
+
+    @Override
+    public void markCarryForwardConsumed(UUID pharmacyId, Instant consumedAt) {
+      delegate.markCarryForwardConsumed(pharmacyId, consumedAt);
+    }
   }
 
   static final class ClaimFinalizeSettlementStore implements SettlementStore {
@@ -2569,6 +2678,16 @@ class AdminPharmacyCommissionSettlementServiceTest {
     @Override
     public boolean existsForPeriod(UUID pharmacyId, LocalDate periodStart, LocalDate periodEnd) {
       return delegate.existsForPeriod(pharmacyId, periodStart, periodEnd);
+    }
+
+    @Override
+    public long sumUnconsumedCarryForwardPaise(UUID pharmacyId) {
+      return delegate.sumUnconsumedCarryForwardPaise(pharmacyId);
+    }
+
+    @Override
+    public void markCarryForwardConsumed(UUID pharmacyId, Instant consumedAt) {
+      delegate.markCarryForwardConsumed(pharmacyId, consumedAt);
     }
   }
 

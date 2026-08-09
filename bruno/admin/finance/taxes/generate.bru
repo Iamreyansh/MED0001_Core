@@ -1,0 +1,125 @@
+meta {
+  name: generate
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/taxes/filings/{{taxFilingId}}/generate
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "format": "JSON"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("taxFilingId")) {
+    throw new Error("taxFilingId missing — run admin/finance/taxes/filings first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.download_url) {
+    bru.setEnvVar("taxFilingDownloadUrl", body.data.download_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("generate envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("download_url");
+    expect(body.data.format).to.equal("JSON");
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/taxes/filings/:filing_id/generate — GSTR-8/TDS export (JSON|CSV). Errors: FILING_NOT_FOUND, FILING_ALREADY_FILED, INVALID_FORMAT, DATA_NOT_AVAILABLE.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/taxes/filings/a0000001-0000-4000-8000-0000000000f1/generate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "format": "JSON"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "filing_id": "a0000001-0000-4000-8000-0000000000f1",
+            "filing_type": "GSTR-8",
+            "period": "2026-07",
+            "format": "JSON",
+            "download_url": "https://s3.amazonaws.com/medmate-filings/gstr8_2026_07.json",
+            "expires_at": "2026-07-25T01:30:00Z",
+            "record_count": 28,
+            "total_tcs_in_file": 28500.00,
+            "generated_at": "2026-07-24T16:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 FILING_ALREADY_FILED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/taxes/filings/a0000001-0000-4000-8000-0000000000f1/generate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "format": "JSON"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FILING_ALREADY_FILED",
+            "message": "Filing is in FILED state; re-generation blocked"
+          }
+        }
+      '''
+    }
+  }
+}

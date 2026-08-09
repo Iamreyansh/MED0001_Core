@@ -1,0 +1,65 @@
+meta {
+  name: hold
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/settlements/{{financeSettlementId}}/hold
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "Compliance investigation open on this pharmacy.",
+    "notes": "Case #COMP-20260724-001. Do not release until cleared."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeSettlementId")) {
+    throw new Error("financeSettlementId missing — run list first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("hold envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("HELD");
+    expect(body.data).to.have.property("reason");
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/settlements/:id/hold — place settlement on hold.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "settlement_id": "a0000001-0000-4000-8000-0000000000s1",
+            "status": "HELD",
+            "held_by": "admin-uuid",
+            "held_at": "2026-07-24T10:05:00Z",
+            "reason": "Compliance investigation open on this pharmacy."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

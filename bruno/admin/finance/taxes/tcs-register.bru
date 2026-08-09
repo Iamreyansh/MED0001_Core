@@ -1,0 +1,82 @@
+meta {
+  name: tcs-register
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/taxes/tcs-register?month=2026-07&page=1&limit=50
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.entries && body.data.entries[0]) {
+    bru.setEnvVar("taxPharmacyId", body.data.entries[0].pharmacy_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("tcs-register envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.entries).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/taxes/tcs-register — per-pharmacy TCS for GSTR-8 reconciliation (EPIC-012/STORY-007).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/taxes/tcs-register?month=2026-07&page=1&limit=50
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "month": "2026-07",
+            "total_tcs": 28500.00,
+            "total_gmv": 2850000.00,
+            "entries": [
+              {
+                "pharmacy_id": "a0000001-0000-4000-8000-0000000000p1",
+                "pharmacy_name": "Apollo Pharmacy, Koramangala",
+                "gstin": "29AAAAA0000A1Z5",
+                "pan": "AAAAA0000A",
+                "gmv": 52000.00,
+                "tcs_collected": 520.00,
+                "cgst_tcs": 260.00,
+                "sgst_tcs": 260.00,
+                "settlement_ids": ["a0000001-0000-4000-8000-0000000000s1"],
+                "month": "2026-07"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 50, "total": 28 }
+        }
+      '''
+    }
+  }
+}

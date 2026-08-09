@@ -1,0 +1,117 @@
+meta {
+  name: detail
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/refunds/{{financeRefundId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeRefundId")) {
+    throw new Error("financeRefundId missing — run admin/finance/refunds/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.refund_id) {
+    bru.setEnvVar("financeRefundId", body.data.refund_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("refund detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("refund_id");
+    expect(body.data).to.have.property("is_partial");
+    expect(body.data).to.have.property("customer");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/refunds/:refund_id — refund detail with order/payment context.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/refunds/a0000001-0000-4000-8000-0000000000r1
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "refund_id": "a0000001-0000-4000-8000-0000000000r1",
+            "order_id": "a0000001-0000-4000-8000-0000000000o1",
+            "order_number": "MED-20260724-018",
+            "order_total": 495.00,
+            "refund_amount": 450.00,
+            "is_partial": true,
+            "payment_method": "UPI",
+            "wallet_portion_original": 50.00,
+            "gateway_portion_original": 445.00,
+            "wallet_refund_amount": 0.00,
+            "gateway_refund_amount": 450.00,
+            "refund_to": "SOURCE_ACCOUNT",
+            "status": "PROCESSING",
+            "cancellation_reason": "PHARMACY_CANCELLED",
+            "razorpay_refund_id": "rfnd_XXXXXXXXXXXX",
+            "razorpay_payment_id": "pay_XXXXXXXXXXXX",
+            "expected_by": "2026-07-29",
+            "customer": {
+              "name": "Priya S",
+              "phone": "9876543210",
+              "email": "priya.s@example.com"
+            },
+            "notes": "Approved",
+            "created_at": "2026-07-24T10:00:00Z",
+            "processed_at": "2026-07-24T10:30:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 REFUND_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/refunds/00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "REFUND_NOT_FOUND", "message": "refund_id does not exist" }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,78 @@
+meta {
+  name: release-all
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/rider-payouts/release-all
+  auth: inherit
+}
+
+headers {
+  Idempotency-Key: {{financeRiderPayoutBulkKey}}
+}
+
+body:json {
+  {
+    "threshold": 10000.00,
+    "cycle_from": "2026-07-14",
+    "notes": "Routine Monday bulk rider payout."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeRiderPayoutBulkKey")) {
+    bru.setEnvVar("financeRiderPayoutBulkKey", "finance-rider-payout-bulk-" + Date.now());
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("bulk release envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("attempted");
+    expect(body.data).to.have.property("released");
+    expect(body.data).to.have.property("failures");
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/rider-payouts/release-all — bulk release PENDING with Rs 100 ≤ net ≤ threshold (default Rs 10,000).
+  Skips HELD / over-threshold / below-threshold (not in candidate query). Requires Idempotency-Key.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "attempted": 48,
+            "released": 44,
+            "failed": 4,
+            "total_amount_released": 62400.00,
+            "failures": [
+              {
+                "payout_id": "uuid",
+                "rider_name": "Suresh M",
+                "reason": "COD_UNRESOLVED"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

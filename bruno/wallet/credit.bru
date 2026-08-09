@@ -1,0 +1,134 @@
+meta {
+  name: credit
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/wallet/credit
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "customer_id": "{{customerId}}",
+    "amount": 100.00,
+    "reason": "REFUND",
+    "reference_id": "{{orderId}}",
+    "note": "Refund for cancelled order"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("customerId")) {
+    throw new Error("customerId missing — run customers/me/get first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    bru.setEnvVar("orderId", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.transaction_id) {
+    bru.setEnvVar("walletCreditTransactionId", body.data.transaction_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("credit envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.reason).to.equal("REFUND");
+    expect(body.data).to.have.property("new_balance");
+    expect(body.data).to.have.property("transaction_id");
+  });
+}
+
+docs {
+  POST /api/v1/wallet/credit — internal (or admin JWT) wallet credit. Errors: CUSTOMER_NOT_FOUND, INVALID_REASON, ADMIN_CREDIT_EXCEEDS_LIMIT.
+}
+
+example {
+  name: 200 OK
+  description: COD refund credit with reason REFUND
+  request: {
+    url: {{baseUrl}}/api/v1/wallet/credit
+    method: post
+    mode: json
+    body:json: {
+      {
+        "customer_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "amount": 100.00,
+        "reason": "REFUND",
+        "reference_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "note": "Refund for cancelled order MED-20260724-015."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "transaction_id": "txnxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx",
+            "customer_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "amount": 100.00,
+            "reason": "REFUND",
+            "balance_before": 100.00,
+            "new_balance": 200.00,
+            "expires_at": "2027-07-24T00:00:00Z",
+            "created_at": "2026-07-24T14:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_REASON
+  description: Unknown credit reason
+  request: {
+    url: {{baseUrl}}/api/v1/wallet/credit
+    method: post
+    mode: json
+    body:json: {
+      {
+        "customer_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "amount": 10.00,
+        "reason": "WITHDRAW",
+        "reference_id": null,
+        "note": "not allowed"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_REASON",
+            "message": "reason not in allowed enum"
+          }
+        }
+      '''
+    }
+  }
+}

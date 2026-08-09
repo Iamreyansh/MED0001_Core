@@ -146,9 +146,9 @@ public final class AdminRoleDefinitions {
           "admin_finance",
           List.of("finance:update", "finance:*", "pharmacies:read"),
           "admin_support",
-          List.of("pharmacies:read"),
+          List.of("pharmacies:read", "finance:read"),
           "admin_compliance",
-          List.of("pharmacies:update", "customers:read"));
+          List.of("pharmacies:update", "customers:read", "taxes:read", "taxes:export"));
 
   private static final Map<String, String> DESCRIPTIONS = buildDescriptions();
 

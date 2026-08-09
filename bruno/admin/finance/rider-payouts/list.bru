@@ -1,0 +1,94 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/rider-payouts?status=PENDING&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.payouts && body.data.payouts[0]) {
+    bru.setEnvVar("financeRiderPayoutId", body.data.payouts[0].payout_id);
+    bru.setEnvVar("financeRiderPayoutRiderId", body.data.payouts[0].rider_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("rider payouts list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.summary).to.have.property("total_pending");
+    expect(body.data.payouts).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/rider-payouts — cycle summary + filterable payout table (EPIC-012/STORY-004).
+  Storage BELOW_THRESHOLD_CARRIED_FORWARD normalised to BELOW_THRESHOLD_CARRIED in responses.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/rider-payouts?status=PENDING&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "summary": {
+              "total_pending": 48,
+              "total_pending_amount": 72400.00,
+              "total_held": 3,
+              "total_held_amount": 4800.00,
+              "total_released_this_cycle": 12,
+              "total_released_amount": 18200.00
+            },
+            "payouts": [
+              {
+                "payout_id": "a0000001-0000-4000-8000-0000000000p1",
+                "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+                "rider_name": "Ravi Kumar",
+                "zone_name": "Koramangala",
+                "cycle_from": "2026-07-14",
+                "cycle_to": "2026-07-20",
+                "base_earnings": 1680.00,
+                "incentives": 150.00,
+                "tips": 70.00,
+                "streak_bonus": 100.00,
+                "cod_deducted": 0.00,
+                "net_payout": 2000.00,
+                "status": "PENDING",
+                "payout_cycle": "2026-W29"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 63 }
+        }
+      '''
+    }
+  }
+}

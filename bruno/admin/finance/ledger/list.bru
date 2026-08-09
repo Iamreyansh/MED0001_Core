@@ -1,0 +1,121 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/ledger?type=PAYOUT_PHARMACY&from=2026-07-01&to=2026-07-24&page=1&limit=50&sort=created_at&order=desc
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.entries) && body.data.entries.length) {
+    bru.setEnvVar("ledgerId", body.data.entries[0].ledger_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("ledger browse envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpi_chips");
+    expect(body.data.kpi_chips).to.have.property("gmv_today");
+    expect(body.data.kpi_chips).to.have.property("commission_today");
+    expect(body.data.kpi_chips).to.have.property("net_revenue_today");
+    expect(body.data).to.have.property("entries");
+    expect(body.meta).to.have.property("page");
+    expect(body.meta).to.have.property("limit");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/ledger — browse append-only financial ledger (EPIC-012/STORY-008).
+  Auth: admin_finance|admin_super. Filter by type/from/to. running_balance is window-sum at query time.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/ledger?type=PAYOUT_PHARMACY&from=2026-07-01&to=2026-07-24&page=1&limit=50&sort=created_at&order=desc
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpi_chips": {
+              "gmv_today": 185000.00,
+              "commission_today": 14800.00,
+              "net_revenue_today": 12064.00
+            },
+            "entries": [
+              {
+                "ledger_id": "11111111-1111-4111-8111-111111111111",
+                "type": "PAYOUT_PHARMACY",
+                "reference_id": "22222222-2222-4222-8222-222222222222",
+                "reference_type": "SETTLEMENT",
+                "credit": 0.00,
+                "debit": 47320.00,
+                "running_balance": 201460.69,
+                "description": "Pharmacy settlement payout",
+                "created_at": "2026-07-24T13:15:00Z"
+              }
+            ]
+          },
+          "meta": {
+            "page": 1,
+            "limit": 50,
+            "total": 1,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/ledger
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Finance access required"
+          }
+        }
+      '''
+    }
+  }
+}

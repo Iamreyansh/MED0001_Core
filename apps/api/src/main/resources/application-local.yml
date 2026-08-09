@@ -19,6 +19,8 @@ logging:
     root: INFO
 
 medmate:
+  internal:
+    service-token: local-internal-wallet-token
   inventory:
     growth-features-enabled: true
     jobs:

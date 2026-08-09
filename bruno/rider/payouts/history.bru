@@ -1,0 +1,73 @@
+meta {
+  name: history
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/rider/payouts/history?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.payouts && body.data.payouts[0]) {
+    bru.setEnvVar("riderPayoutId", body.data.payouts[0].payout_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("payout history envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.payouts).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/rider/payouts/history — authenticated rider's own payout records only (EPIC-012/STORY-004).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "payouts": [
+              {
+                "payout_id": "a0000001-0000-4000-8000-0000000000p1",
+                "cycle_from": "2026-07-14",
+                "cycle_to": "2026-07-20",
+                "base_earnings": 1680.00,
+                "incentives": 150.00,
+                "tips": 70.00,
+                "streak_bonus": 100.00,
+                "cod_deducted": 0.00,
+                "net_payout": 2000.00,
+                "status": "RELEASED",
+                "released_at": "2026-07-21T06:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 12 }
+        }
+      '''
+    }
+  }
+}

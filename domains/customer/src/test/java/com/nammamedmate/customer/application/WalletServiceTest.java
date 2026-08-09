@@ -100,7 +100,7 @@ class WalletServiceTest {
                     financeAdmin, customerId, credit(1500, "GOODWILL", "Too much", null)))
         .isInstanceOf(AppException.class)
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("EXCEEDS_CREDIT_LIMIT");
+        .isEqualTo("ADMIN_CREDIT_EXCEEDS_LIMIT");
   }
 
   @Test
@@ -130,7 +130,7 @@ class WalletServiceTest {
     assertThatThrownBy(
             () -> service.adminCredit(financeAdmin, customerId, credit(10, "NOPE", "n", null)))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("VALIDATION_ERROR");
+        .isEqualTo("INVALID_REASON");
     assertThatThrownBy(
             () -> service.adminCredit(financeAdmin, customerId, credit(10, "REFUND", "  ", null)))
         .extracting(ex -> ((AppException) ex).code())
@@ -920,7 +920,7 @@ class WalletServiceTest {
         .isEqualTo("VALIDATION_ERROR");
     assertThatThrownBy(() -> service.systemCredit(customerId, 0, "x", null, "k"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("VALIDATION_ERROR");
+        .isEqualTo("INVALID_AMOUNT");
     assertThatThrownBy(() -> service.systemCredit(Ids.newId(), 100, "x", null, "k2"))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("CUSTOMER_NOT_FOUND");
@@ -931,7 +931,7 @@ class WalletServiceTest {
     assertThatThrownBy(
             () -> service.systemCredit(customerId, 100_001L, "too big", null, "sys-over-cap"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("EXCEEDS_CREDIT_LIMIT");
+        .isEqualTo("ADMIN_CREDIT_EXCEEDS_LIMIT");
   }
 
   @Test
@@ -1035,5 +1035,333 @@ class WalletServiceTest {
     WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
     assertThatThrownBy(() -> racingService.systemCredit(customerId, 100L, "x", null, "sys-miss"))
         .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+  }
+
+  @Test
+  void debitStrict_ac001_idempotentReplay() {
+    service.adminCredit(financeAdmin, customerId, credit(150, "REFUND", "seed", null));
+    UUID orderId = Ids.newId();
+    Map<String, Object> first =
+        service.debitStrict(customerId, orderId, 5_000L, "checkout-1", "pay");
+    assertThat(first.get("already_processed")).isEqualTo(false);
+    assertThat(first.get("deducted_amount")).isEqualTo(new BigDecimal("50.00"));
+
+    Map<String, Object> replay =
+        service.debitStrict(customerId, orderId, 5_000L, "checkout-1", "pay");
+    assertThat(replay.get("already_processed")).isEqualTo(true);
+    assertThat(replay.get("transaction_id")).isEqualTo(first.get("transaction_id"));
+    assertThat(wallets.findByCustomerId(customerId).orElseThrow().balancePaise())
+        .isEqualTo(10_000L);
+  }
+
+  @Test
+  void debitStrict_ac002_overDebitRejected() {
+    service.adminCredit(financeAdmin, customerId, credit(150, "REFUND", "seed", null));
+    assertThatThrownBy(() -> service.debitStrict(customerId, Ids.newId(), 20_000L, "over", "pay"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("INSUFFICIENT_BALANCE");
+    assertThat(wallets.findByCustomerId(customerId).orElseThrow().balancePaise())
+        .isEqualTo(15_000L);
+  }
+
+  @Test
+  void debitStrict_ac005_fifoConsumesOldestFirst() {
+    UUID walletId = wallets.findByCustomerId(customerId).orElseThrow().id();
+    Instant soon = NOW.plus(10, ChronoUnit.DAYS);
+    Instant later = NOW.plus(300, ChronoUnit.DAYS);
+    wallets.updateWallet(
+        new WalletRecord(walletId, customerId, 15_000L, 15_000L, 0, 1, NOW, NOW), 0);
+    UUID oldCredit = Ids.newId();
+    UUID newCredit = Ids.newId();
+    wallets.insertTransaction(
+        new WalletTxRecord(
+            oldCredit,
+            walletId,
+            WalletTxType.CREDIT,
+            5_000L,
+            5_000L,
+            "REFUND",
+            "old",
+            null,
+            null,
+            null,
+            soon,
+            5_000L,
+            NOW));
+    wallets.insertTransaction(
+        new WalletTxRecord(
+            newCredit,
+            walletId,
+            WalletTxType.CREDIT,
+            10_000L,
+            15_000L,
+            "REFUND",
+            "new",
+            null,
+            null,
+            null,
+            later,
+            10_000L,
+            NOW));
+
+    service.debitStrict(customerId, Ids.newId(), 7_500L, "fifo-1", "pay");
+
+    assertThat(
+            wallets.allTransactions().stream()
+                .filter(t -> t.id().equals(oldCredit))
+                .findFirst()
+                .orElseThrow()
+                .remainingPaise())
+        .isZero();
+    assertThat(
+            wallets.allTransactions().stream()
+                .filter(t -> t.id().equals(newCredit))
+                .findFirst()
+                .orElseThrow()
+                .remainingPaise())
+        .isEqualTo(7_500L);
+  }
+
+  @Test
+  void getMyWalletBalance_ac004_expiringSoonWithin30Days() {
+    UUID walletId = wallets.findByCustomerId(customerId).orElseThrow().id();
+    wallets.updateWallet(new WalletRecord(walletId, customerId, 5_000L, 5_000L, 0, 1, NOW, NOW), 0);
+    wallets.insertTransaction(
+        new WalletTxRecord(
+            Ids.newId(),
+            walletId,
+            WalletTxType.CREDIT,
+            5_000L,
+            5_000L,
+            "REFUND",
+            "soon",
+            null,
+            null,
+            null,
+            NOW.plus(10, ChronoUnit.DAYS),
+            5_000L,
+            NOW));
+
+    Map<String, Object> view = service.getMyWalletBalance(customer);
+    assertThat(view.get("customer_id")).isEqualTo(customerId);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> soon = (Map<String, Object>) view.get("expiring_soon");
+    assertThat(soon.get("amount")).isEqualTo(new BigDecimal("50.00"));
+    assertThat(soon.get("expires_within_days")).isEqualTo(30);
+  }
+
+  @Test
+  void listMyTransactions_ac007_includesBalanceBeforeAfter() {
+    service.adminCredit(financeAdmin, customerId, credit(100, "REFUND", "r1", "ord-1"));
+    WalletService.TxPage page = service.listMyTransactions(customer, 1, 20, null, null, null);
+    assertThat(page.data().getFirst())
+        .containsEntry("balance_before", new BigDecimal("0.00"))
+        .containsEntry("balance_after", new BigDecimal("100.00"))
+        .containsKey("transaction_id")
+        .containsKey("note");
+  }
+
+  @Test
+  void systemCredit_ac008_refundReason() {
+    Map<String, Object> result =
+        service.systemCredit(customerId, 2_500L, "COD refund", "order-1", "refund-1", "REFUND");
+    assertThat(result.get("reason")).isEqualTo("REFUND");
+    assertThat(result.get("amount")).isEqualTo(new BigDecimal("25.00"));
+    assertThat(wallets.allTransactions().getFirst().reason()).isEqualTo("REFUND");
+  }
+
+  @Test
+  void getBalanceAndListTransactionsForCustomer_portPaths() {
+    service.adminCredit(financeAdmin, customerId, credit(40, "REFUND", "seed", null));
+    Map<String, Object> bal = service.getBalanceForCustomer(customerId);
+    assertThat(bal.get("customer_id")).isEqualTo(customerId);
+    assertThat(bal.get("balance")).isEqualTo(new BigDecimal("40.00"));
+
+    assertThatThrownBy(() -> service.getBalanceForCustomer(null))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("CUSTOMER_NOT_FOUND");
+    assertThatThrownBy(() -> service.getBalanceForCustomer(Ids.newId()))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("CUSTOMER_NOT_FOUND");
+
+    WalletService.TxPage page = service.listTransactionsForCustomer(customerId, 1, 10, "CREDIT");
+    assertThat(page.data()).hasSize(1);
+    assertThatThrownBy(() -> service.listTransactionsForCustomer(null, 1, 10, null))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("CUSTOMER_NOT_FOUND");
+    assertThatThrownBy(() -> service.listTransactionsForCustomer(Ids.newId(), 1, 10, null))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("CUSTOMER_NOT_FOUND");
+  }
+
+  @Test
+  void debitStrict_validationAndEdgeBranches() {
+    assertThatThrownBy(() -> service.debitStrict(null, Ids.newId(), 100, "k", "n"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("CUSTOMER_NOT_FOUND");
+    assertThatThrownBy(() -> service.debitStrict(customerId, Ids.newId(), 0, "k", "n"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("INVALID_AMOUNT");
+    assertThatThrownBy(() -> service.debitStrict(Ids.newId(), Ids.newId(), 100, "k", "n"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("CUSTOMER_NOT_FOUND");
+
+    service.adminCredit(financeAdmin, customerId, credit(50, "REFUND", "seed", null));
+    Map<String, Object> debited = service.debitStrict(customerId, null, 1_000L, "blank-desc", null);
+    assertThat(debited.get("already_processed")).isEqualTo(false);
+    assertThat(debited.get("deducted_amount")).isEqualTo(new BigDecimal("10.00"));
+
+    // create wallet via lock miss
+    UUID fresh = Ids.newId();
+    profiles.saveProfile(CustomerTestFixtures.customer(fresh));
+    FakeWalletStore emptyLock =
+        new FakeWalletStore() {
+          @Override
+          public Optional<WalletRecord> lockByCustomerId(UUID id) {
+            return Optional.empty();
+          }
+        };
+    WalletService createService =
+        new WalletService(emptyLock, profiles, rateLimiter, CLOCK, 100_000L);
+    assertThatThrownBy(() -> createService.debitStrict(fresh, Ids.newId(), 100, "cw", "n"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isIn("INSUFFICIENT_BALANCE", "INSUFFICIENT_WALLET_BALANCE");
+  }
+
+  @Test
+  void debitStrict_lockedReplayAndDuplicateKey() {
+    String idem = "debit-locked-replay";
+    WalletRecord wallet = wallets.findByCustomerId(customerId).orElseThrow();
+    WalletTxRecord existing =
+        new WalletTxRecord(
+            Ids.newId(),
+            wallet.id(),
+            WalletTxType.DEBIT,
+            100L,
+            0L,
+            "ORDER_PAYMENT",
+            "pre",
+            null,
+            idem,
+            null,
+            null,
+            null,
+            NOW);
+    FakeWalletStore racing =
+        new FakeWalletStore() {
+          private int finds;
+
+          @Override
+          public Optional<WalletTxRecord> findByIdempotencyKey(String key) {
+            finds++;
+            return finds == 1 ? Optional.empty() : Optional.of(existing);
+          }
+        };
+    racing.insertWallet(wallet);
+    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    Map<String, Object> replay =
+        racingService.debitStrict(customerId, Ids.newId(), 100L, idem, "x");
+    assertThat(replay.get("already_processed")).isEqualTo(true);
+
+    FakeWalletStore flaky =
+        new FakeWalletStore() {
+          @Override
+          public WalletTxRecord insertTransaction(WalletTxRecord tx) {
+            if (tx.type() == WalletTxType.DEBIT) {
+              super.insertTransaction(existing);
+              throw new org.springframework.dao.DuplicateKeyException("race");
+            }
+            return super.insertTransaction(tx);
+          }
+        };
+    flaky.insertWallet(wallet);
+    flaky.insertTransaction(
+        new WalletTxRecord(
+            Ids.newId(),
+            wallet.id(),
+            WalletTxType.CREDIT,
+            5_000L,
+            5_000L,
+            "REFUND",
+            "open",
+            null,
+            null,
+            null,
+            NOW.plus(10, ChronoUnit.DAYS),
+            5_000L,
+            NOW));
+    flaky.updateWallet(
+        new WalletRecord(wallet.id(), customerId, 5_000L, 5_000L, 0, 1, NOW, NOW), 0);
+    WalletService flakyService = new WalletService(flaky, profiles, rateLimiter, CLOCK, 100_000L);
+    Map<String, Object> dup = flakyService.debitStrict(customerId, Ids.newId(), 100L, idem, "  ");
+    assertThat(dup.get("already_processed")).isEqualTo(true);
+  }
+
+  @Test
+  void listTransactions_includesExpiredBalanceBefore() {
+    WalletRecord wallet = wallets.findByCustomerId(customerId).orElseThrow();
+    wallets.updateWallet(new WalletRecord(wallet.id(), customerId, 100L, 100L, 0, 1, NOW, NOW), 0);
+    wallets.insertTransaction(
+        new WalletTxRecord(
+            Ids.newId(),
+            wallet.id(),
+            WalletTxType.EXPIRED,
+            100L,
+            0L,
+            "EXPIRY",
+            "expired",
+            Ids.newId().toString(),
+            null,
+            null,
+            null,
+            null,
+            NOW));
+    WalletService.TxPage page = service.listMyTransactions(customer, 1, 50, null, null, null);
+    assertThat(page.data().getFirst())
+        .containsEntry("type", "EXPIRED")
+        .containsEntry("balance_before", new BigDecimal("1.00"));
+  }
+
+  @Test
+  void systemCredit_duplicateKeyRace_replays() {
+    String idem = "sys-dup";
+    WalletRecord wallet = wallets.findByCustomerId(customerId).orElseThrow();
+    WalletTxRecord existing =
+        new WalletTxRecord(
+            Ids.newId(),
+            wallet.id(),
+            WalletTxType.CREDIT,
+            200L,
+            200L,
+            "REFUND",
+            "raced",
+            null,
+            idem,
+            null,
+            NOW.plus(365, ChronoUnit.DAYS),
+            200L,
+            NOW);
+    FakeWalletStore racing =
+        new FakeWalletStore() {
+          @Override
+          public Optional<WalletTxRecord> findByIdempotencyKey(String key) {
+            if (allTransactions().isEmpty()) {
+              return Optional.empty();
+            }
+            return super.findByIdempotencyKey(key);
+          }
+
+          @Override
+          public WalletTxRecord insertTransaction(WalletTxRecord tx) {
+            super.insertTransaction(existing);
+            throw new org.springframework.dao.DuplicateKeyException("race");
+          }
+        };
+    racing.insertWallet(wallet);
+    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    Map<String, Object> result =
+        racingService.systemCredit(customerId, 200L, "n", null, idem, "REFUND");
+    assertThat(result.get("transaction_id")).isEqualTo(existing.id());
+    assertThat(result.get("already_processed")).isEqualTo(true);
   }
 }

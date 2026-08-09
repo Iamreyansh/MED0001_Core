@@ -1,0 +1,77 @@
+meta {
+  name: filings
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/taxes/filings?year=2026
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.filings && body.data.filings[0]) {
+    bru.setEnvVar("taxFilingId", body.data.filings[0].filing_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("filings envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.filings).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/taxes/filings — tax filings tracker with overdue overlay (EPIC-012/STORY-007).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/taxes/filings?year=2026&status=PENDING
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "filings": [
+              {
+                "filing_id": "a0000001-0000-4000-8000-0000000000f1",
+                "filing_type": "GSTR-8",
+                "period": "2026-07",
+                "due_date": "2026-08-10",
+                "status": "PENDING",
+                "description": "TCS collected from pharmacy settlements in JULY 2026",
+                "tcs_amount": 28500.00,
+                "filed_at": null,
+                "reference_number": null
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

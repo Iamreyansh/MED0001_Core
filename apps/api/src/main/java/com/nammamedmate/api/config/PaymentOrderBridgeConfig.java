@@ -1,0 +1,145 @@
+package com.nammamedmate.api.config;
+
+import com.nammamedmate.customer.application.WalletService;
+import com.nammamedmate.customer.application.WalletService.AdminCreditCommand;
+import com.nammamedmate.customer.application.WalletService.TxPage;
+import com.nammamedmate.kernel.api.PaginationMeta;
+import com.nammamedmate.order.application.OrderPlacementService;
+import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
+import com.nammamedmate.payment.application.port.out.OrderLookupPort;
+import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
+import com.nammamedmate.payment.application.port.out.WalletPort;
+import com.nammamedmate.security.AuthRole;
+import com.nammamedmate.security.MedmatePrincipal;
+import com.nammamedmate.security.TokenScope;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+/**
+ * Composition-root bridges for EPIC-012 payment domain: wallet, order lookup, order status advance.
+ */
+@Configuration
+public class PaymentOrderBridgeConfig {
+
+  @Bean
+  @Primary
+  WalletPort paymentWalletPort(WalletService walletService) {
+    return (customerId, orderId, amountPaise, description) -> {
+      Map<String, Object> result =
+          walletService.debitForOrder(customerId, orderId, amountPaise, description);
+      Object debited = result.get("amount_debited");
+      if (debited instanceof BigDecimal bd) {
+        return bd.movePointRight(2).longValueExact();
+      }
+      if (debited instanceof Number n) {
+        return BigDecimal.valueOf(n.doubleValue()).movePointRight(2).longValue();
+      }
+      return 0L;
+    };
+  }
+
+  @Bean
+  @Primary
+  CustomerWalletPort customerWalletPort(WalletService walletService) {
+    return new CustomerWalletPort() {
+      @Override
+      public Map<String, Object> debit(
+          UUID customerId, UUID orderId, long amountPaise, String idempotencyKey, String note) {
+        return walletService.debitStrict(customerId, orderId, amountPaise, idempotencyKey, note);
+      }
+
+      @Override
+      public Map<String, Object> systemCredit(
+          UUID customerId,
+          long amountPaise,
+          String reason,
+          String referenceId,
+          String note,
+          String idempotencyKey) {
+        return walletService.systemCredit(
+            customerId, amountPaise, note, referenceId, idempotencyKey, reason);
+      }
+
+      @Override
+      public Map<String, Object> adminCredit(
+          UUID adminId,
+          UUID customerId,
+          long amountPaise,
+          String reason,
+          String note,
+          String referenceId,
+          String idempotencyKey) {
+        MedmatePrincipal admin =
+            new MedmatePrincipal(adminId, AuthRole.ADMIN_FINANCE, null, TokenScope.FULL, "jti");
+        BigDecimal rupees =
+            BigDecimal.valueOf(amountPaise).movePointLeft(2).setScale(2, RoundingMode.HALF_UP);
+        return walletService.adminCredit(
+            admin,
+            customerId,
+            new AdminCreditCommand(rupees, reason, note, referenceId, idempotencyKey));
+      }
+
+      @Override
+      public Map<String, Object> balance(UUID customerId) {
+        return walletService.getBalanceForCustomer(customerId);
+      }
+
+      @Override
+      public TransactionsPage transactions(
+          UUID customerId, Integer page, Integer limit, String type) {
+        TxPage txPage = walletService.listTransactionsForCustomer(customerId, page, limit, type);
+        PaginationMeta meta = txPage.meta();
+        return new TransactionsPage(txPage.data(), meta.total(), meta.page(), meta.limit());
+      }
+    };
+  }
+
+  @Bean
+  @Primary
+  OrderLookupPort jdbcOrderLookupPort(JdbcTemplate jdbc) {
+    return orderId -> {
+      List<OrderLookupPort.OrderSnapshot> rows =
+          jdbc.query(
+              """
+              SELECT id, customer_id, payment_method, total_payable_paise, wallet_applied_paise,
+                     status
+              FROM orders
+              WHERE id = ? AND deleted_at IS NULL
+              LIMIT 1
+              """,
+              (rs, i) ->
+                  new OrderLookupPort.OrderSnapshot(
+                      (UUID) rs.getObject("id"),
+                      (UUID) rs.getObject("customer_id"),
+                      rs.getString("payment_method"),
+                      rs.getLong("total_payable_paise"),
+                      rs.getLong("wallet_applied_paise"),
+                      rs.getString("status")),
+              orderId);
+      return rows.stream().findFirst();
+    };
+  }
+
+  @Bean
+  @Primary
+  OrderPaymentStatusPort orderPaymentStatusPort(OrderPlacementService orderPlacement) {
+    return new OrderPaymentStatusPort() {
+      @Override
+      public void onCaptured(UUID orderId, String razorpayPaymentId) {
+        orderPlacement.applyExternalPaymentCapture(orderId, razorpayPaymentId);
+      }
+
+      @Override
+      public void onFailed(UUID orderId, String reason) {
+        orderPlacement.applyExternalPaymentFailure(orderId, reason);
+      }
+    };
+  }
+}

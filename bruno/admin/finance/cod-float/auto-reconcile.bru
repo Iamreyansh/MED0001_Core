@@ -1,0 +1,126 @@
+meta {
+  name: auto-reconcile
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/cod-float/auto-reconcile
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "date": "2026-07-24"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("codFloatJobId", body.data.job_id);
+    bru.setEnvVar("codFloatReportDate", body.data.date);
+  }
+}
+
+tests {
+  test("HTTP 200/409/422", function () {
+    expect([200, 409, 422]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("job_id");
+      expect(body.data.status).to.equal("RUNNING");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(["JOB_ALREADY_RUNNING", "INVALID_DATE"]).to.include(body.error.code);
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/cod-float/auto-reconcile — manual trigger (finance only). Cron: 23:00 IST.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/cod-float/auto-reconcile
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "date": "2026-07-24"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "a0000001-0000-4000-8000-0000000000j1",
+            "date": "2026-07-24",
+            "status": "RUNNING",
+            "triggered_by": "a0000001-0000-4000-8000-0000000000a1",
+            "triggered_at": "2026-07-24T15:00:00Z",
+            "estimated_completion_seconds": 30,
+            "result_url": "/api/v1/admin/finance/cod-float/reconciliation-report?date=2026-07-24"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_DATE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/cod-float/auto-reconcile
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "date": "2099-01-01"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_DATE",
+            "message": "date is in the future"
+          }
+        }
+      '''
+    }
+  }
+}

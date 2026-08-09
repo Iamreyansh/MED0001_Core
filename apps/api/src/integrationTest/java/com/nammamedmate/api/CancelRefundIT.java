@@ -167,7 +167,7 @@ class CancelRefundIT extends AbstractApiIT {
     assertThat(cannotCancel.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     assertThat(errorCode(cannotCancel)).isEqualTo("ORDER_CANNOT_CANCEL");
 
-    // AC2: customer cancel UPI → SOURCE refund + razorpay call
+    // AC2: customer cancel UPI → PENDING SOURCE refund (admin process required; STORY-005 BR-002)
     String upiOrderId = placeAndConfirmUpi(customerToken, med);
     ResponseEntity<Map> custCancel =
         rest.exchange(
@@ -186,12 +186,16 @@ class CancelRefundIT extends AbstractApiIT {
             Integer.class,
             upiOrderId);
     assertThat(refundCount).isEqualTo(1);
-    String rzRefundId =
+    String custRefundStatus =
         jdbc.queryForObject(
-            "SELECT razorpay_refund_id FROM refund WHERE order_id = ?::uuid LIMIT 1",
-            String.class,
-            upiOrderId);
-    assertThat(rzRefundId).startsWith("rfnd_stub_");
+            "SELECT status FROM refund WHERE order_id = ?::uuid LIMIT 1", String.class, upiOrderId);
+    assertThat(custRefundStatus).isEqualTo("PENDING");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT razorpay_refund_id FROM refund WHERE order_id = ?::uuid LIMIT 1",
+                String.class,
+                upiOrderId))
+        .isNull();
 
     // AC8: cancel notifications
     Integer notifyCount =
@@ -318,6 +322,29 @@ class CancelRefundIT extends AbstractApiIT {
         jdbc.queryForObject(
             "SELECT COUNT(*) FROM refund WHERE order_id = ?::uuid", Integer.class, timeoutId);
     assertThat(autoRefunds).isGreaterThanOrEqualTo(1);
+    String timeoutRefundId =
+        jdbc.queryForObject(
+            "SELECT id::text FROM refund WHERE order_id = ?::uuid ORDER BY created_at LIMIT 1",
+            String.class,
+            timeoutId);
+    String timeoutRefundStatus =
+        jdbc.queryForObject(
+            "SELECT status FROM refund WHERE id = ?::uuid", String.class, timeoutRefundId);
+    if ("PENDING".equals(timeoutRefundStatus)) {
+      ResponseEntity<Map> processed =
+          rest.exchange(
+              baseUrl() + "/api/v1/admin/finance/refunds/" + timeoutRefundId + "/process",
+              HttpMethod.POST,
+              bearer(finToken, Map.of("notes", "timeout approval")),
+              Map.class);
+      assertThat(processed.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+    String rzRefundId =
+        jdbc.queryForObject(
+            "SELECT razorpay_refund_id FROM refund WHERE id = ?::uuid",
+            String.class,
+            timeoutRefundId);
+    assertThat(rzRefundId).isNotNull().startsWith("rfnd_stub_");
 
     // webhook refund.processed
     String body =

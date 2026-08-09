@@ -1,0 +1,79 @@
+meta {
+  name: ledger
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/rider-payouts/{{financeRiderPayoutRiderId}}/ledger?from=2026-07-14&to=2026-07-20&page=1&limit=50
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeRiderPayoutRiderId")) {
+    throw new Error("financeRiderPayoutRiderId missing — run list first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("ledger envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("entries");
+    expect(body.data).to.have.property("cycle_summary");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/rider-payouts/:rider_id/ledger — per-trip earnings + cycle summary.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "rider_name": "Ravi Kumar",
+            "entries": [
+              {
+                "date": "2026-07-14",
+                "order_id": "a0000001-0000-4000-8000-0000000000o1",
+                "order_number": "MED-20260714-010",
+                "base_pay": 20.00,
+                "tip": 10.00,
+                "incentive_bonus": 5.00,
+                "total": 35.00,
+                "on_time": true,
+                "distance_km": 2.4,
+                "completed_at": "2026-07-14T11:30:00Z"
+              }
+            ],
+            "cycle_summary": {
+              "base_earnings": 1680.00,
+              "incentives": 150.00,
+              "tips": 70.00,
+              "streak_bonus": 100.00,
+              "cod_deducted": 0.00,
+              "net_payout": 2000.00
+            }
+          },
+          "meta": { "page": 1, "limit": 50, "total": 78 }
+        }
+      '''
+    }
+  }
+}

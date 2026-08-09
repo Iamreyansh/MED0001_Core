@@ -41,6 +41,13 @@ class CustomerWalletControllerTest {
   }
 
   @Test
+  void balance_delegates() {
+    when(service.getMyWalletBalance(customer))
+        .thenReturn(Map.of("customer_id", customer.subject()));
+    assertThat(controller.balance(customer).data()).containsKey("customer_id");
+  }
+
+  @Test
   void transactions_delegates() {
     when(service.listMyTransactions(eq(customer), eq(1), eq(20), isNull(), isNull(), eq("CREDIT")))
         .thenReturn(new TxPage(List.of(Map.of("type", "CREDIT")), PaginationMeta.of(1, 20, 1)));

@@ -187,11 +187,23 @@ public class PlatformConfig {
 
   @Bean
   @Profile({"prod", "staging"})
-  org.springframework.boot.ApplicationRunner razorpayWebhookSecretGuard(
+  org.springframework.boot.ApplicationRunner razorpayPaymentSecretsGuard(
+      @Value("${medmate.razorpay.key-id:}") String keyId,
+      @Value("${medmate.razorpay.key-secret:}") String keySecret,
       @Value("${medmate.razorpay.webhook-secret:}") String webhookSecret) {
     return args ->
-        com.nammamedmate.pharmacy.application.AdminPharmacySettlementService
-            .validateWebhookSecretForDeployedProfile(webhookSecret, true);
+        com.nammamedmate.payment.PaymentConfig.validateRazorpaySecretsForDeployedProfile(
+            keyId, keySecret, webhookSecret, true);
+  }
+
+  @Bean
+  @Profile({"prod", "staging"})
+  org.springframework.boot.ApplicationRunner razorpayXSecretsGuard(
+      @Value("${medmate.razorpayx.key-id:}") String keyId,
+      @Value("${medmate.razorpayx.key-secret:}") String keySecret) {
+    return args ->
+        com.nammamedmate.payment.PaymentConfig.validateRazorpayXSecretsForDeployedProfile(
+            keyId, keySecret, true);
   }
 
   @Bean
