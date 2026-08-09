@@ -231,7 +231,14 @@ locals {
     { name = "MEDMATE_JWT_PUBLIC_KEY_PEM", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:public_key_pem::" },
     { name = "MEDMATE_MFA_ENCRYPTION_KEY_BASE64", valueFrom = "${aws_secretsmanager_secret.mfa.arn}:encryption_key_base64::" },
     { name = "MEDMATE_PAYMENT_ENCRYPTION_KEY_BASE64", valueFrom = "${aws_secretsmanager_secret.mfa.arn}:payment_encryption_key_base64::" },
-    { name = "MEDMATE_MAPS_GEOCODE_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.maps_geocode.arn}:api_key::" }
+    { name = "MEDMATE_MAPS_GEOCODE_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.maps_geocode.arn}:api_key::" },
+    # ponytail: ECS injects these (same as JWT). BootJar relocates EPP META-INF off the app
+    # classpath, so AwsSecretsEnvironmentPostProcessor never runs in the fat jar.
+    { name = "MEDMATE_RAZORPAY_KEY_ID", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_id::" },
+    { name = "MEDMATE_RAZORPAY_KEY_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_secret::" },
+    { name = "MEDMATE_RAZORPAY_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:webhook_secret::" },
+    { name = "MEDMATE_RAZORPAYX_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:webhook_secret::" },
+    { name = "MEDMATE_KYC_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.kyc.arn}:webhook_secret::" }
   ]
   worker_env = [
     { name = "SPRING_PROFILES_ACTIVE", value = local.environment },

@@ -21,5 +21,7 @@ logging:
 medmate:
   kyc:
     webhook-secret: local-kyc-webhook-secret
+  razorpay:
+    webhook-secret: test_razorpay_webhook_secret
   razorpayx:
     webhook-secret: local-razorpayx-webhook-secret

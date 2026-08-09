@@ -55,6 +55,26 @@ dependencies {
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName.set("med0001-api.jar")
+    // BootJar can lift META-INF/spring.factories to the archive root; LaunchedClassLoader
+    // only exposes BOOT-INF/classes, and Spring Boot 3.4 loads EPPs from that file via
+    // SpringFactoriesLoader.forDefaultResourceLocation — ensure it stays on the app classpath.
+    doLast {
+        val entry = "META-INF/spring.factories"
+        val src = layout.buildDirectory.file("resources/main/$entry").get().asFile
+        val staging = layout.buildDirectory.dir("tmp/bootjar-epp").get().asFile
+        val nested = staging.resolve("BOOT-INF/classes/$entry")
+        nested.parentFile.mkdirs()
+        src.copyTo(nested, overwrite = true)
+        exec {
+            commandLine(
+                "jar",
+                "uf",
+                archiveFile.get().asFile.absolutePath,
+                "-C",
+                staging.absolutePath,
+                "BOOT-INF/classes/$entry")
+        }
+    }
 }
 
 tasks.processResources {
