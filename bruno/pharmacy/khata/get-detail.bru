@@ -1,0 +1,82 @@
+meta {
+  name: get-detail
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/khata/{{khataCustomerId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("khataCustomerId")) {
+    throw new Error("khataCustomerId missing — run khata/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or 404", function () {
+    expect([200, 404]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.ledger).to.be.an("array");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/khata/:customer_id — ledger reverse-chronological with running_balance.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/khata/22222222-2222-4222-8222-222222222222
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "customer": {
+              "customer_id": "22222222-2222-4222-8222-222222222222",
+              "name": "Ramesh Gupta",
+              "phone": "+919876543001",
+              "credit_limit": 50000.00
+            },
+            "summary": {
+              "total_outstanding": 8500.00,
+              "overdue_amount": 3000.00,
+              "oldest_unpaid_days": 39,
+              "credit_utilisation_pct": 17.0
+            },
+            "unpaid_bills": [],
+            "ledger": [],
+            "total_outstanding": 8500.00
+          }
+        }
+      '''
+    }
+  }
+}

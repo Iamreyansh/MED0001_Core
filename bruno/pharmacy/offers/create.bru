@@ -1,0 +1,141 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/offers
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "title": "10% Off Antibiotics",
+    "discount_type": "PERCENTAGE",
+    "discount_value": 10,
+    "applies_to": "ALL",
+    "is_online": true,
+    "is_counter": true,
+    "valid_from": "2026-07-01",
+    "valid_until": "2026-07-31",
+    "max_redemptions": 500
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.offer_id) {
+    bru.setEnvVar("offerId", body.data.offer_id);
+    if (body.data.coupon_code) {
+      bru.setEnvVar("offerCouponCode", body.data.coupon_code);
+    }
+  }
+}
+
+tests {
+  test("HTTP 201 or plan/limit error", function () {
+    expect([201, 400, 403]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 201) {
+      expect(body.success).to.equal(true);
+      expect(body.data.offer_id).to.be.a("string");
+      expect(body.data.coupon_code).to.match(/^[A-Z0-9]{6,20}$/);
+    }
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/offers — owner, Growth+.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/offers
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "title": "10% Off Antibiotics",
+        "discount_type": "PERCENTAGE",
+        "discount_value": 10,
+        "applies_to": "ALL",
+        "valid_from": "2026-07-01",
+        "valid_until": "2026-07-31"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "offer_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "title": "10% Off Antibiotics",
+            "coupon_code": "AB12CD",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10,
+            "applies_to": "ALL",
+            "is_online": false,
+            "is_counter": false,
+            "valid_from": "2026-07-01",
+            "valid_until": "2026-07-31",
+            "is_active": true,
+            "created_at": "2026-07-24T14:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 DISCOUNT_EXCEEDS_PLATFORM_LIMIT
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/offers
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "title": "Too big",
+        "discount_type": "PERCENTAGE",
+        "discount_value": 60,
+        "applies_to": "ALL",
+        "valid_from": "2026-07-01",
+        "valid_until": "2026-07-31"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DISCOUNT_EXCEEDS_PLATFORM_LIMIT",
+            "message": "Discount exceeds 50% or ₹1000 cap"
+          }
+        }
+      '''
+    }
+  }
+}

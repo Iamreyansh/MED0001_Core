@@ -1,0 +1,76 @@
+meta {
+  name: export-excel
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/sales?export=EXCEL&from_date=2025-04-01&to_date=2026-03-31
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 xlsx or range error", function () {
+    const status = res.getStatus();
+    expect([200, 400]).to.include(status);
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/sales?export=EXCEL (max 12 months)
+}
+
+example {
+  name: 200 OK
+  description: Binary .xlsx download
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/sales?export=EXCEL&from_date=2025-04-01&to_date=2026-03-31
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: text
+      content: '''PK... (xlsx binary)'''
+    }
+  }
+}
+
+example {
+  name: 400 EXPORT_RANGE_TOO_LARGE
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/sales?export=EXCEL&from_date=2024-01-01&to_date=2026-01-01
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "EXPORT_RANGE_TOO_LARGE",
+            "message": "Export date range cannot exceed 12 months"
+          }
+        }
+      '''
+    }
+  }
+}

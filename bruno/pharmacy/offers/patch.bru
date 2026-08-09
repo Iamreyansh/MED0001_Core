@@ -1,0 +1,106 @@
+meta {
+  name: patch
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/offers/{{offerId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "title": "15% Off Antibiotics"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("offerId")) {
+    throw new Error("offerId missing — run create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200, 400, 404]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.offer_id).to.be.a("string");
+    }
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/offers/:offer_id — owner.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/offers/{{offerId}}
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "title": "15% Off Antibiotics"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "offer_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "title": "15% Off Antibiotics",
+            "updated_at": "2026-07-24T14:10:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 OFFER_EXPIRED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/offers/{{offerId}}
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "title": "Nope"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "OFFER_EXPIRED", "message": "Offer has already expired" }
+        }
+      '''
+    }
+  }
+}

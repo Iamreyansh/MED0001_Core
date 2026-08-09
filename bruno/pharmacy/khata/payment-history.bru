@@ -1,0 +1,72 @@
+meta {
+  name: payment-history
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/khata/payment-history?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.repayments && body.data.repayments.length) {
+    bru.setEnvVar("khataReceiptNumber", body.data.repayments[0].receipt_number);
+  }
+}
+
+tests {
+  test("HTTP 200 or PLAN_FEATURE_LOCKED", function () {
+    expect([200, 403]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.repayments).to.be.an("array");
+      expect(body.data).to.have.property("period_total_collected");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error.code).to.equal("PLAN_FEATURE_LOCKED");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/khata/payment-history
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/khata/payment-history?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "repayments": [],
+            "period_total_collected": 48000.00
+          },
+          "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}

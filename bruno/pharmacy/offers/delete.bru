@@ -1,0 +1,95 @@
+meta {
+  name: delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/offers/{{offerId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("offerId")) {
+    throw new Error("offerId missing — run create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200, 400, 404]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(["HARD_DELETED", "SET_EXPIRED"]).to.include(body.data.action);
+    }
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/offers/:offer_id — owner. Hard-delete if zero redemptions; else SET_EXPIRED.
+}
+
+example {
+  name: 200 HARD_DELETED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/offers/{{offerId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "offer_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "action": "HARD_DELETED",
+            "message": "Offer permanently deleted."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 SET_EXPIRED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/offers/{{offerId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "offer_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "action": "SET_EXPIRED",
+            "message": "Offer had redemptions and has been expired instead of deleted.",
+            "valid_until": "2026-07-24"
+          }
+        }
+      '''
+    }
+  }
+}

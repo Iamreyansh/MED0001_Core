@@ -1,0 +1,124 @@
+meta {
+  name: remind
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/khata/{{khataCustomerId}}/remind
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "channel": "WHATSAPP",
+    "message_template": "POLITE"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("khataCustomerId")) {
+    throw new Error("khataCustomerId missing — run khata/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or story error", function () {
+    expect([200, 400, 403, 429, 503]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("message_id");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/khata/:customer_id/remind — owner only (staff → STAFF_CANNOT_REMIND).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/khata/22222222-2222-4222-8222-222222222222/remind
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channel": "WHATSAPP",
+        "message_template": "POLITE"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "channel": "WHATSAPP",
+            "template": "POLITE",
+            "sent_to": "+919876543001",
+            "outstanding_amount": 8500.00,
+            "message_id": "wa_msg_uuid",
+            "sent_at": "2026-07-24T13:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 REMINDER_RATE_LIMITED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/khata/22222222-2222-4222-8222-222222222222/remind
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channel": "SMS",
+        "message_template": "FIRM"
+      }
+    }
+  }
+  response: {
+    status: { code: 429 text: Too Many Requests }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "REMINDER_RATE_LIMITED",
+            "message": "Reminder already sent in the last 24 hours"
+          }
+        }
+      '''
+    }
+  }
+}

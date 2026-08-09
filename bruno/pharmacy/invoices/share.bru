@@ -1,0 +1,156 @@
+meta {
+  name: share
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/invoices/{{invoiceId}}/share
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "channel": "WHATSAPP",
+    "recipient_phone_or_email": "+919876000001"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("invoiceId")) {
+    throw new Error("invoiceId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or 503 CHANNEL_UNAVAILABLE", function () {
+    const status = res.getStatus();
+    expect([200, 503]).to.include(status);
+    if (status === 503) {
+      expect(res.getBody().error.code).to.equal("CHANNEL_UNAVAILABLE");
+    }
+  });
+  test("share envelope when enabled", function () {
+    if (res.getStatus() !== 200) {
+      return;
+    }
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.channel).to.equal("WHATSAPP");
+    expect(body.data.sent_at).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/invoices/:invoice_id/share
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoices/{{invoiceId}}/share
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channel": "WHATSAPP",
+        "recipient_phone_or_email": "+919876000001"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "channel": "WHATSAPP",
+            "recipient": "+919876000001",
+            "message_id": "wa_msg_uuid",
+            "sent_at": "2026-07-24T12:20:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_RECIPIENT
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoices/{{invoiceId}}/share
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channel": "EMAIL",
+        "recipient_phone_or_email": "not-an-email"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INVALID_RECIPIENT", "message": "Invalid email recipient" }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 503 CHANNEL_UNAVAILABLE
+  description: When medmate.pos.notifications-enabled=false
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoices/{{invoiceId}}/share
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channel": "WHATSAPP",
+        "recipient_phone_or_email": "+919876000001"
+      }
+    }
+  }
+  response: {
+    status: { code: 503 text: Service Unavailable }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CHANNEL_UNAVAILABLE",
+            "message": "Notification channel temporarily unavailable"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,60 @@
+meta {
+  name: get-pdf
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/invoices/{{invoiceId}}/pdf?template=THERMAL
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("invoiceId")) {
+    throw new Error("invoiceId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("application/pdf binary", function () {
+    const ct = res.getHeader("Content-Type") || "";
+    expect(ct.toLowerCase()).to.include("application/pdf");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/invoices/:invoice_id/pdf — returns application/pdf binary stream
+}
+
+example {
+  name: 200 OK PDF
+  description: Binary PDF response (application/pdf)
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoices/{{invoiceId}}/pdf?template=THERMAL
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    headers: {
+      Content-Type: application/pdf
+      Content-Disposition: inline; filename="INV-2026-07-000042.pdf"
+    }
+    body: {
+      type: text
+      content: '''%PDF-1.4 ... (binary)'''
+    }
+  }
+}

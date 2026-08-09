@@ -1,0 +1,72 @@
+meta {
+  name: summary
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/sales/summary?from_date=2026-07-01&to_date=2026-07-24
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.online_vs_counter).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/sales/summary
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/sales/summary?from_date=2026-07-01&to_date=2026-07-24
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": { "from": "2026-07-01", "to": "2026-07-24" },
+            "total_bills": 486,
+            "total_revenue": 248600.00,
+            "avg_bill_value": 511.52,
+            "online_vs_counter": {
+              "online_revenue": 62000.00,
+              "online_pct": 24.9,
+              "counter_revenue": 186600.00,
+              "counter_pct": 75.1
+            },
+            "payment_mode_mix": {},
+            "top_selling_categories": [],
+            "top_selling_products": []
+          }
+        }
+      '''
+    }
+  }
+}

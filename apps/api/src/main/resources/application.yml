@@ -57,6 +57,14 @@ medmate:
       # Stub channel availability until EPIC-017 notification consumer is live.
       whatsapp-enabled: true
       email-enabled: true
+  pos:
+    # Free-tier bootstrap: Starter/Growth POS feature gates (offers etc. in later stories).
+    starter-features-enabled: false
+    growth-features-enabled: false
+    # Local/default share stub succeeds; set false to force CHANNEL_UNAVAILABLE.
+    notifications-enabled: true
+    jobs:
+      enabled: true
   catalogue:
     jobs:
       enabled: true

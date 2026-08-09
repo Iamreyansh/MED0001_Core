@@ -41,6 +41,7 @@ public final class PosTokenRestrictionFilter extends OncePerRequestFilter {
     }
     // BR6: POS tokens only for POS APIs + health probes. Public routes need no POS exception.
     return uri.startsWith("/api/v1/pos/")
+        || uri.startsWith("/api/v1/pharmacy/pos/")
         || uri.equals("/api/v1/health")
         || uri.equals("/actuator/health");
   }

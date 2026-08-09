@@ -1,0 +1,74 @@
+meta {
+  name: search
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/search
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "query": "para",
+    "mode": "TEXT"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("posCartId")) throw new Error("posCartId missing");
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("search envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.results).to.be.an("array");
+    expect(body.data.mode).to.equal("TEXT");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/pos/cart/:cart_id/search — TEXT | BARCODE (auto_add on barcode hit).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/search
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "query": "para",
+        "mode": "TEXT"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "results": [],
+            "mode": "TEXT",
+            "query": "para"
+          }
+        }
+      '''
+    }
+  }
+}
