@@ -15,10 +15,10 @@
 | Phase | Total | Done |
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
-| Phase 2 | 34 | 6 |
+| Phase 2 | 34 | 11 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **52** |
+| **Total** | **129** | **57** |
 
 ---
 
@@ -131,11 +131,11 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-007 | [STORY-001](./EPIC-007-pharmacy-pos-billing/STORY-001-counter-sale-pos.md) | Counter Sale POS - Real-Time Cart and Checkout | pending | — | — |
-| EPIC-007 | [STORY-002](./EPIC-007-pharmacy-pos-billing/STORY-002-gst-invoice-management.md) | GST Invoice Management - Generation, Customization & Sharing | pending | — | — |
-| EPIC-007 | [STORY-003](./EPIC-007-pharmacy-pos-billing/STORY-003-credit-khata-management.md) | Credit / Khata Management - Customer Credit Tracking | pending | — | — |
-| EPIC-007 | [STORY-004](./EPIC-007-pharmacy-pos-billing/STORY-004-sales-ledger.md) | Sales Ledger - Complete Sales Audit Trail | pending | — | — |
-| EPIC-007 | [STORY-005](./EPIC-007-pharmacy-pos-billing/STORY-005-pharmacy-offers-discounts.md) | Pharmacy Offers & Discounts - Promotions and Coupon Engine | pending | — | — |
+| EPIC-007 | [STORY-001](./EPIC-007-pharmacy-pos-billing/STORY-001-counter-sale-pos.md) | Counter Sale POS - Real-Time Cart and Checkout | done | 2026-08-09 | `domains/pos`; V054 barcode+cart+invoice+items+settings+seq (paise); FEFO/stock via PosInventoryBridgeConfig; PDF CDN stub; Khata stub until STORY-003; PosTokenRestrictionFilter allows `/api/v1/pharmacy/pos/`; Bruno `bruno/pharmacy/pos/` |
+| EPIC-007 | [STORY-002](./EPIC-007-pharmacy-pos-billing/STORY-002-gst-invoice-management.md) | GST Invoice Management - Generation, Customization & Sharing | done | 2026-08-09 | `domains/pos`; V054 reuse; list/detail/binary PDF/share/settings; PosPharmacy+PosNotification bridges; admin_finance/support GET read; minimal PDF not Puppeteer; Bruno invoices+invoice-settings |
+| EPIC-007 | [STORY-003](./EPIC-007-pharmacy-pos-billing/STORY-003-credit-khata-management.md) | Credit / Khata Management - Customer Credit Tracking | done | 2026-08-09 | `domains/pos`; V055 khata tables+receipt seq (paise); Starter gate PosPlanPort; CREDIT checkout DEBIT+limit; tenancy via khata_customer_limit; remind 24h; Bruno `bruno/pharmacy/khata/` |
+| EPIC-007 | [STORY-004](./EPIC-007-pharmacy-pos-billing/STORY-004-sales-ledger.md) | Sales Ledger - Complete Sales Audit Trail | done | 2026-08-09 | `domains/pos`; no new migration; period_summary+FY+export cap; mark-paid owner via service STAFF_CANNOT_MARK_PAID; CREDIT mark-paid → Khata (STORY-003); Bruno `bruno/pharmacy/sales/` |
+| EPIC-007 | [STORY-005](./EPIC-007-pharmacy-pos-billing/STORY-005-pharmacy-offers-discounts.md) | Pharmacy Offers & Discounts - Promotions and Coupon Engine | done | 2026-08-09 | `domains/pos`; V056 pharmacy_offer+offer_redemption (paise); Growth gate; manual discount wins else highest counter offer; cart applied_offers; checkout redemption; admin offers OOS; Bruno `bruno/pharmacy/offers/` |
 
 ### EPIC-012 (`EPIC-012-payments-finance`)
 

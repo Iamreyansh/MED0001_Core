@@ -1,0 +1,92 @@
+meta {
+  name: get-detail
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/invoices/{{invoiceId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("invoiceId")) {
+    throw new Error("invoiceId missing — run list or checkout first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("gst_breakdown present", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.gst_breakdown).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/invoices/:invoice_id
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoices/{{invoiceId}}
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "invoice_id": "11111111-1111-4111-8111-111111111111",
+            "invoice_number": "INV-2026-07-000042",
+            "gst_breakdown": [
+              { "slab": "12%", "hsn_code": "30049099", "taxable_amount": 321.43, "cgst": 19.29, "sgst": 19.29 }
+            ],
+            "grand_total": 450.00,
+            "mrp_savings": 24.00
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 INVOICE_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoices/00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INVOICE_NOT_FOUND", "message": "Invoice not found" }
+        }
+      '''
+    }
+  }
+}

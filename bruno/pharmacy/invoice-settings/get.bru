@@ -1,0 +1,65 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/invoice-settings
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("settings envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.invoice_prefix).to.be.a("string");
+    expect(body.data.template).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/invoice-settings
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoice-settings
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "template": "MODERN",
+            "accent_color": "#2563EB",
+            "invoice_prefix": "INV",
+            "show_mrp_savings": true,
+            "show_hsn": true
+          }
+        }
+      '''
+    }
+  }
+}

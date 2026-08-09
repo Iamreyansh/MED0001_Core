@@ -1,2 +1,2 @@
-/** Domain module shell for pos. Business logic lands via epic stories. */
+/** Pharmacy POS & billing (EPIC-007). */
 package com.nammamedmate.pos;

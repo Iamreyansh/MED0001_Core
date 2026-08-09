@@ -1,0 +1,60 @@
+meta {
+  name: clear-cart
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("posCartId")) throw new Error("posCartId missing");
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("clear envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("ACTIVE");
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/pos/cart/:cart_id — clear all items
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cart_id": "11111111-1111-4111-8111-111111111111",
+            "items_removed": 3,
+            "status": "ACTIVE"
+          }
+        }
+      '''
+    }
+  }
+}

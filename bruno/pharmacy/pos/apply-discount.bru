@@ -1,0 +1,103 @@
+meta {
+  name: apply-discount
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/discount
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "type": "PERCENTAGE",
+    "value": 10
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("posCartId")) throw new Error("posCartId missing");
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("discount envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.discount_type).to.equal("PERCENTAGE");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/pos/cart/:cart_id/discount — max min(30%, ₹500).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/discount
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "type": "PERCENTAGE",
+        "value": 10
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10,
+            "discount_amount": 45.00,
+            "grand_total": 405.00
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 DISCOUNT_EXCEEDS_LIMIT
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/discount
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "type": "PERCENTAGE",
+        "value": 35
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "DISCOUNT_EXCEEDS_LIMIT", "message": "Discount exceeds 30% or ₹500 cap" }
+        }
+      '''
+    }
+  }
+}

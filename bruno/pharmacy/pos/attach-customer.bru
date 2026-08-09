@@ -1,0 +1,80 @@
+meta {
+  name: attach-customer
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/customer
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "customer_phone": "+919876000001",
+    "customer_name": "Priya Sharma"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("posCartId")) throw new Error("posCartId missing");
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.customer_id) {
+    bru.setEnvVar("posCustomerId", body.data.customer_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("customer envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.customer_id).to.be.a("string");
+    expect(body.data.phone).to.equal("+919876000001");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/pos/cart/:cart_id/customer
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/customer
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "customer_phone": "+919876000001",
+        "customer_name": "Priya Sharma"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "customer_id": "44444444-4444-4444-8444-444444444444",
+            "name": "Priya Sharma",
+            "phone": "+919876000001",
+            "is_new_customer": false,
+            "outstanding_khata": 500.00
+          }
+        }
+      '''
+    }
+  }
+}

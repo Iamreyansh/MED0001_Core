@@ -1,0 +1,66 @@
+meta {
+  name: get-detail
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/sales/{{saleId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("saleId")) {
+    throw new Error("saleId missing — run sales/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("invoice_id");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/sales/:sale_id (alias of invoice detail)
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/sales/11111111-1111-4111-8111-111111111111
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "invoice_id": "11111111-1111-4111-8111-111111111111",
+            "invoice_number": "INV-2026-07-000042",
+            "payment_status": "PENDING",
+            "grand_total": 450.00
+          }
+        }
+      '''
+    }
+  }
+}

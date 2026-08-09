@@ -1,0 +1,170 @@
+meta {
+  name: patch
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/invoice-settings
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "invoice_prefix": "PHARM1",
+    "template": "MODERN",
+    "show_mrp_savings": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — pharmacy_owner token required");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.invoice_prefix).to.equal("PHARM1");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/invoice-settings (OWNER only)
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoice-settings
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "invoice_prefix": "PHARM1",
+        "template": "MODERN"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "invoice_prefix": "PHARM1",
+            "template": "MODERN",
+            "updated_at": "2026-07-24T12:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PREFIX_FORMAT
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoice-settings
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "invoice_prefix": "TOOLONGPREFIX"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INVALID_PREFIX_FORMAT", "message": "invoice_prefix must be 1-6 alphanumeric uppercase" }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_ACCENT_COLOR
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoice-settings
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "accent_color": "blue"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INVALID_ACCENT_COLOR", "message": "accent_color must be #RRGGBB" }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_IFSC_CODE
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoice-settings
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "bank_details": {
+          "ifsc_code": "SHORT"
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INVALID_IFSC_CODE", "message": "ifsc_code must be exactly 11 characters" }
+        }
+      '''
+    }
+  }
+}

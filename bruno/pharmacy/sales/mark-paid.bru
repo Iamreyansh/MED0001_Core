@@ -1,0 +1,167 @@
+meta {
+  name: mark-paid
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/sales/{{saleId}}/mark-paid
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "payment_mode": "UPI",
+    "amount": 450.00,
+    "reference_number": "UTR123",
+    "note": "Settled at counter"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("saleId")) {
+    throw new Error("saleId missing — run sales/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.receipt_number) {
+    bru.setEnvVar("receiptNumber", body.data.receipt_number);
+  }
+}
+
+tests {
+  test("HTTP 200 or story error", function () {
+    const status = res.getStatus();
+    expect([200, 400, 403, 404]).to.include(status);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("receipt_number");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/sales/:sale_id/mark-paid
+  Owner settles payment; staff receives 403 STAFF_CANNOT_MARK_PAID from service layer.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/sales/11111111-1111-4111-8111-111111111111/mark-paid
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "payment_mode": "UPI",
+        "amount": 450.00
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "sale_id": "11111111-1111-4111-8111-111111111111",
+            "invoice_number": "INV-2026-07-000042",
+            "previous_payment_status": "PENDING",
+            "new_payment_status": "PAID",
+            "amount_settled": 450.00,
+            "settled_at": "2026-07-24T14:00:00Z",
+            "receipt_number": "RCPT-2026-07-000014"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 STAFF_CANNOT_MARK_PAID
+  description: pharmacy_staff is authenticated but rejected by service with story error code
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/sales/11111111-1111-4111-8111-111111111111/mark-paid
+    method: post
+    headers: {
+      Authorization: Bearer {{staffAccessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "payment_mode": "CASH",
+        "amount": 450.00
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "STAFF_CANNOT_MARK_PAID",
+            "message": "Only pharmacy_owner may mark sales as paid"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 SALE_ALREADY_PAID
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/sales/11111111-1111-4111-8111-111111111111/mark-paid
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "payment_mode": "CASH",
+        "amount": 450.00
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "SALE_ALREADY_PAID",
+            "message": "Sale is already paid"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -89,6 +89,44 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/inventory", "/api/v1/pharmacy/inventory/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/pharmacy/pos", "/api/v1/pharmacy/pos/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/offers")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pharmacy/offers/validate")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/pharmacy/offers", "/api/v1/pharmacy/offers/**")
+                    .hasRole("PHARMACY_OWNER")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/pharmacy/invoice-settings")
+                    .hasRole("PHARMACY_OWNER")
+                    .requestMatchers("/api/v1/pharmacy/invoice-settings")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    // Admin finance/support: read-only invoice GET (not share / settings).
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/pharmacy/invoices", "/api/v1/pharmacy/invoices/**")
+                    .hasAnyRole(
+                        "PHARMACY_OWNER", "PHARMACY_STAFF", "ADMIN_FINANCE", "ADMIN_SUPPORT")
+                    .requestMatchers("/api/v1/pharmacy/invoices", "/api/v1/pharmacy/invoices/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pharmacy/sales/*/mark-paid")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/pharmacy/sales", "/api/v1/pharmacy/sales/**")
+                    .hasAnyRole(
+                        "PHARMACY_OWNER", "PHARMACY_STAFF", "ADMIN_FINANCE", "ADMIN_COMPLIANCE")
+                    .requestMatchers("/api/v1/pharmacy/sales", "/api/v1/pharmacy/sales/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    // Khata: remind allows staff at matcher so service returns STAFF_CANNOT_REMIND.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pharmacy/khata/*/remind")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pharmacy/khata/*/repayment")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/pharmacy/khata", "/api/v1/pharmacy/khata/**")
+                    .hasAnyRole(
+                        "PHARMACY_OWNER", "PHARMACY_STAFF", "ADMIN_FINANCE", "ADMIN_SUPPORT")
+                    .requestMatchers("/api/v1/pharmacy/khata", "/api/v1/pharmacy/khata/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers(HttpMethod.POST, "/api/v1/pharmacy/rack-locations")
                     .hasRole("PHARMACY_OWNER")
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/pharmacy/rack-locations/**")

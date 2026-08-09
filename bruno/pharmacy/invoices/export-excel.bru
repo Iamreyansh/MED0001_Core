@@ -1,0 +1,49 @@
+meta {
+  name: export-excel
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/invoices?export=EXCEL
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 xlsx", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/invoices?export=EXCEL
+}
+
+example {
+  name: 200 OK
+  description: Binary .xlsx download
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/invoices?export=EXCEL
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: text
+      content: '''PK... (xlsx binary)'''
+    }
+  }
+}

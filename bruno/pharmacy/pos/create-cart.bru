@@ -1,0 +1,85 @@
+meta {
+  name: create-cart
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/pos/cart
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "created_by_staff_id": null
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.cart_id) {
+    bru.setEnvVar("posCartId", body.data.cart_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create cart envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.cart_id).to.be.a("string");
+    expect(body.data.status).to.equal("ACTIVE");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/pos/cart — create counter-sale cart session.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "cart_id": "11111111-1111-4111-8111-111111111111",
+            "status": "ACTIVE",
+            "items": [],
+            "customer": null,
+            "discount_type": null,
+            "discount_value": 0,
+            "subtotal": 0.00,
+            "gst_total": 0.00,
+            "grand_total": 0.00,
+            "expires_at": "2026-07-24T14:00:00Z",
+            "created_at": "2026-07-24T12:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

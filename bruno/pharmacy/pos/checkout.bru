@@ -1,0 +1,113 @@
+meta {
+  name: checkout
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/checkout
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "payment_method": "CASH",
+    "amount_paid": 500
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("posCartId")) throw new Error("posCartId missing");
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.invoice_id) {
+    bru.setEnvVar("posInvoiceId", body.data.invoice_id);
+    bru.setEnvVar("posInvoiceNumber", body.data.invoice_number);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("checkout envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.invoice_id).to.be.a("string");
+    expect(body.data.invoice_number).to.match(/^INV-\d{4}-\d{2}-\d{6}$/);
+    expect(body.data.invoice_pdf_url).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/pos/cart/:cart_id/checkout — creates invoice + deducts stock.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/checkout
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "payment_method": "CASH",
+        "amount_paid": 500
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "invoice_id": "55555555-5555-4555-8555-555555555555",
+            "invoice_number": "INV-2026-07-000042",
+            "payment_method": "CASH",
+            "amount_paid": 500.00,
+            "change_due": 50.00,
+            "grand_total": 450.00,
+            "invoice_pdf_url": "https://cdn.medmate.in/pharmacy/uuid/INV-2026-07-000042.pdf"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 RX_PRESCRIBER_REQUIRED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/checkout
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "payment_method": "CASH",
+        "amount_paid": 100
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "RX_PRESCRIBER_REQUIRED", "message": "prescribing_doctor required for Rx items" }
+        }
+      '''
+    }
+  }
+}

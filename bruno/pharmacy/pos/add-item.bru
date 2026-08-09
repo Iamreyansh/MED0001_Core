@@ -1,0 +1,113 @@
+meta {
+  name: add-item
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/items
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "product_id": "{{inventoryProductId}}",
+    "quantity": 2,
+    "is_loose": false
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) throw new Error("accessToken missing");
+  if (!bru.getEnvVar("posCartId")) throw new Error("posCartId missing");
+  if (!bru.getEnvVar("inventoryProductId")) throw new Error("inventoryProductId missing — list inventory first");
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.item_id) {
+    bru.setEnvVar("posCartItemId", body.data.item_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("add item envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.item_id).to.be.a("string");
+    expect(body.data.batch_number).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/pos/cart/:cart_id/items — FEFO auto-select when batch_id omitted.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/items
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "product_id": "22222222-2222-4222-8222-222222222222",
+        "quantity": 2
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "item_id": "33333333-3333-4333-8333-333333333333",
+            "product_name": "Paracetamol 500mg Tab",
+            "batch_number": "BN25100",
+            "quantity": 2,
+            "line_total": 45.00,
+            "cart_grand_total": 45.00
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INSUFFICIENT_STOCK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/items
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "product_id": "22222222-2222-4222-8222-222222222222",
+        "quantity": 99999
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INSUFFICIENT_STOCK", "message": "Requested quantity exceeds batch stock" }
+        }
+      '''
+    }
+  }
+}

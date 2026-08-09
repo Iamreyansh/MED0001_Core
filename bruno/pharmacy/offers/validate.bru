@@ -1,0 +1,121 @@
+meta {
+  name: validate
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/offers/validate
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "coupon_code": "{{offerCouponCode}}",
+    "cart_total": 420.00,
+    "product_ids": ["11111111-1111-4111-8111-111111111111"]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("offerCouponCode")) {
+    bru.setEnvVar("offerCouponCode", "SAVE10");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or PLAN_FEATURE_LOCKED", function () {
+    expect([200, 403]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("is_valid");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/offers/validate — owner+staff, Growth+.
+}
+
+example {
+  name: 200 Valid
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/offers/validate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "coupon_code": "ANTIBI10",
+        "cart_total": 420.00,
+        "product_ids": ["11111111-1111-4111-8111-111111111111"]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "is_valid": true,
+            "offer_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "title": "10% Off Antibiotics",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 10,
+            "discount_amount": 42.00,
+            "applies_to_description": "Applies to: All products",
+            "expires_on": "2026-07-31"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 Invalid COUPON_NOT_APPLICABLE
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/offers/validate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "coupon_code": "ANTIBI10",
+        "cart_total": 100.00,
+        "product_ids": ["22222222-2222-4222-8222-222222222222"]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "is_valid": false,
+            "error_code": "COUPON_NOT_APPLICABLE",
+            "message": "This coupon does not apply to any items in the cart."
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,110 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/khata?overdue_only=false&sort=outstanding_desc&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.customers && body.data.customers.length) {
+    bru.setEnvVar("khataCustomerId", body.data.customers[0].customer_id);
+  }
+}
+
+tests {
+  test("HTTP 200 or PLAN_FEATURE_LOCKED", function () {
+    expect([200, 403]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.kpi).to.be.an("object");
+      expect(body.data.aging_chart).to.be.an("object");
+      expect(body.data.customers).to.be.an("array");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error.code).to.equal("PLAN_FEATURE_LOCKED");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/khata — Starter+ outstanding list with KPI + aging.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/khata?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpi": {
+              "total_outstanding": 285000.00,
+              "overdue_30d": 62000.00,
+              "collected_this_month": 48000.00,
+              "collection_rate_pct": 74.5,
+              "all_time_credit_given": 1240000.00
+            },
+            "aging_chart": {
+              "current_0_30d": 223000.00,
+              "overdue_31_60d": 40000.00,
+              "overdue_60d_plus": 22000.00
+            },
+            "customers": []
+          },
+          "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 PLAN_FEATURE_LOCKED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/khata
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PLAN_FEATURE_LOCKED",
+            "message": "Khata requires Starter plan or higher"
+          }
+        }
+      '''
+    }
+  }
+}

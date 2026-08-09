@@ -1,0 +1,132 @@
+meta {
+  name: repayment
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/khata/{{khataCustomerId}}/repayment
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "amount": 5000.00,
+    "payment_mode": "CASH",
+    "note": "Received in cash"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("khataCustomerId")) {
+    throw new Error("khataCustomerId missing — run khata/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.receipt_number) {
+    bru.setEnvVar("khataReceiptNumber", body.data.receipt_number);
+  }
+}
+
+tests {
+  test("HTTP 201 or story error", function () {
+    expect([201, 400, 404]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 201) {
+      expect(body.success).to.equal(true);
+      expect(body.data.receipt_number).to.match(/^RCPT-\d{4}-\d{2}-\d{6}$/);
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/khata/:customer_id/repayment
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/khata/22222222-2222-4222-8222-222222222222/repayment
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "amount": 5000.00,
+        "payment_mode": "CASH"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "receipt_id": "33333333-3333-4333-8333-333333333333",
+            "receipt_number": "RCPT-2026-07-000013",
+            "customer_name": "Ramesh Gupta",
+            "amount": 5000.00,
+            "payment_mode": "CASH",
+            "previous_outstanding": 8500.00,
+            "new_outstanding": 3500.00,
+            "receipt_pdf_url": "https://cdn.medmate.in/pharmacy/uuid/RCPT-2026-07-000013.pdf",
+            "created_at": "2026-07-24T13:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 REPAYMENT_EXCEEDS_OUTSTANDING
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/khata/22222222-2222-4222-8222-222222222222/repayment
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "amount": 999999.00,
+        "payment_mode": "CASH"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "REPAYMENT_EXCEEDS_OUTSTANDING",
+            "message": "amount exceeds outstanding balance"
+          }
+        }
+      '''
+    }
+  }
+}

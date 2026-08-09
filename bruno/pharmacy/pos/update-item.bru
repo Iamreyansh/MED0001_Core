@@ -1,0 +1,72 @@
+meta {
+  name: update-item
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/items/{{posCartItemId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "quantity": 3
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("posCartItemId")) throw new Error("posCartItemId missing");
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("update envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.quantity).to.equal(3);
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/pos/cart/:cart_id/items/:item_id
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/pos/cart/{{posCartId}}/items/{{posCartItemId}}
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "quantity": 3
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "item_id": "33333333-3333-4333-8333-333333333333",
+            "quantity": 3,
+            "line_total": 67.50,
+            "cart_grand_total": 67.50
+          }
+        }
+      '''
+    }
+  }
+}

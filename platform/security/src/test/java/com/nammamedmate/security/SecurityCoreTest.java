@@ -249,7 +249,9 @@ class SecurityCoreTest {
     JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService);
     PosTokenRestrictionFilter posFilter = new PosTokenRestrictionFilter();
 
-    String[] allowed = {"/api/v1/pos/sale", "/actuator/health", "/api/v1/health"};
+    String[] allowed = {
+      "/api/v1/pos/sale", "/api/v1/pharmacy/pos/cart", "/actuator/health", "/api/v1/health"
+    };
     for (String path : allowed) {
       SecurityContextHolder.clearContext();
       MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
