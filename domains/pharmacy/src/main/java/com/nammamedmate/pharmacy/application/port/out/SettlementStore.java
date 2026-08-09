@@ -88,4 +88,9 @@ public interface SettlementStore {
   ListResult list(UUID pharmacyId, ListFilter filter);
 
   boolean existsForPeriod(UUID pharmacyId, LocalDate periodStart, LocalDate periodEnd);
+
+  /** Unconsumed BELOW_THRESHOLD_CARRIED nets to fold into the next cycle (EPIC-012 STORY-003). */
+  long sumUnconsumedCarryForwardPaise(UUID pharmacyId);
+
+  void markCarryForwardConsumed(UUID pharmacyId, Instant consumedAt);
 }

@@ -188,6 +188,31 @@ class CodReconciliationServiceTest {
   }
 
   @Test
+  void financePorts_wiredDepositHookAndDailyBridge() {
+    java.util.concurrent.atomic.AtomicBoolean depositHook =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicReference<java.time.LocalDate> daily =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    CodReconciliationService wired =
+        new CodReconciliationService(
+            riders,
+            collections,
+            deposits,
+            cfg("200000"),
+            new FakeFleet(),
+            new OutboxPublisher(outbox, new ObjectMapper()),
+            clock,
+            (depositId, rider, amount) -> depositHook.set(true),
+            daily::set);
+    riders.adjustCodInHand(riderId, 50_000L, T0);
+    wired.markDeposited(finance(), riderId, 100.00, null, "HOOK-REF-" + Ids.newId(), null);
+    assertThat(depositHook).isTrue();
+    wired.publishDailyReport();
+    assertThat(daily.get()).isEqualTo(java.time.LocalDate.parse("2026-07-24"));
+    assertThat(outbox.all()).isEmpty();
+  }
+
+  @Test
   void recordCollection_idempotentPerOrder() {
     UUID orderId = Ids.newId();
     service.recordCollection(riderId, orderId, 1000L, T0);

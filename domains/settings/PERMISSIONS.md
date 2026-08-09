@@ -26,7 +26,7 @@ Catalog (EPIC-001): `GET /api/v1/admin/permissions` remains available.
 |------|------------------------------------------|-----|
 | `admin_operations` | `pharmacies:suspend`, `orders:dispatch`, `customers:read`, `finance:read`, `orders:*`, `riders:*`, `logistics:*` | Pharmacy suspend, dispatch, prior wildcard coverage |
 | `admin_finance` | `finance:update`, `finance:*`, `pharmacies:read` | Commission/COD/payout update + wallet `finance:*` gate |
-| `admin_support` | `pharmacies:read` | Prior support pharmacy read access |
+| `admin_support` | `pharmacies:read`, `finance:read` | Prior support pharmacy read; EPIC-012 refund queue read |
 | `admin_compliance` | `pharmacies:update`, `customers:read` | Live KYC admin uses `pharmacies:update` |
 
 `admin_super` still short-circuits to allow-all in middleware.

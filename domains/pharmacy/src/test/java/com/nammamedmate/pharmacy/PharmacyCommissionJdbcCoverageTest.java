@@ -3,7 +3,9 @@ package com.nammamedmate.pharmacy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.id.Ids;
@@ -209,6 +211,14 @@ class PharmacyCommissionJdbcCoverageTest {
             store.existsForPeriod(
                 PID, LocalDate.parse("2026-07-14"), LocalDate.parse("2026-07-20")))
         .isFalse();
+
+    when(jdbc.queryForObject(any(String.class), eq(Long.class), eq(PID)))
+        .thenReturn(1234L)
+        .thenReturn(null);
+    assertThat(store.sumUnconsumedCarryForwardPaise(PID)).isEqualTo(1234L);
+    assertThat(store.sumUnconsumedCarryForwardPaise(PID)).isZero();
+    store.markCarryForwardConsumed(PID, NOW);
+    verify(jdbc, atLeastOnce()).update(any(String.class), any(), any(), eq(PID));
   }
 
   @Test

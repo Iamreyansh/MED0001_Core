@@ -1,0 +1,128 @@
+meta {
+  name: mark-filed
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/taxes/filings/{{taxFilingId}}/mark-filed
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filed_at": "2026-08-08T14:30:00Z",
+    "reference_number": "ARN-2026-08-08-XXXXXXXX",
+    "notes": "GSTR-8 for July 2026 filed via GSTN portal."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("taxFilingId")) {
+    throw new Error("taxFilingId missing — run admin/finance/taxes/filings first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.filing_id) {
+    bru.setEnvVar("taxFilingId", body.data.filing_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("mark-filed envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("FILED");
+    expect(body.data.reference_number).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/taxes/filings/:filing_id/mark-filed — status mutation only (BR-006). Errors: FILING_NOT_FOUND, ALREADY_FILED, REFERENCE_REQUIRED.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/taxes/filings/a0000001-0000-4000-8000-0000000000f1/mark-filed
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "filed_at": "2026-08-08T14:30:00Z",
+        "reference_number": "ARN-2026-08-08-XXXXXXXX",
+        "notes": "GSTR-8 for July 2026 filed via GSTN portal."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "filing_id": "a0000001-0000-4000-8000-0000000000f1",
+            "filing_type": "GSTR-8",
+            "period": "2026-07",
+            "status": "FILED",
+            "filed_at": "2026-08-08T14:30:00Z",
+            "reference_number": "ARN-2026-08-08-XXXXXXXX",
+            "marked_by": "a0000001-0000-4000-8000-0000000000a1"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 REFERENCE_REQUIRED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/taxes/filings/a0000001-0000-4000-8000-0000000000f1/mark-filed
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "filed_at": "2026-08-08T14:30:00Z",
+        "notes": "missing reference"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "REFERENCE_REQUIRED",
+            "message": "reference_number is mandatory"
+          }
+        }
+      '''
+    }
+  }
+}

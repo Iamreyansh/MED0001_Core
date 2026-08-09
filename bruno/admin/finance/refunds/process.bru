@@ -1,0 +1,127 @@
+meta {
+  name: process
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/refunds/{{financeRefundId}}/process
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "notes": "Approved. Pharmacy confirmed they cancelled the order."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeRefundId")) {
+    throw new Error("financeRefundId missing — run admin/finance/refunds/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.refund_id) {
+    bru.setEnvVar("financeRefundId", body.data.refund_id);
+    if (body.data.razorpay_refund_id) {
+      bru.setEnvVar("razorpayRefundId", body.data.razorpay_refund_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("process envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("refund_id");
+    expect(body.data).to.have.property("status");
+    expect(["PROCESSING", "COMPLETED"]).to.include(body.data.status);
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/refunds/:refund_id/process — admin_finance processes PENDING refund.
+  Errors: REFUND_NOT_FOUND 404, REFUND_ALREADY_PROCESSED 409, RAZORPAY_REFUND_FAILED 502.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/refunds/a0000001-0000-4000-8000-0000000000r1/process
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "notes": "Approved. Pharmacy confirmed they cancelled the order."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "refund_id": "a0000001-0000-4000-8000-0000000000r1",
+            "order_id": "a0000001-0000-4000-8000-0000000000o1",
+            "refund_amount": 450.00,
+            "refund_to": "SOURCE_ACCOUNT",
+            "status": "PROCESSING",
+            "razorpay_refund_id": "rfnd_XXXXXXXXXXXX",
+            "expected_by": "2026-07-29",
+            "processed_by": "a0000001-0000-4000-8000-0000000000a1",
+            "processed_at": "2026-07-24T10:30:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 REFUND_ALREADY_PROCESSED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/refunds/a0000001-0000-4000-8000-0000000000r1/process
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "notes": "retry"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "REFUND_ALREADY_PROCESSED", "message": "Refund not in PENDING state" }
+        }
+      '''
+    }
+  }
+}

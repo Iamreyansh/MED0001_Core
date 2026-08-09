@@ -52,7 +52,28 @@ class JdbcRefundAndCancellationStoreTest {
             "idem",
             T0);
     store.insert(refund);
-    verify(jdbc).update(anyString(), any(Object[].class));
+    verify(jdbc, org.mockito.Mockito.atLeastOnce())
+        .update(
+            anyString(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any());
     Refund processed =
         new Refund(
             id,
@@ -75,7 +96,7 @@ class JdbcRefundAndCancellationStoreTest {
     refund.markProcessed(T0);
     store.update(refund);
     org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.atLeastOnce())
-        .update(anyString(), any(), any(), any(), any(), any(), any());
+        .update(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
 
     when(jdbc.query(anyString(), any(RowMapper.class), eq(id)))
         .thenAnswer(
@@ -97,6 +118,11 @@ class JdbcRefundAndCancellationStoreTest {
               when(rs.getString("failed_reason")).thenReturn(null);
               when(rs.getString("idempotency_key")).thenReturn("idem");
               when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(T0));
+              when(rs.getBoolean("auto_processed")).thenReturn(true);
+              when(rs.getObject("expected_by", java.time.LocalDate.class))
+                  .thenReturn(java.time.LocalDate.parse("2026-08-14"));
+              when(rs.getTimestamp("completed_at")).thenReturn(Timestamp.from(T0));
+              when(rs.getObject("processed_by")).thenReturn(refund.issuedBy());
               return List.of(mapper.mapRow(rs, 0));
             });
     assertThat(store.findById(id)).isPresent();
@@ -122,9 +148,21 @@ class JdbcRefundAndCancellationStoreTest {
               when(rs.getString("failed_reason")).thenReturn(null);
               when(rs.getString("idempotency_key")).thenReturn(null);
               when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(T0));
+              when(rs.getBoolean("auto_processed")).thenReturn(false);
+              when(rs.getObject("expected_by", java.time.LocalDate.class)).thenReturn(null);
+              when(rs.getTimestamp("completed_at")).thenReturn(null);
+              when(rs.getObject("processed_by")).thenReturn(null);
               return List.of(mapper.mapRow(rs, 0));
             });
     assertThat(store.findById(nullProcessedId)).isPresent();
+
+    // insert with expected_by + completed_at set
+    refund.setExpectedBy(java.time.LocalDate.parse("2026-08-14"));
+    refund.setCompletedAt(T0);
+    refund.setAutoProcessed(true);
+    refund.setProcessedBy(refund.issuedBy());
+    store.insert(refund);
+    store.update(refund);
 
     when(jdbc.query(anyString(), any(RowMapper.class), eq("idem"))).thenReturn(List.of(refund));
     assertThat(store.findByIdempotencyKey("idem")).isPresent();

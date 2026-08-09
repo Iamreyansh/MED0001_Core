@@ -1,0 +1,108 @@
+meta {
+  name: cash-position
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/cash-position?period=30D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("financeCashPlatformNet", String(body.data.platform_net));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cash-position envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("received_from_customers");
+    expect(body.data).to.have.property("paid_to_pharmacies");
+    expect(body.data).to.have.property("paid_to_riders");
+    expect(body.data).to.have.property("refunded_to_customers");
+    expect(body.data).to.have.property("platform_net");
+    expect(body.data).to.have.property("net_free_cash");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/cash-position — cumulative cash position. EPIC-012/STORY-009.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/cash-position?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "30D",
+            "from": "2026-06-24",
+            "to": "2026-07-24",
+            "received_from_customers": 5550000.00,
+            "paid_to_pharmacies": 4100000.00,
+            "paid_to_riders": 320000.00,
+            "refunded_to_customers": 122000.00,
+            "held_in_wallet": 1250000.00,
+            "cod_in_transit": 28450.00,
+            "platform_net": 1008000.00,
+            "gateway_fees_paid": 82000.00,
+            "tcs_collected_held": 55500.00,
+            "net_free_cash": 869950.00
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/cash-position?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Finance access required"
+          }
+        }
+      '''
+    }
+  }
+}

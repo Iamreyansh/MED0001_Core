@@ -1,0 +1,77 @@
+meta {
+  name: release-all
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/settlements/release-all
+  auth: inherit
+}
+
+headers {
+  Idempotency-Key: {{financeSettlementBulkKey}}
+}
+
+body:json {
+  {
+    "threshold": 50000.00,
+    "notes": "Routine Monday bulk release."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeSettlementBulkKey")) {
+    bru.setEnvVar("financeSettlementBulkKey", "finance-settlement-bulk-" + Date.now());
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("bulk release envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("attempted");
+    expect(body.data).to.have.property("released");
+    expect(body.data).to.have.property("failures");
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/settlements/release-all — bulk release PENDING ≤ threshold (default Rs 50,000).
+  Requires Idempotency-Key. Skips HELD and over-threshold (not in candidate query).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "attempted": 20,
+            "released": 18,
+            "failed": 2,
+            "total_amount_released": 682400.00,
+            "failures": [
+              {
+                "settlement_id": "uuid",
+                "pharmacy_name": "MedPlus, HSR Layout",
+                "reason": "PHARMACY_NO_BANK_ACCOUNT"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

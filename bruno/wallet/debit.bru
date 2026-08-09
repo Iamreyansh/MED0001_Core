@@ -1,0 +1,133 @@
+meta {
+  name: debit
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/wallet/debit
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "customer_id": "{{customerId}}",
+    "amount": 50.00,
+    "order_id": "{{orderId}}",
+    "idempotency_key": "{{walletDebitIdempotencyKey}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("customerId")) {
+    throw new Error("customerId missing — run customers/me/get first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    bru.setEnvVar("orderId", crypto.randomUUID());
+  }
+  if (!bru.getEnvVar("walletDebitIdempotencyKey")) {
+    bru.setEnvVar("walletDebitIdempotencyKey", "checkout_" + crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.transaction_id) {
+    bru.setEnvVar("walletDebitTransactionId", body.data.transaction_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("debit envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("transaction_id");
+    expect(body.data).to.have.property("already_processed");
+    expect(body.data).to.have.property("remaining_balance");
+  });
+}
+
+docs {
+  POST /api/v1/wallet/debit — internal checkout debit (idempotent). Errors: CUSTOMER_NOT_FOUND, INSUFFICIENT_BALANCE, INVALID_AMOUNT.
+}
+
+example {
+  name: 200 OK
+  description: First debit for idempotency key
+  request: {
+    url: {{baseUrl}}/api/v1/wallet/debit
+    method: post
+    mode: json
+    body:json: {
+      {
+        "customer_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "amount": 50.00,
+        "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "idempotency_key": "checkout_order_uuid_attempt_1"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "transaction_id": "txnxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx",
+            "customer_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "deducted_amount": 50.00,
+            "balance_before": 150.00,
+            "remaining_balance": 100.00,
+            "idempotency_key": "checkout_order_uuid_attempt_1",
+            "already_processed": false
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INSUFFICIENT_BALANCE
+  description: Debit amount exceeds wallet balance
+  request: {
+    url: {{baseUrl}}/api/v1/wallet/debit
+    method: post
+    mode: json
+    body:json: {
+      {
+        "customer_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "amount": 200.00,
+        "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "idempotency_key": "checkout_overdraft"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INSUFFICIENT_BALANCE",
+            "message": "Wallet balance insufficient for debit"
+          }
+        }
+      '''
+    }
+  }
+}

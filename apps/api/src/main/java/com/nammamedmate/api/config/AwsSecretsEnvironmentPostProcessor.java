@@ -75,6 +75,8 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
       String razorpayxArn = environment.getProperty("MEDMATE_SECRETS_RAZORPAYX_ARN");
       if (razorpayxArn != null && !razorpayxArn.isBlank()) {
         JsonNode razorpayx = MAPPER.readTree(getSecret(client, razorpayxArn));
+        props.put("medmate.razorpayx.key-id", text(razorpayx, "key_id"));
+        props.put("medmate.razorpayx.key-secret", text(razorpayx, "key_secret"));
         props.put("medmate.razorpayx.webhook-secret", text(razorpayx, "webhook_secret"));
       }
       String kycArn = environment.getProperty("MEDMATE_SECRETS_KYC_ARN");

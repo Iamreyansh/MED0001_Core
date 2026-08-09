@@ -1,6 +1,7 @@
 package com.nammamedmate.order.domain;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public final class Refund {
@@ -20,6 +21,10 @@ public final class Refund {
   private String failedReason;
   private final String idempotencyKey;
   private final Instant createdAt;
+  private boolean autoProcessed;
+  private LocalDate expectedBy;
+  private Instant completedAt;
+  private UUID processedBy;
 
   public Refund(
       UUID id,
@@ -114,9 +119,42 @@ public final class Refund {
     return createdAt;
   }
 
+  public boolean autoProcessed() {
+    return autoProcessed;
+  }
+
+  public LocalDate expectedBy() {
+    return expectedBy;
+  }
+
+  public Instant completedAt() {
+    return completedAt;
+  }
+
+  public UUID processedBy() {
+    return processedBy;
+  }
+
+  public void setAutoProcessed(boolean autoProcessed) {
+    this.autoProcessed = autoProcessed;
+  }
+
+  public void setExpectedBy(LocalDate expectedBy) {
+    this.expectedBy = expectedBy;
+  }
+
+  public void setCompletedAt(Instant completedAt) {
+    this.completedAt = completedAt;
+  }
+
+  public void setProcessedBy(UUID processedBy) {
+    this.processedBy = processedBy;
+  }
+
   public void markProcessed(Instant at) {
     this.status = RefundStatus.PROCESSED;
     this.processedAt = at;
+    this.completedAt = at;
   }
 
   public void markFailed(String reason, Instant at) {

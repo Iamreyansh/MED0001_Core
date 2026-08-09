@@ -305,6 +305,39 @@ public class JdbcSettlementStore implements SettlementStore {
     return count != null && count > 0;
   }
 
+  @Override
+  public long sumUnconsumedCarryForwardPaise(UUID pharmacyId) {
+    Long sum =
+        jdbc.queryForObject(
+            """
+            SELECT COALESCE(SUM(net_paid_paise), 0) FROM settlement
+            WHERE pharmacy_id = ?
+              AND status = 'BELOW_THRESHOLD_CARRIED'
+              AND carry_forward_consumed_at IS NULL
+              AND deleted_at IS NULL
+            """,
+            Long.class,
+            pharmacyId);
+    return sum == null ? 0L : sum;
+  }
+
+  @Override
+  public void markCarryForwardConsumed(UUID pharmacyId, Instant consumedAt) {
+    jdbc.update(
+        """
+        UPDATE settlement SET
+          carry_forward_consumed_at = ?,
+          updated_at = ?
+        WHERE pharmacy_id = ?
+          AND status = 'BELOW_THRESHOLD_CARRIED'
+          AND carry_forward_consumed_at IS NULL
+          AND deleted_at IS NULL
+        """,
+        Timestamp.from(consumedAt),
+        Timestamp.from(consumedAt),
+        pharmacyId);
+  }
+
   private Optional<SettlementRow> queryOne(String sql, Object... args) {
     List<SettlementRow> rows = jdbc.query(sql, this::mapRow, args);
     return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());

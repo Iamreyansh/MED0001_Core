@@ -20,16 +20,29 @@ import com.nammamedmate.order.domain.RefundIssuedByType;
 import com.nammamedmate.order.domain.RefundStatus;
 import com.nammamedmate.order.domain.RefundTo;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class RefundService implements RefundInitiatorPort {
+
+  /** EPIC-012 STORY-005 BR-002: auto-process ≤ ₹500 for pharmacy/system cancels. */
+  public static final long AUTO_REFUND_MAX_PAISE = 50_000L;
+
+  private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
   private final RefundStore refunds;
   private final OrderCancellationStore cancellations;
@@ -37,6 +50,7 @@ public class RefundService implements RefundInitiatorPort {
   private final RazorpayPaymentPort razorpay;
   private final WalletPort wallet;
   private final Clock clock;
+  private final TransactionTemplate tx;
 
   public RefundService(
       RefundStore refunds,
@@ -45,22 +59,51 @@ public class RefundService implements RefundInitiatorPort {
       RazorpayPaymentPort razorpay,
       WalletPort wallet,
       Clock clock) {
+    this(refunds, cancellations, orders, razorpay, wallet, clock, null);
+  }
+
+  @Autowired
+  public RefundService(
+      RefundStore refunds,
+      OrderCancellationStore cancellations,
+      OrderStore orders,
+      RazorpayPaymentPort razorpay,
+      WalletPort wallet,
+      Clock clock,
+      @Nullable PlatformTransactionManager transactionManager) {
     this.refunds = refunds;
     this.cancellations = cancellations;
     this.orders = orders;
     this.razorpay = razorpay;
     this.wallet = wallet;
     this.clock = clock;
+    this.tx = transactionManager == null ? null : new TransactionTemplate(transactionManager);
+  }
+
+  private <T> T inTx(Supplier<T> action) {
+    if (tx == null) {
+      return action.get();
+    }
+    return tx.execute(status -> action.get());
+  }
+
+  private void inTx(Runnable action) {
+    inTx(
+        () -> {
+          action.run();
+          return null;
+        });
   }
 
   @Override
-  @Transactional
-  public RefundPlan initiate(
+  public RefundInitiatorPort.RefundPlan initiate(
       Order order, String reason, ActorType cancelledByType, UUID cancelledById) {
     Instant now = clock.instant();
-    persistCancellation(order, reason, toCancelledBy(cancelledByType), cancelledById, now);
+    inTx(
+        () ->
+            persistCancellation(order, reason, toCancelledBy(cancelledByType), cancelledById, now));
     if (!isAutoRefundDue(order)) {
-      return new RefundPlan(false, 0L, null);
+      return new RefundInitiatorPort.RefundPlan(false, 0L, null);
     }
     Refund primary = null;
     if (order.walletAppliedPaise() > 0) {
@@ -71,25 +114,39 @@ public class RefundService implements RefundInitiatorPort {
               RefundTo.WALLET,
               reason,
               null,
-              null,
+              cancelledById,
               issuedByType(cancelledByType),
               null,
-              now);
+              now,
+              true,
+              true);
     }
     long online = order.totalPayablePaise();
     if (online > 0 && isPayableRefundable(order)) {
       RefundTo to = defaultRefundTo(order);
+      boolean autoEligible =
+          cancelledByType == ActorType.PHARMACY || cancelledByType == ActorType.SYSTEM;
       primary =
           executeRefund(
-              order, online, to, reason, null, null, issuedByType(cancelledByType), null, now);
+              order,
+              online,
+              to,
+              reason,
+              null,
+              cancelledById,
+              issuedByType(cancelledByType),
+              null,
+              now,
+              false,
+              autoEligible);
     }
     if (primary == null) {
-      return new RefundPlan(false, 0L, null);
+      return new RefundInitiatorPort.RefundPlan(false, 0L, null);
     }
-    return new RefundPlan(true, primary.amountPaise(), primary.refundTo().name());
+    return new RefundInitiatorPort.RefundPlan(
+        true, primary.amountPaise(), primary.refundTo().name());
   }
 
-  @Transactional
   public Refund issueManual(
       Order order,
       long amountPaise,
@@ -111,6 +168,9 @@ public class RefundService implements RefundInitiatorPort {
       throw new AppException(
           "REFUND_EXCEEDS_REMAINING_REFUNDABLE", "Refund exceeds remaining refundable amount", 422);
     }
+    if (amountPaise < order.totalPayablePaise() && (notes == null || notes.isBlank())) {
+      throw new AppException("VALIDATION_ERROR", "notes are required for partial refunds", 400);
+    }
     if (refundTo == RefundTo.SOURCE) {
       long maxSource = onlinePortionMax(order) - sourceRefundedPaise(order.id());
       if (amountPaise > maxSource) {
@@ -129,10 +189,11 @@ public class RefundService implements RefundInitiatorPort {
         issuedBy,
         RefundIssuedByType.ADMIN,
         key,
-        clock.instant());
+        clock.instant(),
+        true,
+        false);
   }
 
-  @Transactional
   public Refund issueOnAdminCancel(
       Order order, long amountPaise, RefundTo refundTo, String reason, UUID issuedBy, Instant now) {
     if (amountPaise <= 0) {
@@ -151,11 +212,20 @@ public class RefundService implements RefundInitiatorPort {
           "REFUND_EXCEEDS_ORDER_TOTAL", "SOURCE refund exceeds online payment portion", 422);
     }
     return executeRefund(
-        order, amountPaise, refundTo, reason, null, issuedBy, RefundIssuedByType.ADMIN, null, now);
+        order,
+        amountPaise,
+        refundTo,
+        reason,
+        null,
+        issuedBy,
+        RefundIssuedByType.ADMIN,
+        null,
+        now,
+        true,
+        false);
   }
 
   /** Reverse wallet debit applied at checkout (not bounded by total_payable). */
-  @Transactional
   public Refund reverseWalletApplied(Order order, String reason, UUID issuedBy, Instant now) {
     if (order.walletAppliedPaise() <= 0) {
       return null;
@@ -169,7 +239,9 @@ public class RefundService implements RefundInitiatorPort {
         issuedBy,
         issuedBy == null ? RefundIssuedByType.SYSTEM : RefundIssuedByType.ADMIN,
         null,
-        now);
+        now,
+        true,
+        true);
   }
 
   public void persistCancellation(
@@ -240,35 +312,89 @@ public class RefundService implements RefundInitiatorPort {
       UUID issuedBy,
       RefundIssuedByType issuedByType,
       String idempotencyKey,
-      Instant now) {
+      Instant now,
+      boolean forceProcess,
+      boolean autoEligible) {
     UUID id = Ids.newId();
-    RefundStatus status = RefundStatus.INITIATED;
-    String rzRefundId = null;
-    UUID walletTxId = null;
-    Instant processedAt = null;
+    String reasonText = reason == null ? "REFUND" : truncate(reason, 300);
+    String notesText = notes == null || notes.isBlank() ? null : truncate(notes, 500);
+
+    boolean queuePending =
+        !forceProcess
+            && refundTo == RefundTo.SOURCE
+            && !(autoEligible && amountPaise <= AUTO_REFUND_MAX_PAISE);
+
+    if (queuePending) {
+      Refund refund =
+          new Refund(
+              id,
+              order.id(),
+              amountPaise,
+              refundTo,
+              reasonText,
+              notesText,
+              RefundStatus.PENDING,
+              issuedBy,
+              issuedByType,
+              null,
+              null,
+              null,
+              null,
+              idempotencyKey,
+              now);
+      inTx(
+          () -> {
+            refunds.insert(refund);
+            refreshOrderPaymentStatus(order.id(), now);
+          });
+      return refund;
+    }
 
     if (refundTo == RefundTo.WALLET) {
       String key =
           idempotencyKey != null ? idempotencyKey : "order-refund-" + order.id() + "-" + id;
-      walletTxId =
-          wallet.creditForRefund(
-              order.customerId(),
-              order.id(),
-              amountPaise,
-              reason == null ? "Order refund" : reason,
-              key);
-      status = RefundStatus.PROCESSED;
-      processedAt = now;
-    } else {
-      String paymentId = order.razorpayPaymentId();
-      if (paymentId == null || paymentId.isBlank()) {
-        throw new AppException(
-            "VALIDATION_ERROR", "Order has no Razorpay payment for SOURCE refund", 422);
-      }
-      // ponytail: sync Razorpay SOURCE refund in-request (stub client). Ceiling: TX/provider
-      // orphan risk under live gateway — upgrade to INITIATED+outbox→worker then webhook PROCESSED.
-      RazorpayPaymentPort.RefundResult rz = razorpay.refund(paymentId, amountPaise);
-      rzRefundId = rz.razorpayRefundId();
+      return inTx(
+          () -> {
+            UUID walletTxId =
+                wallet.creditForRefund(
+                    order.customerId(),
+                    order.id(),
+                    amountPaise,
+                    reason == null ? "Order refund" : reason,
+                    key);
+            Refund refund =
+                new Refund(
+                    id,
+                    order.id(),
+                    amountPaise,
+                    refundTo,
+                    reasonText,
+                    notesText,
+                    RefundStatus.PROCESSED,
+                    issuedBy,
+                    issuedByType,
+                    null,
+                    walletTxId,
+                    now,
+                    null,
+                    idempotencyKey,
+                    now);
+            refund.setAutoProcessed(autoEligible);
+            refund.setCompletedAt(now);
+            if (issuedBy != null) {
+              refund.setProcessedBy(issuedBy);
+            }
+            refunds.insert(refund);
+            refreshOrderPaymentStatus(order.id(), now);
+            return refund;
+          });
+    }
+
+    // SOURCE auto/manual process: persist INITIATED, then Razorpay outside TX, then attach id
+    String paymentId = order.razorpayPaymentId();
+    if (paymentId == null || paymentId.isBlank()) {
+      throw new AppException(
+          "VALIDATION_ERROR", "Order has no Razorpay payment for SOURCE refund", 422);
     }
 
     Refund refund =
@@ -277,20 +403,59 @@ public class RefundService implements RefundInitiatorPort {
             order.id(),
             amountPaise,
             refundTo,
-            reason == null ? "REFUND" : truncate(reason, 300),
-            notes == null || notes.isBlank() ? null : truncate(notes, 500),
-            status,
+            reasonText,
+            notesText,
+            RefundStatus.INITIATED,
             issuedBy,
             issuedByType,
-            rzRefundId,
-            walletTxId,
-            processedAt,
+            null,
+            null,
+            now,
             null,
             idempotencyKey,
             now);
-    refunds.insert(refund);
-    refreshOrderPaymentStatus(order.id(), now);
+    refund.setAutoProcessed(autoEligible);
+    if (issuedBy != null) {
+      refund.setProcessedBy(issuedBy);
+    }
+    inTx(() -> refunds.insert(refund));
+
+    try {
+      RazorpayPaymentPort.RefundResult rz = razorpay.refund(paymentId, amountPaise);
+      LocalDate expectedBy = addBusinessDays(LocalDate.ofInstant(now, IST), 5);
+      inTx(
+          () -> {
+            refund.setRazorpayRefundId(rz.razorpayRefundId());
+            refund.setExpectedBy(expectedBy);
+            refunds.update(refund);
+            refreshOrderPaymentStatus(order.id(), now);
+          });
+    } catch (RuntimeException ex) {
+      inTx(
+          () -> {
+            refund.markFailed(
+                ex.getMessage() == null ? "razorpay refund failed" : ex.getMessage(), now);
+            refunds.update(refund);
+          });
+      if (ex instanceof AppException app) {
+        throw app;
+      }
+      throw new AppException("RAZORPAY_REFUND_FAILED", "Failed to initiate Razorpay refund", 502);
+    }
     return refund;
+  }
+
+  static LocalDate addBusinessDays(LocalDate start, int days) {
+    LocalDate d = start;
+    int added = 0;
+    while (added < days) {
+      d = d.plusDays(1);
+      DayOfWeek dow = d.getDayOfWeek();
+      if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY) {
+        added++;
+      }
+    }
+    return d;
   }
 
   private void refreshOrderPaymentStatus(UUID orderId, Instant now) {
@@ -336,7 +501,11 @@ public class RefundService implements RefundInitiatorPort {
   private long sourceRefundedPaise(UUID orderId) {
     return refunds.listByOrderId(orderId).stream()
         .filter(r -> r.refundTo() == RefundTo.SOURCE)
-        .filter(r -> r.status() == RefundStatus.INITIATED || r.status() == RefundStatus.PROCESSED)
+        .filter(
+            r ->
+                r.status() == RefundStatus.INITIATED
+                    || r.status() == RefundStatus.PROCESSED
+                    || r.status() == RefundStatus.PENDING)
         .mapToLong(Refund::amountPaise)
         .sum();
   }
@@ -374,18 +543,20 @@ public class RefundService implements RefundInitiatorPort {
     return trimmed;
   }
 
-  private static String text(JsonNode node, String field) {
-    JsonNode n = node.get(field);
-    if (n == null || n.isNull()) {
-      return null;
+  private static String truncate(String value, int max) {
+    if (value.length() <= max) {
+      return value;
     }
-    String v = n.asText();
-    return v.isBlank() ? null : v;
+    return value.substring(0, max);
   }
 
-  private static String truncate(String s, int max) {
-    String t = s.trim();
-    return t.length() <= max ? t : t.substring(0, max);
+  static String text(JsonNode node, String field) {
+    JsonNode child = node.get(field);
+    if (child == null || child.isNull()) {
+      return null;
+    }
+    String v = child.asText();
+    return v == null || v.isBlank() ? null : v;
   }
 
   static RefundTo parseRefundTo(String raw) {

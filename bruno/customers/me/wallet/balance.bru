@@ -1,0 +1,86 @@
+meta {
+  name: balance
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me/wallet/balance
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.customer_id) {
+    bru.setEnvVar("customerId", body.data.customer_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("story balance envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("customer_id");
+    expect(body.data).to.have.property("balance");
+    expect(body.data.expiring_soon).to.be.an("object");
+    expect(body.data.expiring_soon).to.have.property("expires_within_days");
+  });
+}
+
+docs {
+  GET /api/v1/customers/me/wallet/balance — EPIC-012 story-shaped balance (expiring_soon within 30 days).
+  Errors: 401 UNAUTHORIZED
+}
+
+example {
+  name: 200 OK
+  description: Balance with expiring_soon within 30 days
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/wallet/balance
+    method: get
+    mode: none
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "customer_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "balance": 200.00,
+            "expiring_soon": {
+              "amount": 50.00,
+              "expires_within_days": 30
+            }
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

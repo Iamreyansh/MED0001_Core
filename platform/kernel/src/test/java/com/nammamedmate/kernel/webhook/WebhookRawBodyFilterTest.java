@@ -53,6 +53,22 @@ class WebhookRawBodyFilterTest {
   }
 
   @Test
+  void cachesBodyForPaymentWebhookPaths() throws Exception {
+    WebhookRawBodyFilter filter = new WebhookRawBodyFilter();
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/api/v1/payments/webhook/razorpay");
+    byte[] payload = "{\"event\":\"payment.captured\"}".getBytes(StandardCharsets.UTF_8);
+    request.setContent(payload);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain chain =
+        (req, res) -> {
+          CachedBodyHttpServletRequest cached = (CachedBodyHttpServletRequest) req;
+          assertThat(WebhookRawBodyFilter.rawBody(cached)).isEqualTo(payload);
+        };
+    filter.doFilter(request, response, chain);
+  }
+
+  @Test
   void skipsNonWebhookPaths() throws Exception {
     WebhookRawBodyFilter filter = new WebhookRawBodyFilter();
     HttpServletRequest request = mock(HttpServletRequest.class);

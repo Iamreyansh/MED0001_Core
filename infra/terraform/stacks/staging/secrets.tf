@@ -84,6 +84,8 @@ resource "aws_secretsmanager_secret" "razorpayx" {
 resource "aws_secretsmanager_secret_version" "razorpayx" {
   secret_id = aws_secretsmanager_secret.razorpayx.id
   secret_string = jsonencode({
+    key_id         = "rzp_test_replace_me"
+    key_secret     = "replace_me"
     webhook_secret = random_password.razorpayx_webhook.result
   })
 

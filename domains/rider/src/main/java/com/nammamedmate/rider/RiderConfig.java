@@ -11,11 +11,13 @@ import com.nammamedmate.rider.adapter.out.sse.InMemoryOrderLocationPush;
 import com.nammamedmate.rider.application.port.out.AadhaarKycPort;
 import com.nammamedmate.rider.application.port.out.ActiveDeliveryPort;
 import com.nammamedmate.rider.application.port.out.AssignmentOtpCachePort;
+import com.nammamedmate.rider.application.port.out.CodDepositConfirmedPort;
 import com.nammamedmate.rider.application.port.out.CustomerOrderLocationPort;
 import com.nammamedmate.rider.application.port.out.DispatchOrderPort;
 import com.nammamedmate.rider.application.port.out.DispatchOrderPort.OrderDetails;
 import com.nammamedmate.rider.application.port.out.DispatchOrderPort.QueuePage;
 import com.nammamedmate.rider.application.port.out.DistanceMatrixPort;
+import com.nammamedmate.rider.application.port.out.FinanceCodDailyReconciliationPort;
 import com.nammamedmate.rider.application.port.out.OrderLocationPushPort;
 import com.nammamedmate.rider.application.port.out.RazorpayRoutePort;
 import com.nammamedmate.rider.application.port.out.RiderLiveStatusCachePort;
@@ -146,5 +148,21 @@ public class RiderConfig {
   @ConditionalOnMissingBean(CustomerOrderLocationPort.class)
   CustomerOrderLocationPort stubCustomerOrderLocationPort() {
     return orderId -> Optional.empty();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(CodDepositConfirmedPort.class)
+  CodDepositConfirmedPort stubCodDepositConfirmedPort() {
+    return (depositId, riderId, amountPaise) -> {
+      // no-op until apps/api ledger bridge (EPIC-012/STORY-006)
+    };
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(FinanceCodDailyReconciliationPort.class)
+  FinanceCodDailyReconciliationPort stubFinanceCodDailyReconciliationPort() {
+    return reportDate -> {
+      // no-op until apps/api bridge — CodReconciliationService falls back to outbox stub
+    };
   }
 }

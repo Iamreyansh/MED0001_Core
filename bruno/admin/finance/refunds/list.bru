@@ -1,0 +1,91 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/refunds?status=PENDING&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.refunds && body.data.refunds[0]) {
+    bru.setEnvVar("financeRefundId", body.data.refunds[0].refund_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("refunds list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.kpi_chips).to.have.property("pending_count");
+    expect(body.data.kpi_chips).to.have.property("overdue_count");
+    expect(body.data.refunds).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/refunds — KPI chips + filterable refund queue (EPIC-012/STORY-005).
+  Storage INITIATED/PROCESSED map to PROCESSING/COMPLETED in responses. SOURCE maps to SOURCE_ACCOUNT.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/refunds?status=PENDING&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpi_chips": {
+              "pending_count": 12,
+              "pending_value": 8450.00,
+              "processed_today": 24,
+              "failed_today": 1,
+              "overdue_count": 3
+            },
+            "refunds": [
+              {
+                "refund_id": "a0000001-0000-4000-8000-0000000000r1",
+                "order_id": "a0000001-0000-4000-8000-0000000000o1",
+                "order_number": "MED-20260724-018",
+                "customer_name": "Priya S",
+                "customer_phone": "9876543210",
+                "refund_amount": 450.00,
+                "payment_method": "UPI",
+                "refund_to": "SOURCE_ACCOUNT",
+                "status": "PENDING",
+                "cancellation_reason": "PHARMACY_CANCELLED",
+                "is_overdue": false,
+                "created_at": "2026-07-24T10:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 36 }
+        }
+      '''
+    }
+  }
+}

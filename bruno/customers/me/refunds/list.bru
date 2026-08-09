@@ -1,0 +1,78 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me/refunds?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.refunds && body.data.refunds[0]) {
+    bru.setEnvVar("customerRefundId", body.data.refunds[0].refund_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("customer refunds envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.refunds).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/customers/me/refunds — customer refund history (EPIC-012/STORY-005).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/refunds?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "refunds": [
+              {
+                "refund_id": "a0000001-0000-4000-8000-0000000000r1",
+                "order_id": "a0000001-0000-4000-8000-0000000000o1",
+                "order_number": "MED-20260724-018",
+                "amount": 450.00,
+                "refund_to": "SOURCE_ACCOUNT",
+                "status": "PROCESSING",
+                "expected_by": "2026-07-29",
+                "message": "Your refund is being processed and will be credited to your original payment method within 3-5 business days.",
+                "created_at": "2026-07-24T10:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 3 }
+        }
+      '''
+    }
+  }
+}

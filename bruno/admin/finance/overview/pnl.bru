@@ -1,0 +1,116 @@
+meta {
+  name: pnl
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/pnl?period=7D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("financePnlPeriod", body.data.period);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pnl envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("period");
+    expect(body.data).to.have.property("gmv");
+    expect(body.data).to.have.property("net_revenue");
+    expect(body.data).to.have.property("gmv_chart");
+    expect(body.data).to.have.property("gmv_breakdown_pie");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/pnl — P&L for period (TODAY|7D|30D|90D|CUSTOM). EPIC-012/STORY-009.
+  CUSTOM requires from & to (YYYY-MM-DD); max 365 days.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/pnl?period=7D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "7D",
+            "from": "2026-07-17",
+            "to": "2026-07-24",
+            "gmv": 1295000.00,
+            "commission_earned": 103600.00,
+            "refunds_issued": 28500.00,
+            "gateway_fees": 19175.00,
+            "net_revenue": 55925.00,
+            "orders_count": 3714,
+            "avg_order_value": 348.60,
+            "gmv_chart": [
+              { "label": "2026-07-17", "gmv": 162000.00, "orders": 465 }
+            ],
+            "gmv_breakdown_pie": {
+              "pharmacy_payout": 946200.00,
+              "platform_commission": 103600.00,
+              "tcs_collected": 12950.00,
+              "gateway_fees": 19175.00,
+              "refunds": 28500.00,
+              "net_platform_revenue": 55925.00
+            }
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 CUSTOM_DATES_REQUIRED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/pnl?period=CUSTOM
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CUSTOM_DATES_REQUIRED",
+            "message": "period=CUSTOM requires from and to"
+          }
+        }
+      '''
+    }
+  }
+}

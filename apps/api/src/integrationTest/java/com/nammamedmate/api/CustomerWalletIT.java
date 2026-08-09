@@ -119,7 +119,7 @@ class CustomerWalletIT extends AbstractApiIT {
                 "wallet-it-over-limit"),
             Map.class);
     assertThat(overLimit.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-    assertThat(errorCode(overLimit)).isEqualTo("EXCEEDS_CREDIT_LIMIT");
+    assertThat(errorCode(overLimit)).isEqualTo("ADMIN_CREDIT_EXCEEDS_LIMIT");
 
     String supportToken = adminLogin("support-wallet@test.in");
     ResponseEntity<Map> forbidden =

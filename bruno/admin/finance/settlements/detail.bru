@@ -1,0 +1,86 @@
+meta {
+  name: detail
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/settlements/{{financeSettlementId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeSettlementId")) {
+    throw new Error("financeSettlementId missing — run list first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("line_items");
+    expect(body.data).to.have.property("net_payable");
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/settlements/:settlement_id — detail with per-order line items.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "settlement_id": "a0000001-0000-4000-8000-0000000000s1",
+            "pharmacy_id": "a0000001-0000-4000-8000-0000000000p1",
+            "pharmacy_name": "Apollo Pharmacy, Koramangala",
+            "pharmacy_bank": {
+              "account_number_masked": "XXXXXXXXXXXX4521",
+              "bank_name": "HDFC Bank",
+              "ifsc": "HDFC0001234"
+            },
+            "cycle_from": "2026-07-14",
+            "cycle_to": "2026-07-20",
+            "gmv": 52000.00,
+            "commission_pct": 8.0,
+            "commission_earned": 4160.00,
+            "tcs_deducted": 520.00,
+            "gst_on_commission": 748.80,
+            "net_payable": 47320.00,
+            "status": "PENDING",
+            "orders_count": 148,
+            "line_items": []
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 SETTLEMENT_NOT_FOUND
+  response: {
+    status: { code: 404 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "SETTLEMENT_NOT_FOUND", "message": "Settlement not found" } }
+      '''
+    }
+  }
+}

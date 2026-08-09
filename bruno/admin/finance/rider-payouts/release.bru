@@ -1,0 +1,122 @@
+meta {
+  name: release
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/rider-payouts/{{financeRiderPayoutRiderId}}/release
+  auth: inherit
+}
+
+headers {
+  Idempotency-Key: {{financeRiderPayoutReleaseKey}}
+}
+
+body:json {
+  {
+    "payout_id": "{{financeRiderPayoutId}}",
+    "notes": "Manual release after COD resolved."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeRiderPayoutId") || !bru.getEnvVar("financeRiderPayoutRiderId")) {
+    throw new Error("financeRiderPayout* missing — run list first");
+  }
+  if (!bru.getEnvVar("financeRiderPayoutReleaseKey")) {
+    bru.setEnvVar("financeRiderPayoutReleaseKey", "finance-rider-payout-release-" + Date.now());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.razorpay_payout_id) {
+    bru.setEnvVar("razorpayPayoutId", body.data.razorpay_payout_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("release envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RELEASED");
+    expect(body.data).to.have.property("razorpay_payout_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/rider-payouts/:rider_id/release — Razorpay Route + ledger PAYOUT_RIDER + SMS outbox.
+  Requires Idempotency-Key.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/rider-payouts/{{financeRiderPayoutRiderId}}/release
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: finance-rider-payout-release-demo
+    }
+    body:json: {
+      {
+        "payout_id": "{{financeRiderPayoutId}}",
+        "notes": "Manual release after COD resolved."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "payout_id": "a0000001-0000-4000-8000-0000000000p1",
+            "rider_id": "a0000001-0000-4000-8000-0000000000r1",
+            "net_payout": 2000.00,
+            "status": "RELEASED",
+            "razorpay_payout_id": "pout_XXXXXXXXXXXX",
+            "released_by": "admin-uuid",
+            "released_at": "2026-07-24T10:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 COD_UNRESOLVED
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "COD_UNRESOLVED", "message": "Rider cod_in_hand still > cod_float_limit" } }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 PAYOUT_BELOW_THRESHOLD
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "PAYOUT_BELOW_THRESHOLD", "message": "net_payout < Rs 100" } }
+      '''
+    }
+  }
+}

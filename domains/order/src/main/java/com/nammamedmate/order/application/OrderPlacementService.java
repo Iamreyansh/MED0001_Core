@@ -522,6 +522,42 @@ public class OrderPlacementService {
     notifyPharmacy(order, address, pharmacy);
   }
 
+  /**
+   * Called from payment domain bridge on CAPTURED (EPIC-012). Idempotent when already paid /
+   * accepted.
+   */
+  @Transactional
+  public void applyExternalPaymentCapture(UUID orderId, String razorpayPaymentId) {
+    if (orderId == null) {
+      return;
+    }
+    Order order = orders.findById(orderId).orElse(null);
+    if (order == null) {
+      return;
+    }
+    if (order.paymentStatus() == PaymentStatus.PAID) {
+      if (razorpayPaymentId == null) {
+        return;
+      }
+      if (razorpayPaymentId.equals(order.razorpayPaymentId())) {
+        return;
+      }
+    }
+    if (order.status() != OrderStatus.PAYMENT_PENDING) {
+      return;
+    }
+    confirmOnlineOrder(order, razorpayPaymentId);
+  }
+
+  /**
+   * Called from payment domain bridge on payment.failed. Orders schema has no PAYMENT_FAILED —
+   * leave PAYMENT_PENDING so the customer can retry (ponytail until status enum expands).
+   */
+  @Transactional
+  public void applyExternalPaymentFailure(UUID orderId, String reason) {
+    // no-op on order row; payment domain owns FAILED status
+  }
+
   private void recordPendingAcceptance(Order order, Instant at) {
     statusEvents.append(
         new OrderStatusEvent(

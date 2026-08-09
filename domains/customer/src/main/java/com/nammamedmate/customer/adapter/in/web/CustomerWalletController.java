@@ -31,6 +31,13 @@ public class CustomerWalletController {
     return ApiResponse.ok(service.getMyWallet(principal));
   }
 
+  @GetMapping("/balance")
+  @Operation(summary = "Get wallet balance (EPIC-012 story shape)")
+  public ApiResponse<Map<String, Object>> balance(
+      @AuthenticationPrincipal MedmatePrincipal principal) {
+    return ApiResponse.ok(service.getMyWalletBalance(principal));
+  }
+
   @GetMapping("/transactions")
   @Operation(summary = "List wallet transactions")
   public ApiResponse<List<Map<String, Object>>> transactions(

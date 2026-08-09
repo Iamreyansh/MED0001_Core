@@ -1,0 +1,61 @@
+meta {
+  name: reconciliation-report-export
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/finance/cod-float/reconciliation-report/export?date=2026-07-24
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  // CSV body — no JSON env chaining
+}
+
+tests {
+  test("HTTP 200 or 404", function () {
+    expect([200, 404]).to.include(res.getStatus());
+  });
+  test("csv or error", function () {
+    if (res.getStatus() === 200) {
+      const body = res.getBody();
+      expect(String(body)).to.include("rider_id");
+    } else {
+      const body = res.getBody();
+      expect(body.success).to.equal(false);
+    }
+  });
+}
+
+docs {
+  GET /api/v1/admin/finance/cod-float/reconciliation-report/export — CSV rider breakdown (AC-007).
+}
+
+example {
+  name: 200 OK CSV
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/cod-float/reconciliation-report/export?date=2026-07-24
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: text
+      content: '''
+        rider_id,rider_name,orders,collected,deposited,variance,status
+        a0000001-0000-4000-8000-0000000000r1,Ravi Kumar,14,4200.00,4200.00,0.00,MATCHED
+      '''
+    }
+  }
+}

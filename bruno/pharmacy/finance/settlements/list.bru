@@ -1,0 +1,72 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/finance/settlements?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.settlements && body.data.settlements[0]) {
+    bru.setEnvVar("pharmacyFinanceSettlementId", body.data.settlements[0].settlement_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pharmacy settlements envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.settlements).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/finance/settlements — pharmacy_owner own settlement history.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "settlements": [
+              {
+                "settlement_id": "a0000001-0000-4000-8000-0000000000s1",
+                "cycle_from": "2026-07-14",
+                "cycle_to": "2026-07-20",
+                "gmv": 52000.00,
+                "commission_pct": 8.0,
+                "commission_deducted": 4160.00,
+                "tcs_deducted": 520.00,
+                "net_payable": 47320.00,
+                "status": "RELEASED",
+                "released_at": "2026-07-21T06:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 12 }
+        }
+      '''
+    }
+  }
+}

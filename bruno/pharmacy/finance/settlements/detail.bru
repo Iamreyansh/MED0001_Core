@@ -1,0 +1,81 @@
+meta {
+  name: detail
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/finance/settlements/{{pharmacyFinanceSettlementId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("pharmacyFinanceSettlementId")) {
+    throw new Error("pharmacyFinanceSettlementId missing — run list first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pharmacy detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("line_items");
+    expect(body.data).to.not.have.property("pharmacy_bank");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/finance/settlements/:id — own settlement detail (403 if another pharmacy).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "settlement_id": "a0000001-0000-4000-8000-0000000000s1",
+            "pharmacy_id": "a0000001-0000-4000-8000-0000000000p1",
+            "pharmacy_name": "Apollo Pharmacy, Koramangala",
+            "cycle_from": "2026-07-14",
+            "cycle_to": "2026-07-20",
+            "gmv": 52000.00,
+            "commission_pct": 8.0,
+            "commission_earned": 4160.00,
+            "tcs_deducted": 520.00,
+            "gst_on_commission": 748.80,
+            "net_payable": 47320.00,
+            "status": "RELEASED",
+            "orders_count": 148,
+            "line_items": []
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "FORBIDDEN", "message": "Settlement does not belong to this pharmacy" } }
+      '''
+    }
+  }
+}

@@ -198,7 +198,8 @@ class AwsSecretsEnvironmentPostProcessorTest {
     when(client.getSecretValue(any(GetSecretValueRequest.class)))
         .thenReturn(
             GetSecretValueResponse.builder()
-                .secretString("{\"webhook_secret\":\"prod-razorpayx-hmac-secret\"}")
+                .secretString(
+                    "{\"key_id\":\"rzp_x\",\"key_secret\":\"xsec\",\"webhook_secret\":\"prod-razorpayx-hmac-secret\"}")
                 .build());
 
     StandardEnvironment env = new StandardEnvironment();
@@ -211,6 +212,8 @@ class AwsSecretsEnvironmentPostProcessorTest {
     new AwsSecretsEnvironmentPostProcessor(() -> client)
         .postProcessEnvironment(env, new SpringApplication());
 
+    assertThat(env.getProperty("medmate.razorpayx.key-id")).isEqualTo("rzp_x");
+    assertThat(env.getProperty("medmate.razorpayx.key-secret")).isEqualTo("xsec");
     assertThat(env.getProperty("medmate.razorpayx.webhook-secret"))
         .isEqualTo("prod-razorpayx-hmac-secret");
   }

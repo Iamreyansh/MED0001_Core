@@ -43,15 +43,16 @@ class OrderCustomerBridgeConfigTest {
     assertThat(port.debitForOrder(customerId, orderId, 1, "x")).isEqualTo(0L);
 
     UUID txId = UUID.randomUUID();
-    when(wallets.systemCredit(eq(customerId), eq(5000L), any(), eq(orderId.toString()), eq("ik")))
+    when(wallets.systemCredit(
+            eq(customerId), eq(5000L), any(), eq(orderId.toString()), eq("ik"), eq("REFUND")))
         .thenReturn(Map.of("transaction_id", txId));
     assertThat(port.creditForRefund(customerId, orderId, 5000L, "refund", "ik")).isEqualTo(txId);
 
-    when(wallets.systemCredit(eq(customerId), eq(100L), any(), isNull(), eq("ik2")))
+    when(wallets.systemCredit(eq(customerId), eq(100L), any(), isNull(), eq("ik2"), eq("REFUND")))
         .thenReturn(Map.of("transaction_id", txId.toString()));
     assertThat(port.creditForRefund(customerId, null, 100L, "refund", "ik2")).isEqualTo(txId);
 
-    when(wallets.systemCredit(any(), anyLong(), any(), any(), any()))
+    when(wallets.systemCredit(any(), anyLong(), any(), any(), any(), any()))
         .thenReturn(new java.util.HashMap<>());
     assertThat(port.creditForRefund(customerId, orderId, 1L, "x", "ik3")).isNull();
 

@@ -1,0 +1,121 @@
+meta {
+  name: release
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/settlements/{{financeSettlementId}}/release
+  auth: inherit
+}
+
+headers {
+  Idempotency-Key: {{financeSettlementReleaseKey}}
+}
+
+body:json {
+  {
+    "notes": "Routine weekly release."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeSettlementId")) {
+    throw new Error("financeSettlementId missing — run list first");
+  }
+  if (!bru.getEnvVar("financeSettlementReleaseKey")) {
+    bru.setEnvVar("financeSettlementReleaseKey", "finance-settlement-release-" + Date.now());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.razorpay_payout_id) {
+    bru.setEnvVar("razorpayPayoutId", body.data.razorpay_payout_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("release envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RELEASED");
+    expect(body.data).to.have.property("razorpay_payout_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/settlements/:id/release — RazorpayX payout + ledger PAYOUT_PHARMACY.
+  Requires Idempotency-Key. PENDING_RELEASE stored as RELEASED after success.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/finance/settlements/{{financeSettlementId}}/release
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Idempotency-Key: finance-settlement-release-demo
+    }
+    body:json: {
+      {
+        "notes": "Routine weekly release."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "settlement_id": "a0000001-0000-4000-8000-0000000000s1",
+            "pharmacy_id": "a0000001-0000-4000-8000-0000000000p1",
+            "net_payable": 47320.00,
+            "status": "RELEASED",
+            "razorpay_payout_id": "pout_XXXXXXXXXXXX",
+            "released_by": "admin-uuid",
+            "released_at": "2026-07-24T10:00:00Z",
+            "notification_sent": true
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 AMOUNT_BELOW_THRESHOLD
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "AMOUNT_BELOW_THRESHOLD", "message": "net_payable < Rs 100; amount carried forward to next cycle" } }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 SETTLEMENT_HELD
+  response: {
+    status: { code: 422 }
+    body: {
+      type: json
+      content: '''
+        { "success": false, "error": { "code": "SETTLEMENT_HELD", "message": "Settlement is on HOLD; unhold before releasing" } }
+      '''
+    }
+  }
+}

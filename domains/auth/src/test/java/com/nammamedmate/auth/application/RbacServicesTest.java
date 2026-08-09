@@ -356,8 +356,12 @@ class RbacServicesTest {
             "kyc:read",
             "kyc:approve",
             "kyc:reject");
+    assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_compliance"))
+        .contains("taxes:read", "taxes:export");
     assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_operations"))
         .contains("pharmacies:suspend", "orders:dispatch", "orders:*");
+    assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_support"))
+        .contains("pharmacies:read", "finance:read");
     assertThat(AdminRoleDefinitions.liveExtras()).containsKey("admin_finance");
     assertThat(AdminRoleDefinitions.find("admin_super")).isPresent();
     assertThat(AdminRoleDefinitions.find("nope")).isEmpty();
