@@ -1,0 +1,95 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/purchases?status={{grnStatus}}&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  status: {{grnStatus}}
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+  if (!bru.getEnvVar("grnStatus")) {
+    bru.setEnvVar("grnStatus", "STOCKED");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.grns && body.data.grns[0]) {
+    bru.setEnvVar("grnId", body.data.grns[0].grn_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope with kpi", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpi");
+    expect(body.data).to.have.property("grns");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/purchases
+  Filter by status DRAFT|SAVED|STOCKED. Seed distributorId via SQL for Free-plan GRN tests.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases?status=STOCKED&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpi": {
+              "purchases_this_month": 18,
+              "input_gst_credit_this_month": 24500.00,
+              "total_grns": 124
+            },
+            "grns": [
+              {
+                "grn_id": "11111111-2222-4333-8444-555555555555",
+                "distributor_name": "Medico Pharma Distributors",
+                "invoice_number": "MED-2026-04521",
+                "invoice_date": "2026-07-22",
+                "line_count": 24,
+                "taxable_amount": 48000.00,
+                "gst_amount": 5760.00,
+                "total": 53760.00,
+                "status": "STOCKED",
+                "created_at": "2026-07-22T16:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 124, "has_next": true }
+        }
+      '''
+    }
+  }
+}

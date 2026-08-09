@@ -1,0 +1,73 @@
+meta {
+  name: get
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/purchases/{{grnId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("grnId")) {
+    throw new Error("grnId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("items");
+    expect(body.data).to.have.property("totals");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/purchases/:grn_id
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases/11111111-2222-4333-8444-555555555555
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "grn_id": "11111111-2222-4333-8444-555555555555",
+            "distributor": { "id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "firm_name": "Medico Pharma" },
+            "invoice_number": "MED-2026-04521",
+            "invoice_date": "2026-07-22",
+            "status": "STOCKED",
+            "items": [],
+            "totals": {
+              "taxable_amount": 48000.00,
+              "gst_amount": 5760.00,
+              "grand_total": 53760.00,
+              "input_gst_credit": 5760.00
+            }
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,81 @@
+meta {
+  name: list-purchase-orders
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.purchase_orders && body.data.purchase_orders[0]) {
+    bru.setEnvVar("poId", body.data.purchase_orders[0].po_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("PO list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.purchase_orders).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/reorder/purchase-orders — filter by status|distributor_id.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "purchase_orders": [
+              {
+                "po_id": "dddddddd-0001-4000-8000-000000000001",
+                "po_number": "PO-2026-08-000001",
+                "distributor_name": "Medico Pharma Distributors",
+                "items_count": 12,
+                "estimated_total": 38400.00,
+                "status": "SENT",
+                "created_at": "2026-07-24T11:30:00Z",
+                "sent_at": "2026-07-24T12:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 5, "has_next": false }
+        }
+      '''
+    }
+  }
+}

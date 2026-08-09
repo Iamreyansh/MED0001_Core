@@ -1,0 +1,77 @@
+meta {
+  name: patch-item
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/purchases/{{grnId}}/items/{{grnItemId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "quantity": 250
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("grnId") || !bru.getEnvVar("grnItemId")) {
+    throw new Error("grnId/grnItemId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patched item", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.quantity).to.equal(250);
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/purchases/:grn_id/items/:item_id
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases/11111111-2222-4333-8444-555555555555/items/dddddddd-0001-4000-8000-000000000001
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "quantity": 250
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "item_id": "dddddddd-0001-4000-8000-000000000001",
+            "quantity": 250,
+            "taxable_amount": 3250.00,
+            "gst_amount": 390.00,
+            "line_total": 3640.00,
+            "updated_at": "2026-07-24T10:20:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

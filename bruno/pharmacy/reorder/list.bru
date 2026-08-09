@@ -1,0 +1,106 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/reorder?group_by=distributor&page=1&limit=50
+  body: none
+  auth: inherit
+}
+
+params:query {
+  group_by: distributor
+  page: 1
+  limit: 50
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.kpi) {
+    bru.setEnvVar("reorderItemsBelow", String(body.data.kpi.items_below_reorder_level));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("suggestions envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.kpi).to.be.an("object");
+    expect(body.data.suggestion_groups).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/reorder — Growth+. group_by=distributor|urgency.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder?group_by=distributor
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpi": {
+              "items_below_reorder_level": 24,
+              "distributors_to_order_from": 3,
+              "estimated_savings": 4200.00,
+              "open_pos_count": 2,
+              "last_refreshed_at": "2026-07-24T02:00:00Z"
+            },
+            "suggestion_groups": []
+          },
+          "meta": { "page": 1, "limit": 50, "total": 24, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 PLAN_FEATURE_LOCKED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PLAN_FEATURE_LOCKED",
+            "message": "Reorder suggestions require Growth plan or higher"
+          }
+        }
+      '''
+    }
+  }
+}

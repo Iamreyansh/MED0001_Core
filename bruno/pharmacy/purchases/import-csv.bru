@@ -1,0 +1,89 @@
+meta {
+  name: import-csv
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/purchases/import-csv
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  csv_file: @file(./sample-grn.csv)
+  distributor_id: {{distributorId}}
+  invoice_number: MED-CSV-001
+  invoice_date: 2026-07-22
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("distributorId")) {
+    throw new Error("distributorId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.grn_id) {
+    bru.setEnvVar("grnId", body.data.grn_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("preview envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("matched_rows");
+    expect(body.data).to.have.property("unmatched_items");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/purchases/import-csv — step 1 preview. CSV columns:
+  product_name,manufacturer,batch_number,expiry_date,quantity,free_quantity,purchase_price,mrp,gst_pct
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases/import-csv
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "grn_id": "11111111-2222-4333-8444-555555555555",
+            "total_rows": 30,
+            "matched_rows": 26,
+            "unmatched_rows": 4,
+            "status": "DRAFT",
+            "preview_items": [],
+            "unmatched_items": [
+              {
+                "row_number": 12,
+                "raw_data": { "product_name": "SomeUnknownMed 100mg", "manufacturer": "XYZ Labs" },
+                "suggested_action": "CREATE_NEW"
+              }
+            ]
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

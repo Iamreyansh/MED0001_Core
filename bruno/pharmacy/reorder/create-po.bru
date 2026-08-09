@@ -1,0 +1,130 @@
+meta {
+  name: create-po
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/reorder/create-po
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "distributor_id": "{{distributorId}}",
+    "items": [
+      {
+        "product_id": "{{productId}}",
+        "quantity": 200
+      }
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("distributorId")) {
+    throw new Error("distributorId missing — create distributor first");
+  }
+  if (!bru.getEnvVar("productId")) {
+    throw new Error("productId missing — seed inventory product first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.po_id) {
+    bru.setEnvVar("poId", body.data.po_id);
+    bru.setEnvVar("poNumber", body.data.po_number);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("draft PO envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("DRAFT");
+    expect(body.data.po_number).to.match(/^PO-\d{4}-\d{2}-\d{6}$/);
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/reorder/create-po — create DRAFT PO.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/create-po
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "distributor_id": "bbbbbbbb-0001-4000-8000-000000000001",
+        "items": [{ "product_id": "cccccccc-0001-4000-8000-000000000001", "quantity": 200 }]
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "po_id": "dddddddd-0001-4000-8000-000000000001",
+            "po_number": "PO-2026-08-000001",
+            "distributor_id": "bbbbbbbb-0001-4000-8000-000000000001",
+            "distributor_name": "Medico Pharma Distributors",
+            "items_count": 1,
+            "estimated_total": 2364.00,
+            "status": "DRAFT",
+            "created_at": "2026-08-09T11:30:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 EMPTY_ITEMS_LIST
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/create-po
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "distributor_id": "bbbbbbbb-0001-4000-8000-000000000001",
+        "items": []
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "EMPTY_ITEMS_LIST",
+            "message": "items array is empty"
+          }
+        }
+      '''
+    }
+  }
+}

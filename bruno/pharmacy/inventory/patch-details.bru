@@ -1,0 +1,115 @@
+meta {
+  name: patch-details
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/{{inventoryProductId}}/details
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Paracetamol 500mg Tab",
+    "hsn_code": "30049099",
+    "gst_pct": 12
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("inventoryProductId")) {
+    throw new Error("inventoryProductId missing — run list first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("details envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.hsn_code).to.be.a("string");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/inventory/:product_id/details — pharmacy_owner only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/details
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "name": "Paracetamol 500mg Tab",
+        "hsn_code": "30049099",
+        "gst_pct": 12
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "11111111-2222-4333-8444-555555555555",
+            "name": "Paracetamol 500mg Tab",
+            "hsn_code": "30049099",
+            "gst_pct": 12,
+            "updated_at": "2026-08-09T00:00:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_GST_PCT
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/details
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "gst_pct": 7
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_GST_PCT",
+            "message": "GST percentage not in allowed slabs"
+          }
+        }
+      '''
+    }
+  }
+}

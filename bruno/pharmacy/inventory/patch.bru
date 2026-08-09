@@ -1,0 +1,118 @@
+meta {
+  name: patch
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/{{inventoryProductId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "is_loose_selling_enabled": false,
+    "is_online_visible": true,
+    "reorder_level": 60,
+    "rack_location_code": "A1-03"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("inventoryProductId")) {
+    throw new Error("inventoryProductId missing — run list first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string");
+    expect(body.data.rack_locations).to.be.an("array");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/inventory/:product_id — owner (staff: rack only; visibility → FORBIDDEN).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "is_online_visible": true,
+        "reorder_level": 60,
+        "rack_location_code": "A1-03"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "11111111-2222-4333-8444-555555555555",
+            "is_loose_selling_enabled": false,
+            "is_online_visible": true,
+            "reorder_level": 60,
+            "rack_locations": ["A1-03"],
+            "updated_at": "2026-08-09T00:00:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 PLAN_FEATURE_LOCKED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "is_online_visible": true
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PLAN_FEATURE_LOCKED",
+            "message": "Online visibility requires Growth plan or higher"
+          }
+        }
+      '''
+    }
+  }
+}

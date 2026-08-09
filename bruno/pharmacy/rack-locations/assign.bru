@@ -1,0 +1,80 @@
+meta {
+  name: assign
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/rack-locations/assign
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "product_ids": ["{{inventoryProductId}}"],
+    "rack_code": "{{rackCode}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("rackCode")) {
+    bru.setEnvVar("rackCode", "A1-01");
+  }
+  if (!bru.getEnvVar("inventoryProductId")) {
+    throw new Error("inventoryProductId missing — run inventory list first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("assign envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.rack_code).to.be.a("string");
+    expect(body.data).to.have.property("assigned_count");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/rack-locations/assign — idempotent bulk assign. Errors: EMPTY_PRODUCT_LIST, RACK_NOT_FOUND.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations/assign
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "product_ids": ["11111111-2222-4333-8444-555555555555"],
+        "rack_code": "A1-01"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rack_code": "A1-01",
+            "assigned_count": 1,
+            "skipped_count": 0,
+            "product_ids_assigned": ["11111111-2222-4333-8444-555555555555"]
+          }
+        }
+      '''
+    }
+  }
+}

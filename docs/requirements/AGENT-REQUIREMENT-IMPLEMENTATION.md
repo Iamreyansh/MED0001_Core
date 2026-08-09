@@ -15,10 +15,10 @@
 | Phase | Total | Done |
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
-| Phase 2 | 34 | 0 |
+| Phase 2 | 34 | 6 |
 | Phase 3 | 32 | 0 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **46** |
+| **Total** | **129** | **52** |
 
 ---
 
@@ -120,12 +120,12 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-006 | [STORY-001](./EPIC-006-pharmacy-inventory/STORY-001-inventory-management.md) | Inventory Management - Stock Master, Product CRUD & Visibility Controls | pending | — | — |
-| EPIC-006 | [STORY-002](./EPIC-006-pharmacy-inventory/STORY-002-batch-expiry-management.md) | Batch & Expiry Management - FEFO Tracking and Expiry Alerts | pending | — | — |
-| EPIC-006 | [STORY-003](./EPIC-006-pharmacy-inventory/STORY-003-rack-location-management.md) | Rack Location Management - Physical Shelf Mapping | pending | — | — |
-| EPIC-006 | [STORY-004](./EPIC-006-pharmacy-inventory/STORY-004-purchase-grn-management.md) | Purchase / GRN Management - Distributor Invoice Entry & Goods Received Notes | pending | — | — |
-| EPIC-006 | [STORY-005](./EPIC-006-pharmacy-inventory/STORY-005-distributor-management.md) | Distributor Management - Supplier Directory & Price Comparison | pending | — | — |
-| EPIC-006 | [STORY-006](./EPIC-006-pharmacy-inventory/STORY-006-reorder-suggestions.md) | Reorder Suggestions - Auto-Reorder Intelligence | pending | — | — |
+| EPIC-006 | [STORY-001](./EPIC-006-pharmacy-inventory/STORY-001-inventory-management.md) | Inventory Management - Stock Master, Product CRUD & Visibility Controls | done | 2026-08-09 | `domains/inventory`; V048 `pharmacy_product` (money paise); Growth gate via `medmate.inventory.growth-features-enabled`; sync EXCEL always (async >500 deferred); batches/movements empty until STORY-002; units_sold stub 0 |
+| EPIC-006 | [STORY-002](./EPIC-006-pharmacy-inventory/STORY-002-batch-expiry-management.md) | Batch & Expiry Management - FEFO Tracking and Expiry Alerts | done | 2026-08-09 | `domains/inventory`; V049 `product_batch`+`batch_adjustment_log`+`inventory_stock_movement` (paise); duplicate batch → 201+`topped_up`; VaR=qty×purchase_price_paise; `FefoBatchSelectionPort` unit-tested (no POS deduct); sync Excel+minimal PDF expiry-report; staff write-off → `STAFF_CANNOT_WRITE_OFF` |
+| EPIC-006 | [STORY-003](./EPIC-006-pharmacy-inventory/STORY-003-rack-location-management.md) | Rack Location Management - Physical Shelf Mapping | done | 2026-08-09 | `domains/inventory`; V050 `rack_location` (soft delete); product mapping via `pharmacy_product.rack_locations`; print-labels minimal PDF data URL (A4/QR/S3 deferred); POS rack search deferred EPIC-007 |
+| EPIC-006 | [STORY-004](./EPIC-006-pharmacy-inventory/STORY-004-purchase-grn-management.md) | Purchase / GRN Management - Distributor Invoice Entry & Goods Received Notes | done | 2026-08-09 | `domains/inventory`; V051 distributors(minimal)+purchase_grn+purchase_grn_item (paise); DRAFT→STOCKED via save-and-stock (owner); free qty on batch, GST on paid qty; CSV import+confirm-import; no public distributor API (tests seed JDBC); `OrderInventoryBridgeConfig` pharmacy_product+is_online_visible with catalogue-mapping fallback |
+| EPIC-006 | [STORY-005](./EPIC-006-pharmacy-inventory/STORY-005-distributor-management.md) | Distributor Management - Supplier Directory & Price Comparison | done | 2026-08-09 | `domains/inventory`; V052 expand distributors+`distributor_supply_item` (paise); Growth gate via `InventoryPlanPort`; GRN save-and-stock upserts supply items; outstanding_payable=Σ STOCKED GRN (repayments=0); Bruno `bruno/pharmacy/distributors/` |
+| EPIC-006 | [STORY-006](./EPIC-006-pharmacy-inventory/STORY-006-reorder-suggestions.md) | Reorder Suggestions - Auto-Reorder Intelligence | done | 2026-08-09 | `domains/inventory`; V053 snapshot+PO+items (paise); `PharmacyReorderService` (avoids order `ReorderService` bean clash); Growth gate; nightly 02:00 IST; outbox `inventory.po.sent` ids-only; channel stub props; days_of_cover null until POS; Bruno `bruno/pharmacy/reorder/` |
 
 ### EPIC-007 (`EPIC-007-pharmacy-pos-billing`)
 

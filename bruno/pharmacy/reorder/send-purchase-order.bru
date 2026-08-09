@@ -1,0 +1,113 @@
+meta {
+  name: send-purchase-order
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/{{poId}}/send
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "channel": "WHATSAPP"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("poId")) {
+    throw new Error("poId missing — create-po first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("sent envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("SENT");
+    expect(body.data.channel).to.equal("WHATSAPP");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/reorder/purchase-orders/:poId/send — pharmacy_owner only; publishes inventory.po.sent.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/dddddddd-0001-4000-8000-000000000001/send
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "channel": "WHATSAPP"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "po_id": "dddddddd-0001-4000-8000-000000000001",
+            "po_number": "PO-2026-08-000001",
+            "status": "SENT",
+            "channel": "WHATSAPP",
+            "sent_to": "+919876543210",
+            "sent_at": "2026-07-24T12:00:00Z",
+            "pdf_url": "data:application/pdf;base64,JVBERi0x"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 PO_ALREADY_SENT
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/dddddddd-0001-4000-8000-000000000001/send
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "channel": "WHATSAPP"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PO_ALREADY_SENT",
+            "message": "PO already in SENT status"
+          }
+        }
+      '''
+    }
+  }
+}

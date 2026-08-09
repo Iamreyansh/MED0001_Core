@@ -1,0 +1,89 @@
+meta {
+  name: refresh
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/reorder/refresh
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("refresh envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.refreshed_at).to.be.a("string");
+    expect(body.data.items_below_reorder_level).to.be.a("number");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/reorder/refresh — owner only; burst 1 / 5 min → 429.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/refresh
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "refreshed_at": "2026-07-24T12:30:00Z",
+            "items_below_reorder_level": 24
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 RATE_LIMITED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/refresh
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 429 text: Too Many Requests }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RATE_LIMITED",
+            "message": "Refresh allowed once per 5 minutes"
+          }
+        }
+      '''
+    }
+  }
+}

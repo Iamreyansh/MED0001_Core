@@ -1,0 +1,116 @@
+meta {
+  name: write-off-batch
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/{{inventoryProductId}}/batches/{{inventoryBatchId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "write_off_reason": "EXPIRED",
+    "notes": "Bruno smoke write-off"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("inventoryProductId") || !bru.getEnvVar("inventoryBatchId")) {
+    throw new Error("inventoryProductId/inventoryBatchId missing — run add-batch first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("write-off envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_active).to.equal(false);
+    expect(body.data).to.have.property("units_written_off");
+  });
+}
+
+docs {
+  DELETE /api/v1/pharmacy/inventory/:product_id/batches/:batch_id
+  Owner-only. Staff receives 403 STAFF_CANNOT_WRITE_OFF.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/batches/22222222-3333-4444-8555-666666666666
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "write_off_reason": "EXPIRED",
+        "notes": "Past expiry"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "batch_id": "22222222-3333-4444-8555-666666666666",
+            "batch_number": "BN25100",
+            "units_written_off": 145,
+            "value_written_off": 2030.00,
+            "is_active": false,
+            "written_off_at": "2026-08-09T00:15:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 STAFF_CANNOT_WRITE_OFF
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/batches/22222222-3333-4444-8555-666666666666
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "write_off_reason": "EXPIRED"
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "STAFF_CANNOT_WRITE_OFF",
+            "message": "Only pharmacy_owner may write off batches"
+          }
+        }
+      '''
+    }
+  }
+}

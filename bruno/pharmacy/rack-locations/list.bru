@@ -1,0 +1,83 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/rack-locations?page=1&limit=50
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 50
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.racks && body.data.racks[0]) {
+    bru.setEnvVar("rackCode", body.data.racks[0].rack_code);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.kpi).to.be.an("object");
+    expect(body.data.racks).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/rack-locations — pharmacy_owner / pharmacy_staff. Optional zone, q.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations?page=1&limit=50
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpi": {
+              "racks_count": 0,
+              "zones_count": 0,
+              "medicines_mapped_count": 0,
+              "unlocated_count": 0
+            },
+            "racks": []
+          },
+          "meta": {
+            "page": 1,
+            "limit": 50,
+            "total": 0,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,65 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/rack-locations/{{rackCode}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("rackCode")) {
+    bru.setEnvVar("rackCode", "A1-01");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.rack_code).to.be.a("string");
+    expect(body.data.medicines).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/rack-locations/:rack_code — medicines in rack.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations/A1-01
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rack_code": "A1-01",
+            "zone_name": "Zone A",
+            "description": "Antibiotics shelf 1",
+            "medicine_count": 0,
+            "medicines": []
+          }
+        }
+      '''
+    }
+  }
+}

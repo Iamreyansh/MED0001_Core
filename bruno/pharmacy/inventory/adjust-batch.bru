@@ -1,0 +1,119 @@
+meta {
+  name: adjust-batch
+  type: http
+  seq: 12
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/{{inventoryProductId}}/batches/{{inventoryBatchId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "adjustment": -5,
+    "reason": "DAMAGE"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+  if (!bru.getEnvVar("inventoryProductId") || !bru.getEnvVar("inventoryBatchId")) {
+    throw new Error("inventoryProductId/inventoryBatchId missing — run add-batch first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("adjustment envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("before_qty");
+    expect(body.data).to.have.property("after_qty");
+    expect(body.data.reason).to.equal("DAMAGE");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/inventory/:product_id/batches/:batch_id
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/batches/22222222-3333-4444-8555-666666666666
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "adjustment": -5,
+        "reason": "DAMAGE"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "batch_id": "22222222-3333-4444-8555-666666666666",
+            "batch_number": "BN25100",
+            "before_qty": 150,
+            "adjustment": -5,
+            "after_qty": 145,
+            "reason": "DAMAGE",
+            "adjusted_by": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "adjusted_at": "2026-08-09T00:10:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INSUFFICIENT_BATCH_QUANTITY
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/batches/22222222-3333-4444-8555-666666666666
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "adjustment": -9999,
+        "reason": "DAMAGE"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INSUFFICIENT_BATCH_QUANTITY",
+            "message": "Adjustment would make quantity negative"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,88 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory?tab=ALL&page=1&limit=20&sort=name&order=asc
+  body: none
+  auth: inherit
+}
+
+params:query {
+  tab: ALL
+  page: 1
+  limit: 20
+  sort: name
+  order: asc
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.products && body.data.products[0]) {
+    bru.setEnvVar("inventoryProductId", body.data.products[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.products).to.be.an("array");
+    expect(body.meta.tab_counts).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/inventory — pharmacy_owner / pharmacy_staff. Optional export=EXCEL.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory?tab=ALL&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "products": []
+          },
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 0,
+            "has_next": false,
+            "tab_counts": {
+              "ALL": 0,
+              "ALERTS": 0,
+              "LOW_STOCK": 0,
+              "EXPIRING": 0,
+              "RX_ONLY": 0,
+              "OUT_OF_STOCK": 0,
+              "UNALLOCATED": 0
+            }
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,136 @@
+meta {
+  name: add-batch
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/{{inventoryProductId}}/batches
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "batch_number": "BN-BRUNO-001",
+    "expiry_date": "2027-06-30",
+    "manufactured_date": "2025-06-01",
+    "quantity": 100,
+    "free_quantity": 20,
+    "purchase_price_per_unit": 13.00,
+    "mrp_per_unit": 22.50
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner or pharmacy_staff first");
+  }
+  if (!bru.getEnvVar("inventoryProductId")) {
+    throw new Error("inventoryProductId missing — run inventory list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("inventoryBatchId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("created batch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.quantity_received).to.equal(120);
+    expect(body.data).to.have.property("topped_up");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/inventory/:product_id/batches
+  Duplicate batch_number tops up quantity and returns 201 with topped_up=true.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/batches
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "batch_number": "BN25100",
+        "expiry_date": "2027-06-30",
+        "quantity": 100,
+        "free_quantity": 20,
+        "purchase_price_per_unit": 13.00,
+        "mrp_per_unit": 22.50
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "22222222-3333-4444-8555-666666666666",
+            "batch_number": "BN25100",
+            "expiry_date": "2027-06-30",
+            "quantity_received": 120,
+            "quantity_current": 120,
+            "purchase_price_per_unit": 13.00,
+            "mrp_per_unit": 22.50,
+            "is_active": true,
+            "created_at": "2026-08-09T00:00:00Z",
+            "topped_up": false
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 EXPIRY_DATE_IN_PAST
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/11111111-2222-4333-8444-555555555555/batches
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "batch_number": "BN-OLD",
+        "expiry_date": "2020-01-01",
+        "quantity": 10,
+        "purchase_price_per_unit": 13.00,
+        "mrp_per_unit": 22.50
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "EXPIRY_DATE_IN_PAST",
+            "message": "expiry_date must be today or later"
+          }
+        }
+      '''
+    }
+  }
+}

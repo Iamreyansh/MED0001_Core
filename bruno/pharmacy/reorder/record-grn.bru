@@ -1,0 +1,118 @@
+meta {
+  name: record-grn
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/{{poId}}/record-grn
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "invoice_number": "INV-PO-001",
+    "invoice_date": "2026-08-09"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("poId")) {
+    throw new Error("poId missing — create and send PO first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.grn_id) {
+    bru.setEnvVar("grnId", body.data.grn_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("GRN from PO envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.grn_status).to.equal("DRAFT");
+    expect(body.data.grn_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/reorder/purchase-orders/:poId/record-grn — SENT PO → DRAFT GRN; PO → RECEIVED.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/dddddddd-0001-4000-8000-000000000001/record-grn
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "invoice_number": "INV-PO-001",
+        "invoice_date": "2026-08-09"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "grn_id": "eeeeeeee-0001-4000-8000-000000000001",
+            "grn_status": "DRAFT",
+            "po_id": "dddddddd-0001-4000-8000-000000000001",
+            "prefilled_items_count": 12,
+            "message": "GRN created in DRAFT with PO items pre-filled. Review and finalize to update stock."
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 PO_NOT_SENT
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/reorder/purchase-orders/dddddddd-0001-4000-8000-000000000001/record-grn
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "invoice_number": "INV-X",
+        "invoice_date": "2026-08-09"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PO_NOT_SENT",
+            "message": "PO must be in SENT status to record GRN"
+          }
+        }
+      '''
+    }
+  }
+}

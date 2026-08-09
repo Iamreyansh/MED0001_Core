@@ -1,0 +1,70 @@
+meta {
+  name: unlocated
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/rack-locations/unlocated?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("unlocated envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.products).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/rack-locations/unlocated — products with empty rack_locations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/rack-locations/unlocated?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "unlocated_count": 0,
+            "products": []
+          },
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 0,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}

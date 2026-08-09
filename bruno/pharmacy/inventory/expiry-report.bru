@@ -1,0 +1,105 @@
+meta {
+  name: expiry-report
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/inventory/expiry-report?within_months=4&export=JSON
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+}
+
+script:post-response {
+  // no chaining vars
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("report envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("report_date");
+    expect(body.data.batches).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/inventory/expiry-report
+  Owner-only. export=JSON|EXCEL|PDF
+}
+
+example {
+  name: 200 OK JSON
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/expiry-report?within_months=4&export=JSON
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "report_date": "2026-08-09",
+            "scope_months": 4,
+            "total_batches": 1,
+            "total_value_at_risk": 255.00,
+            "batches": [
+              {
+                "product_name": "Amoxicillin 250mg Cap",
+                "batch_number": "AM23010",
+                "expiry_date": "2026-08-15",
+                "days_to_expiry": 6,
+                "quantity_current": 30,
+                "purchase_price_per_unit": 8.50,
+                "value_at_risk": 255.00,
+                "rack_location": "B2-04"
+              }
+            ]
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN staff
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/inventory/expiry-report
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Pharmacy owner role required"
+          }
+        }
+      '''
+    }
+  }
+}

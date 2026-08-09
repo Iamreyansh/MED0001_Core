@@ -1,0 +1,82 @@
+meta {
+  name: patch
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/distributors/{{distributorId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "contact_name": "Ramesh Kumar",
+    "payment_terms_days": 45
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — login as pharmacy_owner first");
+  }
+  if (!bru.getEnvVar("distributorId")) {
+    throw new Error("distributorId missing — run create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("distributorId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("updated envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string");
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/distributors/:id — pharmacy_owner, Growth+.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/distributors/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "payment_terms_days": 45
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "firm_name": "Medico Pharma Distributors",
+            "updated_at": "2026-07-24T11:10:00Z"
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}

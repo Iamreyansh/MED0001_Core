@@ -1,0 +1,100 @@
+meta {
+  name: save-and-stock
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/purchases/{{grnId}}/save-and-stock
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — pharmacy_owner required");
+  }
+  if (!bru.getEnvVar("grnId")) {
+    throw new Error("grnId missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("stocked", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("STOCKED");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/purchases/:grn_id/save-and-stock — owner only; staff → STAFF_CANNOT_STOCK.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases/11111111-2222-4333-8444-555555555555/save-and-stock
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "grn_id": "11111111-2222-4333-8444-555555555555",
+            "status": "STOCKED",
+            "stocked_at": "2026-07-24T10:30:00Z",
+            "line_count": 24,
+            "new_products_created": 2,
+            "batches_created": 22,
+            "batches_topped_up": 2,
+            "total_units_added": 3600,
+            "total_value_at_cost": 53760.00,
+            "total_input_gst_credit": 5760.00,
+            "updated_stock_summary": []
+          },
+          "meta": null
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 STAFF_CANNOT_STOCK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/purchases/11111111-2222-4333-8444-555555555555/save-and-stock
+    method: post
+    headers: {
+      Authorization: Bearer {{staffAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "STAFF_CANNOT_STOCK",
+            "message": "Only pharmacy_owner may finalize GRN"
+          }
+        }
+      '''
+    }
+  }
+}
