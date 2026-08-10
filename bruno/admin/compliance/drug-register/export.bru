@@ -1,0 +1,120 @@
+meta {
+  name: export
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/compliance/drug-register/export
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "pharmacy_id": "{{pharmacyId}}",
+    "schedule": "H1",
+    "from_date": "2026-04-01",
+    "to_date": "2026-06-30"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing — set env pharmacyId");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.export_job_id) {
+    bru.setEnvVar("drugRegisterExportJobId", body.data.export_job_id);
+  }
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("export job accepted", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("export_job_id");
+    expect(body.data).to.have.property("poll_url");
+  });
+}
+
+docs {
+  POST /api/v1/admin/compliance/drug-register/export — async regulatory CSV export.
+  Auth: admin_compliance | admin_super only (pharmacy_staff → 403).
+}
+
+example {
+  name: 202 Accepted
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/drug-register/export
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "pharmacy_id": "22222222-2222-4222-8222-222222222222",
+        "schedule": "H1",
+        "from_date": "2026-04-01",
+        "to_date": "2026-06-30"
+      }
+    }
+  }
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "export_job_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "GENERATING",
+            "estimated_ready_seconds": 15,
+            "poll_url": "/api/v1/admin/compliance/drug-register/export/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 DATE_RANGE_TOO_LARGE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/drug-register/export
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "pharmacy_id": "22222222-2222-4222-8222-222222222222",
+        "schedule": "H1",
+        "from_date": "2025-01-01",
+        "to_date": "2026-01-02"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "DATE_RANGE_TOO_LARGE", "message": "Date range exceeds 1 year" }
+        }
+      '''
+    }
+  }
+}

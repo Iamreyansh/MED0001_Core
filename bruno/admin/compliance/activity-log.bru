@@ -1,0 +1,79 @@
+meta {
+  name: activity-log
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/compliance/activity-log?page=1&limit=50
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 50
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("activity log envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/compliance/activity-log — append-only.
+  Auth: admin_compliance | admin_super | admin_operations (not finance).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/activity-log
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "log_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+              "action": "RX_VERIFIED",
+              "actor_id": "55555555-5555-4555-8555-555555555555",
+              "actor_name": "Ananya Compliance",
+              "actor_role": "admin_compliance",
+              "rx_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+              "payload": { "verified": true },
+              "created_at": "2026-07-24T09:15:00Z"
+            }
+          ],
+          "meta": { "page": 1, "limit": 50, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

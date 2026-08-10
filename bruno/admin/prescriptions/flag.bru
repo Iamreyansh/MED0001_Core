@@ -1,0 +1,90 @@
+meta {
+  name: flag
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/prescriptions/{{adminRxId}}/flag
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "reason": "Suspected duplicate Rx for Schedule H1 drug within 30 days",
+    "severity": "HIGH"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminRxId")) {
+    throw new Error("adminRxId missing — run admin/prescriptions/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rx_id) {
+    bru.setEnvVar("adminRxId", body.data.rx_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("flagged envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.audit_status).to.equal("FLAGGED");
+    expect(body.data).to.have.property("escalation_sent");
+  });
+}
+
+docs {
+  POST /api/v1/admin/prescriptions/:rx_id/flag — MEDIUM/HIGH escalate email to Head of Compliance via outbox.
+  Auth: admin_compliance | admin_super.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/prescriptions/c1000001-0000-4000-8000-0000000000c1/flag
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "reason": "Suspected duplicate",
+        "severity": "HIGH"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rx_id": "c1000001-0000-4000-8000-0000000000c1",
+            "audit_status": "FLAGGED",
+            "severity": "HIGH",
+            "flagged_by": "a1000001-0000-4000-8000-0000000000a1",
+            "flagged_at": "2026-07-24T09:20:00Z",
+            "escalation_sent": true
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,89 @@
+meta {
+  name: verify
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/prescriptions/{{adminRxId}}/verify
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "verified": true,
+    "flag_reason": null,
+    "notes": "All checklist items cleared."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminRxId")) {
+    throw new Error("adminRxId missing — run admin/prescriptions/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rx_id) {
+    bru.setEnvVar("adminRxId", body.data.rx_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("verified envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.audit_status).to.equal("VERIFIED");
+  });
+}
+
+docs {
+  POST /api/v1/admin/prescriptions/:rx_id/verify — append-only verify action.
+  Auth: admin_compliance | admin_super. PATCH/DELETE → 405.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/prescriptions/c1000001-0000-4000-8000-0000000000c1/verify
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "verified": true,
+        "notes": "Cleared"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rx_id": "c1000001-0000-4000-8000-0000000000c1",
+            "audit_status": "VERIFIED",
+            "verified_by": "a1000001-0000-4000-8000-0000000000a1",
+            "verified_at": "2026-07-24T09:15:00Z",
+            "notes": "Cleared"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

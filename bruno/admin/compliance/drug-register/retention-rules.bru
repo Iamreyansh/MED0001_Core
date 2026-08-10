@@ -1,0 +1,84 @@
+meta {
+  name: retention-rules
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/compliance/drug-register/retention-rules
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success) {
+    bru.setEnvVar("drugRegisterRetentionLoaded", "true");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("retention rules envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("rules");
+    expect(body.data).to.have.property("archival_policy");
+  });
+}
+
+docs {
+  GET /api/v1/admin/compliance/drug-register/retention-rules — statutory H1/X retention config.
+  Auth: admin_compliance | admin_super | pharmacy_owner.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/drug-register/retention-rules
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rules": [
+              {
+                "schedule": "H1",
+                "retention_years": 3,
+                "governing_rule": "Drugs and Cosmetics Rules 1945, Rule 65(15)",
+                "dcg_guideline_url": "https://cdsco.gov.in/opencms/export/sites/CDSCO_WEB/Pdf-documents/Schedule-H1.pdf",
+                "notes": "Register must be maintained in Form-17B and produced on demand by the Inspector"
+              },
+              {
+                "schedule": "X",
+                "retention_years": 5,
+                "governing_rule": "Drugs and Cosmetics Rules 1945, Rule 65(16)",
+                "dcg_guideline_url": "https://cdsco.gov.in/opencms/export/sites/CDSCO_WEB/Pdf-documents/Schedule-X.pdf",
+                "notes": "Narcotic/psychotropic drugs; register form specified under NDPS Act provisions"
+              }
+            ],
+            "archival_policy": "Entries are archived (not deleted) after retention period. Archived entries remain accessible via API with is_archived: true."
+          }
+        }
+      '''
+    }
+  }
+}

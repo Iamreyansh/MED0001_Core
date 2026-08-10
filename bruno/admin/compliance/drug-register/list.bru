@@ -1,0 +1,121 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/compliance/drug-register?schedule=H1&page=1&limit=50
+  body: none
+  auth: bearer
+}
+
+params:query {
+  schedule: H1
+  page: 1
+  limit: 50
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.entries && body.data.entries.length) {
+    bru.setEnvVar("drugRegisterEntryId", body.data.entries[0].entry_id);
+    bru.setEnvVar("drugRegisterPharmacyId", body.data.entries[0].pharmacy_name ? bru.getEnvVar("pharmacyId") : bru.getEnvVar("pharmacyId"));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("register envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("schedule");
+    expect(body.data).to.have.property("entries");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/compliance/drug-register — Schedule H1/X statutory register.
+  Auth: admin_compliance | admin_super | admin_operations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/drug-register?schedule=H1
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "schedule": "H1",
+            "entries": [
+              {
+                "entry_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "sno": 1,
+                "date": "2026-07-24",
+                "rx_reference_no": "RX-2026-00451",
+                "patient_name": "Ravi Kumar",
+                "patient_age": 52,
+                "prescriber_name": "Dr. Priya Sharma",
+                "prescriber_reg_no": "MH12345",
+                "drug_name": "Alprazolam 0.5mg",
+                "batch_no": "BX2024011",
+                "quantity_issued": 30,
+                "running_balance": 470,
+                "pharmacy_name": "Sai Medicals, Koramangala",
+                "pharmacy_license_no": "KA-PHR-2023-001234",
+                "dispensed_by": "Ramesh Pharmacist",
+                "dispensed_at": "2026-07-24T08:30:00Z",
+                "is_archived": false
+              }
+            ],
+            "total_qty_issued": 30,
+            "total_pages": 1
+          },
+          "meta": { "page": 1, "limit": 50, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_SCHEDULE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/drug-register?schedule=H
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "INVALID_SCHEDULE", "message": "Schedule must be H1 or X" }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,83 @@
+meta {
+  name: statistics
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/prescriptions/statistics?from_date=2026-06-24&to_date=2026-07-24
+  body: none
+  auth: bearer
+}
+
+params:query {
+  from_date: 2026-06-24
+  to_date: 2026-07-24
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.period) {
+    bru.setEnvVar("rxComplianceStatsFrom", body.data.period.from);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("statistics envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.compliance_rate_by_schedule).to.have.property("H");
+    expect(body.data.compliance_rate_by_schedule).to.have.property("H1");
+    expect(body.data.compliance_rate_by_schedule).to.have.property("X");
+  });
+}
+
+docs {
+  GET /api/v1/admin/prescriptions/statistics — compliance rates by schedule.
+  Auth: admin_compliance | admin_super.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/prescriptions/statistics?from_date=2026-06-24&to_date=2026-07-24
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": { "from": "2026-06-24", "to": "2026-07-24" },
+            "compliance_rate_by_schedule": { "H": 98.2, "H1": 95.4, "X": 93.1 },
+            "flagged_rate_pct": 3.2,
+            "top_flagged_pharmacies": [],
+            "top_flagged_drugs": [],
+            "total_audited": 312,
+            "total_verified": 295,
+            "total_flagged": 10,
+            "overdue_audits": 2
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,124 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/prescriptions/{{rxId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("rxId")) {
+    throw new Error("rxId missing — run pharmacy/prescriptions/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rx_id) {
+    bru.setEnvVar("rxId", body.data.rx_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("file_url");
+    expect(body.data).to.have.property("patient");
+    expect(body.data).to.have.property("doctor");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/prescriptions/:rx_id — detail with signed file URL, patient, doctor card.
+}
+
+example {
+  name: 200 OK
+  description: Detail
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rx_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "type": "UPLOADED",
+            "status": "PENDING_REVIEW",
+            "is_overdue": true,
+            "file_url": "https://s3.example/signed",
+            "patient": {
+              "name": "Ravi Kumar",
+              "phone": "+91-9876543210",
+              "customer_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+              "previous_orders_count": 5
+            },
+            "doctor": {
+              "name": "Dr. Priya Sharma",
+              "qualification": null,
+              "registration_no": null,
+              "verified": false
+            },
+            "medicines_verified": [],
+            "estimated_bill_value": 0.00,
+            "duplicate_rx_warning": false,
+            "timeline": [],
+            "order_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "received_at": "2026-07-24T05:10:00Z",
+            "sla_deadline": "2026-07-24T07:10:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 RX_NOT_FOUND
+  description: Not in pharmacy queue
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/99999999-9999-4999-8999-999999999999
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RX_NOT_FOUND",
+            "message": "Prescription not in this pharmacy's queue"
+          }
+        }
+      '''
+    }
+  }
+}

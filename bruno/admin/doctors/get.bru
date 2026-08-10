@@ -1,0 +1,115 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/doctors/{{adminDoctorId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminDoctorId")) {
+    throw new Error("adminDoctorId missing — run admin/doctors/list or unverified first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("adminDoctorId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("doctor detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("registration_no");
+    expect(body.data).to.have.property("prescription_stats");
+  });
+}
+
+docs {
+  GET /api/v1/admin/doctors/:id — doctor detail with Rx stats.
+  Auth: admin_compliance | admin_super | admin_operations | admin_support.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/doctors/d1000001-0000-4000-8000-0000000000d1
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "d1000001-0000-4000-8000-0000000000d1",
+            "registration_no": "MH12345",
+            "name": "Dr. Priya Sharma",
+            "qualification": "MBBS MD",
+            "specialty": "Endocrinology",
+            "status": "VERIFIED",
+            "verification_method": "STATE_BOARD",
+            "verified_at": "2026-06-15T10:00:00Z",
+            "verified_by": "a1000001-0000-4000-8000-0000000000a1",
+            "source": "OCR",
+            "prescription_stats": {
+              "total_prescriptions": 47,
+              "scheduled_h_count": 5,
+              "scheduled_h1_count": 10,
+              "scheduled_x_count": 2,
+              "prescriptions_by_category": { "Antibiotics": 15, "Antidiabetics": 20 }
+            },
+            "associated_orders_count": 42,
+            "blacklisted": false,
+            "blacklist_reason": null,
+            "blacklisted_at": null,
+            "created_at": "2026-03-01T08:00:00Z",
+            "updated_at": "2026-06-15T10:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 DOCTOR_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/doctors/00000000-0000-4000-8000-000000000099
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "DOCTOR_NOT_FOUND", "message": "Doctor ID not found" }
+        }
+      '''
+    }
+  }
+}

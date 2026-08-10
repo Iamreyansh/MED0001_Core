@@ -1,0 +1,133 @@
+meta {
+  name: approve
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/prescriptions/{{rxId}}/approve
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "approved_medicines": [
+      {
+        "name": "Metformin 500mg",
+        "quantity": 60,
+        "price": 85.00
+      }
+    ],
+    "notes": "Approved for dispense"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("rxId")) {
+    throw new Error("rxId missing — run pharmacy/prescriptions/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rx_id) {
+    bru.setEnvVar("rxId", body.data.rx_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("approved envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("APPROVED");
+    expect(body.data).to.have.property("approved_medicines");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/prescriptions/:rx_id/approve — sets order line items from approved_medicines.
+}
+
+example {
+  name: 200 OK
+  description: Approved
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/approve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "approved_medicines": [
+          { "name": "Metformin 500mg", "quantity": 60, "price": 85.00 }
+        ],
+        "notes": "ok"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rx_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "status": "APPROVED",
+            "approved_medicines": [
+              { "name": "Metformin 500mg", "quantity": 60, "price": 85.00, "line_total": 5100.00 }
+            ],
+            "approved_by": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "approved_at": "2026-07-24T07:55:00Z",
+            "order_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 APPROVED_MEDICINES_EMPTY
+  description: Empty medicines
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/approve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "approved_medicines": []
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "APPROVED_MEDICINES_EMPTY",
+            "message": "approved_medicines list is empty"
+          }
+        }
+      '''
+    }
+  }
+}

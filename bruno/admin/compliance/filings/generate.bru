@@ -1,0 +1,89 @@
+meta {
+  name: generate
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/compliance/filings/{{complianceFilingId}}/generate
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "period": "2026-06",
+    "format": "CSV"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("complianceFilingId")) {
+    throw new Error("complianceFilingId missing — run filings/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.job_id) {
+    bru.setEnvVar("complianceGenerateJobId", body.data.job_id);
+  }
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("generate accepted", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("job_id");
+    expect(body.data).to.have.property("poll_url");
+  });
+}
+
+docs {
+  POST /api/v1/admin/compliance/filings/:id/generate — async report (CSV/PDF). Concurrent → same job_id.
+  Auth: admin_compliance | admin_super.
+}
+
+example {
+  name: 202 Accepted
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/filings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/generate
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "period": "2026-06",
+        "format": "CSV"
+      }
+    }
+  }
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "filing_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "status": "GENERATING",
+            "format": "CSV",
+            "estimated_ready_seconds": 20,
+            "poll_url": "/api/v1/admin/compliance/filings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/generate/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          }
+        }
+      '''
+    }
+  }
+}

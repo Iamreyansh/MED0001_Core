@@ -1,0 +1,103 @@
+meta {
+  name: dispense-to-billing
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/prescriptions/{{rxId}}/dispense-to-billing
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("rxId")) {
+    throw new Error("rxId missing — run pharmacy/prescriptions/approve first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.pos_cart_id) {
+    bru.setEnvVar("posCartId", body.data.pos_cart_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("billing envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("pos_cart_id");
+    expect(body.data).to.have.property("medicines_loaded");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/prescriptions/:rx_id/dispense-to-billing — push approved medicines to POS cart.
+}
+
+example {
+  name: 200 OK
+  description: POS cart prefilled
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/dispense-to-billing
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rx_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "pos_cart_id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+            "medicines_loaded": 1,
+            "message": "Approved medicines pushed to POS billing cart"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 503 POS_UNAVAILABLE
+  description: POS down
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/dispense-to-billing
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 503 text: Service Unavailable }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "POS_UNAVAILABLE",
+            "message": "POS integration unavailable"
+          }
+        }
+      '''
+    }
+  }
+}

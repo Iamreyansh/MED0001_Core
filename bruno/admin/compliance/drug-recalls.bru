@@ -1,0 +1,88 @@
+meta {
+  name: drug-recalls
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/compliance/drug-recalls
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "drug_name": "Paracetamol 500mg",
+    "batch_no": "PCM2024Q1",
+    "reason": "CDSCO recall notice"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.filing_id) {
+    bru.setEnvVar("drugRecallFilingId", body.data.filing_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("recall envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("batches_banned");
+    expect(body.data).to.have.property("pharmacies_affected");
+  });
+}
+
+docs {
+  POST /api/v1/admin/compliance/drug-recalls — ban matching inventory batches + WA pharmacies.
+  Auth: admin_compliance | admin_super. Writes DRUG_RECALLED activity.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/drug-recalls
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "drug_name": "Paracetamol 500mg",
+        "batch_no": "PCM2024Q1",
+        "reason": "CDSCO recall notice"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "filing_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            "drug_name": "Paracetamol 500mg",
+            "batch_no": "PCM2024Q1",
+            "batches_banned": 12,
+            "pharmacies_affected": 8,
+            "pharmacy_ids": ["22222222-2222-4222-8222-222222222222"]
+          }
+        }
+      '''
+    }
+  }
+}

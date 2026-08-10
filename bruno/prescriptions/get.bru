@@ -1,0 +1,126 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/prescriptions/{{prescriptionId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("prescriptionId")) {
+    throw new Error("prescriptionId missing — run prescriptions/upload or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.file_url) {
+    bru.setEnvVar("prescriptionFileUrl", body.data.file_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with fresh file_url", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.equal(bru.getEnvVar("prescriptionId"));
+    expect(body.data.file_url).to.be.a("string").that.is.not.empty;
+    expect(body.data).to.not.have.property("s3_key");
+  });
+}
+
+docs {
+  GET /api/v1/prescriptions/:id — detail with freshly signed 1h URL. 404 PRESCRIPTION_NOT_FOUND for other customers.
+}
+
+example {
+  name: 200 OK
+  description: Detail with OCR fields when available.
+
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/{{prescriptionId}}
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "type": "UPLOADED",
+            "status": "UPLOADED",
+            "file_url": "https://local.invalid/...fresh-signed...",
+            "patient_name": "Ravi Kumar",
+            "notes": "Morning medicines refill",
+            "doctor_name": "Dr. OCR Stub",
+            "prescription_date": "2026-07-20",
+            "source": "UPLOAD",
+            "medicines_extracted": [
+              {
+                "name": "Metformin 500mg",
+                "quantity": "60 tablets",
+                "dosage": "1-0-1",
+                "schedule": "H"
+              }
+            ],
+            "associated_order_id": null,
+            "associated_orders": [],
+            "expires_at": "2027-01-24T07:30:00Z",
+            "uploaded_at": "2026-07-24T07:30:00Z",
+            "created_at": "2026-07-24T07:30:00Z",
+            "updated_at": "2026-07-24T07:30:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 PRESCRIPTION_NOT_FOUND
+  description: Missing or other customer's prescription.
+
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/ffffffff-ffff-4fff-8fff-ffffffffffff
+    method: get
+  }
+
+  response: {
+    status: {
+      code: 404
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PRESCRIPTION_NOT_FOUND",
+            "message": "Prescription not found"
+          }
+        }
+      '''
+    }
+  }
+}

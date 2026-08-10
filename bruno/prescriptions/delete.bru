@@ -1,0 +1,102 @@
+meta {
+  name: delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/prescriptions/{{prescriptionId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("prescriptionId")) {
+    throw new Error("prescriptionId missing — run prescriptions/upload first");
+  }
+}
+
+script:post-response {
+  // Soft-deleted; clear env so subsequent calls re-upload.
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("prescriptionId", "");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.message).to.equal("Prescription deleted successfully");
+  });
+}
+
+docs {
+  DELETE /api/v1/prescriptions/:id — soft-delete uploaded Rx. Errors: PRESCRIPTION_NOT_FOUND, PRESCRIPTION_IN_USE (409), CANNOT_DELETE_EPRESCRIPTION (403).
+}
+
+example {
+  name: 200 OK
+  description: Soft-deleted uploaded prescription.
+
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/{{prescriptionId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "message": "Prescription deleted successfully"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 PRESCRIPTION_IN_USE
+  description: Linked to non-CANCELLED order.
+
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/{{prescriptionId}}
+    method: delete
+  }
+
+  response: {
+    status: {
+      code: 409
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PRESCRIPTION_IN_USE",
+            "message": "Prescription is linked to an active or dispensed order"
+          }
+        }
+      '''
+    }
+  }
+}
