@@ -52,6 +52,8 @@ class AdminCustomerServiceTest {
     LoyaltyService loyaltyService =
         new LoyaltyService(
             new FakeLoyaltyStore(),
+            (customerId, cartId) -> java.util.Optional.empty(),
+            walletService,
             rateLimiter,
             CLOCK,
             new OutboxPublisher(outboxStore, new ObjectMapper()));
@@ -124,6 +126,8 @@ class AdminCustomerServiceTest {
     LoyaltyService loyaltyService =
         new LoyaltyService(
             new FakeLoyaltyStore(),
+            (customerId, cartId) -> java.util.Optional.empty(),
+            walletService,
             rateLimiter,
             CLOCK,
             new OutboxPublisher(outboxStore, new ObjectMapper()));

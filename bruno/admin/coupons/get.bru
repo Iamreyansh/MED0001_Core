@@ -1,0 +1,81 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/coupons/{{couponCode}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("couponCode")) {
+    bru.setEnvVar("couponCode", "NAMMA25");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.code) {
+    bru.setEnvVar("couponCode", body.data.code);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("economics");
+    expect(body.data).to.have.property("budget_ring");
+  });
+}
+
+docs {
+  GET /api/v1/admin/coupons/:code — coupon detail with ROAS.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/coupons/NAMMA25
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a0130001-0000-4000-8000-000000000001",
+            "code": "NAMMA25",
+            "type": "PERCENTAGE",
+            "value": 25,
+            "status": "ACTIVE",
+            "budget_total": 50000000,
+            "budget_used": 0,
+            "redemptions_count": 0,
+            "economics": {
+              "discount_per_redemption_rs": 0,
+              "revenue_attributed_rs": 0,
+              "roas": 0
+            },
+            "budget_ring": { "used": 0, "total": 50000000, "pct_used": 0.0 }
+          }
+        }
+      '''
+    }
+  }
+}

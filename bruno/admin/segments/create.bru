@@ -1,0 +1,130 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/segments
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "High AOV Bangalore",
+    "description": "Bangalore customers with avg order above Rs 800",
+    "criteria": [
+      { "field": "city", "operator": "in", "value": ["Bangalore"] },
+      { "field": "avg_order_value_rs", "operator": ">", "value": 800 },
+      { "field": "total_orders", "operator": ">=", "value": 3 }
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("segmentId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("id");
+    expect(body.data.segment_type).to.equal("CUSTOM");
+    expect(body.data.status).to.equal("PENDING_COMPUTE");
+  });
+}
+
+docs {
+  POST /api/v1/admin/segments — create custom segment (PENDING_COMPUTE).
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/segments
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "name": "High AOV Bangalore",
+        "description": "Bangalore customers with avg order above Rs 800",
+        "criteria": [
+          { "field": "city", "operator": "in", "value": ["Bangalore"] },
+          { "field": "avg_order_value_rs", "operator": ">", "value": 800 }
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c0130004-0000-4000-8000-000000000099",
+            "name": "High AOV Bangalore",
+            "segment_type": "CUSTOM",
+            "status": "PENDING_COMPUTE",
+            "created_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 EMPTY_CRITERIA
+  request: {
+    url: {{baseUrl}}/api/v1/admin/segments
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "name": "Empty",
+        "criteria": []
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "EMPTY_CRITERIA",
+            "message": "At least one criterion is required"
+          }
+        }
+      '''
+    }
+  }
+}

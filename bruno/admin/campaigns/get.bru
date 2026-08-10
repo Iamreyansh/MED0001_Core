@@ -1,0 +1,86 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/campaigns/{{campaignId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("campaignId")) {
+    throw new Error("campaignId missing — run admin/campaigns/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.funnel).to.have.property("sent");
+    expect(body.data.economics).to.have.property("roi_pct");
+    expect(body.data.timeline).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/campaigns/:id — campaign detail with funnel, economics, timeline.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns/c0130003-0000-4000-8000-000000000001
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c0130003-0000-4000-8000-000000000001",
+            "name": "Monsoon Reactivation - Dormant Users",
+            "channel": "WHATSAPP",
+            "segment_id": "a0130004-0000-4000-8000-000000000002",
+            "status": "COMPLETED",
+            "funnel": {
+              "sent": 12400,
+              "delivered": 12185,
+              "opened": 4655,
+              "clicked": 1054,
+              "converted": 620
+            },
+            "economics": {
+              "total_cost_rs": 25800.00,
+              "revenue_attributed_rs": 186000.00,
+              "roi_pct": 620.9
+            },
+            "timeline": [
+              { "event": "CREATED", "at": "2026-07-24T09:00:00Z", "actor": "admin_uuid_001" },
+              { "event": "LAUNCHED", "at": "2026-07-25T10:00:00Z", "actor": "admin_uuid_001" },
+              { "event": "COMPLETED", "at": "2026-07-25T10:48:00Z", "actor": "SYSTEM" }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

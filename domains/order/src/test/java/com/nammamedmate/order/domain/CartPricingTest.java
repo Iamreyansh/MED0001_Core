@@ -13,6 +13,12 @@ import org.junit.jupiter.api.Test;
 class CartPricingTest {
 
   @Test
+  void namma25CapsAt100Rupees() {
+    assertThat(CartPricing.couponDiscountPaise("NAMMA25", 58_000L)).isEqualTo(10_000L);
+    assertThat(CartPricing.applyCoupon("NAMMA25", 58_000L).discountPaise()).isEqualTo(10_000L);
+  }
+
+  @Test
   void namma25On25500AndDeliveryUsesPreCouponTotal() {
     // NAMMA25 on ₹255 → discount 63.75; delivery 0 because pre-coupon 255 >= 199
     // (story AC text said 25, but BR-3 / Notes: threshold uses pre-coupon item_total)

@@ -67,6 +67,22 @@
       <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$PatchZoneCommand"/>
       <Class name="com.nammamedmate.integration.domain.CommunicationConfigAudit"/>
       <Class name="com.nammamedmate.teleconsult.adapter.in.web.AdminConsultController$EprescriptionBody"/>
+      <Class name="com.nammamedmate.customer.application.ReferralService$AdminOverviewResult"/>
+      <Class name="com.nammamedmate.customer.application.port.out.LoyaltyStore$OverviewStats"/>
+      <Class name="com.nammamedmate.marketing.application.port.out.ReferralAdminPort$OverviewResult"/>
+      <Class name="com.nammamedmate.marketing.adapter.in.web.AdminBannerController$ReorderRequest"/>
+      <Class name="com.nammamedmate.marketing.adapter.in.web.AdminCouponController$CreateCouponRequest"/>
+      <Class name="com.nammamedmate.marketing.adapter.in.web.AdminCouponController$PatchCouponRequest"/>
+      <Class name="com.nammamedmate.marketing.adapter.in.web.AdminSegmentController$CreateSegmentRequest"/>
+      <Class name="com.nammamedmate.marketing.application.BannerService$PagedResult"/>
+      <Class name="com.nammamedmate.marketing.application.CampaignService$PagedResult"/>
+      <Class name="com.nammamedmate.marketing.application.CouponService$CreateCommand"/>
+      <Class name="com.nammamedmate.marketing.application.CouponService$PatchCommand"/>
+      <Class name="com.nammamedmate.marketing.application.CouponService$PagedResult"/>
+      <Class name="com.nammamedmate.marketing.application.SegmentService$PagedResult"/>
+      <Class name="com.nammamedmate.marketing.application.port.out.CampaignDispatchPort$DispatchResult"/>
+      <Class name="com.nammamedmate.marketing.application.port.out.SegmentStore$PagedMemberships"/>
+      <Class name="com.nammamedmate.marketing.domain.Segment"/>
     </Or>
   </Match>
 </FindBugsFilter>

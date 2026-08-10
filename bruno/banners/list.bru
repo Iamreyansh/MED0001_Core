@@ -1,0 +1,75 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/banners?placement=HOME_TOP
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run customer OTP verify first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.banners && body.data.banners.length) {
+    bru.setEnvVar("bannerId", body.data.banners[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("banners");
+  });
+}
+
+docs {
+  GET /api/v1/banners?placement= — active live banners in priority order (customer).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/banners?placement=HOME_TOP
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "banners": [
+              {
+                "id": "b0130002-0000-4000-8000-000000000001",
+                "headline": "Monsoon Sale - Up to 25% Off",
+                "sub_text": "Use code NAMMA25 at checkout",
+                "image_url": "https://cdn.nammamedmate.com/banners/monsoon-2026.jpg",
+                "link_type": "COUPON",
+                "link_value": "NAMMA25",
+                "theme_color": "#1A73E8",
+                "priority": 1
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

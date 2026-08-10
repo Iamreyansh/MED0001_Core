@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nammamedmate.customer.application.ReferralService.ApplyCommand;
+import com.nammamedmate.customer.application.ReferralService.InviteCommand;
+import com.nammamedmate.customer.application.ReferralService.PatchProgramCommand;
 import com.nammamedmate.customer.application.port.out.ReferralStore.ReferralEventRecord;
 import com.nammamedmate.customer.application.port.out.ReferralStore.ReferralRecord;
 import com.nammamedmate.customer.application.port.out.WalletStore.WalletRecord;
@@ -23,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +45,8 @@ class ReferralServiceTest {
   private UUID referrerId;
   private UUID refereeId;
   private MedmatePrincipal refereePrincipal;
+  private MedmatePrincipal adminSuper;
+  private MedmatePrincipal adminOps;
 
   @BeforeEach
   void setUp() {
@@ -59,8 +64,7 @@ class ReferralServiceTest {
             walletService,
             new InMemoryRateLimiter(CLOCK),
             CLOCK,
-            "https://nammamedmate.com/join",
-            10_000L);
+            "https://nammamedmate.com/join");
 
     referrerId = Ids.newId();
     refereeId = Ids.newId();
@@ -73,6 +77,10 @@ class ReferralServiceTest {
 
     refereePrincipal =
         new MedmatePrincipal(refereeId, AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
+    adminSuper =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_SUPER, null, TokenScope.FULL, "j");
+    adminOps =
+        new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_OPERATIONS, null, TokenScope.FULL, "j");
   }
 
   @Test
@@ -89,6 +97,14 @@ class ReferralServiceTest {
         .extracting(ReferralEventRecord::status)
         .isEqualTo(ReferralEventStatus.PENDING);
     assertThat(referrals.findByCustomerId(referrerId).orElseThrow().totalReferrals()).isEqualTo(1);
+  }
+
+  @Test
+  void applyWhenPaused_returnsProgramPaused() {
+    referrals.setActive(false);
+    assertThatThrownBy(() -> service.applyCode(refereePrincipal, new ApplyCommand("MEDRAM7")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("REFERRAL_PROGRAM_PAUSED");
   }
 
   @Test
@@ -135,6 +151,7 @@ class ReferralServiceTest {
 
   @Test
   void onDelivered_rewardsBothWalletsAndMarksRewarded() {
+    referrals.setRewards(15_000L, 10_000L);
     service.applyCode(refereePrincipal, new ApplyCommand("MEDRAM7"));
     UUID orderId = Ids.newId();
 
@@ -144,7 +161,7 @@ class ReferralServiceTest {
     assertThat(event.firstOrderId()).isEqualTo(orderId);
     assertThat(wallets.findByCustomerId(refereeId).orElseThrow().balancePaise()).isEqualTo(10_000L);
     assertThat(wallets.findByCustomerId(referrerId).orElseThrow().balancePaise())
-        .isEqualTo(10_000L);
+        .isEqualTo(15_000L);
     assertThat(
             wallets.listTransactions(
                 wallets.findByCustomerId(refereeId).orElseThrow().id(),
@@ -183,6 +200,155 @@ class ReferralServiceTest {
         .containsEntry("total_referrals", 0)
         .containsEntry("pending_referrals", 0);
     assertThat(data.get("share_message").toString()).contains("MEDRAM7");
+    assertThat(data).containsKey("earnings_stats");
+  }
+
+  @Test
+  void invite_logsShareAndReturnsPayload() {
+    MedmatePrincipal refP =
+        new MedmatePrincipal(referrerId, AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
+    Map<String, Object> data = service.invite(refP, new InviteCommand("whatsapp"));
+    assertThat(data)
+        .containsEntry("channel", "WHATSAPP")
+        .containsEntry("referral_code", "MEDRAM7")
+        .containsEntry("share_count", 1L);
+    assertThat(data.get("share_text").toString()).contains("MEDRAM7");
+    assertThatThrownBy(() -> service.invite(refP, new InviteCommand("TELEGRAM")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.invite(refP, null))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+  }
+
+  @Test
+  void adminOverviewAndProgram_settings() {
+    service.applyCode(refereePrincipal, new ApplyCommand("MEDRAM7"));
+    service.onRefereeOrderDelivered(refereeId, Ids.newId());
+
+    ReferralService.AdminOverviewResult overview =
+        service.adminOverview(adminOps, "CONVERTED", 1, 20);
+    assertThat(overview.data().get("chips")).isInstanceOf(Map.class);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> chips = (Map<String, Object>) overview.data().get("chips");
+    assertThat(chips.get("converted_referrals")).isEqualTo(1L);
+    assertThat(chips.get("referral_cac_rs")).isEqualTo(200L);
+    assertThat(overview.meta().total()).isEqualTo(1);
+
+    assertThat(service.getProgram(adminOps))
+        .containsEntry("is_active", true)
+        .containsEntry("reward_for_referrer_rs", new BigDecimal("100.00"));
+
+    Map<String, Object> patched =
+        service.patchProgram(
+            adminSuper, new PatchProgramCommand(150, 100, true, 365, "Updated conditions"));
+    assertThat(patched).containsKeys("updated_at", "updated_by");
+    assertThat(service.getProgram(adminOps))
+        .containsEntry("reward_for_referrer_rs", new BigDecimal("150.00"))
+        .containsEntry("conditions", "Updated conditions");
+
+    assertThatThrownBy(
+            () ->
+                service.patchProgram(
+                    adminOps, new PatchProgramCommand(null, null, false, null, null)))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("FORBIDDEN");
+
+    assertThatThrownBy(() -> service.adminOverview(refereePrincipal, null, null, null))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("FORBIDDEN");
+
+    assertThatThrownBy(() -> service.adminOverview(adminOps, "NOPE", 1, 20))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+
+    assertThatThrownBy(
+            () ->
+                service.patchProgram(adminSuper, new PatchProgramCommand(0, 100, null, null, null)))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(
+            () ->
+                service.patchProgram(adminSuper, new PatchProgramCommand(100, 100, null, 0, null)))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+  }
+
+  @Test
+  void adminCoverage_masksAndBlankNamesAndFilters() {
+    // CAC with zero conversions (converted==0 branch)
+    assertThat(service.adminOverview(adminOps, null, 1, 20).data().get("chips"))
+        .isInstanceOf(Map.class);
+
+    service.applyCode(refereePrincipal, new ApplyCommand("MEDRAM7"));
+    service.onRefereeOrderDelivered(refereeId, Ids.newId());
+
+    referrals.topReferrerName = "  ";
+    referrals.adminReferrerName = null;
+    referrals.adminRefereeName = "   ";
+    referrals.adminRefereePhone = null;
+    ReferralService.AdminOverviewResult blankNames = service.adminOverview(adminOps, "  ", 1, 20);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> topBlank =
+        (List<Map<String, Object>>) blankNames.data().get("top_referrers");
+    assertThat(topBlank.getFirst().get("name")).isEqualTo("Customer");
+
+    referrals.adminRefereePhone = "98";
+    service.adminOverview(adminOps, null, 1, 20);
+    referrals.adminRefereePhone = "9876543210";
+    service.adminOverview(adminOps, null, 1, 20);
+    referrals.adminRefereePhone = "+919876543210";
+    service.adminOverview(adminOps, "CONVERTED", 1, 20);
+
+    UUID pendingCancel = Ids.newId();
+    profiles.saveProfile(CustomerTestFixtures.customer(pendingCancel));
+    referrals.insert(new ReferralRecord(Ids.newId(), pendingCancel, "MEDPEND2", 0, 0, 0L, NOW));
+    service.applyCode(
+        new MedmatePrincipal(pendingCancel, AuthRole.CUSTOMER, null, TokenScope.FULL, "j"),
+        new ApplyCommand("MEDRAM7"));
+    service.onRefereeFirstOrderCancelled(pendingCancel, Ids.newId());
+    ReferralService.AdminOverviewResult expired = service.adminOverview(adminOps, "EXPIRED", 1, 20);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> rows = (List<Map<String, Object>>) expired.data().get("referrals");
+    assertThat(rows.getFirst().get("status")).isEqualTo("EXPIRED");
+
+    assertThatThrownBy(() -> service.adminOverview(null, null, 1, 20))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("FORBIDDEN");
+    assertThatThrownBy(() -> service.patchProgram(null, null))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("FORBIDDEN");
+    assertThatThrownBy(() -> service.invite(refereePrincipal, new InviteCommand("  ")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    service.adminOverview(adminOps, "CONVERTED", 1, 20);
+
+    service.patchProgram(adminSuper, new PatchProgramCommand(120, null, null, null, null));
+    service.patchProgram(adminSuper, new PatchProgramCommand(null, 90, false, 180, "conds"));
+    service.patchProgram(adminSuper, new PatchProgramCommand(null, null, true, null, null));
+    service.patchProgram(adminSuper, null);
+    assertThatThrownBy(
+            () ->
+                service.patchProgram(adminSuper, new PatchProgramCommand(100, 0, null, null, null)))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+
+    referrals.adminReferrerName = "Priya";
+    referrals.adminRefereeName = "Ankit";
+    referrals.adminRefereePhone = "+91987";
+    referrals.topReferrerName = "Priya";
+    ReferralService.AdminOverviewResult named = service.adminOverview(adminOps, null, null, 150);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> topNamed =
+        (List<Map<String, Object>>) named.data().get("top_referrers");
+    assertThat(topNamed.getFirst().get("name")).isEqualTo("Priya");
+
+    referrals.topReferrerName = null;
+    ReferralService.AdminOverviewResult topNull = service.adminOverview(adminOps, null, 2, 20);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> topRows =
+        (List<Map<String, Object>>) topNull.data().get("top_referrers");
+    assertThat(topRows.getFirst().get("name")).isEqualTo("Customer");
   }
 
   @Test
@@ -195,8 +361,7 @@ class ReferralServiceTest {
             new WalletService(wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, 100_000L),
             new InMemoryRateLimiter(CLOCK),
             CLOCK,
-            "https://nammamedmate.com/join/",
-            0L);
+            "https://nammamedmate.com/join/");
     assertThat(
             trailing
                 .getMyReferral(
@@ -249,7 +414,6 @@ class ReferralServiceTest {
         .isEqualTo("VALIDATION_ERROR");
     assertThat(service.onRefereeOrderDelivered(Ids.newId(), Ids.newId())).isEmpty();
 
-    // Reward with referrer lock missing → requireReferral path
     referrals.clearLocks = true;
     service.onRefereeOrderDelivered(refereeId, Ids.newId());
     referrals.clearLocks = false;
@@ -322,9 +486,26 @@ class ReferralServiceTest {
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("UNAUTHORIZED");
 
+    referrals.failSettings = true;
+    assertThat(
+            service
+                .getMyReferral(
+                    new MedmatePrincipal(referrerId, AuthRole.CUSTOMER, null, TokenScope.FULL, "j"))
+                .get("referral_code"))
+        .isEqualTo("MEDRAM7");
+    referrals.failSettings = false;
+
+    service.adminOverview(adminOps, null, null, null);
+    service.adminOverview(adminOps, null, 2, 150);
+    service.adminOverview(adminOps, "PENDING", 0, 0);
+    service.adminOverview(adminOps, "EXPIRED", 1, 5);
+    service.adminOverview(adminOps, "REWARDED", 1, 5);
+    service.patchProgram(adminSuper, new PatchProgramCommand(null, null, null, null, null));
+
+    // 1 get already used above (failSettings); INFO_LIMIT=30 → 29 more then rate-limited
     MedmatePrincipal refP =
         new MedmatePrincipal(referrerId, AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < 29; i++) {
       service.getMyReferral(refP);
     }
     assertThatThrownBy(() -> service.getMyReferral(refP))

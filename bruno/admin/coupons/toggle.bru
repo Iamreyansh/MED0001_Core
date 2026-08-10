@@ -1,0 +1,69 @@
+meta {
+  name: toggle
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/coupons/{{couponCode}}/toggle
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("couponCode")) {
+    bru.setEnvVar("couponCode", "FLAT99");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("couponStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("toggle envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(["ACTIVE", "PAUSED"]).to.include(body.data.status);
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/coupons/:code/toggle — ACTIVE ↔ PAUSED.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/coupons/FLAT99/toggle
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "code": "FLAT99",
+            "status": "PAUSED",
+            "toggled_at": "2026-07-24T09:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

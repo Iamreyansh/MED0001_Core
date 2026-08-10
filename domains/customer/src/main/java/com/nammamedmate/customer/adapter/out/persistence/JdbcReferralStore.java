@@ -18,6 +18,8 @@ public class JdbcReferralStore implements ReferralStore {
 
   private static final RowMapper<ReferralRecord> REFERRAL_ROW = JdbcReferralStore::mapReferral;
   private static final RowMapper<ReferralEventRecord> EVENT_ROW = JdbcReferralStore::mapEvent;
+  private static final RowMapper<ProgramSettingsRecord> SETTINGS_ROW =
+      JdbcReferralStore::mapSettings;
 
   private final JdbcTemplate jdbc;
 
@@ -103,9 +105,9 @@ public class JdbcReferralStore implements ReferralStore {
         """
         INSERT INTO referral_events (
           id, referee_customer_id, referrer_customer_id, referral_code, status,
-          first_order_id, reward_amount_paise, referee_rewarded_at, referrer_rewarded_at,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          first_order_id, reward_amount_paise, referee_reward_amount_paise,
+          referee_rewarded_at, referrer_rewarded_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         event.id(),
         event.refereeCustomerId(),
@@ -114,6 +116,7 @@ public class JdbcReferralStore implements ReferralStore {
         event.status().name(),
         event.firstOrderId(),
         event.rewardAmountPaise(),
+        event.refereeRewardAmountPaise(),
         toTs(event.refereeRewardedAt()),
         toTs(event.referrerRewardedAt()),
         Timestamp.from(event.createdAt()),
@@ -173,6 +176,171 @@ public class JdbcReferralStore implements ReferralStore {
     return count == null ? 0L : count;
   }
 
+  @Override
+  public ProgramSettingsRecord getProgramSettings() {
+    List<ProgramSettingsRecord> rows =
+        jdbc.query(
+            "SELECT * FROM referral_program_settings WHERE id = ?",
+            SETTINGS_ROW,
+            PROGRAM_SETTINGS_ID);
+    return rows.stream()
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("referral_program_settings missing"));
+  }
+
+  @Override
+  public ProgramSettingsRecord updateProgramSettings(ProgramSettingsRecord settings) {
+    jdbc.update(
+        """
+        UPDATE referral_program_settings SET
+          reward_for_referrer_paise = ?,
+          reward_for_referee_paise = ?,
+          is_active = ?,
+          reward_expiry_days = ?,
+          conditions = ?,
+          updated_by = ?,
+          updated_at = ?
+        WHERE id = ?
+        """,
+        settings.rewardForReferrerPaise(),
+        settings.rewardForRefereePaise(),
+        settings.active(),
+        settings.rewardExpiryDays(),
+        settings.conditions(),
+        settings.updatedBy(),
+        Timestamp.from(settings.updatedAt()),
+        settings.id());
+    return settings;
+  }
+
+  @Override
+  public void insertShareEvent(UUID id, UUID customerId, String channel, Instant createdAt) {
+    jdbc.update(
+        """
+        INSERT INTO referral_share_events (id, customer_id, channel, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        id,
+        customerId,
+        channel,
+        Timestamp.from(createdAt));
+  }
+
+  @Override
+  public long countShareEvents(UUID customerId) {
+    Long count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM referral_share_events WHERE customer_id = ?",
+            Long.class,
+            customerId);
+    return count == null ? 0L : count;
+  }
+
+  @Override
+  public AdminOverviewChips chips() {
+    return jdbc.query(
+            """
+            SELECT
+              (SELECT COUNT(*) FROM referral_events) AS total_referrals,
+              (SELECT COUNT(*) FROM referral_events WHERE status = 'REWARDED') AS converted,
+              (SELECT COALESCE(SUM(reward_amount_paise), 0) FROM referral_events
+                 WHERE status = 'PENDING') AS pending_rewards,
+              (SELECT COALESCE(SUM(reward_amount_paise + referee_reward_amount_paise), 0)
+                 FROM referral_events WHERE status = 'REWARDED') AS total_paid
+            """,
+            (rs, i) ->
+                new AdminOverviewChips(
+                    rs.getLong("total_referrals"),
+                    rs.getLong("converted"),
+                    rs.getLong("pending_rewards"),
+                    rs.getLong("total_paid")))
+        .getFirst();
+  }
+
+  @Override
+  public List<TopReferrerRow> topReferrers(int limit) {
+    return jdbc.query(
+        """
+        SELECT cr.customer_id, c.name, cr.total_referrals, cr.converted_referrals,
+               cr.total_earned_paise
+        FROM customer_referrals cr
+        JOIN customers c ON c.id = cr.customer_id AND c.deleted_at IS NULL
+        WHERE cr.converted_referrals > 0
+        ORDER BY cr.converted_referrals DESC, cr.total_earned_paise DESC
+        LIMIT ?
+        """,
+        (rs, i) ->
+            new TopReferrerRow(
+                (UUID) rs.getObject("customer_id"),
+                rs.getString("name"),
+                rs.getInt("total_referrals"),
+                rs.getInt("converted_referrals"),
+                rs.getLong("total_earned_paise")),
+        limit);
+  }
+
+  @Override
+  public List<AdminReferralRow> listAdminReferrals(
+      ReferralEventStatus statusFilter, int limit, int offset) {
+    if (statusFilter == null) {
+      return jdbc.query(
+          """
+          SELECT re.id, ref.name AS referrer_name, ree.name AS referee_name, ree.phone,
+                 re.status, re.referrer_rewarded_at, re.created_at
+          FROM referral_events re
+          JOIN customers ref ON ref.id = re.referrer_customer_id
+          JOIN customers ree ON ree.id = re.referee_customer_id
+          ORDER BY re.created_at DESC
+          LIMIT ? OFFSET ?
+          """,
+          ADMIN_ROW,
+          limit,
+          offset);
+    }
+    return jdbc.query(
+        """
+        SELECT re.id, ref.name AS referrer_name, ree.name AS referee_name, ree.phone,
+               re.status, re.referrer_rewarded_at, re.created_at
+        FROM referral_events re
+        JOIN customers ref ON ref.id = re.referrer_customer_id
+        JOIN customers ree ON ree.id = re.referee_customer_id
+        WHERE re.status = ?
+        ORDER BY re.created_at DESC
+        LIMIT ? OFFSET ?
+        """,
+        ADMIN_ROW,
+        statusFilter.name(),
+        limit,
+        offset);
+  }
+
+  @Override
+  public long countAdminReferrals(ReferralEventStatus statusFilter) {
+    if (statusFilter == null) {
+      Long count = jdbc.queryForObject("SELECT COUNT(*) FROM referral_events", Long.class);
+      return count == null ? 0L : count;
+    }
+    Long count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM referral_events WHERE status = ?",
+            Long.class,
+            statusFilter.name());
+    return count == null ? 0L : count;
+  }
+
+  private static final RowMapper<AdminReferralRow> ADMIN_ROW =
+      (rs, i) -> {
+        Timestamp credited = rs.getTimestamp("referrer_rewarded_at");
+        return new AdminReferralRow(
+            (UUID) rs.getObject("id"),
+            rs.getString("referrer_name"),
+            rs.getString("referee_name"),
+            rs.getString("phone"),
+            ReferralEventStatus.valueOf(rs.getString("status")),
+            credited == null ? null : credited.toInstant(),
+            rs.getTimestamp("created_at").toInstant());
+      };
+
   private static Timestamp toTs(Instant instant) {
     return instant == null ? null : Timestamp.from(instant);
   }
@@ -191,6 +359,10 @@ public class JdbcReferralStore implements ReferralStore {
   private static ReferralEventRecord mapEvent(ResultSet rs, int rowNum) throws SQLException {
     Timestamp refereeAt = rs.getTimestamp("referee_rewarded_at");
     Timestamp referrerAt = rs.getTimestamp("referrer_rewarded_at");
+    long refereeReward = rs.getLong("referee_reward_amount_paise");
+    if (rs.wasNull()) {
+      refereeReward = rs.getLong("reward_amount_paise");
+    }
     return new ReferralEventRecord(
         (UUID) rs.getObject("id"),
         (UUID) rs.getObject("referee_customer_id"),
@@ -199,9 +371,22 @@ public class JdbcReferralStore implements ReferralStore {
         ReferralEventStatus.valueOf(rs.getString("status")),
         (UUID) rs.getObject("first_order_id"),
         rs.getLong("reward_amount_paise"),
+        refereeReward,
         refereeAt == null ? null : refereeAt.toInstant(),
         referrerAt == null ? null : referrerAt.toInstant(),
         rs.getTimestamp("created_at").toInstant(),
+        rs.getTimestamp("updated_at").toInstant());
+  }
+
+  private static ProgramSettingsRecord mapSettings(ResultSet rs, int rowNum) throws SQLException {
+    return new ProgramSettingsRecord(
+        (UUID) rs.getObject("id"),
+        rs.getLong("reward_for_referrer_paise"),
+        rs.getLong("reward_for_referee_paise"),
+        rs.getBoolean("is_active"),
+        rs.getInt("reward_expiry_days"),
+        rs.getString("conditions"),
+        (UUID) rs.getObject("updated_by"),
         rs.getTimestamp("updated_at").toInstant());
   }
 }

@@ -12,6 +12,7 @@ import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.Med
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.StockLine;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort.PharmacyRow;
+import com.nammamedmate.order.application.port.out.PlatformCouponPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.WalletBalancePort;
 import com.nammamedmate.order.application.port.out.ZoneMembershipPort;
@@ -19,7 +20,6 @@ import com.nammamedmate.order.domain.Cart;
 import com.nammamedmate.order.domain.CartItem;
 import com.nammamedmate.order.domain.CartPricing;
 import com.nammamedmate.order.domain.CartPricing.Bill;
-import com.nammamedmate.order.domain.CartPricing.CouponResult;
 import com.nammamedmate.order.domain.CartStatus;
 import com.nammamedmate.order.domain.Haversine;
 import com.nammamedmate.order.domain.PharmacyScorer;
@@ -50,6 +50,7 @@ public class CartService {
   private final PrescriptionPort prescriptions;
   private final ZoneMembershipPort zones;
   private final DeliveryFeePort deliveryFees;
+  private final PlatformCouponPort platformCoupons;
   private final RateLimiter rateLimiter;
   private final Clock clock;
 
@@ -63,6 +64,7 @@ public class CartService {
       PrescriptionPort prescriptions,
       ZoneMembershipPort zones,
       DeliveryFeePort deliveryFees,
+      PlatformCouponPort platformCoupons,
       RateLimiter rateLimiter,
       Clock clock) {
     this.carts = carts;
@@ -74,6 +76,7 @@ public class CartService {
     this.prescriptions = prescriptions;
     this.zones = zones;
     this.deliveryFees = deliveryFees;
+    this.platformCoupons = platformCoupons;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
   }
@@ -225,7 +228,7 @@ public class CartService {
       throw new AppException(
           "COUPON_ALREADY_APPLIED", "A different coupon is already applied", 409);
     }
-    CouponResult applied = CartPricing.applyCoupon(couponCode, cart.itemTotalPaise());
+    PlatformCouponPort.Quote applied = platformCoupons.apply(couponCode, cart.itemTotalPaise());
     cart.setCoupon(applied.code(), applied.discountPaise());
     cart.touch(now());
     carts.update(cart);

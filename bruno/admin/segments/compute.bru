@@ -1,0 +1,71 @@
+meta {
+  name: compute
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/segments/{{segmentId}}/compute
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("segmentId")) {
+    throw new Error("segmentId missing — run admin/segments/create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.job_id) {
+    bru.setEnvVar("segmentComputeJobId", body.data.job_id);
+  }
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("compute envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("ENQUEUED");
+    expect(body.data).to.have.property("job_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/segments/:id/compute — enqueue async recompute (202 + job_id).
+}
+
+example {
+  name: 202 Accepted
+  request: {
+    url: {{baseUrl}}/api/v1/admin/segments/{{segmentId}}/compute
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c0130004-0000-4000-8000-000000000099",
+            "job_id": "j0130004-0000-4000-8000-000000000001",
+            "status": "ENQUEUED",
+            "message": "Segment computation enqueued. Results available in 2-5 minutes."
+          }
+        }
+      '''
+    }
+  }
+}

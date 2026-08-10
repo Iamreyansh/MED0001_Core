@@ -3,6 +3,8 @@ package com.nammamedmate.api.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.auth.adapter.out.ratelimit.RedisRateLimiter;
 import com.nammamedmate.auth.adapter.out.revocation.RedisTokenRevocationStore;
+import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredLoyaltyConsumer;
+import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredReferralConsumer;
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.kernel.storage.PresignedUrlService;
@@ -158,11 +160,16 @@ public class PlatformConfig {
 
   @Bean
   SqsEventDispatcher sqsEventDispatcher(
-      OutboxStore store, AutoKycOutboxConsumer autoKycOutboxConsumer) {
+      OutboxStore store,
+      AutoKycOutboxConsumer autoKycOutboxConsumer,
+      OrderDeliveredReferralConsumer orderDeliveredReferralConsumer,
+      OrderDeliveredLoyaltyConsumer orderDeliveredLoyaltyConsumer) {
     return new SqsEventDispatcher(
         store,
         message -> {
           autoKycOutboxConsumer.accept(message);
+          orderDeliveredReferralConsumer.accept(message);
+          orderDeliveredLoyaltyConsumer.accept(message);
         },
         25);
   }

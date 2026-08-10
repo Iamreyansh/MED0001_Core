@@ -12,6 +12,7 @@ import com.nammamedmate.customer.application.port.out.CustomerOrderHistoryPort;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore.CustomerProfileRecord;
 import com.nammamedmate.customer.application.port.out.GeocodePort;
+import com.nammamedmate.customer.application.port.out.LoyaltyCartPort;
 import com.nammamedmate.customer.application.port.out.PaymentMethodInActiveOrderPort;
 import com.nammamedmate.customer.application.port.out.RazorpayVpaPort;
 import com.nammamedmate.kernel.error.AppException;
@@ -22,6 +23,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -31,6 +33,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Configuration
 public class CustomerConfig {
+
+  @Bean
+  @ConditionalOnMissingBean(LoyaltyCartPort.class)
+  LoyaltyCartPort stubLoyaltyCartPort() {
+    return (customerId, cartId) -> Optional.empty();
+  }
 
   @Bean
   @ConditionalOnMissingBean(CustomerOrderHistoryPort.class)

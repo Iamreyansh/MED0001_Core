@@ -78,5 +78,9 @@ class LoyaltyTiersTest {
     assertThat(LoyaltyTiers.pointsForOrderPaise(9_999L)).isEqualTo(0);
     assertThat(LoyaltyTiers.pointsForOrderPaise(0L)).isEqualTo(0);
     assertThat(LoyaltyTiers.pointsForOrderPaise(-1L)).isEqualTo(0);
+    assertThat(LoyaltyTiers.pointsForOrderPaise(58_000L, 100)).isEqualTo(5);
+    assertThat(LoyaltyTiers.fromLifetimePoints(50, 12, 50, 120)).isEqualTo("GOLD");
+    assertThat(LoyaltyTiers.thresholds(12, 50, 120))
+        .containsKeys("NONE", "SILVER", "GOLD", "PLATINUM");
   }
 }

@@ -1,0 +1,93 @@
+meta {
+  name: launch
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/campaigns/{{campaignId}}/launch
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("campaignId")) {
+    throw new Error("campaignId missing — run admin/campaigns/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("launch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(["RUNNING", "PAUSED"]).to.include(body.data.status);
+    expect(body.data.launched_at).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/admin/campaigns/:id/launch — snapshot audience and start async send.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns/c0130003-0000-4000-8000-000000000001/launch
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c0130003-0000-4000-8000-000000000001",
+            "status": "RUNNING",
+            "launched_at": "2026-07-25T10:00:00Z",
+            "estimated_recipients": 12400
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 CAMPAIGN_ALREADY_RUNNING
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns/c0130003-0000-4000-8000-000000000001/launch
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CAMPAIGN_ALREADY_RUNNING",
+            "message": "Campaign already in RUNNING state"
+          }
+        }
+      '''
+    }
+  }
+}

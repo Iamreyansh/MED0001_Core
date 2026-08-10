@@ -1,0 +1,113 @@
+meta {
+  name: patch
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/coupons/{{couponCode}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "min_order_value": 299,
+    "description": "Updated description"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("couponCode")) {
+    bru.setEnvVar("couponCode", "FLAT99");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("updated_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/coupons/:code — update mutable fields.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/coupons/FLAT99
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "min_order_value": 299
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "code": "FLAT99",
+            "updated_at": "2026-07-24T08:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 IMMUTABLE_FIELD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/coupons/FLAT99
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "code": "NEWCODE"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "IMMUTABLE_FIELD",
+            "message": "code and type cannot be changed"
+          }
+        }
+      '''
+    }
+  }
+}

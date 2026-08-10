@@ -1,0 +1,66 @@
+meta {
+  name: impression
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/banners/{{bannerId}}/impression
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Session-Id: {{sessionId}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run customer OTP verify first");
+  }
+  if (!bru.getEnvVar("bannerId")) {
+    throw new Error("bannerId missing — run banners/list or admin create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("impression envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.logged).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/banners/:id/impression — throttled 1 per (banner, customer, session) / 30m.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/banners/{{bannerId}}/impression
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      X-Session-Id: {{sessionId}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": { "logged": true }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,16 @@
+meta {
+  name: segments
+  seq: 80
+}
+
+auth {
+  mode: bearer
+  bearer {
+    token: {{accessToken}}
+  }
+}
+
+docs {
+  Admin customer segments (EPIC-013 / STORY-004).
+  Auth: list/detail admin_super|ops|finance; create/compute admin_super|ops; customers admin_super|ops; delete admin_super only.
+}

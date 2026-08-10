@@ -1,0 +1,95 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/referrals?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.referrals && body.data.referrals[0]) {
+    bru.setEnvVar("referralEventId", body.data.referrals[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("overview envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("chips");
+    expect(body.data).to.have.property("top_referrers");
+    expect(body.data).to.have.property("referrals");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/referrals — chips, top referrers, referral table.
+  Query: status=PENDING|CONVERTED|EXPIRED, page, limit
+  Auth: admin_super | admin_operations
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/referrals?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "chips": {
+              "total_referrals": 4820,
+              "converted_referrals": 2940,
+              "pending_rewards_rs": 194000.00,
+              "referral_cac_rs": 133,
+              "referral_mrr_rs": 0
+            },
+            "top_referrers": [
+              {
+                "customer_id": "a1b2c3d4-e5f6-7890-a123-456789abcdef",
+                "name": "Priya Sharma",
+                "total_referrals": 48,
+                "converted": 32,
+                "total_earned_rs": 3200.00
+              }
+            ],
+            "referrals": [
+              {
+                "id": "c3d4e5f6-a7b8-4901-c234-56789abcdef0",
+                "referrer_name": "Priya Sharma",
+                "referee_name": "Ankit Gupta",
+                "referee_phone": "+919xxxxxxxxx",
+                "status": "CONVERTED",
+                "reward_credited_at": "2026-07-20T14:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 4820, "has_next": true }
+        }
+      '''
+    }
+  }
+}

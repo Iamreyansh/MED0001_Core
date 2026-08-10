@@ -1,0 +1,73 @@
+meta {
+  name: overview
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/loyalty/overview
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("overview envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("total_points_outstanding");
+    expect(body.data).to.have.property("points_liability_rs");
+    expect(body.data).to.have.property("tier_distribution");
+  });
+}
+
+docs {
+  GET /api/v1/admin/loyalty/overview — liability + tier distribution KPIs.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/loyalty/overview
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total_points_outstanding": 482000,
+            "points_liability_rs": 482000,
+            "avg_points_per_customer": 34,
+            "tier_distribution": {
+              "NONE": 8420,
+              "SILVER": 3100,
+              "GOLD": 980,
+              "PLATINUM": 240
+            },
+            "points_earned_last_30d": 58400,
+            "points_redeemed_last_30d": 22100,
+            "points_expired_last_30d": 1800
+          }
+        }
+      '''
+    }
+  }
+}

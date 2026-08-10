@@ -1,0 +1,85 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/segments?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.segments) && body.data.segments.length) {
+    const custom = body.data.segments.find((s) => s.segment_type === "CUSTOM");
+    const system = body.data.segments.find((s) => s.name === "VIP");
+    if (custom) bru.setEnvVar("segmentId", custom.id);
+    if (system) bru.setEnvVar("systemSegmentId", system.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("segments");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/segments — list SYSTEM + CUSTOM segments.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/segments?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "segments": [
+              {
+                "id": "a0130004-0000-4000-8000-000000000004",
+                "name": "VIP",
+                "description": "30+ orders or LTV > Rs 10,000",
+                "customer_count": 1840,
+                "avg_aov_rs": 620.00,
+                "total_ltv_rs": 18420000.00,
+                "last_computed_at": "2026-07-24T02:15:00Z",
+                "segment_type": "SYSTEM"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 8, "has_next": false }
+        }
+      '''
+    }
+  }
+}

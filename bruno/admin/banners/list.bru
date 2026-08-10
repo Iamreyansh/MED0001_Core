@@ -1,0 +1,77 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/banners?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("banners");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/admin/banners — list banners (admin_super | admin_operations | admin_finance).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "banners": [
+              {
+                "id": "b0130002-0000-4000-8000-000000000001",
+                "placement": "HOME_TOP",
+                "headline": "Monsoon Sale - Up to 25% Off",
+                "image_url": "https://cdn.nammamedmate.com/banners/monsoon-2026.jpg",
+                "link_action": { "type": "COUPON", "value": "NAMMA25" },
+                "impressions": 128400,
+                "clicks": 6420,
+                "ctr_pct": 5.0,
+                "priority": 1,
+                "is_live": true,
+                "valid_from": "2026-07-01T00:00:00Z",
+                "valid_until": "2026-07-31T23:59:59Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

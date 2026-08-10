@@ -1,0 +1,66 @@
+meta {
+  name: resume
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/campaigns/{{campaignId}}/resume
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("campaignId")) {
+    throw new Error("campaignId missing — run admin/campaigns/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("resume envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RUNNING");
+    expect(body.data.resumed_at).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/admin/campaigns/:id/resume — resume a PAUSED campaign.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns/c0130003-0000-4000-8000-000000000001/resume
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c0130003-0000-4000-8000-000000000001",
+            "status": "RUNNING",
+            "resumed_at": "2026-07-25T10:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

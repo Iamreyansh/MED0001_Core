@@ -69,9 +69,11 @@ docs {
   Rate limit: 5 req/hour per user.
   Set referralApplyExpectStatus / referralApplyExpectCode env vars to assert a seeded error path
   (defaults to the 200 happy path).
-  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 404 REFERRAL_CODE_NOT_FOUND,
-    409 REFERRAL_ALREADY_USED | FIRST_ORDER_ALREADY_PLACED, 422 SELF_REFERRAL_NOT_ALLOWED,
-    429 RATE_LIMITED
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 REFERRAL_PROGRAM_PAUSED,
+    404 REFERRAL_CODE_NOT_FOUND, 409 REFERRAL_ALREADY_USED | FIRST_ORDER_ALREADY_PLACED,
+    422 SELF_REFERRAL_NOT_ALLOWED, 429 RATE_LIMITED
+  Note (EPIC-013 STORY-005 / plan 2C): path stays under customers/me/referral (not /referral/apply);
+    keep EPIC-002 error codes REFERRAL_ALREADY_USED / SELF_REFERRAL_NOT_ALLOWED.
 }
 
 example {

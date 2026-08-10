@@ -1,0 +1,143 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/banners
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "headline": "Monsoon Sale - Up to 25% Off",
+    "sub_text": "Use code NAMMA25 at checkout",
+    "image_url": "https://cdn.nammamedmate.com/banners/monsoon-2026.jpg",
+    "placement": "HOME_TOP",
+    "link_type": "COUPON",
+    "link_value": "NAMMA25",
+    "theme_color": "#1A73E8",
+    "is_live": true,
+    "valid_from": "2026-07-01T00:00:00Z",
+    "valid_until": "2026-12-31T23:59:59Z",
+    "priority": 1
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("bannerId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("id");
+    expect(body.data.status).to.equal("LIVE");
+  });
+}
+
+docs {
+  POST /api/v1/admin/banners — create banner (admin_super | admin_operations).
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "headline": "Monsoon Sale - Up to 25% Off",
+        "sub_text": "Use code NAMMA25 at checkout",
+        "image_url": "https://cdn.nammamedmate.com/banners/monsoon-2026.jpg",
+        "placement": "HOME_TOP",
+        "link_type": "COUPON",
+        "link_value": "NAMMA25",
+        "theme_color": "#1A73E8",
+        "is_live": true,
+        "valid_from": "2026-07-01T00:00:00Z",
+        "valid_until": "2026-12-31T23:59:59Z",
+        "priority": 1
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "b0130002-0000-4000-8000-000000000001",
+            "headline": "Monsoon Sale - Up to 25% Off",
+            "placement": "HOME_TOP",
+            "status": "LIVE",
+            "created_at": "2026-07-24T07:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_IMAGE_URL
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "headline": "Bad image",
+        "image_url": "https://cdn.nammamedmate.com/banners/missing-404.jpg",
+        "placement": "HOME_TOP",
+        "link_type": "COUPON",
+        "link_value": "NAMMA25",
+        "valid_from": "2026-07-01T00:00:00Z",
+        "valid_until": "2026-12-31T23:59:59Z"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_IMAGE_URL",
+            "message": "Image URL unreachable or not JPG/PNG"
+          }
+        }
+      '''
+    }
+  }
+}

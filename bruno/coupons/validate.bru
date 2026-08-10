@@ -1,0 +1,127 @@
+meta {
+  name: validate
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/coupons/validate
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "coupon_code": "NAMMA25",
+    "cart_total": 580,
+    "customer_id": "{{customerId}}",
+    "is_first_order": false,
+    "has_rx_items": false
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run customer OTP verify first");
+  }
+  if (!bru.getEnvVar("customerId")) {
+    bru.setEnvVar("customerId", "00000000-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("validate envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("valid");
+  });
+}
+
+docs {
+  POST /api/v1/coupons/validate — eligibility check (valid:false is HTTP 200).
+}
+
+example {
+  name: 200 valid
+  request: {
+    url: {{baseUrl}}/api/v1/coupons/validate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "coupon_code": "NAMMA25",
+        "cart_total": 580,
+        "customer_id": "cust_uuid_001",
+        "is_first_order": false
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "valid": true,
+            "discount_type": "PERCENTAGE",
+            "discount_amount": 100,
+            "applies_to": "SUBTOTAL",
+            "error_code": null
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 COUPON_MIN_ORDER_NOT_MET
+  request: {
+    url: {{baseUrl}}/api/v1/coupons/validate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "coupon_code": "NAMMA25",
+        "cart_total": 100,
+        "customer_id": "cust_uuid_001"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "valid": false,
+            "discount_type": null,
+            "discount_amount": 0,
+            "applies_to": null,
+            "error_code": "COUPON_MIN_ORDER_NOT_MET"
+          }
+        }
+      '''
+    }
+  }
+}

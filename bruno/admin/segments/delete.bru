@@ -1,0 +1,94 @@
+meta {
+  name: delete
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/segments/{{segmentId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("segmentId")) {
+    throw new Error("segmentId missing — run admin/segments/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.deleted) {
+    bru.deleteEnvVar("segmentId");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.deleted).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/segments/:id — soft-delete CUSTOM only (admin_super). SYSTEM → 403 CANNOT_DELETE_SYSTEM_SEGMENT.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/segments/{{segmentId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c0130004-0000-4000-8000-000000000099",
+            "deleted": true
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 CANNOT_DELETE_SYSTEM_SEGMENT
+  request: {
+    url: {{baseUrl}}/api/v1/admin/segments/a0130004-0000-4000-8000-000000000004
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CANNOT_DELETE_SYSTEM_SEGMENT",
+            "message": "System segments cannot be deleted"
+          }
+        }
+      '''
+    }
+  }
+}

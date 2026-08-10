@@ -1,0 +1,123 @@
+meta {
+  name: reorder
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/banners/reorder
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "items": [
+      { "id": "{{bannerId}}", "priority": 1 },
+      { "id": "{{bannerId2}}", "priority": 2 },
+      { "id": "{{bannerId3}}", "priority": 3 }
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("bannerId")) {
+    throw new Error("bannerId missing — run admin/banners/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reorder envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("updated_count");
+    expect(body.data).to.have.property("reordered_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/banners/reorder — atomic priority update within one placement.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners/reorder
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "items": [
+          { "id": "b0130002-0000-4000-8000-000000000001", "priority": 1 },
+          { "id": "b0130002-0000-4000-8000-000000000002", "priority": 2 }
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "updated_count": 2,
+            "reordered_at": "2026-07-24T10:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 MIXED_PLACEMENTS
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners/reorder
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "items": [
+          { "id": "b0130002-0000-4000-8000-000000000001", "priority": 1 },
+          { "id": "b0130002-0000-4000-8000-000000000099", "priority": 2 }
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MIXED_PLACEMENTS",
+            "message": "Items span multiple placements (not allowed)"
+          }
+        }
+      '''
+    }
+  }
+}
