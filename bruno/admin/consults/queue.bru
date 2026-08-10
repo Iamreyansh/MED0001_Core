@@ -1,0 +1,91 @@
+meta {
+  name: queue
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/consults/queue
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.pending_list && body.data.pending_list[0]) {
+    bru.setEnvVar("consultId", body.data.pending_list[0].consult_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("queue envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("status_counts");
+    expect(body.data).to.have.property("pending_list");
+    expect(body.data.status_counts).to.have.property("total_active");
+  });
+}
+
+docs {
+  GET /api/v1/admin/consults/queue — sorted IN_CALL → CALLING → DOCTOR_REVIEWING → REQUESTED, then created_at ASC.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/consults/queue
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "status_counts": {
+              "REQUESTED": 2,
+              "DOCTOR_REVIEWING": 1,
+              "CALLING": 0,
+              "IN_CALL": 3,
+              "total_active": 6
+            },
+            "pending_list": [
+              {
+                "consult_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+                "status": "IN_CALL",
+                "patient_name": "Ravi Kumar",
+                "doctor_name": "Dr. Anil Mehta",
+                "medicines_requested": ["Metformin 500mg"],
+                "call_started_at": "2026-07-24T10:33:00Z",
+                "wait_time_minutes": 4,
+                "is_cart_mode": true
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

@@ -119,7 +119,8 @@ class AwsSecretsEnvironmentPostProcessorTest {
               } else if (id.contains("mfa")) {
                 body =
                     "{\"encryption_key_base64\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=\","
-                        + "\"payment_encryption_key_base64\":\"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=\"}";
+                        + "\"payment_encryption_key_base64\":\"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=\","
+                        + "\"teleconsult_encryption_key_base64\":\"Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0M=\"}";
               } else {
                 body = "{\"username\":\"u\",\"password\":\"p\"}";
               }
@@ -146,6 +147,8 @@ class AwsSecretsEnvironmentPostProcessorTest {
         .isEqualTo("QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=");
     assertThat(env.getProperty("medmate.payment.encryption-key-base64"))
         .isEqualTo("QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=");
+    assertThat(env.getProperty("medmate.teleconsult.encryption-key-base64"))
+        .isEqualTo("Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0M=");
   }
 
   @Test
@@ -248,13 +251,15 @@ class AwsSecretsEnvironmentPostProcessorTest {
             GetSecretValueResponse.builder()
                 .secretString(
                     "{\"encryption_key_base64\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=\","
-                        + "\"payment_encryption_key_base64\":null}")
+                        + "\"payment_encryption_key_base64\":null,"
+                        + "\"teleconsult_encryption_key_base64\":null}")
                 .build())
         .thenReturn(
             GetSecretValueResponse.builder()
                 .secretString(
                     "{\"encryption_key_base64\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=\","
-                        + "\"payment_encryption_key_base64\":\"   \"}")
+                        + "\"payment_encryption_key_base64\":\"   \","
+                        + "\"teleconsult_encryption_key_base64\":\"   \"}")
                 .build());
 
     StandardEnvironment envNull = new StandardEnvironment();
@@ -265,6 +270,7 @@ class AwsSecretsEnvironmentPostProcessorTest {
     new AwsSecretsEnvironmentPostProcessor(() -> client)
         .postProcessEnvironment(envNull, new SpringApplication());
     assertThat(envNull.getProperty("medmate.payment.encryption-key-base64")).isNull();
+    assertThat(envNull.getProperty("medmate.teleconsult.encryption-key-base64")).isNull();
 
     StandardEnvironment envBlank = new StandardEnvironment();
     envBlank.setActiveProfiles("prod");
@@ -275,6 +281,7 @@ class AwsSecretsEnvironmentPostProcessorTest {
     new AwsSecretsEnvironmentPostProcessor(() -> client)
         .postProcessEnvironment(envBlank, new SpringApplication());
     assertThat(envBlank.getProperty("medmate.payment.encryption-key-base64")).isNull();
+    assertThat(envBlank.getProperty("medmate.teleconsult.encryption-key-base64")).isNull();
   }
 
   @Test

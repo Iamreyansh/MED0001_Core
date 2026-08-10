@@ -1,0 +1,113 @@
+meta {
+  name: availability
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/teleconsult/doctors/{{teleconsultDoctorId}}/availability
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "is_available": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("teleconsultDoctorId")) {
+    throw new Error("teleconsultDoctorId missing — run admin/teleconsult/doctors/create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("teleconsultDoctorId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("availability envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("is_available");
+    expect(body.data).to.have.property("updated_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/teleconsult/doctors/:id/availability — admin_super only.
+  Errors: DOCTOR_PROFILE_INCOMPLETE (422) when available=true without avatar_url and bio.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/teleconsult/doctors/{{teleconsultDoctorId}}/availability
+    method: patch
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "is_available": true
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1000002-0000-4000-8000-0000000000t2",
+            "is_available": true,
+            "updated_at": "2026-07-24T10:15:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 DOCTOR_PROFILE_INCOMPLETE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/teleconsult/doctors/{{teleconsultDoctorId}}/availability
+    method: patch
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "is_available": true
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DOCTOR_PROFILE_INCOMPLETE",
+            "message": "Cannot set available=true without avatar_url and bio"
+          }
+        }
+      '''
+    }
+  }
+}

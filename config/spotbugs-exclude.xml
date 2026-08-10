@@ -66,6 +66,7 @@
       <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$CreateZoneCommand"/>
       <Class name="com.nammamedmate.rider.application.AdminDeliveryZoneService$PatchZoneCommand"/>
       <Class name="com.nammamedmate.integration.domain.CommunicationConfigAudit"/>
+      <Class name="com.nammamedmate.teleconsult.adapter.in.web.AdminConsultController$EprescriptionBody"/>
     </Or>
   </Match>
 </FindBugsFilter>

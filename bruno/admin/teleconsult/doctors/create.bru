@@ -1,0 +1,144 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/teleconsult/doctors
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "name": "Dr. Kavitha Reddy",
+    "qualification": "MBBS MS",
+    "registration_no": "AP54321",
+    "specialty": "General Medicine",
+    "languages_spoken": ["Telugu", "English", "Hindi"],
+    "years_experience": 8,
+    "avatar_url": "https://cdn.nammamedmate.com/doctors/kavitha-reddy.jpg",
+    "bio": "Dr. Kavitha Reddy is a General Medicine specialist with 8 years of experience in primary care and preventive medicine.",
+    "internal_phone": "+91-9123456780"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("teleconsultDoctorId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope — no internal_phone", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_available).to.equal(false);
+    expect(body.data.total_consults).to.equal(0);
+    expect(body.data).to.not.have.property("internal_phone");
+  });
+}
+
+docs {
+  POST /api/v1/admin/teleconsult/doctors — admin_super only.
+  Errors: REGISTRATION_NO_DUPLICATE (409), INVALID_QUALIFICATION (422).
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/teleconsult/doctors
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "name": "Dr. Kavitha Reddy",
+        "qualification": "MBBS MS",
+        "registration_no": "AP54321",
+        "specialty": "General Medicine",
+        "languages_spoken": ["Telugu", "English", "Hindi"],
+        "years_experience": 8,
+        "avatar_url": "https://cdn.nammamedmate.com/doctors/kavitha-reddy.jpg",
+        "bio": "Dr. Kavitha Reddy is a General Medicine specialist with 8 years of experience.",
+        "internal_phone": "+91-9123456780"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1000002-0000-4000-8000-0000000000t2",
+            "name": "Dr. Kavitha Reddy",
+            "qualification": "MBBS MS",
+            "registration_no": "AP54321",
+            "specialty": "General Medicine",
+            "languages_spoken": ["Telugu", "English", "Hindi"],
+            "years_experience": 8,
+            "avatar_url": "https://cdn.nammamedmate.com/doctors/kavitha-reddy.jpg",
+            "is_available": false,
+            "avg_rating": null,
+            "total_consults": 0,
+            "created_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 REGISTRATION_NO_DUPLICATE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/teleconsult/doctors
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "name": "Dr. Dup",
+        "qualification": "MBBS",
+        "registration_no": "AP54321",
+        "specialty": "General Medicine",
+        "languages_spoken": ["English"],
+        "years_experience": 5,
+        "avatar_url": "https://cdn.nammamedmate.com/doctors/dup.jpg",
+        "bio": "Duplicate registration test.",
+        "internal_phone": "+91-9000000001"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "REGISTRATION_NO_DUPLICATE",
+            "message": "Doctor with this registration_no already exists"
+          }
+        }
+      '''
+    }
+  }
+}

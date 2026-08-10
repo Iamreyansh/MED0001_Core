@@ -1,0 +1,95 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/teleconsult/doctors?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~is_available: true
+  ~specialty: General Medicine
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && Array.isArray(body.data) && body.data.length) {
+    bru.setEnvVar("teleconsultDoctorId", body.data[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("teleconsult doctor list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+    if (body.data.length) {
+      expect(body.data[0]).to.not.have.property("internal_phone");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/admin/teleconsult/doctors — in-house teleconsult roster.
+  Auth: admin_super | admin_compliance | admin_operations.
+  Filters: is_available, specialty, page, limit.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/teleconsult/doctors?page=1&limit=20
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "a1000001-0000-4000-8000-0000000000t1",
+              "name": "Dr. Anil Mehta",
+              "qualification": "MBBS MD",
+              "registration_no": "DL98765",
+              "specialty": "General Medicine",
+              "rating": 4.7,
+              "years_experience": 12,
+              "languages": ["Hindi", "English", "Kannada"],
+              "is_available": true,
+              "consults_today": 8,
+              "total_consults": 1247,
+              "last_assigned_at": "2026-07-24T00:45:00Z",
+              "avatar_url": "https://cdn.nammamedmate.com/doctors/anil-mehta.jpg",
+              "created_at": "2025-01-15T09:00:00Z"
+            }
+          ],
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

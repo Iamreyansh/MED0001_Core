@@ -1,0 +1,66 @@
+meta {
+  name: download
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/prescriptions/eprescriptions/{{ePrescriptionId}}/download
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("ePrescriptionId") && !bru.getEnvVar("prescriptionId")) {
+    throw new Error("ePrescriptionId missing — run admin/consults/eprescription first");
+  }
+  if (!bru.getEnvVar("ePrescriptionId") && bru.getEnvVar("prescriptionId")) {
+    bru.setEnvVar("ePrescriptionId", bru.getEnvVar("prescriptionId"));
+  }
+}
+
+script:post-response {
+  const loc = res.getHeader("Location");
+  if (loc) {
+    bru.setEnvVar("ePrescriptionDownloadUrl", loc);
+  }
+}
+
+tests {
+  test("HTTP 302", function () {
+    expect(res.getStatus()).to.equal(302);
+  });
+  test("Location header present", function () {
+    expect(res.getHeader("Location")).to.be.a("string").that.is.not.empty;
+  });
+}
+
+docs {
+  GET /api/v1/prescriptions/eprescriptions/:id/download — 302 to 15m signed URL.
+  Generates PDF on demand if missing. Auth: customer (own) | admin_compliance.
+}
+
+example {
+  name: 302 Found
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/eprescriptions/{{ePrescriptionId}}/download
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 302 text: Found }
+    headers: {
+      Location: https://s3.ap-south-1.amazonaws.com/namma-medmate-rx/eprescriptions/RX-20260724-NMM-000451.pdf?X-Amz-Expires=900
+    }
+    body: {
+      type: text
+      content: '''
+      '''
+    }
+  }
+}

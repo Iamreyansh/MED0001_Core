@@ -1,0 +1,98 @@
+meta {
+  name: update
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/teleconsult/doctors/{{teleconsultDoctorId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "bio": "Updated bio text.",
+    "years_experience": 13,
+    "languages_spoken": ["Hindi", "English", "Kannada", "Marathi"]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("teleconsultDoctorId")) {
+    throw new Error("teleconsultDoctorId missing — run admin/teleconsult/doctors/create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("teleconsultDoctorId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("update envelope — languages reflected", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.languages).to.include("Marathi");
+    expect(body.data).to.not.have.property("internal_phone");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/teleconsult/doctors/:id — admin_super only. Partial update.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/teleconsult/doctors/{{teleconsultDoctorId}}
+    method: patch
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "bio": "Updated bio text.",
+        "years_experience": 13,
+        "languages_spoken": ["Hindi", "English", "Kannada", "Marathi"]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1000002-0000-4000-8000-0000000000t2",
+            "name": "Dr. Kavitha Reddy",
+            "qualification": "MBBS MS",
+            "registration_no": "AP54321",
+            "specialty": "General Medicine",
+            "rating": null,
+            "years_experience": 13,
+            "languages": ["Hindi", "English", "Kannada", "Marathi"],
+            "is_available": false,
+            "consults_today": 0,
+            "total_consults": 0,
+            "last_assigned_at": null,
+            "avatar_url": "https://cdn.nammamedmate.com/doctors/kavitha-reddy.jpg",
+            "created_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

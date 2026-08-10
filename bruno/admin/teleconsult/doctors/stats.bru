@@ -1,0 +1,85 @@
+meta {
+  name: stats
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/teleconsult/doctors/{{teleconsultDoctorId}}/stats?period=7d
+  body: none
+  auth: bearer
+}
+
+params:query {
+  period: 7d
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("teleconsultDoctorId")) {
+    throw new Error("teleconsultDoctorId missing — run admin/teleconsult/doctors/create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.doctor_id) {
+    bru.setEnvVar("teleconsultDoctorId", body.data.doctor_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("stats envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("consults_today");
+    expect(body.data).to.have.property("period");
+    expect(body.data).to.not.have.property("internal_phone");
+  });
+}
+
+docs {
+  GET /api/v1/admin/teleconsult/doctors/:id/stats — admin_super | admin_operations.
+  period: today | 7d | 30d | 90d (default 7d).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/teleconsult/doctors/{{teleconsultDoctorId}}/stats?period=today
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "doctor_id": "a1000001-0000-4000-8000-0000000000t1",
+            "period": "today",
+            "consults_today": 8,
+            "consults_period": 0,
+            "avg_call_duration_minutes": 0,
+            "avg_rating": 4.7,
+            "e_prescriptions_issued": 0,
+            "advice_only_consults": 0,
+            "patient_satisfaction_rate": 0,
+            "consults_by_day": []
+          }
+        }
+      '''
+    }
+  }
+}

@@ -163,6 +163,13 @@ medmate:
   accounting:
     # Hex (64 chars) or Base64 AES-256 key for Zoho OAuth token ciphertext. Blank → local zero key.
     token-cipher-key: ""
+  teleconsult:
+    # Local blank → zero key. Staging/prod: SM teleconsult_encryption_key_base64 or MFA fallback (fail-closed).
+    encryption-key-base64: ""
+    jobs:
+      enabled: true
+    auto-cancel:
+      delay-ms: 60000
   integration:
     payout-retry:
       enabled: true

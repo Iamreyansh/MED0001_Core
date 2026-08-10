@@ -1,0 +1,189 @@
+meta {
+  name: eprescription
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/consults/{{consultId}}/eprescription
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "medicines": [
+      {
+        "name": "Metformin 500mg",
+        "dosage": "500mg",
+        "frequency": "1-0-1 (morning and night)",
+        "quantity": 60,
+        "unit": "tablets",
+        "duration_days": 30,
+        "notes": "Take with food"
+      }
+    ],
+    "advice_only": false,
+    "advice_text": null,
+    "clinical_notes": "Patient presents with T2DM."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+  if (!bru.getEnvVar("consultId")) {
+    throw new Error("consultId missing — run consults/request + admin status to IN_CALL first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.prescription_id) {
+      bru.setEnvVar("ePrescriptionId", body.data.prescription_id);
+      bru.setEnvVar("prescriptionId", body.data.prescription_id);
+    }
+    if (body.data.rx_id) {
+      bru.setEnvVar("rxId", body.data.rx_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("e-Rx issuance envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("prescription_id");
+    expect(body.data).to.have.property("rx_id");
+    expect(body.data.rx_type).to.equal("E_PRESCRIPTION");
+    expect(body.data.seal).to.equal("VERIFIED");
+    expect(body.data).to.have.property("digital_signature_hash");
+    expect(body.data).to.have.property("download_url");
+  });
+}
+
+docs {
+  POST /api/v1/admin/consults/:id/eprescription — issue e-Rx (admin_super|admin_operations).
+  Consult must be IN_CALL or COMPLETED with doctor_id set. Cart-mode auto-links cart.
+  Errors: CONSULT_NOT_FOUND, CONSULT_NOT_ASSIGNED, CONSULT_ALREADY_HAS_EPRESCRIPTION,
+  ADVICE_TEXT_REQUIRED, MEDICINES_REQUIRED, CONSULT_NOT_COMPLETED.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/consults/{{consultId}}/eprescription
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "medicines": [
+          {
+            "name": "Metformin 500mg",
+            "dosage": "500mg",
+            "frequency": "1-0-1",
+            "quantity": 60,
+            "unit": "tablets",
+            "duration_days": 30,
+            "notes": "Take with food"
+          }
+        ],
+        "advice_only": false,
+        "advice_text": null,
+        "clinical_notes": "T2DM dual therapy"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "prescription_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "rx_id": "RX-20260724-NMM-000451",
+            "rx_type": "E_PRESCRIPTION",
+            "consult_id": "b2c3d4e5-f6a7-4890-9bcd-ef0123456789",
+            "doctor": {
+              "id": "c3d4e5f6-a7b8-4901-acde-f01234567890",
+              "name": "Dr. Anil Mehta",
+              "qualification": "MBBS MD",
+              "registration_no": "DL98765"
+            },
+            "patient_name": "Ravi Kumar",
+            "issued_at": "2026-07-24T10:40:00Z",
+            "is_verified": true,
+            "seal": "VERIFIED",
+            "advice_only": false,
+            "medicines": [
+              {
+                "name": "Metformin 500mg",
+                "dosage": "500mg",
+                "frequency": "1-0-1",
+                "quantity": 60,
+                "unit": "tablets",
+                "duration_days": 30,
+                "notes": "Take with food"
+              }
+            ],
+            "advice_text": null,
+            "digital_signature_hash": "a3f8d9c1e2b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5",
+            "expires_at": "2026-10-22T10:40:00Z",
+            "cart_linked": true,
+            "cart_id": "d4e5f6a7-b8c9-4012-bcde-f12345678901",
+            "download_url": "/api/v1/prescriptions/eprescriptions/a1b2c3d4-e5f6-4789-8abc-def012345678/download"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 CONSULT_NOT_ASSIGNED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/consults/{{consultId}}/eprescription
+    method: post
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+    body:json: {
+      {
+        "medicines": [],
+        "advice_only": true,
+        "advice_text": "Rest"
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CONSULT_NOT_ASSIGNED",
+            "message": "Consult is not assigned to a doctor"
+          }
+        }
+      '''
+    }
+  }
+}

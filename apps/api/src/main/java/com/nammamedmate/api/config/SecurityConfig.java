@@ -176,8 +176,20 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/customers/**")
                     .hasRole("CUSTOMER")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/prescriptions/eprescriptions/*/download")
+                    .hasAnyRole("CUSTOMER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/prescriptions/eprescriptions/*/link-to-cart")
+                    .hasRole("CUSTOMER")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/prescriptions/eprescriptions/*")
+                    .hasAnyRole("CUSTOMER", "ADMIN_COMPLIANCE", "ADMIN_SUPER")
                     .requestMatchers("/api/v1/prescriptions/**")
                     .hasRole("CUSTOMER")
+                    .requestMatchers("/api/v1/consults/**")
+                    .hasRole("CUSTOMER")
+                    .requestMatchers("/api/v1/admin/consults", "/api/v1/admin/consults/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers("/api/v1/cart/**", "/api/v1/pharmacies/**")
                     .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/rider/kyc/**")
@@ -328,6 +340,20 @@ public class SecurityConfig {
                         HttpMethod.GET, "/api/v1/admin/doctors", "/api/v1/admin/doctors/**")
                     .hasAnyRole(
                         "ADMIN_SUPER", "ADMIN_COMPLIANCE", "ADMIN_OPERATIONS", "ADMIN_SUPPORT")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/teleconsult/doctors")
+                    .hasRole("ADMIN_SUPER")
+                    .requestMatchers(
+                        HttpMethod.PATCH, "/api/v1/admin/teleconsult/doctors/*/availability")
+                    .hasRole("ADMIN_SUPER")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/admin/teleconsult/doctors/*")
+                    .hasRole("ADMIN_SUPER")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/teleconsult/doctors/*/stats")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/admin/teleconsult/doctors",
+                        "/api/v1/admin/teleconsult/doctors/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE", "ADMIN_OPERATIONS")
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/cancel")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/refund")
