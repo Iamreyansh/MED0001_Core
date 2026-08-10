@@ -1,0 +1,84 @@
+meta {
+  name: investigate
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/support/disputes/{{supportDisputeUuid}}/investigate
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "assigned_to": "{{adminUserId}}",
+    "notes": "Contacted pharmacy to verify packing records."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("supportDisputeUuid")) {
+    throw new Error("supportDisputeUuid missing — run create/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("investigating", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("INVESTIGATING");
+  });
+}
+
+docs {
+  POST /api/v1/admin/support/disputes/:id/investigate
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/disputes/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1/investigate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "assigned_to": "a0000002-0000-4000-8000-000000000002",
+        "notes": "Contacted pharmacy"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+            "status": "INVESTIGATING",
+            "assigned_to": "a0000002-0000-4000-8000-000000000002",
+            "updated_at": "2026-07-24T10:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

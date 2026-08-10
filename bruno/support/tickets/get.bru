@@ -1,0 +1,69 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("supportTicketUuid")) {
+    throw new Error("supportTicketUuid missing — run create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.conversation).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/support/tickets/:id — ticket detail (internal notes stripped for customers).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "tkt_uuid_001",
+            "ticket_id": "TKT-20260724-000042",
+            "subject": "Wrong items delivered",
+            "status": "OPEN",
+            "priority": "HIGH",
+            "sla_level": "L3",
+            "conversation": []
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,75 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/sla-policies
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.sla_policies && body.data.sla_policies[0]) {
+    bru.setEnvVar("slaPolicyId", body.data.sla_policies[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("policies envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.sla_policies).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/sla-policies — list SLA policies (admin_super|operations|support|finance).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/sla-policies
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "sla_policies": [
+              {
+                "id": "a1500003-0001-4000-8000-000000000005",
+                "category": "ORDER",
+                "priority": "ANY",
+                "first_response_sla_minutes": 30,
+                "resolution_sla_hours": 8,
+                "resolution_sla_minutes": 480,
+                "sla_level": "L1",
+                "escalation_levels": ["L1", "L2", "L3", "L4"]
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

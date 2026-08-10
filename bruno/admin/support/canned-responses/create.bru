@@ -1,0 +1,121 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/support/canned-responses
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "title": "Payment refund - processing time",
+    "category": "PAYMENT",
+    "body": "Hi {customer_name}, your refund of {refund_amount} for order {order_id} has been processed.",
+    "shortcut_key": "/refund-processing"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("cannedResponseId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.shortcut_key).to.equal("/refund-processing");
+  });
+}
+
+docs {
+  POST /api/v1/admin/support/canned-responses — create (admin_super|operations only).
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/canned-responses
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "title": "Payment refund - processing time",
+        "category": "PAYMENT",
+        "body": "Hi {customer_name}, refund processed.",
+        "shortcut_key": "/refund-processing"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1500005-0001-4000-8000-000000000010",
+            "title": "Payment refund - processing time",
+            "shortcut_key": "/refund-processing",
+            "created_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 SHORTCUT_KEY_EXISTS
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/canned-responses
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "title": "Dup",
+        "category": "PAYMENT",
+        "body": "x",
+        "shortcut_key": "/refund-processing"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "SHORTCUT_KEY_EXISTS", "message": "Shortcut key already used" }
+        }
+      '''
+    }
+  }
+}

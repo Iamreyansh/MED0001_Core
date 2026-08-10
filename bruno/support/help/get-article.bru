@@ -1,0 +1,64 @@
+meta {
+  name: get-article
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/support/help/articles/{{helpArticleId}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("helpArticleId")) {
+    throw new Error("helpArticleId missing — run list/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("article envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.content_markdown).to.be.a("string");
+    expect(body.data.view_count).to.be.a("number");
+  });
+}
+
+docs {
+  GET /api/v1/support/help/articles/:id — increments view_count.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/help/articles/a1500005-0001-4000-8000-000000000020
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1500005-0001-4000-8000-000000000020",
+            "title": "How to track my order",
+            "category": "ORDER",
+            "content_markdown": "## How to track your order",
+            "tags": ["order", "tracking"],
+            "view_count": 4821,
+            "last_updated": "2026-07-10T09:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

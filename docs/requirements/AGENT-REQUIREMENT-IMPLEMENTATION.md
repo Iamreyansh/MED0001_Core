@@ -16,9 +16,9 @@
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
 | Phase 2 | 34 | 34 |
-| Phase 3 | 32 | 16 |
+| Phase 3 | 32 | 21 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **90** |
+| **Total** | **129** | **95** |
 
 ---
 
@@ -215,11 +215,11 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-015 | [STORY-001](./EPIC-015-support-disputes/STORY-001-support-ticket-management.md) | Support Ticket Management | pending | — | — |
-| EPIC-015 | [STORY-002](./EPIC-015-support-disputes/STORY-002-dispute-management.md) | Dispute Management | pending | — | — |
-| EPIC-015 | [STORY-003](./EPIC-015-support-disputes/STORY-003-sla-escalation-management.md) | SLA and Escalation Management | pending | — | — |
-| EPIC-015 | [STORY-004](./EPIC-015-support-disputes/STORY-004-agent-management.md) | Agent Management | pending | — | — |
-| EPIC-015 | [STORY-005](./EPIC-015-support-disputes/STORY-005-knowledge-base.md) | Knowledge Base | pending | — | — |
+| EPIC-015 | [STORY-001](./EPIC-015-support-disputes/STORY-001-support-ticket-management.md) | Support Ticket Management | done | 2026-08-11 | `domains/support`; V096 tickets+messages+agent_profiles; CSAT+SLA breach schedulers; outbox notify/automation stubs; ORDER→HIGH default; Bruno support/tickets + admin/support/tickets |
+| EPIC-015 | [STORY-002](./EPIC-015-support-disputes/STORY-002-dispute-management.md) | Dispute Management | done | 2026-08-11 | `domains/support`; V097 disputes+events; RefundPort/OrderContextPort bridges; order detail banner via SupportDisputeBannerPort; ≤₹200 auto-refund; Bruno admin/support/disputes + support/disputes + customers/me/disputes |
+| EPIC-015 | [STORY-003](./EPIC-015-support-disputes/STORY-003-sla-escalation-management.md) | SLA and Escalation Management | done | 2026-08-11 | `domains/support`; V098 sla_policies+escalation_matrix; 60s breach poller via AutomationEscalatePort; TicketService DB policy lookup; adherence ×100; Bruno admin/support/sla-* |
+| EPIC-015 | [STORY-004](./EPIC-015-support-disputes/STORY-004-agent-management.md) | Agent Management | done | 2026-08-11 | `domains/support`; V099 agent_performance_snapshots; AdminSupportAgentController; suggest-assignment+overflow; weekly Mon 08:00 IST; Bruno admin/support/agents/ |
+| EPIC-015 | [STORY-005](./EPIC-015-support-disputes/STORY-005-knowledge-base.md) | Knowledge Base | done | 2026-08-11 | `domains/support`; V100 canned+help_articles; public help+deflection; canned interpolate in ticket reply; rate limit 60/min; Bruno admin canned/help-articles + support/help |
 
 ### EPIC-017 (`EPIC-017-notifications-comms`)
 

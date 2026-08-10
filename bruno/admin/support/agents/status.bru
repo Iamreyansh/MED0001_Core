@@ -1,0 +1,118 @@
+meta {
+  name: status
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/support/agents/{{supportAgentId}}/status
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "is_online": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("supportAgentId")) {
+    throw new Error("supportAgentId missing — run admin/support/agents/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.agent_id) {
+    bru.setEnvVar("supportAgentId", body.data.agent_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("status toggle envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("is_online");
+    expect(body.data).to.have.property("toggled_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/support/agents/:id/status — toggle online (support own only; ops/super any).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents/a0000002-0000-4000-8000-000000000002/status
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "is_online": true
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "agent_id": "a0000002-0000-4000-8000-000000000002",
+            "is_online": true,
+            "toggled_at": "2026-07-24T09:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents/a0000002-0000-4000-8000-000000000099/status
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "is_online": false
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "admin_support can only toggle own status"
+          }
+        }
+      '''
+    }
+  }
+}

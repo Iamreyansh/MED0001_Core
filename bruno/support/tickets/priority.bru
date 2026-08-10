@@ -1,0 +1,83 @@
+meta {
+  name: priority
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/priority
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "priority": "URGENT"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — admin token required");
+  }
+  if (!bru.getEnvVar("supportTicketUuid")) {
+    throw new Error("supportTicketUuid missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("priority envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.priority).to.equal("URGENT");
+    expect(body.data.sla_level).to.equal("L4");
+  });
+}
+
+docs {
+  PATCH /api/v1/support/tickets/:id/priority — URGENT→L4.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/priority
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "priority": "URGENT"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "ticket_id": "TKT-20260724-000042",
+            "priority": "URGENT",
+            "sla_level": "L4",
+            "updated_at": "2026-07-24T10:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

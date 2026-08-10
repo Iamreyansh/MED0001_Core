@@ -1,0 +1,55 @@
+meta {
+  name: export-csv
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/disputes?export=true
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("CSV content type", function () {
+    const ct = res.getHeader("Content-Type") || "";
+    expect(ct.toLowerCase()).to.include("text/csv");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/disputes?export=true — CSV export of disputes.
+}
+
+example {
+  name: 200 CSV
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/disputes?export=true
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: text
+      content: '''
+        dispute_id,order_id,customer_name,type,status,liable_party,refund_amount
+        DSP-20260724-000014,ord_uuid_001,Priya Sharma,WRONG_ITEMS,OPEN,,
+      '''
+    }
+  }
+}

@@ -1,0 +1,90 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/escalation-matrix
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("matrix envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.escalation_matrix).to.be.an("array");
+    expect(body.data.escalation_matrix.length).to.equal(4);
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/escalation-matrix — admin_super|operations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/escalation-matrix
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "escalation_matrix": [
+              {
+                "level": "L1",
+                "criteria": "Default assignment",
+                "assigned_team": "Front-line Agents",
+                "notification_channel": ["IN_APP"],
+                "auto_escalate_after_minutes": 30
+              },
+              {
+                "level": "L2",
+                "criteria": "L1 first-response breach",
+                "assigned_team": "Senior Agents",
+                "notification_channel": ["IN_APP", "WHATSAPP"],
+                "auto_escalate_after_minutes": 120
+              },
+              {
+                "level": "L3",
+                "criteria": "L2 breach",
+                "assigned_team": "Team Lead",
+                "notification_channel": ["IN_APP", "WHATSAPP"],
+                "auto_escalate_after_minutes": 480
+              },
+              {
+                "level": "L4",
+                "criteria": "L3 breach",
+                "assigned_team": "Senior Ops Manager",
+                "notification_channel": ["IN_APP", "WHATSAPP", "CALL"],
+                "auto_escalate_after_minutes": 1440
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

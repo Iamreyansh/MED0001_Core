@@ -1,0 +1,74 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/disputes/{{supportDisputeUuid}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("supportDisputeUuid")) {
+    throw new Error("supportDisputeUuid missing — run list or create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.liability_recommendation).to.be.an("object");
+    expect(body.data.history).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/disputes/:id — detail with timeline.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/disputes/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+            "dispute_id": "DSP-20260724-000014",
+            "dispute_type": "WRONG_ITEMS",
+            "status": "OPEN",
+            "liability_recommendation": {
+              "recommended_liable_party": "PHARMACY",
+              "rationale": "WRONG_ITEMS disputes are attributed to pharmacy fulfilment error."
+            },
+            "history": [
+              { "event": "DISPUTE_RAISED", "at": "2026-07-24T10:00:00Z", "actor": "Priya Sharma" }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

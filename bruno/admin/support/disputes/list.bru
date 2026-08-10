@@ -1,0 +1,74 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/disputes?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.disputes && body.data.disputes[0]) {
+    bru.setEnvVar("supportDisputeUuid", body.data.disputes[0].id);
+    bru.setEnvVar("supportDisputeId", body.data.disputes[0].dispute_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.chips).to.be.an("object");
+    expect(body.data.disputes).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/disputes — admin dispute queue with chips.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/disputes?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "chips": {
+              "open_disputes": 14,
+              "refund_exposure_rs": 42800,
+              "avg_resolution_hours": 18.4,
+              "resolved_today": 6
+            },
+            "disputes": []
+          },
+          "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}

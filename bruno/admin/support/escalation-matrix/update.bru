@@ -1,0 +1,116 @@
+meta {
+  name: update
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/support/escalation-matrix
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "escalation_rules": [
+      {
+        "level": "L2",
+        "auto_escalate_after_minutes": 90,
+        "notification_channel": ["IN_APP", "WHATSAPP", "EMAIL"]
+      }
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("update envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.updated_levels).to.be.an("array");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/support/escalation-matrix — admin_super only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/escalation-matrix
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "escalation_rules": [
+          {
+            "level": "L2",
+            "auto_escalate_after_minutes": 90,
+            "notification_channel": ["IN_APP", "WHATSAPP", "EMAIL"]
+          }
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "updated_levels": ["L2"],
+            "updated_at": "2026-07-24T10:00:00Z",
+            "updated_by": "a0000001-0000-4000-8000-000000000001"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/escalation-matrix
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "escalation_rules": []
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Only admin_super may update escalation matrix"
+          }
+        }
+      '''
+    }
+  }
+}

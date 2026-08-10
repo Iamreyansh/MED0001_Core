@@ -1,0 +1,86 @@
+meta {
+  name: resolve-reject
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/support/disputes/{{supportDisputeUuid}}/resolve-reject
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "rejection_reason": "Evidence insufficient. Delivery tracking confirms correct items dispatched.",
+    "notes": "Pharmacy provided warehouse CCTV evidence of correct packing."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("supportDisputeUuid")) {
+    throw new Error("supportDisputeUuid missing — run create/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("rejected", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RESOLVED");
+    expect(body.data.refund_amount_rs).to.equal(0);
+  });
+}
+
+docs {
+  POST /api/v1/admin/support/disputes/:id/resolve-reject
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/disputes/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1/resolve-reject
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "rejection_reason": "Evidence insufficient",
+        "notes": "CCTV confirms correct packing"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+            "status": "RESOLVED",
+            "liable_party": "CUSTOMER",
+            "refund_amount_rs": 0,
+            "resolved_at": "2026-07-24T11:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

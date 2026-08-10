@@ -1,0 +1,89 @@
+meta {
+  name: reply
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/reply
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "message": "I have initiated a replacement for your order.",
+    "is_internal_note": false,
+    "attachments": []
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("supportTicketUuid")) {
+    throw new Error("supportTicketUuid missing — run create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.message_id) {
+    bru.setEnvVar("supportMessageId", body.data.message_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("reply envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.message_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/support/tickets/:id/reply
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/reply
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "message": "Looking into this",
+        "is_internal_note": false
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "message_id": "msg_uuid_003",
+            "ticket_id": "TKT-20260724-000042",
+            "sender": "agent",
+            "created_at": "2026-07-24T10:20:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

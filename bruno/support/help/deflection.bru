@@ -1,0 +1,79 @@
+meta {
+  name: deflection
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/support/help/deflection
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "article_id": "{{helpArticleId}}",
+    "issue_resolved": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("helpArticleId")) {
+    throw new Error("helpArticleId missing — run list/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("deflection envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.deflection_logged).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/support/help/deflection — auth optional; increments deflection_count when issue_resolved=true.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/help/deflection
+    method: post
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "article_id": "a1500005-0001-4000-8000-000000000020",
+        "issue_resolved": true
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "article_id": "a1500005-0001-4000-8000-000000000020",
+            "issue_resolved": true,
+            "deflection_logged": true
+          }
+        }
+      '''
+    }
+  }
+}

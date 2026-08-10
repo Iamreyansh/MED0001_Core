@@ -1,0 +1,69 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/support/help?q=track
+  body: none
+  auth: none
+}
+
+script:pre-request {
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.articles && body.data.articles[0]) {
+    bru.setEnvVar("helpArticleId", body.data.articles[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("public help envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.articles).to.be.an("array");
+    expect(body.data.categories).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/support/help — public published articles only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/help?q=track
+    method: get
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "categories": [{ "name": "ORDER", "article_count": 1 }],
+            "articles": [
+              {
+                "id": "a1500005-0001-4000-8000-000000000020",
+                "title": "How to track my order",
+                "category": "ORDER",
+                "summary": "Learn how to track your delivery in real time...",
+                "tags": ["order", "tracking"]
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 100, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

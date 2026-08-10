@@ -1,0 +1,81 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/sla-breaches?breach_type=FIRST_RESPONSE
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("slaBreachCount", String(body.data.breach_count || 0));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("breaches envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("breach_count");
+    expect(body.data.breaches).to.be.an("array");
+    expect(body.data).to.have.property("last_refreshed_at");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/sla-breaches — live breach list with minutes_breached.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/sla-breaches?breach_type=FIRST_RESPONSE
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "breach_count": 1,
+            "breaches": [
+              {
+                "ticket_id": "TKT-20260724-000042",
+                "category": "ORDER",
+                "customer_name": "Priya Sharma",
+                "assigned_agent": "Ravi Kumar",
+                "sla_level": "L1",
+                "breach_type": "FIRST_RESPONSE",
+                "breached_at": "2026-07-24T18:00:00Z",
+                "minutes_breached": 125,
+                "current_status": "OPEN"
+              }
+            ],
+            "last_refreshed_at": "2026-07-24T20:05:00Z",
+            "sla_adherence_pct": 87.5
+          }
+        }
+      '''
+    }
+  }
+}

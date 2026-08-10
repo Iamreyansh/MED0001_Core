@@ -1,0 +1,105 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/agents/{{supportAgentId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("supportAgentId")) {
+    throw new Error("supportAgentId missing — run admin/support/agents/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("agent detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("id");
+    expect(body.data).to.have.property("sla_breach_count_this_week");
+    expect(body.data.at_risk_tickets).to.be.an("array");
+    expect(body.data.performance_trend).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/agents/:id — agent detail (admin_super|operations).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents/a0000002-0000-4000-8000-000000000002
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a0000002-0000-4000-8000-000000000002",
+            "name": "Ravi Kumar",
+            "email": "ravi.kumar@nammamedmate.com",
+            "specialties": ["ORDER", "PAYMENT"],
+            "is_online": true,
+            "open_load": 12,
+            "handled_today": 24,
+            "avg_handle_minutes": 18.4,
+            "csat_score": 4.6,
+            "sla_breach_count_this_week": 2,
+            "at_risk_tickets": [],
+            "performance_trend": [
+              { "week": "2026-W29", "csat": 4.5, "handled": 112, "avg_handle_min": 19.2 }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 AGENT_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents/00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "AGENT_NOT_FOUND",
+            "message": "Agent ID does not exist"
+          }
+        }
+      '''
+    }
+  }
+}
