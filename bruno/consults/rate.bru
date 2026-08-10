@@ -1,0 +1,113 @@
+meta {
+  name: rate
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/consults/{{consultId}}/rate
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "rating": 5,
+    "feedback_text": "Doctor was very helpful and explained everything clearly."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("consultId")) {
+    throw new Error("consultId missing — run consults/request first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.consult_id) {
+    bru.setEnvVar("consultId", body.data.consult_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("rate envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.rating).to.equal(5);
+    expect(body.data).to.have.property("rated_at");
+  });
+}
+
+docs {
+  POST /api/v1/consults/:id/rate — COMPLETED only; once.
+  Errors: CONSULT_NOT_COMPLETED (409), ALREADY_RATED (409), INVALID_RATING (422).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/consults/{{consultId}}/rate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "rating": 5,
+        "feedback_text": "Doctor was very helpful and explained everything clearly."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "consult_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "rating": 5,
+            "feedback_text": "Doctor was very helpful and explained everything clearly.",
+            "rated_at": "2026-07-24T11:15:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 CONSULT_NOT_COMPLETED
+  request: {
+    url: {{baseUrl}}/api/v1/consults/{{consultId}}/rate
+    method: post
+    body:json: {
+      {
+        "rating": 5
+      }
+    }
+  }
+  response: {
+    status: { code: 409 }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CONSULT_NOT_COMPLETED",
+            "message": "Consult is not in COMPLETED status"
+          }
+        }
+      '''
+    }
+  }
+}

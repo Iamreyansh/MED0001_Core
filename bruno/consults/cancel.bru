@@ -1,0 +1,116 @@
+meta {
+  name: cancel
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/consults/{{consultId}}/cancel
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "No longer needed"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("consultId")) {
+    throw new Error("consultId missing — run consults/request first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.consult_id) {
+    bru.setEnvVar("consultId", body.data.consult_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cancelled envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("CANCELLED");
+    expect(body.data.cancelled_at).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/consults/:id/cancel — only REQUESTED or DOCTOR_REVIEWING.
+  Errors: CONSULT_CANNOT_CANCEL (409), CONSULT_NOT_FOUND (404).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/consults/{{consultId}}/cancel
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "No longer needed"
+      }
+    }
+  }
+  response: {
+    status: {
+      code: 200
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "consult_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "status": "CANCELLED",
+            "cancelled_at": "2026-07-24T10:32:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 CONSULT_CANNOT_CANCEL
+  description: Already IN_CALL
+
+  request: {
+    url: {{baseUrl}}/api/v1/consults/{{consultId}}/cancel
+    method: post
+    body:json: {
+      {
+        "reason": "Too late"
+      }
+    }
+  }
+  response: {
+    status: {
+      code: 409
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CONSULT_CANNOT_CANCEL",
+            "message": "Consult cannot be cancelled in status IN_CALL"
+          }
+        }
+      '''
+    }
+  }
+}

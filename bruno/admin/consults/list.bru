@@ -1,0 +1,108 @@
+meta {
+  name: list
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/consults?date=2026-07-24&status=ALL&page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  date: 2026-07-24
+  status: ALL
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken") && !bru.getEnvVar("accessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminAccessToken") && bru.getEnvVar("accessToken")) {
+    bru.setEnvVar("adminAccessToken", bru.getEnvVar("accessToken"));
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.consults && body.data.consults[0]) {
+    bru.setEnvVar("consultId", body.data.consults[0].consult_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("stats");
+    expect(body.data).to.have.property("consults");
+    expect(body.meta).to.have.property("has_next");
+  });
+}
+
+docs {
+  GET /api/v1/admin/consults — date (IST day, default today), doctor_id, status, is_cart_mode, page, limit.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/consults?date=2026-07-24&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{adminAccessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "stats": {
+              "total_today": 52,
+              "completed": 44,
+              "in_progress": 6,
+              "cancelled": 2,
+              "avg_duration_minutes": 6.3,
+              "avg_rating": 4.6,
+              "pending_rating": 11
+            },
+            "consults": [
+              {
+                "consult_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+                "patient_name": "Ravi Kumar",
+                "doctor_name": "Dr. Anil Mehta",
+                "status": "COMPLETED",
+                "duration_minutes": 7,
+                "e_prescription_issued": true,
+                "is_cart_mode": true,
+                "rating": 5,
+                "created_at": "2026-07-24T10:30:00Z",
+                "completed_at": "2026-07-24T10:40:00Z"
+              }
+            ]
+          },
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 52,
+            "has_next": true
+          }
+        }
+      '''
+    }
+  }
+}

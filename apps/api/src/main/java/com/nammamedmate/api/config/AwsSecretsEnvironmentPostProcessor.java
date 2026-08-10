@@ -64,6 +64,12 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
             props.put("medmate.payment.encryption-key-base64", paymentKey);
           }
         }
+        if (mfa.hasNonNull("teleconsult_encryption_key_base64")) {
+          String teleconsultKey = mfa.get("teleconsult_encryption_key_base64").asText();
+          if (!teleconsultKey.isBlank()) {
+            props.put("medmate.teleconsult.encryption-key-base64", teleconsultKey);
+          }
+        }
       }
       String razorpayArn = environment.getProperty("MEDMATE_SECRETS_RAZORPAY_ARN");
       if (razorpayArn != null && !razorpayArn.isBlank()) {

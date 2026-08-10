@@ -1,0 +1,147 @@
+meta {
+  name: request
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/consults/request
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "patient_name": "Ravi Kumar",
+    "patient_phone": "+91-9876543210",
+    "slot": "NOW",
+    "symptoms": ["fatigue", "increased thirst"],
+    "medicines_needing_rx": [
+      { "name": "Metformin 500mg", "reason": "REFILL" }
+    ],
+    "reason": "RX_NEEDED"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.consult_id) {
+    bru.setEnvVar("consultId", body.data.consult_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("success envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.consult_id).to.be.a("string");
+    expect(body.data).to.not.have.property("patient_phone");
+  });
+}
+
+docs {
+  POST /api/v1/consults/request — customer, free consult (NOW or ISO-8601 scheduled).
+  Errors: MAX_ACTIVE_CONSULTS_REACHED (429), CART_NOT_FOUND (404), CART_ALREADY_HAS_CONSULT (409).
+}
+
+example {
+  name: 201 Created assigned
+  description: NOW slot with available doctor
+
+  request: {
+    url: {{baseUrl}}/api/v1/consults/request
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "patient_name": "Ravi Kumar",
+        "patient_phone": "+91-9876543210",
+        "slot": "NOW",
+        "symptoms": ["fatigue"],
+        "reason": "GENERAL"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "consult_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "status": "DOCTOR_REVIEWING",
+            "doctor": {
+              "id": "b2c3d4e5-f6a7-4890-9bcd-ef0123456789",
+              "name": "Dr. Anil Mehta",
+              "qualification": "MBBS MD",
+              "avatar_url": "https://cdn.nammamedmate.com/doctors/anil-mehta.jpg",
+              "registration_no": "DL98765",
+              "rating": 4.7
+            },
+            "estimated_call_in_minutes": 3,
+            "scheduled_at": null,
+            "cart_id": null,
+            "is_cart_mode": false,
+            "created_at": "2026-07-24T10:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 MAX_ACTIVE_CONSULTS_REACHED
+  description: Fourth concurrent active consult
+
+  request: {
+    url: {{baseUrl}}/api/v1/consults/request
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "patient_name": "Ravi Kumar",
+        "patient_phone": "+91-9876543210",
+        "slot": "NOW",
+        "reason": "GENERAL"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 429
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MAX_ACTIVE_CONSULTS_REACHED",
+            "message": "Customer already has 3 active consults"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -15,10 +15,10 @@
 | Phase | Total | Done |
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
-| Phase 2 | 34 | 33 |
-| Phase 3 | 32 | 6 |
+| Phase 2 | 34 | 34 |
+| Phase 3 | 32 | 10 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **79** |
+| **Total** | **129** | **84** |
 
 ---
 
@@ -172,7 +172,7 @@
 | EPIC-022 | [STORY-002](./EPIC-022-external-integrations/STORY-002-maps-geolocation.md) | Maps & Geolocation | done | 2026-08-10 | `domains/integration`; V075; Redis\|DB cache; zone ray-cast; GeocodePort+DistanceMatrixPort bridges |
 | EPIC-022 | [STORY-003](./EPIC-022-external-integrations/STORY-003-government-api-integration.md) | Government API Integration | done | 2026-08-10 | `domains/integration`; V076; GSTN/DigiLocker/drug/FSSAI; pharmacy KYC bridges; rider Aadhaar deferred |
 | EPIC-022 | [STORY-004](./EPIC-022-external-integrations/STORY-004-einvoicing-irn.md) | E-Invoicing IRN | done | 2026-08-10 | `domains/integration`; V077; GSP stub\|live; EinvoicePort bridge; POS finalize hook deferred |
-| EPIC-022 | [STORY-005](./EPIC-022-external-integrations/STORY-005-accounting-integration.md) | Accounting Integration | in_progress | — | `domains/integration`; V078 implemented; make check green (tracker left in_progress per implement request) |
+| EPIC-022 | [STORY-005](./EPIC-022-external-integrations/STORY-005-accounting-integration.md) | Accounting Integration | done | 2026-08-10 | `domains/integration`; V078; Tally XML + Zoho Books stub; plan gate; auto-sync scheduler; Bruno `integrations/accounting/`; AC-001–008 covered |
 | EPIC-022 | [STORY-006](./EPIC-022-external-integrations/STORY-006-communication-integrations.md) | Communication Integrations | done | 2026-08-10 | `domains/integration`; V079; admin control plane; health 5m; CommunicationChannelLookupPort for EPIC-017 |
 
 ---
@@ -195,10 +195,10 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-009 | [STORY-001](./EPIC-009-doctor-teleconsult/STORY-001-doctor-profile-management.md) | Teleconsult Doctor Profile Management | pending | — | — |
-| EPIC-009 | [STORY-002](./EPIC-009-doctor-teleconsult/STORY-002-consult-request-scheduling.md) | Patient Consultation Request and Scheduling | pending | — | — |
-| EPIC-009 | [STORY-003](./EPIC-009-doctor-teleconsult/STORY-003-consult-session-management.md) | Teleconsult Session Lifecycle Management | pending | — | — |
-| EPIC-009 | [STORY-004](./EPIC-009-doctor-teleconsult/STORY-004-eprescription-generation.md) | e-Prescription Generation and Linking | pending | — | — |
+| EPIC-009 | [STORY-001](./EPIC-009-doctor-teleconsult/STORY-001-doctor-profile-management.md) | Teleconsult Doctor Profile Management | done | 2026-08-10 | `domains/teleconsult`; V086 `teleconsult_doctors`; Bruno `bruno/admin/teleconsult/doctors/`; AES-GCM `teleconsultPhoneCipher` for `internal_phone` (never in API); midnight IST `consults_today` reset gated by `medmate.teleconsult.jobs.enabled`; stats period aggregates zero until STORY-003 consult table; LRU `selectLeastRecentlyAssigned` + running-avg helpers unit-tested for AC-005/006; UUID v4 (no `tdoc_` prefixes); BUMS in qualification allow-list |
+| EPIC-009 | [STORY-002](./EPIC-009-doctor-teleconsult/STORY-002-consult-request-scheduling.md) | Patient Consultation Request and Scheduling | done | 2026-08-10 | `domains/teleconsult`; V087 `consults`; Bruno `bruno/consults/`; CartPort + NotificationDispatchPort stub/outbox bridge; NOW LRU assign + queue wait=`position×rolling_7d_avg` (default 7); auto-cancel +30m gated by `medmate.teleconsult.jobs.enabled`; UUID v4; e-Rx cart link AC-005 deferred to STORY-004 |
+| EPIC-009 | [STORY-003](./EPIC-009-doctor-teleconsult/STORY-003-consult-session-management.md) | Teleconsult Session Lifecycle Management | done | 2026-08-10 | `domains/teleconsult`; V088 `consult_status_events` + duration/rated_at/clinical_notes; Bruno `bruno/admin/consults/` + `bruno/consults/rate.bru`; doctor stats period aggregates from COMPLETED consults |
+| EPIC-009 | [STORY-004](./EPIC-009-doctor-teleconsult/STORY-004-eprescription-generation.md) | e-Prescription Generation and Linking | done | 2026-08-10 | domains/teleconsult + prescription bridge; V089; Bruno admin/consults/eprescription + prescriptions/eprescriptions |
 
 ### EPIC-013 (`EPIC-013-marketing-growth`)
 

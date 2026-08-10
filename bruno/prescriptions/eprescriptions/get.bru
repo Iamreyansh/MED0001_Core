@@ -1,0 +1,119 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/prescriptions/eprescriptions/{{ePrescriptionId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("ePrescriptionId") && !bru.getEnvVar("prescriptionId")) {
+    throw new Error("ePrescriptionId missing — run admin/consults/eprescription first");
+  }
+  if (!bru.getEnvVar("ePrescriptionId") && bru.getEnvVar("prescriptionId")) {
+    bru.setEnvVar("ePrescriptionId", bru.getEnvVar("prescriptionId"));
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.prescription_id) {
+    bru.setEnvVar("ePrescriptionId", body.data.prescription_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("e-Rx detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.signature_valid).to.equal(true);
+    expect(body.data.seal).to.equal("VERIFIED");
+    expect(body.data.rx_type).to.equal("E_PRESCRIPTION");
+  });
+}
+
+docs {
+  GET /api/v1/prescriptions/eprescriptions/:id — customer (own) | admin_compliance | admin_super.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/eprescriptions/{{ePrescriptionId}}
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "prescription_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "rx_id": "RX-20260724-NMM-000451",
+            "rx_type": "E_PRESCRIPTION",
+            "is_verified": true,
+            "seal": "VERIFIED",
+            "doctor": {
+              "name": "Dr. Anil Mehta",
+              "qualification": "MBBS MD",
+              "registration_no": "DL98765",
+              "specialty": "General Medicine"
+            },
+            "patient_name": "Ravi Kumar",
+            "issued_at": "2026-07-24T10:40:00Z",
+            "expires_at": "2026-10-22T10:40:00Z",
+            "is_expired": false,
+            "advice_only": false,
+            "medicines": [],
+            "advice_text": null,
+            "digital_signature_hash": "a3f8d9c1e2b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5",
+            "signature_valid": true,
+            "consult_id": "b2c3d4e5-f6a7-4890-9bcd-ef0123456789",
+            "associated_order_id": null
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 PRESCRIPTION_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/eprescriptions/00000000-0000-4000-8000-000000000001
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PRESCRIPTION_NOT_FOUND",
+            "message": "e-Rx not found for this customer"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,85 @@
+meta {
+  name: list
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/consults?status=ALL&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && Array.isArray(body.data) && body.data.length > 0) {
+    bru.setEnvVar("consultId", body.data[0].consult_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope — no patient_phone", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.meta).to.have.property("has_next");
+    if (body.data.length > 0) {
+      expect(body.data[0]).to.not.have.property("patient_phone");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/consults — customer consult history. patient_phone never returned.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/consults?status=ALL&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: {
+      code: 200
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "consult_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+              "date": "2026-07-24",
+              "doctor_name": "Dr. Anil Mehta",
+              "status": "COMPLETED",
+              "e_prescription_id": null,
+              "cart_id": null,
+              "is_cart_mode": false,
+              "rating_given": 5,
+              "created_at": "2026-07-24T10:30:00Z"
+            }
+          ],
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,120 @@
+meta {
+  name: link-to-cart
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/prescriptions/eprescriptions/{{ePrescriptionId}}/link-to-cart
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "cart_id": "{{cartId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("ePrescriptionId") && !bru.getEnvVar("prescriptionId")) {
+    throw new Error("ePrescriptionId missing — run admin/consults/eprescription first");
+  }
+  if (!bru.getEnvVar("ePrescriptionId") && bru.getEnvVar("prescriptionId")) {
+    bru.setEnvVar("ePrescriptionId", bru.getEnvVar("prescriptionId"));
+  }
+  if (!bru.getEnvVar("cartId")) {
+    throw new Error("cartId missing — run cart flow first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.cart_id) {
+    bru.setEnvVar("cartId", body.data.cart_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("link envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.message).to.equal("e-Prescription linked to cart successfully");
+    expect(body.data.cart_prescription_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/prescriptions/eprescriptions/:id/link-to-cart — customer manual attach (non-cart-mode consults).
+  Errors: PRESCRIPTION_NOT_FOUND, PRESCRIPTION_EXPIRED, CART_NOT_FOUND.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/eprescriptions/{{ePrescriptionId}}/link-to-cart
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "cart_id": "d4e5f6a7-b8c9-4012-bcde-f12345678901"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "prescription_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "cart_id": "d4e5f6a7-b8c9-4012-bcde-f12345678901",
+            "cart_prescription_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "message": "e-Prescription linked to cart successfully"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 PRESCRIPTION_EXPIRED
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions/eprescriptions/{{ePrescriptionId}}/link-to-cart
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "cart_id": "d4e5f6a7-b8c9-4012-bcde-f12345678901"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PRESCRIPTION_EXPIRED",
+            "message": "e-Rx has expired"
+          }
+        }
+      '''
+    }
+  }
+}

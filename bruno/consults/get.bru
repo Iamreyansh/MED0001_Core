@@ -1,0 +1,114 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/consults/{{consultId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("consultId")) {
+    throw new Error("consultId missing — run consults/request first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.consult_id) {
+    bru.setEnvVar("consultId", body.data.consult_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("own consult — no patient_phone", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.consult_id).to.equal(bru.getEnvVar("consultId"));
+    expect(body.data).to.not.have.property("patient_phone");
+  });
+}
+
+docs {
+  GET /api/v1/consults/:id — own consult only; other customer's consult → 404 CONSULT_NOT_FOUND.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/consults/{{consultId}}
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: {
+      code: 200
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "consult_id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "doctor": {
+              "id": "b2c3d4e5-f6a7-4890-9bcd-ef0123456789",
+              "name": "Dr. Anil Mehta",
+              "qualification": "MBBS MD",
+              "avatar_url": "https://cdn.nammamedmate.com/doctors/anil-mehta.jpg",
+              "registration_no": "DL98765",
+              "rating": 4.7
+            },
+            "status": "DOCTOR_REVIEWING",
+            "scheduled_at": null,
+            "call_started_at": null,
+            "call_ended_at": null,
+            "e_prescription_id": null,
+            "cart_id": null,
+            "is_cart_mode": false,
+            "patient_name": "Ravi Kumar",
+            "created_at": "2026-07-24T10:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 CONSULT_NOT_FOUND
+  description: Missing or other customer's consult
+
+  request: {
+    url: {{baseUrl}}/api/v1/consults/ffffffff-ffff-4fff-8fff-ffffffffffff
+    method: get
+  }
+  response: {
+    status: {
+      code: 404
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CONSULT_NOT_FOUND",
+            "message": "Consult not found for this customer"
+          }
+        }
+      '''
+    }
+  }
+}
