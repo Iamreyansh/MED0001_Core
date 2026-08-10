@@ -1,0 +1,88 @@
+meta {
+  name: unverified
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/doctors/unverified?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.doctors && body.data.doctors.length) {
+    bru.setEnvVar("adminDoctorId", body.data.doctors[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("unverified queue envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("total_unverified");
+    expect(body.data).to.have.property("doctors");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/doctors/unverified — unverified doctors sorted by prescription_count DESC.
+  Auth: admin_compliance | admin_super.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/doctors/unverified
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total_unverified": 23,
+            "doctors": [
+              {
+                "id": "d1000002-0000-4000-8000-0000000000d2",
+                "registration_no": "KA99999",
+                "name": "Dr. Suresh Nair",
+                "qualification": "MBBS",
+                "specialty": null,
+                "prescription_count": 18,
+                "scheduled_drug_count": 6,
+                "source": "OCR",
+                "first_seen_at": "2026-05-10T12:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 23, "has_next": true }
+        }
+      '''
+    }
+  }
+}

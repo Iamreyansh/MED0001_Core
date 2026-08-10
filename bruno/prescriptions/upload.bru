@@ -1,0 +1,134 @@
+meta {
+  name: upload
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/prescriptions
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  patient_name: Ravi Kumar
+  notes: Morning medicines refill
+  file: @file(/path/to/prescription.jpg)
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("prescriptionId", body.data.id);
+    console.log(`prescriptionId=${body.data.id}`);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("success envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.a("string").that.is.not.empty;
+    expect(body.data.status).to.equal("UPLOADED");
+    expect(body.data.type).to.equal("UPLOADED");
+    expect(body.data.file_url).to.be.a("string").that.is.not.empty;
+    expect(body.data.file_url).to.not.include("s3_key");
+  });
+}
+
+docs {
+  POST /api/v1/prescriptions — multipart upload (PDF/JPG/PNG ≤10 MB). Optional patient_name, notes (max 500).
+  Requires CUSTOMER role. Sets prescriptionId for subsequent calls.
+}
+
+example {
+  name: 201 Created
+  description: Valid JPG under 10 MB uploaded.
+
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions
+    method: post
+    mode: multipartForm
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:multipart-form: {
+      patient_name: Ravi Kumar
+      notes: Morning medicines refill
+      file: @file(/path/to/prescription.jpg)
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+            "type": "UPLOADED",
+            "status": "UPLOADED",
+            "file_url": "https://local.invalid/med0001-local-uploads/prescriptions/...?get=1&n=...",
+            "patient_name": "Ravi Kumar",
+            "notes": "Morning medicines refill",
+            "doctor_name": null,
+            "prescription_date": null,
+            "medicines_extracted": null,
+            "source": "UPLOAD",
+            "expires_at": "2027-01-24T07:30:00Z",
+            "uploaded_at": "2026-07-24T07:30:00Z",
+            "created_at": "2026-07-24T07:30:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 FILE_TOO_LARGE
+  description: File exceeds 10 MB.
+
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions
+    method: post
+    mode: multipartForm
+    body:multipart-form: {
+      file: @file(/path/to/large.jpg)
+    }
+  }
+
+  response: {
+    status: {
+      code: 422
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FILE_TOO_LARGE",
+            "message": "File exceeds 10 MB limit"
+          }
+        }
+      '''
+    }
+  }
+}

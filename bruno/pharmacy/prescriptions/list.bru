@@ -1,0 +1,130 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/prescriptions?status=PENDING_REVIEW&sort=urgency&page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: PENDING_REVIEW
+  sort: urgency
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.prescriptions && body.data.prescriptions.length) {
+    bru.setEnvVar("rxId", body.data.prescriptions[0].rx_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("queue envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpis");
+    expect(body.data).to.have.property("prescriptions");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/prescriptions — KPIs + Rx queue (overdue first). Starter+ plan required.
+}
+
+example {
+  name: 200 OK
+  description: Queue with KPIs
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions?status=PENDING_REVIEW&sort=urgency
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpis": {
+              "pending_review": 4,
+              "pending_review_overdue": 1,
+              "awaiting_dispense": 2,
+              "dispensed_today_count": 11,
+              "dispensed_today_value": 4250.00,
+              "avg_turnaround_minutes": 38,
+              "digital_share_pct": 62.5,
+              "sla_on_time_pct": 91.3
+            },
+            "prescriptions": [
+              {
+                "rx_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "type": "UPLOADED",
+                "status": "PENDING_REVIEW",
+                "is_overdue": true,
+                "overdue_by_minutes": 43,
+                "patient_name": "Ravi Kumar",
+                "doctor_name": "Dr. Priya Sharma",
+                "received_at": "2026-07-24T05:10:00Z",
+                "sla_deadline": "2026-07-24T07:10:00Z",
+                "order_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "source": "UPLOADED"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 PLAN_UPGRADE_REQUIRED
+  description: Free plan pharmacy
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PLAN_UPGRADE_REQUIRED",
+            "message": "Rx queue requires Starter plan or higher"
+          }
+        }
+      '''
+    }
+  }
+}

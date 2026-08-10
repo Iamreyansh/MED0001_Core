@@ -6,9 +6,9 @@ spring:
     name: med0001-api
   servlet:
     multipart:
-      # Product rule: max 10 MB per upload (KYC and future uploads)
-      max-file-size: 10MB
-      max-request-size: 10MB
+      # Slightly above product 10 MB so domain can return FILE_TOO_LARGE (422) before servlet hard-fail
+      max-file-size: 11MB
+      max-request-size: 11MB
   datasource:
     url: jdbc:postgresql://localhost:5432/medmate
     username: medmate
@@ -81,6 +81,11 @@ medmate:
       poll-delay-ms: 60000
     zones:
       low-pharmacy-warning-threshold: 3
+  prescription:
+    jobs:
+      enabled: true
+    # Local store uses java.io.tmpdir/medmate-prescriptions (LocalPrescriptionObjectStore).
+    # Staging/prod use S3PrescriptionObjectStore.
   s3:
     # Local only. Staging/prod: MEDMATE_S3_BUCKET=med0001-{env}-uploads-105927215604
     bucket: med0001-local-uploads

@@ -1,0 +1,81 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/prescriptions/{{adminRxId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminRxId")) {
+    throw new Error("adminRxId missing — run admin/prescriptions/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rx_id) {
+    bru.setEnvVar("adminRxId", body.data.rx_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("rx_id");
+    expect(body.data).to.have.property("verification_checklist");
+  });
+}
+
+docs {
+  GET /api/v1/admin/prescriptions/:rx_id — audit detail.
+  file_url present for admin_compliance|admin_super only (absent for admin_operations).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/prescriptions/c1000001-0000-4000-8000-0000000000c1
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rx_id": "c1000001-0000-4000-8000-0000000000c1",
+            "audit_status": "AWAITING_AUDIT",
+            "file_url": "https://s3.example/rx.jpg?n=...",
+            "verification_checklist": {
+              "doctor_registered": { "status": "VERIFIED", "source_label": "OCR extracted" },
+              "quantity_appropriate": { "status": "PENDING", "source_label": "OCR extracted" },
+              "not_duplicate_rx": { "status": "CLEAR", "duplicate_found": false },
+              "schedule_check": { "schedule": "H1", "status": "PENDING", "source_label": "OCR extracted" }
+            },
+            "possible_duplicate": false
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

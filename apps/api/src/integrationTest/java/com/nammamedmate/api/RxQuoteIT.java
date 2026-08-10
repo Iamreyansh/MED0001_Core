@@ -2,6 +2,7 @@ package com.nammamedmate.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nammamedmate.api.support.PrescriptionFixtures;
 import com.nammamedmate.auth.domain.MagicOtp;
 import com.nammamedmate.order.adapter.out.persistence.StubPrescriptionAdapter;
 import com.nammamedmate.order.application.RxQuoteBroadcastService;
@@ -133,7 +134,7 @@ class RxQuoteIT extends AbstractApiIT {
     rest.exchange(
         baseUrl() + "/api/v1/cart", HttpMethod.GET, bearer(customerToken, null), Map.class);
 
-    UUID rxId = UUID.randomUUID();
+    UUID rxId = PrescriptionFixtures.insertVerified(jdbc, customerId);
     ResponseEntity<Map> broadcast =
         rest.exchange(
             baseUrl() + "/api/v1/orders/rx-quote/broadcast",
@@ -161,6 +162,7 @@ class RxQuoteIT extends AbstractApiIT {
     assertThat(notified.stream().map(p -> String.valueOf(p.get("pharmacy_id"))))
         .contains(PH1.toString(), PH2.toString());
 
+    PrescriptionFixtures.insertExpired(jdbc, customerId, StubPrescriptionAdapter.EXPIRED_ID);
     ResponseEntity<Map> expiredRx =
         rest.exchange(
             baseUrl() + "/api/v1/orders/rx-quote/broadcast",
@@ -291,7 +293,7 @@ class RxQuoteIT extends AbstractApiIT {
     assertThat(rxQuoteService.expireBroadcastsAndNotify()).isGreaterThanOrEqualTo(0);
 
     // force-expire a fresh broadcast for push outbox
-    UUID rx2 = UUID.randomUUID();
+    UUID rx2 = PrescriptionFixtures.insertVerified(jdbc, customerId);
     ResponseEntity<Map> bc2 =
         rest.exchange(
             baseUrl() + "/api/v1/orders/rx-quote/broadcast",

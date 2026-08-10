@@ -1,0 +1,115 @@
+meta {
+  name: dispense
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/prescriptions/{{rxId}}/dispense
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("rxId")) {
+    throw new Error("rxId missing — run pharmacy/prescriptions/approve first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.sale_record_id) {
+    bru.setEnvVar("saleRecordId", body.data.sale_record_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("dispensed envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("DISPENSED");
+    expect(body.data.order_status_updated_to).to.equal("READY_FOR_PICKUP");
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/prescriptions/:rx_id/dispense — DISPENSED + POS sale stub + READY_FOR_PICKUP.
+}
+
+example {
+  name: 200 OK
+  description: Dispensed
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/dispense
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rx_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "status": "DISPENSED",
+            "dispensed_by": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "dispensed_at": "2026-07-24T08:30:00Z",
+            "sale_record_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            "order_status_updated_to": "READY_FOR_PICKUP"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 RX_NOT_APPROVED
+  description: Not yet approved
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/dispense
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {}
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RX_NOT_APPROVED",
+            "message": "Cannot dispense without prior approval"
+          }
+        }
+      '''
+    }
+  }
+}

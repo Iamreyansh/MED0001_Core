@@ -14,6 +14,7 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 class GlobalExceptionHandlerTest {
 
@@ -92,6 +93,15 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void mapsMaxUploadToFileTooLarge() {
+    var response = handler.handleMaxUpload(new MaxUploadSizeExceededException(10L * 1024 * 1024));
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().error()).isNotNull();
+    assertThat(response.getBody().error().code()).isEqualTo("FILE_TOO_LARGE");
+  }
+
+  @Test
   void mapsMethodNotAllowedForAdminRoles() {
     MockHttpServletRequest rolesReq =
         new MockHttpServletRequest("POST", "/api/v1/admin/roles/x/permissions");
@@ -101,6 +111,14 @@ class GlobalExceptionHandlerTest {
     assertThat(roles.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
     assertThat(roles.getBody().error().code()).isEqualTo("METHOD_NOT_ALLOWED");
     assertThat(roles.getBody().error().message()).contains("not customisable");
+
+    MockHttpServletRequest drugReq =
+        new MockHttpServletRequest("DELETE", "/api/v1/admin/compliance/drug-register/x");
+    var drug =
+        handler.handleMethodNotSupported(
+            new HttpRequestMethodNotSupportedException("DELETE"), drugReq);
+    assertThat(drug.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    assertThat(drug.getBody().error().message()).contains("cannot be modified");
 
     MockHttpServletRequest otherReq =
         new MockHttpServletRequest("DELETE", "/api/v1/orders/1/note/2");

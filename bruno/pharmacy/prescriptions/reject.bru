@@ -1,0 +1,124 @@
+meta {
+  name: reject
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/prescriptions/{{rxId}}/reject
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "reason": "ILLEGIBLE",
+    "custom_message": "The prescription image is too blurry. Please upload a clearer photo."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+  if (!bru.getEnvVar("rxId")) {
+    throw new Error("rxId missing — run pharmacy/prescriptions/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rx_id) {
+    bru.setEnvVar("rxId", body.data.rx_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("rejected envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("REJECTED");
+    expect(body.data.customer_notified).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/prescriptions/:rx_id/reject — reasons ILLEGIBLE|UNVERIFIED_PRESCRIBER|EXPIRED|NOT_STOCKED|INVALID.
+}
+
+example {
+  name: 200 OK
+  description: Rejected with customer notify
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/reject
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "ILLEGIBLE",
+        "custom_message": "Please upload a clearer photo."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rx_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "status": "REJECTED",
+            "reason": "ILLEGIBLE",
+            "custom_message": "Please upload a clearer photo.",
+            "rejected_by": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "rejected_at": "2026-07-24T07:55:00Z",
+            "customer_notified": true
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_REJECTION_REASON
+  description: Bad reason enum
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/prescriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/reject
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "UNKNOWN"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_REJECTION_REASON",
+            "message": "Reason not in allowed ENUM values"
+          }
+        }
+      '''
+    }
+  }
+}

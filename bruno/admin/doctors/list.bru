@@ -1,0 +1,89 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/doctors?status=ALL&page=1&limit=20&sort=prescription_count&order=desc
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: ALL
+  page: 1
+  limit: 20
+  sort: prescription_count
+  order: desc
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && Array.isArray(body.data) && body.data.length) {
+    bru.setEnvVar("adminDoctorId", body.data[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("doctor directory envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/doctors — prescribing doctor directory.
+  Auth: admin_compliance | admin_super | admin_operations | admin_support.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/doctors?status=ALL
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "d1000001-0000-4000-8000-0000000000d1",
+              "registration_no": "MH12345",
+              "name": "Dr. Priya Sharma",
+              "qualification": "MBBS MD",
+              "specialty": "Endocrinology",
+              "prescription_count": 47,
+              "scheduled_drug_count": 12,
+              "status": "VERIFIED",
+              "verification_method": "STATE_BOARD",
+              "verified_at": "2026-06-15T10:00:00Z",
+              "source": "OCR"
+            }
+          ],
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

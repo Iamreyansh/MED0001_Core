@@ -1,0 +1,93 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/compliance/filings?year=2026&page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  year: 2026
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.filings && body.data.filings.length) {
+    bru.setEnvVar("complianceFilingId", body.data.filings[0].filing_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("filings envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpis");
+    expect(body.data).to.have.property("filings");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/compliance/filings
+  Auth: admin_compliance | admin_super | admin_operations | admin_finance (read-only).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/filings?year=2026
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpis": { "pending_filings": 2, "overdue_filings": 0 },
+            "filings": [
+              {
+                "filing_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "filing_type": "SCHEDULE_H1_REGISTER",
+                "period_label": "June 2026",
+                "period_from": "2026-06-01",
+                "period_to": "2026-06-30",
+                "due_date": "2026-07-15",
+                "status": "PENDING",
+                "filed_at": null,
+                "filed_by": null,
+                "reference_number": null,
+                "generated_report_url": null,
+                "is_archived": false
+              }
+            ],
+            "total_pages": 1
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

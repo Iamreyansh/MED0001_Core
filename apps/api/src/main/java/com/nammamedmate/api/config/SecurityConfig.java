@@ -176,6 +176,8 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/customers/**")
                     .hasRole("CUSTOMER")
+                    .requestMatchers("/api/v1/prescriptions/**")
+                    .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/cart/**", "/api/v1/pharmacies/**")
                     .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/rider/kyc/**")
@@ -269,6 +271,63 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/rx-quotes/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(
+                        "/api/v1/pharmacy/prescriptions", "/api/v1/pharmacy/prescriptions/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(
+                        "/api/v1/pharmacy/compliance/drug-register",
+                        "/api/v1/pharmacy/compliance/drug-register/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/compliance/drug-register/export")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/admin/compliance/drug-register/export/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/admin/compliance/drug-register/retention-rules")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE", "PHARMACY_OWNER")
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/admin/compliance/drug-register",
+                        "/api/v1/admin/compliance/drug-register/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE", "ADMIN_OPERATIONS")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/compliance/filings/*/generate")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/admin/compliance/filings/*/generate/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/compliance/filings/*/mark-filed")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/compliance/filings")
+                    .hasAnyRole(
+                        "ADMIN_SUPER", "ADMIN_COMPLIANCE", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/compliance/activity-log")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE", "ADMIN_OPERATIONS")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/compliance/drug-recalls")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/prescriptions/statistics")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/prescriptions/*/verify")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/prescriptions/*/flag")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/admin/prescriptions",
+                        "/api/v1/admin/prescriptions/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE", "ADMIN_OPERATIONS")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/doctors/unverified")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/doctors/*/verify")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/doctors/*/blacklist")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_COMPLIANCE")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/admin/doctors", "/api/v1/admin/doctors/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER", "ADMIN_COMPLIANCE", "ADMIN_OPERATIONS", "ADMIN_SUPPORT")
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/cancel")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/orders/*/refund")

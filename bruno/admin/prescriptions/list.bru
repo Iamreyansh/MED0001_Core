@@ -1,0 +1,100 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/prescriptions?status=AWAITING_AUDIT&schedule=ALL&page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: AWAITING_AUDIT
+  schedule: ALL
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.prescriptions && body.data.prescriptions.length) {
+    bru.setEnvVar("adminRxId", body.data.prescriptions[0].rx_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("audit queue envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpis");
+    expect(body.data).to.have.property("prescriptions");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/prescriptions — compliance audit queue + KPIs.
+  Auth: admin_compliance | admin_super | admin_operations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/prescriptions?status=AWAITING_AUDIT
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kpis": {
+              "awaiting_audit": 23,
+              "flagged": 3,
+              "schedule_h1_x_count": 18,
+              "verified_today": 41,
+              "compliance_rate_pct": 94.6
+            },
+            "prescriptions": [
+              {
+                "rx_id": "c1000001-0000-4000-8000-0000000000c1",
+                "audit_status": "AWAITING_AUDIT",
+                "is_overdue": false,
+                "hours_since_dispense": 3.2,
+                "schedule": "H1",
+                "patient_name": "Ravi Kumar",
+                "doctor_name": "Dr. Priya Sharma",
+                "doctor_verified": true,
+                "pharmacy_name": "Sai Medicals",
+                "dispensed_at": "2026-07-24T04:10:00Z",
+                "audit_deadline": "2026-07-25T04:10:00Z",
+                "possible_duplicate": false,
+                "source": "UPLOADED"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 23, "has_next": true }
+        }
+      '''
+    }
+  }
+}

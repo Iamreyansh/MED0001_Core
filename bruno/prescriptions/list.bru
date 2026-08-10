@@ -1,0 +1,102 @@
+meta {
+  name: list
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/prescriptions?page=1&limit=20&order=desc
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+  order: desc
+  ~status:
+  ~type:
+  ~sort: created_at
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && Array.isArray(body.data) && body.data.length > 0) {
+    bru.setEnvVar("prescriptionId", body.data[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("success envelope with pagination meta", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("array");
+    expect(body.meta).to.be.an("object");
+    expect(body.meta.page).to.be.a("number");
+    expect(body.meta.limit).to.be.a("number");
+    expect(body.meta.total).to.be.a("number");
+    expect(body.meta).to.have.property("has_next");
+  });
+}
+
+docs {
+  GET /api/v1/prescriptions — list own prescriptions. Query: status, type, page, limit, sort, order.
+}
+
+example {
+  name: 200 OK
+  description: Paginated prescription wallet.
+
+  request: {
+    url: {{baseUrl}}/api/v1/prescriptions?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": [
+            {
+              "id": "a1b2c3d4-e5f6-4789-8abc-def012345678",
+              "type": "UPLOADED",
+              "status": "UPLOADED",
+              "file_url": "https://local.invalid/...signed...",
+              "patient_name": "Ravi Kumar",
+              "doctor_name": null,
+              "prescription_date": null,
+              "source": "UPLOAD",
+              "expires_at": "2027-01-24T07:30:00Z",
+              "associated_order_id": null,
+              "created_at": "2026-07-24T07:30:00Z"
+            }
+          ],
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}

@@ -2,6 +2,7 @@ package com.nammamedmate.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nammamedmate.api.support.PrescriptionFixtures;
 import com.nammamedmate.auth.domain.MagicOtp;
 import java.util.HashMap;
 import java.util.List;
@@ -363,7 +364,7 @@ class ReorderIT extends AbstractApiIT {
             Map.class);
     assertThat(add.getStatusCode()).isEqualTo(HttpStatus.OK);
     String cartId = String.valueOf(data(add).get("cart_id"));
-    UUID rxId = UUID.randomUUID();
+    UUID rxId = PrescriptionFixtures.insertVerified(jdbc, customerId);
     rest.exchange(
         baseUrl() + "/api/v1/cart/prescription",
         HttpMethod.POST,

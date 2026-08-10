@@ -1,0 +1,119 @@
+meta {
+  name: verify
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/doctors/{{adminDoctorId}}/verify
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "verified": true,
+    "verification_method": "STATE_BOARD",
+    "notes": "Verified against State Medical Council registry."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminDoctorId")) {
+    throw new Error("adminDoctorId missing — run admin/doctors/list or unverified first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("adminDoctorId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("verified envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("VERIFIED");
+    expect(body.data).to.have.property("verification_method");
+  });
+}
+
+docs {
+  POST /api/v1/admin/doctors/:id/verify — v1 manual verification (NMC_REGISTRY|STATE_BOARD|MANUAL).
+  Auth: admin_compliance | admin_super. admin_operations → 403.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/doctors/d1000001-0000-4000-8000-0000000000d1/verify
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "verified": true,
+        "verification_method": "STATE_BOARD",
+        "notes": "Verified against Maharashtra Medical Council."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "d1000001-0000-4000-8000-0000000000d1",
+            "status": "VERIFIED",
+            "verification_method": "STATE_BOARD",
+            "verified_by": "a1000001-0000-4000-8000-0000000000a1",
+            "verified_at": "2026-07-24T09:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 Forbidden
+  description: admin_operations cannot verify
+  request: {
+    url: {{baseUrl}}/api/v1/admin/doctors/d1000001-0000-4000-8000-0000000000d1/verify
+    method: post
+    headers: { Authorization: Bearer {{opsAccessToken}} }
+    body:json: {
+      {
+        "verified": true,
+        "verification_method": "MANUAL"
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "FORBIDDEN", "message": "Forbidden" }
+        }
+      '''
+    }
+  }
+}

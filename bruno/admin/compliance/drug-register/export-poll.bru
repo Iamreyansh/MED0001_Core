@@ -1,0 +1,75 @@
+meta {
+  name: export-poll
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/compliance/drug-register/export/{{drugRegisterExportJobId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("drugRegisterExportJobId")) {
+    throw new Error("drugRegisterExportJobId missing — run export first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.download_url) {
+    bru.setEnvVar("drugRegisterExportUrl", body.data.download_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("export poll envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("export_job_id");
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  GET /api/v1/admin/compliance/drug-register/export/:job_id — poll export; signed URL TTL 15 minutes.
+}
+
+example {
+  name: 200 READY
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/drug-register/export/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "export_job_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "READY",
+            "download_url": "https://s3.example/exports/drug-register-H1.csv?X-Amz-Expires=900",
+            "row_count": 47,
+            "generated_at": "2026-07-24T09:30:00Z",
+            "expires_at": "2026-07-24T09:45:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

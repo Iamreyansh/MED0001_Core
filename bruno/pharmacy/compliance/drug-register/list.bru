@@ -1,0 +1,108 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/compliance/drug-register?schedule=H1&page=1&limit=50
+  body: none
+  auth: bearer
+}
+
+params:query {
+  schedule: H1
+  page: 1
+  limit: 50
+}
+
+auth:bearer {
+  token: {{pharmacyAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyAccessToken")) {
+    throw new Error("pharmacyAccessToken missing — run pharmacy login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.entries && body.data.entries.length) {
+    bru.setEnvVar("pharmacyDrugRegisterEntryId", body.data.entries[0].entry_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("own-pharmacy register only", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("entries");
+    expect(body.data.schedule).to.equal("H1");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/compliance/drug-register — own pharmacy Schedule H1/X register.
+  Auth: pharmacy_owner | pharmacy_staff. pharmacy_id auto-scoped.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/compliance/drug-register?schedule=H1
+    method: get
+    headers: { Authorization: Bearer {{pharmacyAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "schedule": "H1",
+            "entries": [],
+            "total_qty_issued": 0,
+            "total_pages": 0
+          },
+          "meta": { "page": 1, "limit": 50, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 Forbidden (cross-pharmacy)
+  description: Pharmacy JWT cannot call admin export; staff on admin export returns 403.
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/drug-register/export
+    method: post
+    headers: { Authorization: Bearer {{pharmacyAccessToken}} }
+    body:json: {
+      {
+        "pharmacy_id": "22222222-2222-4222-8222-222222222222",
+        "schedule": "H1",
+        "from_date": "2026-04-01",
+        "to_date": "2026-06-30"
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "FORBIDDEN", "message": "Insufficient role" }
+        }
+      '''
+    }
+  }
+}

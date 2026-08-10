@@ -1,0 +1,120 @@
+meta {
+  name: mark-filed
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/compliance/filings/{{complianceFilingId}}/mark-filed
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "filed_by": "{{adminUserId}}",
+    "filed_at": "2026-07-12T14:30:00Z",
+    "reference_number": "KSDCD/2026/H1/07/4521"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("complianceFilingId")) {
+    throw new Error("complianceFilingId missing — run filings/list first");
+  }
+  if (!bru.getEnvVar("adminUserId")) {
+    bru.setEnvVar("adminUserId", "55555555-5555-4555-8555-555555555555");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("filed envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("FILED");
+    expect(body.data).to.have.property("reference_number");
+  });
+}
+
+docs {
+  POST mark-filed — requires reference_number else 422 REFERENCE_NUMBER_REQUIRED; already FILED → 409.
+  Auth: admin_compliance | admin_super.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/filings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/mark-filed
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "filed_by": "55555555-5555-4555-8555-555555555555",
+        "filed_at": "2026-07-12T14:30:00Z",
+        "reference_number": "KSDCD/2026/H1/07/4521"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "filing_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "status": "FILED",
+            "filed_by": "55555555-5555-4555-8555-555555555555",
+            "filed_at": "2026-07-12T14:30:00Z",
+            "reference_number": "KSDCD/2026/H1/07/4521"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 REFERENCE_NUMBER_REQUIRED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/filings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/mark-filed
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "filed_by": "55555555-5555-4555-8555-555555555555",
+        "filed_at": "2026-07-12T14:30:00Z",
+        "reference_number": ""
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "REFERENCE_NUMBER_REQUIRED",
+            "message": "reference_number is required"
+          }
+        }
+      '''
+    }
+  }
+}

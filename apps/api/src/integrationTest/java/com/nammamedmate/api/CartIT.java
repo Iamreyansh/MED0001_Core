@@ -2,6 +2,7 @@ package com.nammamedmate.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nammamedmate.api.support.PrescriptionFixtures;
 import com.nammamedmate.auth.domain.MagicOtp;
 import java.util.HashMap;
 import java.util.List;
@@ -185,7 +186,9 @@ class CartIT extends AbstractApiIT {
     Map<String, Object> freedelBill = (Map<String, Object>) freedelCart.get("bill");
     assertThat(((Number) freedelBill.get("delivery_fee")).doubleValue()).isEqualTo(0.0);
 
-    UUID rx = UUID.randomUUID();
+    UUID customerId =
+        jdbc.queryForObject("SELECT id FROM customers WHERE phone = ?", UUID.class, CUSTOMER_PHONE);
+    UUID rx = PrescriptionFixtures.insertVerified(jdbc, customerId);
     ResponseEntity<Map> attachRx =
         rest.exchange(
             baseUrl() + "/api/v1/cart/prescription",

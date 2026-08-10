@@ -1,0 +1,74 @@
+meta {
+  name: generate-poll
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/compliance/filings/{{complianceFilingId}}/generate/{{complianceGenerateJobId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("complianceGenerateJobId")) {
+    throw new Error("complianceGenerateJobId missing — run filings/generate first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.download_url) {
+    bru.setEnvVar("complianceReportUrl", body.data.download_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("job ready envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  GET poll for filing report generation. Download URL TTL 24h when READY.
+}
+
+example {
+  name: 200 READY
+  request: {
+    url: {{baseUrl}}/api/v1/admin/compliance/filings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/generate/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "READY",
+            "download_url": "https://s3.example/reports/compliance-schedule_h1_register-2026-06-01.csv?X-Amz-Expires=86400",
+            "row_count": 312,
+            "generated_at": "2026-07-24T10:00:00Z",
+            "expires_at": "2026-07-25T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

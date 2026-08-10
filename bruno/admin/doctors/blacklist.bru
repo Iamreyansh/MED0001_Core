@@ -1,0 +1,119 @@
+meta {
+  name: blacklist
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/doctors/{{adminDoctorId}}/blacklist
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+body:json {
+  {
+    "reason": "Registration reported fraudulent by State Medical Council. All prescriptions invalid."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminDoctorId")) {
+    throw new Error("adminDoctorId missing — run admin/doctors/list or unverified first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("adminDoctorId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("blacklist envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("BLACKLISTED");
+    expect(body.data).to.have.property("retroactive_flags_queued");
+  });
+}
+
+docs {
+  POST /api/v1/admin/doctors/:id/blacklist — terminal in v1; queues retroactive BLACKLISTED_DOCTOR flags.
+  Auth: admin_compliance | admin_super.
+  Errors: DOCTOR_NOT_FOUND (404), DOCTOR_ALREADY_BLACKLISTED (409).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/doctors/d1000001-0000-4000-8000-0000000000d1/blacklist
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "reason": "Registration number MH12345 reported as fraudulent."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "d1000001-0000-4000-8000-0000000000d1",
+            "status": "BLACKLISTED",
+            "blacklist_reason": "Registration number MH12345 reported as fraudulent.",
+            "blacklisted_by": "a1000001-0000-4000-8000-0000000000a1",
+            "blacklisted_at": "2026-07-24T09:30:00Z",
+            "retroactive_flags_queued": 47,
+            "message": "Doctor blacklisted. 47 associated prescriptions queued for retroactive flagging."
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 DOCTOR_ALREADY_BLACKLISTED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/doctors/d1000001-0000-4000-8000-0000000000d1/blacklist
+    method: post
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+    body:json: {
+      {
+        "reason": "Already blacklisted"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DOCTOR_ALREADY_BLACKLISTED",
+            "message": "Doctor already has BLACKLISTED status"
+          }
+        }
+      '''
+    }
+  }
+}

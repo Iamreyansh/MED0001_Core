@@ -15,10 +15,10 @@
 | Phase | Total | Done |
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
-| Phase 2 | 34 | 34 |
-| Phase 3 | 32 | 0 |
+| Phase 2 | 34 | 33 |
+| Phase 3 | 32 | 6 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **80** |
+| **Total** | **129** | **79** |
 
 ---
 
@@ -172,7 +172,7 @@
 | EPIC-022 | [STORY-002](./EPIC-022-external-integrations/STORY-002-maps-geolocation.md) | Maps & Geolocation | done | 2026-08-10 | `domains/integration`; V075; Redis\|DB cache; zone ray-cast; GeocodePort+DistanceMatrixPort bridges |
 | EPIC-022 | [STORY-003](./EPIC-022-external-integrations/STORY-003-government-api-integration.md) | Government API Integration | done | 2026-08-10 | `domains/integration`; V076; GSTN/DigiLocker/drug/FSSAI; pharmacy KYC bridges; rider Aadhaar deferred |
 | EPIC-022 | [STORY-004](./EPIC-022-external-integrations/STORY-004-einvoicing-irn.md) | E-Invoicing IRN | done | 2026-08-10 | `domains/integration`; V077; GSP stub\|live; EinvoicePort bridge; POS finalize hook deferred |
-| EPIC-022 | [STORY-005](./EPIC-022-external-integrations/STORY-005-accounting-integration.md) | Accounting Integration | done | 2026-08-10 | `domains/integration`; V078; Zoho stub\|live + Tally XML; CRM plan gate; in-process sync; Bruno accounting/ |
+| EPIC-022 | [STORY-005](./EPIC-022-external-integrations/STORY-005-accounting-integration.md) | Accounting Integration | in_progress | — | `domains/integration`; V078 implemented; make check green (tracker left in_progress per implement request) |
 | EPIC-022 | [STORY-006](./EPIC-022-external-integrations/STORY-006-communication-integrations.md) | Communication Integrations | done | 2026-08-10 | `domains/integration`; V079; admin control plane; health 5m; CommunicationChannelLookupPort for EPIC-017 |
 
 ---
@@ -184,12 +184,12 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-008 | [STORY-001](./EPIC-008-prescription-management/STORY-001-prescription-upload.md) | Prescription Upload and Storage | pending | — | — |
-| EPIC-008 | [STORY-002](./EPIC-008-prescription-management/STORY-002-pharmacy-rx-queue.md) | Pharmacy Prescription Review and Dispense Workflow | pending | — | — |
-| EPIC-008 | [STORY-003](./EPIC-008-prescription-management/STORY-003-rx-compliance-audit.md) | Admin Rx Compliance Audit | pending | — | — |
-| EPIC-008 | [STORY-004](./EPIC-008-prescription-management/STORY-004-schedule-drug-register.md) | Statutory Schedule H1/X Drug Register | pending | — | — |
-| EPIC-008 | [STORY-005](./EPIC-008-prescription-management/STORY-005-doctor-registry.md) | Prescribing Doctor Registry and Verification | pending | — | — |
-| EPIC-008 | [STORY-006](./EPIC-008-prescription-management/STORY-006-compliance-reports-filings.md) | Regulatory Compliance Filings and Reports | pending | — | — |
+| EPIC-008 | [STORY-001](./EPIC-008-prescription-management/STORY-001-prescription-upload.md) | Prescription Upload and Storage | done | 2026-08-10 | `domains/prescription`; V080; multipart+local/S3 store; sync OCR stub; IST expiry; OrderPrescriptionPort bridge; Bruno prescriptions/ |
+| EPIC-008 | [STORY-002](./EPIC-008-prescription-management/STORY-002-pharmacy-rx-queue.md) | Pharmacy Prescription Review and Dispense Workflow | done | 2026-08-10 | `domains/prescription`; V081; queue approve/reject/dispense; CRM plan gate; POS/register ports stub; Bruno pharmacy/prescriptions/ |
+| EPIC-008 | [STORY-003](./EPIC-008-prescription-management/STORY-003-rx-compliance-audit.md) | Admin Rx Compliance Audit | done | 2026-08-10 | `domains/prescription`; V082; rx_audit_entry+append-only activity_log; 15m overdue; ops no file_url; Bruno admin/prescriptions/ |
+| EPIC-008 | [STORY-004](./EPIC-008-prescription-management/STORY-004-schedule-drug-register.md) | Statutory Schedule H1/X Drug Register | done | 2026-08-10 | `domains/prescription`; V083; sync register on H1/X dispense; export jobs; archival; Bruno admin+pharmacy drug-register/ |
+| EPIC-008 | [STORY-005](./EPIC-008-prescription-management/STORY-005-doctor-registry.md) | Prescribing Doctor Registry and Verification | done | 2026-08-10 | `domains/prescription`; V084; doctor registry verify/blacklist; OCR upsert; DoctorCardPort; Bruno admin/doctors/ |
+| EPIC-008 | [STORY-006](./EPIC-008-prescription-management/STORY-006-compliance-reports-filings.md) | Regulatory Compliance Filings and Reports | done | 2026-08-10 | `domains/prescription`; V085; filings crons IST; generate/mark-filed; drug-recall zeros batch qty+refreshes denorm; activity-log; Bruno admin/compliance/ |
 
 ### EPIC-009 (`EPIC-009-doctor-teleconsult`)
 

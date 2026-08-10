@@ -1,0 +1,76 @@
+meta {
+  name: export
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/prescriptions?export=true&status=ALL
+  body: none
+  auth: bearer
+}
+
+params:query {
+  export: true
+  status: ALL
+}
+
+auth:bearer {
+  token: {{adminAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminAccessToken")) {
+    throw new Error("adminAccessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.download_url) {
+    bru.setEnvVar("rxComplianceExportUrl", body.data.download_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("CSV export URL", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("download_url");
+    expect(body.data).to.have.property("record_count");
+  });
+}
+
+docs {
+  GET /api/v1/admin/prescriptions?export=true — CSV download URL for audit queue.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/prescriptions?export=true&status=ALL
+    method: get
+    headers: { Authorization: Bearer {{adminAccessToken}} }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "download_url": "file:///tmp/medmate-compliance-exports/exports-rx_compliance.csv?ttl=3600",
+            "expires_at": "2026-07-24T11:00:00Z",
+            "record_count": 50,
+            "generated_at": "2026-07-24T10:00:00Z"
+          },
+          "meta": { "page": 1, "limit": 1, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
