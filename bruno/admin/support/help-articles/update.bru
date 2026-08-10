@@ -1,0 +1,82 @@
+meta {
+  name: update
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/support/help-articles/{{helpArticleId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "content_markdown": "## Cancelling your order\n\nUpdated steps...",
+    "is_published": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("helpArticleId")) {
+    throw new Error("helpArticleId missing — run create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("update envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.id).to.be.ok;
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/support/help-articles/:id
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/help-articles/a1500005-0001-4000-8000-000000000020
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "content_markdown": "## Updated",
+        "is_published": true
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1500005-0001-4000-8000-000000000020",
+            "updated_at": "2026-07-24T11:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

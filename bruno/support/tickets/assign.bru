@@ -1,0 +1,113 @@
+meta {
+  name: assign
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/assign
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "agent_id": "{{supportAgentId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — admin token required");
+  }
+  if (!bru.getEnvVar("supportTicketUuid")) {
+    throw new Error("supportTicketUuid missing");
+  }
+  if (!bru.getEnvVar("supportAgentId")) {
+    bru.setEnvVar("supportAgentId", "a0000002-0000-4000-8000-000000000002");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or capacity/not found", function () {
+    const status = res.getStatus();
+    expect([200, 400, 404]).to.include(status);
+  });
+}
+
+docs {
+  POST /api/v1/support/tickets/:id/assign — AGENT_AT_CAPACITY 400, AGENT_NOT_FOUND 404.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/assign
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "agent_id": "a0000002-0000-4000-8000-000000000002"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "ticket_id": "TKT-20260724-000042",
+            "assigned_to": "a0000002-0000-4000-8000-000000000002",
+            "assigned_to_name": "Ravi Kumar",
+            "assigned_at": "2026-07-24T10:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 AGENT_AT_CAPACITY
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/assign
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "agent_id": "a0000002-0000-4000-8000-000000000002"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "AGENT_AT_CAPACITY",
+            "message": "Agent has 20 open tickets"
+          }
+        }
+      '''
+    }
+  }
+}

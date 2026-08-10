@@ -1,0 +1,132 @@
+meta {
+  name: suggest-assignment
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/agents/suggest-assignment?ticket_id={{supportTicketUuid}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("supportTicketUuid")) {
+    throw new Error("supportTicketUuid missing — create/list a support ticket first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.suggested_agent) {
+    bru.setEnvVar("suggestedAgentId", body.data.suggested_agent.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("suggest envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("overflow");
+    expect(body.data).to.have.property("ticket_id");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/agents/suggest-assignment?ticket_id= — specialty + load + CSAT; overflow:true when full.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents/suggest-assignment?ticket_id=tkt_uuid_001
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "ticket_id": "tkt_uuid_001",
+            "suggested_agent": {
+              "id": "a0000002-0000-4000-8000-000000000002",
+              "name": "Ravi Kumar",
+              "is_online": true,
+              "open_load": 12,
+              "csat_score": 4.6,
+              "specialty_match": true
+            },
+            "alternative_agents": [],
+            "overflow": false
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 overflow
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents/suggest-assignment?ticket_id=tkt_uuid_001
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "ticket_id": "tkt_uuid_001",
+            "suggested_agent": null,
+            "alternative_agents": [],
+            "overflow": true
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 TICKET_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents/suggest-assignment?ticket_id=00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "TICKET_NOT_FOUND",
+            "message": "Ticket ID does not exist"
+          }
+        }
+      '''
+    }
+  }
+}

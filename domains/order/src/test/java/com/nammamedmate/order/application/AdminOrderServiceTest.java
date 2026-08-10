@@ -25,6 +25,7 @@ import com.nammamedmate.order.application.port.out.AdminOrderQueryPort.CustomerA
 import com.nammamedmate.order.application.port.out.AdminOrderQueryPort.PharmacyAdminView;
 import com.nammamedmate.order.application.port.out.AdminOrderQueryPort.SummaryAgg;
 import com.nammamedmate.order.application.port.out.ExportObjectStore;
+import com.nammamedmate.order.application.port.out.ExternalDisputeBannerPort;
 import com.nammamedmate.order.application.port.out.LiveFeedCachePort;
 import com.nammamedmate.order.application.port.out.OrderDisputeStore;
 import com.nammamedmate.order.application.port.out.OrderNoteStore;
@@ -174,6 +175,45 @@ class AdminOrderServiceTest {
     Map<String, Object> banner = (Map<String, Object>) detail.get("dispute_banner");
     assertThat(banner.get("liable_party")).isEqualTo("RIDER");
     assertThat(banner.get("reason")).isEqualTo("Not delivered");
+  }
+
+  @Test
+  void supportExternalDisputeBannerVisibleOnDetail() throws Exception {
+    Order order = seedOrder(OrderStatus.DELIVERED, null, null);
+    query.seedPharmacy(PH1, "Sai", "Area", new BigDecimal("8"));
+    query.seedCustomer(CUST, "Ravi", "+91", 1, 100);
+    ExternalDisputeBannerPort port =
+        orderId ->
+            Optional.of(
+                Map.of(
+                    "dispute_id",
+                    "DSP-20260724-000001",
+                    "status",
+                    "OPEN",
+                    "reason",
+                    "Wrong items",
+                    "liable_party",
+                    "PHARMACY"));
+    var field = AdminOrderService.class.getDeclaredField("externalDisputeBanners");
+    field.setAccessible(true);
+    field.set(service, port);
+    Map<String, Object> detail = service.detail(ops, order.id());
+    assertThat(detail.get("is_disputed")).isEqualTo(true);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> banner = (Map<String, Object>) detail.get("dispute_banner");
+    assertThat(banner.get("dispute_id")).isEqualTo("DSP-20260724-000001");
+  }
+
+  @Test
+  void supportExternalDisputeBannerAbsentLeavesUndisputed() throws Exception {
+    Order order = seedOrder(OrderStatus.DELIVERED, null, null);
+    query.seedPharmacy(PH1, "Sai", "Area", new BigDecimal("8"));
+    query.seedCustomer(CUST, "Ravi", "+91", 1, 100);
+    var field = AdminOrderService.class.getDeclaredField("externalDisputeBanners");
+    field.setAccessible(true);
+    field.set(service, (ExternalDisputeBannerPort) orderId -> Optional.empty());
+    Map<String, Object> detail = service.detail(ops, order.id());
+    assertThat(detail.get("is_disputed")).isEqualTo(false);
   }
 
   @Test

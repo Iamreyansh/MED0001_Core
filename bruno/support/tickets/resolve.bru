@@ -1,0 +1,83 @@
+meta {
+  name: resolve
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/resolve
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "resolution_summary": "Replacement order dispatched."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("supportTicketUuid")) {
+    throw new Error("supportTicketUuid missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("resolve envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RESOLVED");
+    expect(body.data.csat_survey_scheduled_at).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/support/tickets/:id/resolve — schedules CSAT at resolved+24h.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/resolve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "resolution_summary": "Replacement dispatched"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "ticket_id": "TKT-20260724-000042",
+            "status": "RESOLVED",
+            "resolved_at": "2026-07-24T11:00:00Z",
+            "csat_survey_scheduled_at": "2026-07-25T11:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

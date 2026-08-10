@@ -1,0 +1,82 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/agents
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.agents && body.data.agents[0]) {
+    bru.setEnvVar("supportAgentId", body.data.agents[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("agents roster envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.agents).to.be.an("array");
+    expect(body.data).to.have.property("total_agents");
+    expect(body.data).to.have.property("online_agents");
+    expect(body.data).to.have.property("overflow_queue_count");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/agents — roster with load/online/csat (admin_super|operations).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "total_agents": 2,
+            "online_agents": 1,
+            "overflow_queue_count": 0,
+            "agents": [
+              {
+                "id": "a0000002-0000-4000-8000-000000000002",
+                "name": "Ravi Kumar",
+                "role": "admin_support",
+                "specialties": ["ORDER", "PAYMENT"],
+                "is_online": true,
+                "open_load": 12,
+                "handled_today": 24,
+                "avg_handle_minutes": 18.4,
+                "csat_score": 4.6
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,134 @@
+meta {
+  name: create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/support/disputes
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "order_id": "{{orderId}}",
+    "dispute_type": "WRONG_ITEMS",
+    "description": "I received ibuprofen 400mg instead of the paracetamol 500mg I ordered.",
+    "evidence_urls": [
+      "https://cdn.nammamedmate.com/evidence/img_dispute_001.jpg"
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+  if (!bru.getEnvVar("orderId")) {
+    throw new Error("orderId missing — set a delivered order id");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.id) bru.setEnvVar("supportDisputeUuid", body.data.id);
+    if (body.data.dispute_id) bru.setEnvVar("supportDisputeId", body.data.dispute_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.dispute_id).to.match(/^DSP-\d{8}-\d{6}$/);
+    expect(body.data.status).to.equal("OPEN");
+  });
+}
+
+docs {
+  POST /api/v1/support/disputes — customer raise dispute on delivered order.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/support/disputes
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "order_id": "ord_uuid_001",
+        "dispute_type": "WRONG_ITEMS",
+        "description": "Wrong items received",
+        "evidence_urls": ["https://cdn.nammamedmate.com/evidence/img_dispute_001.jpg"]
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "dsp_uuid_001",
+            "dispute_id": "DSP-20260724-000014",
+            "order_id": "ord_uuid_001",
+            "dispute_type": "WRONG_ITEMS",
+            "status": "OPEN",
+            "resolution_sla_at": "2026-07-26T10:00:00Z",
+            "created_at": "2026-07-24T10:00:00Z",
+            "message": "Your dispute has been raised. We will resolve it within 48 hours."
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 DISPUTE_ALREADY_EXISTS
+  request: {
+    url: {{baseUrl}}/api/v1/support/disputes
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "order_id": "ord_uuid_001",
+        "dispute_type": "WRONG_ITEMS",
+        "description": "Second dispute"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DISPUTE_ALREADY_EXISTS",
+            "message": "Order already has a dispute"
+          }
+        }
+      '''
+    }
+  }
+}

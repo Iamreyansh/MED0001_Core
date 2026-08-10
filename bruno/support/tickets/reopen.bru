@@ -1,0 +1,81 @@
+meta {
+  name: reopen
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/reopen
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "reason": "Issue not fully resolved"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+  if (!bru.getEnvVar("supportTicketUuid")) {
+    throw new Error("supportTicketUuid missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reopen envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("IN_PROGRESS");
+  });
+}
+
+docs {
+  POST /api/v1/support/tickets/:id/reopen
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/reopen
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "reason": "Still broken"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "ticket_id": "TKT-20260724-000042",
+            "status": "IN_PROGRESS",
+            "reopened_at": "2026-07-24T14:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

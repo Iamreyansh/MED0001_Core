@@ -1,0 +1,95 @@
+meta {
+  name: create-on-behalf
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/support/tickets
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "customer_id": "{{customerId}}",
+    "category": "PAYMENT",
+    "subject": "Refund not received after 7 days",
+    "description": "Customer called in. Refund for order not received.",
+    "channel": "PHONE"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("customerId")) {
+    bru.setEnvVar("customerId", "c0000001-0000-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.ticket_id) {
+    bru.setEnvVar("supportTicketId", body.data.ticket_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create on behalf envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("OPEN");
+    expect(body.data.created_for_customer_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/admin/support/tickets — create on behalf of customer.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/tickets
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "customer_id": "c0000001-0000-4000-8000-000000000001",
+        "category": "PAYMENT",
+        "subject": "Refund not received after 7 days",
+        "description": "Customer called in.",
+        "channel": "PHONE"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "ticket_id": "TKT-20260724-000043",
+            "created_for_customer_id": "c0000001-0000-4000-8000-000000000001",
+            "created_by_admin_id": "a0000001-0000-4000-8000-000000000001",
+            "status": "OPEN"
+          }
+        }
+      '''
+    }
+  }
+}

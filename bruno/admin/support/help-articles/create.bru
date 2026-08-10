@@ -1,0 +1,91 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/support/help-articles
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "title": "How to cancel my order",
+    "category": "ORDER",
+    "content_markdown": "## Cancelling your order\n\nYou can cancel before dispatch...",
+    "tags": ["order", "cancel", "refund"],
+    "is_published": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("helpArticleId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_published).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/admin/support/help-articles
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/help-articles
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "title": "How to cancel my order",
+        "category": "ORDER",
+        "content_markdown": "## Cancelling your order",
+        "tags": ["order", "cancel"],
+        "is_published": true
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1500005-0001-4000-8000-000000000021",
+            "title": "How to cancel my order",
+            "is_published": true,
+            "created_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

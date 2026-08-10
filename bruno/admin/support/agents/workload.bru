@@ -1,0 +1,82 @@
+meta {
+  name: workload
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/agents/{{supportAgentId}}/workload
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("supportAgentId")) {
+    throw new Error("supportAgentId missing — run admin/support/agents/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("workload envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.open_tickets_breakdown).to.be.an("array");
+    expect(body.data.recent_resolved).to.be.an("array");
+    expect(body.data.handle_time_distribution).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/agents/:id/workload — open/resolved workload (super|ops|support).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/agents/a0000002-0000-4000-8000-000000000002/workload
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "agent_id": "a0000002-0000-4000-8000-000000000002",
+            "open_tickets_breakdown": [
+              { "category": "ORDER", "priority": "HIGH", "count": 6 }
+            ],
+            "recent_resolved": [
+              {
+                "ticket_id": "TKT-20260724-000038",
+                "category": "ORDER",
+                "handle_minutes": 14,
+                "csat_score": 5
+              }
+            ],
+            "handle_time_distribution": [
+              { "bucket": "0-15 min", "count": 42 },
+              { "bucket": "15-30 min", "count": 68 },
+              { "bucket": "30-60 min", "count": 18 },
+              { "bucket": "60+ min", "count": 5 }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

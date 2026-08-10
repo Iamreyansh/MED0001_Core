@@ -1,0 +1,75 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/support/help-articles?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.articles && body.data.articles[0]) {
+    bru.setEnvVar("helpArticleId", body.data.articles[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("articles envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.articles).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/support/help-articles — sorted by deflection_count desc.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/help-articles
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "articles": [
+              {
+                "id": "a1500005-0001-4000-8000-000000000020",
+                "title": "How to track my order",
+                "category": "ORDER",
+                "view_count": 4820,
+                "deflection_count": 1240,
+                "is_published": true,
+                "last_updated": "2026-07-10T09:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

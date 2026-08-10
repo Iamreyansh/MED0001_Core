@@ -1,0 +1,116 @@
+meta {
+  name: update
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/support/sla-policies/{{slaPolicyId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "first_response_sla_minutes": 45,
+    "resolution_sla_minutes": 960
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("slaPolicyId")) {
+    throw new Error("slaPolicyId missing — run admin/support/sla-policies/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("slaPolicyId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("update envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("first_response_sla_minutes");
+    expect(body.data).to.have.property("updated_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/support/sla-policies/:id — admin_super only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/sla-policies/a1500003-0001-4000-8000-000000000005
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "first_response_sla_minutes": 45,
+        "resolution_sla_minutes": 960
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a1500003-0001-4000-8000-000000000005",
+            "first_response_sla_minutes": 45,
+            "resolution_sla_minutes": 960,
+            "updated_at": "2026-07-24T10:00:00Z",
+            "updated_by": "a0000001-0000-4000-8000-000000000001"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/sla-policies/a1500003-0001-4000-8000-000000000005
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "first_response_sla_minutes": 45
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Only admin_super may update SLA policies"
+          }
+        }
+      '''
+    }
+  }
+}

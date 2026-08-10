@@ -1,0 +1,128 @@
+meta {
+  name: resolve-approve
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/support/disputes/{{supportDisputeUuid}}/resolve-approve
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "liable_party": "PHARMACY",
+    "refund_amount": 96,
+    "refund_to": "SOURCE",
+    "resolution_notes": "Pharmacy confirmed packing error. Full refund processed."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("supportDisputeUuid")) {
+    throw new Error("supportDisputeUuid missing — run create/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("approved", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RESOLVED");
+    expect(body.data.auto_processed).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/admin/support/disputes/:id/resolve-approve — ≤ Rs 200 auto-processes.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/disputes/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1/resolve-approve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "liable_party": "PHARMACY",
+        "refund_amount": 96,
+        "refund_to": "SOURCE",
+        "resolution_notes": "Packing error"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+            "status": "RESOLVED",
+            "liable_party": "PHARMACY",
+            "refund_amount_rs": 96,
+            "refund_to": "SOURCE",
+            "auto_processed": true,
+            "refund_transaction_id": "txn_uuid_001",
+            "resolved_at": "2026-07-24T11:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 APPROVAL_REQUIRED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/disputes/8f14e45f-ceea-467a-9571-d2a0f3c8b9d1/resolve-approve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "liable_party": "PLATFORM",
+        "refund_amount": 250,
+        "refund_to": "SOURCE",
+        "resolution_notes": "Large refund"
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "APPROVAL_REQUIRED",
+            "message": "Refund > Rs 200 requires admin_support role"
+          }
+        }
+      '''
+    }
+  }
+}

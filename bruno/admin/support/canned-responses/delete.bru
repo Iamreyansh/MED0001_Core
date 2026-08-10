@@ -1,0 +1,61 @@
+meta {
+  name: delete
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/support/canned-responses/{{cannedResponseId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("cannedResponseId")) {
+    throw new Error("cannedResponseId missing — run create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.deleted).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/support/canned-responses/:id — soft delete (super|ops).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/support/canned-responses/a1500005-0001-4000-8000-000000000010
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": { "id": "a1500005-0001-4000-8000-000000000010", "deleted": true }
+        }
+      '''
+    }
+  }
+}

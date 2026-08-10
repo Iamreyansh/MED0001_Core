@@ -1,0 +1,95 @@
+meta {
+  name: create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/support/tickets
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "category": "ORDER",
+    "subject": "Wrong items delivered in my order",
+    "description": "I ordered paracetamol 500mg but received ibuprofen 400mg instead.",
+    "channel": "APP"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.id) bru.setEnvVar("supportTicketUuid", body.data.id);
+    if (body.data.ticket_id) bru.setEnvVar("supportTicketId", body.data.ticket_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.ticket_id).to.match(/^TKT-\d{8}-\d{6}$/);
+    expect(body.data.priority).to.equal("HIGH");
+    expect(body.data.sla_level).to.equal("L3");
+  });
+}
+
+docs {
+  POST /api/v1/support/tickets — customer/pharmacy/admin create.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "category": "ORDER",
+        "subject": "Wrong items delivered",
+        "description": "Received wrong medicine",
+        "channel": "APP"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "tkt_uuid_001",
+            "ticket_id": "TKT-20260724-000042",
+            "status": "OPEN",
+            "priority": "HIGH",
+            "sla_level": "L3",
+            "sla_due_at": "2026-07-24T18:00:00Z",
+            "created_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

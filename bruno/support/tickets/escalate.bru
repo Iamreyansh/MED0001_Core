@@ -1,0 +1,84 @@
+meta {
+  name: escalate
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/escalate
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "escalation_level": "L3",
+    "reason": "Customer has been waiting 4 hours"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — admin token required");
+  }
+  if (!bru.getEnvVar("supportTicketUuid")) {
+    throw new Error("supportTicketUuid missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("escalate envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.supervisor_notified).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/support/tickets/:id/escalate
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/support/tickets/{{supportTicketUuid}}/escalate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "escalation_level": "L3",
+        "reason": "Waiting too long"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "ticket_id": "TKT-20260724-000042",
+            "sla_level": "L3",
+            "escalated_at": "2026-07-24T14:00:00Z",
+            "supervisor_notified": true
+          }
+        }
+      '''
+    }
+  }
+}

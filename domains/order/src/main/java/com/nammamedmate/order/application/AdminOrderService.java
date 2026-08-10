@@ -16,6 +16,7 @@ import com.nammamedmate.order.application.port.out.AdminOrderQueryPort.CustomerA
 import com.nammamedmate.order.application.port.out.AdminOrderQueryPort.PharmacyAdminView;
 import com.nammamedmate.order.application.port.out.AdminOrderQueryPort.SummaryAgg;
 import com.nammamedmate.order.application.port.out.ExportObjectStore;
+import com.nammamedmate.order.application.port.out.ExternalDisputeBannerPort;
 import com.nammamedmate.order.application.port.out.LiveFeedCachePort;
 import com.nammamedmate.order.application.port.out.OrderDisputeStore;
 import com.nammamedmate.order.application.port.out.OrderNoteStore;
@@ -79,6 +80,10 @@ public class AdminOrderService {
   private final Clock clock;
   private final ObjectMapper objectMapper;
   private final Executor exportExecutor;
+
+  /** Optional EPIC-015 support dispute banner (wired from apps/api). */
+  @Autowired(required = false)
+  private ExternalDisputeBannerPort externalDisputeBanners;
 
   @Autowired
   public AdminOrderService(
@@ -193,6 +198,15 @@ public class AdminOrderService {
     Instant now = clock.instant();
 
     OrderDispute openDispute = disputes.findOpenByOrderId(orderId).orElse(null);
+    boolean disputed = openDispute != null;
+    Map<String, Object> banner = disputeBanner(openDispute);
+    if (!disputed && externalDisputeBanners != null) {
+      var ext = externalDisputeBanners.findBanner(orderId);
+      if (ext.isPresent()) {
+        disputed = true;
+        banner = ext.get();
+      }
+    }
     List<OrderStatusEvent> events = statusEvents.listByOrderId(orderId);
     List<OrderNote> noteRows = notes.listByOrderId(orderId);
 
@@ -212,8 +226,8 @@ public class AdminOrderService {
     data.put("order_id", order.id().toString());
     data.put("order_number", order.orderNumber());
     data.put("status", order.status().name());
-    data.put("is_disputed", openDispute != null);
-    data.put("dispute_banner", disputeBanner(openDispute));
+    data.put("is_disputed", disputed);
+    data.put("dispute_banner", banner);
     data.put("status_timeline", timeline(events, order));
     data.put("customer", customerMap(customer));
     data.put("pharmacy", pharmacyMap(pharmacy));
