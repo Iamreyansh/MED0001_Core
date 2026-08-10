@@ -1,0 +1,135 @@
+meta {
+  name: invite
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customers/me/referral/invite
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "channel": "WHATSAPP"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.referral_code) {
+    bru.setEnvVar("myReferralCode", body.data.referral_code);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("invite envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.channel).to.equal("WHATSAPP");
+    expect(body.data).to.have.property("referral_link");
+    expect(body.data).to.have.property("share_text");
+    expect(body.data).to.have.property("share_logged_at");
+  });
+}
+
+docs {
+  POST /api/v1/customers/me/referral/invite — log share channel and return share payload.
+  Channels: WHATSAPP | SMS | EMAIL | COPY_LINK | OTHER
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 429 RATE_LIMITED
+}
+
+example {
+  name: 200 OK
+  description: Share logged for WhatsApp.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/referral/invite
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "channel": "WHATSAPP"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "referral_code": "MEDRAM7",
+            "referral_link": "https://nammamedmate.com/join?ref=MEDRAM7",
+            "share_text": "Use my code MEDRAM7 to get Rs 100 off your first order on Namma MedMate!",
+            "channel": "WHATSAPP",
+            "share_logged_at": "2026-07-24T10:00:00Z",
+            "share_count": 1
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 VALIDATION_ERROR
+  description: Unknown channel.
+
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/referral/invite
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "channel": "TELEGRAM"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "channel must be one of WHATSAPP, SMS, EMAIL, COPY_LINK, OTHER"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,90 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/campaigns?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~status: RUNNING
+  ~channel: WHATSAPP
+  ~sort: scheduled_at
+  ~order: desc
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.campaigns && body.data.campaigns[0]) {
+    bru.setEnvVar("campaignId", body.data.campaigns[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.campaigns).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/campaigns — list campaigns (admin_super|ops|finance).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "campaigns": [
+              {
+                "id": "c0130003-0000-4000-8000-000000000001",
+                "name": "Monsoon Reactivation - Dormant Users",
+                "channel": "WHATSAPP",
+                "target_segment": "DORMANT",
+                "sent_count": 12400,
+                "open_rate": 38.2,
+                "ctr": 8.6,
+                "conversions": 620,
+                "revenue_attributed_rs": 186000.00,
+                "roi_pct": 620.9,
+                "status": "COMPLETED",
+                "scheduled_at": "2026-07-20T10:00:00Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

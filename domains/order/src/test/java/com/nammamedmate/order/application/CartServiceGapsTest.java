@@ -19,11 +19,13 @@ import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.Med
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.StockLine;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort.PharmacyRow;
+import com.nammamedmate.order.application.port.out.PlatformCouponPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.WalletBalancePort;
 import com.nammamedmate.order.application.port.out.ZoneMembershipPort;
 import com.nammamedmate.order.domain.Cart;
 import com.nammamedmate.order.domain.CartItem;
+import com.nammamedmate.order.domain.CartPricing;
 import com.nammamedmate.order.domain.CartStatus;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -85,6 +87,15 @@ class CartServiceGapsTest {
             prescriptions,
             zones,
             new StubDeliveryFeeAdapter(),
+            (code, total) -> {
+              var applied = CartPricing.applyCoupon(code, total);
+              return new PlatformCouponPort.Quote(
+                  applied.code(),
+                  applied.type(),
+                  applied.discountPaise(),
+                  applied.type() == CartPricing.CouponType.FREE_DELIVERY,
+                  applied.message());
+            },
             rateLimiter,
             clock);
   }

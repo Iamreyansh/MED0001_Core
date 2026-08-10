@@ -21,11 +21,13 @@ import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.Med
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.StockLine;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort.PharmacyRow;
+import com.nammamedmate.order.application.port.out.PlatformCouponPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.WalletBalancePort;
 import com.nammamedmate.order.application.port.out.ZoneMembershipPort;
 import com.nammamedmate.order.domain.Cart;
 import com.nammamedmate.order.domain.CartItem;
+import com.nammamedmate.order.domain.CartPricing;
 import com.nammamedmate.order.domain.CartStatus;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -92,6 +94,7 @@ class CartServiceTest {
             prescriptions,
             zones,
             new StubDeliveryFeeAdapter(),
+            fallbackCoupons(),
             rateLimiter,
             clock);
     when(wallet.balancePaise(CUST)).thenReturn(0L);
@@ -394,6 +397,7 @@ class CartServiceTest {
             prescriptions,
             zones,
             new StubDeliveryFeeAdapter(),
+            fallbackCoupons(),
             new InMemoryRateLimiter(clock),
             clock);
     limited.getCart(customer);
@@ -421,6 +425,18 @@ class CartServiceTest {
     when(inventory.checkAvailability(eq(pharmacyId), eq(List.of(medicineId))))
         .thenReturn(
             List.of(new StockLine(medicineId, "M", qty, pricePaise, pricePaise, qty > 0, null)));
+  }
+
+  private static PlatformCouponPort fallbackCoupons() {
+    return (code, total) -> {
+      var applied = CartPricing.applyCoupon(code, total);
+      return new PlatformCouponPort.Quote(
+          applied.code(),
+          applied.type(),
+          applied.discountPaise(),
+          applied.type() == CartPricing.CouponType.FREE_DELIVERY,
+          applied.message());
+    };
   }
 
   private Cart seededCartWithItem(UUID pharmacyId, UUID medicineId, int qty, long unitPaise) {

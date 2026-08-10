@@ -33,6 +33,7 @@ class OrderConfigTest {
     assertThat(config.prescriptionPort()).isInstanceOf(StubPrescriptionAdapter.class);
     assertThat(config.zoneMembershipPort()).isInstanceOf(StubZoneMembershipAdapter.class);
     assertThat(config.deliveryFeePort()).isInstanceOf(StubDeliveryFeeAdapter.class);
+    assertThat(config.platformCouponPort()).isNotNull();
     assertThat(config.rxBroadcastStore(jdbc, om)).isInstanceOf(JdbcRxBroadcastStore.class);
     assertThat(config.orderStore(jdbc, om))
         .isInstanceOf(com.nammamedmate.order.adapter.out.persistence.JdbcOrderStore.class);

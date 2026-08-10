@@ -4,7 +4,11 @@ import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.function.Predicate;
 
-/** Referral codes: {@code MED} + 4 uppercase base-36 chars (7 total). */
+/**
+ * Referral codes: {@code MED} + 4 uppercase base-36 chars (7 total).
+ *
+ * <p>EPIC-013 STORY-005 asked for 8-char alphanumeric; we keep EPIC-002 MED**** format (plan 2C).
+ */
 public final class ReferralCodes {
 
   private static final String ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";

@@ -1,6 +1,7 @@
 package com.nammamedmate.customer.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
@@ -9,6 +10,8 @@ import com.nammamedmate.customer.application.LoyaltyService;
 import com.nammamedmate.customer.application.LoyaltyService.TxPage;
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.kernel.api.PaginationMeta;
+import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
 import com.nammamedmate.security.TokenScope;
@@ -50,5 +53,41 @@ class CustomerLoyaltyControllerTest {
         controller.transactions(customer, null, null, null, null);
     assertThat(response.data()).hasSize(1);
     assertThat(response.meta()).isEqualTo(page.meta());
+  }
+
+  @Test
+  void redeem_delegatesAndValidates() {
+    UUID cartId = Ids.newId();
+    when(service.redeem(customer, 20, cartId)).thenReturn(Map.of("points_redeemed", 20));
+    ApiResponse<Map<String, Object>> ok =
+        controller.redeem(
+            customer, new CustomerLoyaltyController.RedeemRequest(20, cartId.toString()));
+    assertThat(ok.data()).containsEntry("points_redeemed", 20);
+
+    assertThatThrownBy(() -> controller.redeem(customer, null))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(
+            () ->
+                controller.redeem(
+                    customer, new CustomerLoyaltyController.RedeemRequest(0, cartId.toString())))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(
+            () ->
+                controller.redeem(
+                    customer, new CustomerLoyaltyController.RedeemRequest(10, "not-uuid")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(
+            () ->
+                controller.redeem(customer, new CustomerLoyaltyController.RedeemRequest(10, "  ")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(
+            () ->
+                controller.redeem(customer, new CustomerLoyaltyController.RedeemRequest(10, null)))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
   }
 }

@@ -1,0 +1,81 @@
+meta {
+  name: get
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/segments/{{segmentId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("segmentId")) {
+    throw new Error("segmentId missing — run admin/segments/create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("segmentId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("recommended_actions");
+    expect(body.data.recommended_actions.length).to.be.above(0);
+    expect(body.data).to.have.property("growth_chart");
+  });
+}
+
+docs {
+  GET /api/v1/admin/segments/:id — detail with growth_chart + recommended_actions.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/segments/{{segmentId}}
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "a0130004-0000-4000-8000-000000000004",
+            "name": "VIP",
+            "segment_type": "SYSTEM",
+            "customer_count": 1840,
+            "criteria": [{ "field": "total_orders", "operator": ">=", "value": 30 }],
+            "avg_aov_rs": 620.00,
+            "avg_ltv_rs": 10011.00,
+            "growth_chart": [{ "date": "2026-07-21", "count": 1840 }],
+            "recommended_actions": [
+              "Target with exclusive PLATINUM loyalty invite",
+              "Send early-access campaign for new product launches"
+            ],
+            "last_computed_at": "2026-07-24T02:15:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,66 @@
+meta {
+  name: toggle
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/banners/{{bannerId}}/toggle
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("bannerId")) {
+    throw new Error("bannerId missing — run admin/banners/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("toggle envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("is_live");
+    expect(body.data).to.have.property("toggled_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/banners/:id/toggle — flip is_live.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners/{{bannerId}}/toggle
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "b0130002-0000-4000-8000-000000000001",
+            "is_live": false,
+            "toggled_at": "2026-07-24T10:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

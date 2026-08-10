@@ -1,0 +1,65 @@
+meta {
+  name: delete
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/coupons/{{couponCode}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("couponCode")) {
+    bru.setEnvVar("couponCode", "FLAT99");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(["DELETED", "EXPIRED"]).to.include(body.data.action);
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/coupons/:code — hard-delete if 0 redemptions else EXPIRED.
+}
+
+example {
+  name: 200 DELETED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/coupons/FLAT99
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "code": "FLAT99",
+            "action": "DELETED",
+            "message": "Coupon deleted."
+          }
+        }
+      '''
+    }
+  }
+}

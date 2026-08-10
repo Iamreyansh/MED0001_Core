@@ -354,7 +354,9 @@ public class OrderLifecycleService {
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("order_id", order.id().toString());
       payload.put("customer_id", order.customerId().toString());
+      payload.put("item_total_paise", order.itemTotalPaise());
       payload.put("total_payable_paise", order.totalPayablePaise());
+      payload.put("order_number", order.orderNumber());
       payload.put("delivered_at", now.toString());
       outbox.publish(DomainEvent.of("order.delivered", "order", order.id(), payload));
     }

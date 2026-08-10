@@ -15,19 +15,28 @@ public final class LoyaltyTiers {
   private static final int SILVER_MIN = 12;
   private static final int GOLD_MIN = 50;
   private static final int PLATINUM_MIN = 120;
+  private static final int DEFAULT_EARN_RATE_RS = 100;
 
   private LoyaltyTiers() {}
 
-  /** Tier from lifetime points earned (never drops on reverse). */
+  /** Tier from lifetime points earned (never drops on reverse). Default story thresholds. */
   public static String fromLifetimePoints(int pointsEarnedLifetime) {
+    return fromLifetimePoints(pointsEarnedLifetime, SILVER_MIN, GOLD_MIN, PLATINUM_MIN);
+  }
+
+  public static String fromLifetimePoints(
+      int pointsEarnedLifetime, int silverMin, int goldMin, int platinumMin) {
     int pts = Math.max(0, pointsEarnedLifetime);
-    if (pts >= PLATINUM_MIN) {
+    int silver = Math.max(1, silverMin);
+    int gold = Math.max(silver + 1, goldMin);
+    int platinum = Math.max(gold + 1, platinumMin);
+    if (pts >= platinum) {
       return PLATINUM;
     }
-    if (pts >= GOLD_MIN) {
+    if (pts >= gold) {
       return GOLD;
     }
-    if (pts >= SILVER_MIN) {
+    if (pts >= silver) {
       return SILVER;
     }
     return NONE;
@@ -51,30 +60,42 @@ public final class LoyaltyTiers {
   }
 
   public static int minForTier(String tier) {
+    return minForTier(tier, SILVER_MIN, GOLD_MIN, PLATINUM_MIN);
+  }
+
+  public static int minForTier(String tier, int silverMin, int goldMin, int platinumMin) {
     return switch (normalize(tier)) {
-      case SILVER -> SILVER_MIN;
-      case GOLD -> GOLD_MIN;
-      case PLATINUM -> PLATINUM_MIN;
+      case SILVER -> Math.max(1, silverMin);
+      case GOLD -> Math.max(Math.max(1, silverMin) + 1, goldMin);
+      case PLATINUM -> Math.max(Math.max(Math.max(1, silverMin) + 1, goldMin) + 1, platinumMin);
       default -> 0;
     };
   }
 
   public static Integer maxForTier(String tier) {
+    return maxForTier(tier, SILVER_MIN, GOLD_MIN, PLATINUM_MIN);
+  }
+
+  public static Integer maxForTier(String tier, int silverMin, int goldMin, int platinumMin) {
+    int silver = Math.max(1, silverMin);
+    int gold = Math.max(silver + 1, goldMin);
+    int platinum = Math.max(gold + 1, platinumMin);
     return switch (normalize(tier)) {
-      case NONE -> SILVER_MIN - 1;
-      case SILVER -> GOLD_MIN - 1;
-      case GOLD -> PLATINUM_MIN - 1;
+      case NONE -> silver - 1;
+      case SILVER -> gold - 1;
+      case GOLD -> platinum - 1;
       default -> null;
     };
   }
 
-  /**
-   * Progress toward next tier based on lifetime points. At PLATINUM, next is null and progress_pct
-   * is 100.
-   */
   public static Map<String, Object> progress(int pointsEarnedLifetime) {
+    return progress(pointsEarnedLifetime, SILVER_MIN, GOLD_MIN, PLATINUM_MIN);
+  }
+
+  public static Map<String, Object> progress(
+      int pointsEarnedLifetime, int silverMin, int goldMin, int platinumMin) {
     int pts = Math.max(0, pointsEarnedLifetime);
-    String current = fromLifetimePoints(pts);
+    String current = fromLifetimePoints(pts, silverMin, goldMin, platinumMin);
     String next = nextTier(current);
     Map<String, Object> progress = new LinkedHashMap<>();
     progress.put("current_tier", current);
@@ -85,8 +106,8 @@ public final class LoyaltyTiers {
       progress.put("progress_pct", 100);
       return progress;
     }
-    int nextMin = minForTier(next);
-    int currentMin = minForTier(current);
+    int nextMin = minForTier(next, silverMin, goldMin, platinumMin);
+    int currentMin = minForTier(current, silverMin, goldMin, platinumMin);
     int needed = Math.max(0, nextMin - pts);
     int span = Math.max(1, nextMin - currentMin);
     int gained = Math.min(span, Math.max(0, pts - currentMin));
@@ -98,21 +119,34 @@ public final class LoyaltyTiers {
   }
 
   public static Map<String, Object> thresholds() {
+    return thresholds(SILVER_MIN, GOLD_MIN, PLATINUM_MIN);
+  }
+
+  /** EPIC-002 response shape: each tier → {min, max}. */
+  public static Map<String, Object> thresholds(int silverMin, int goldMin, int platinumMin) {
+    int silver = Math.max(1, silverMin);
+    int gold = Math.max(silver + 1, goldMin);
+    int platinum = Math.max(gold + 1, platinumMin);
     Map<String, Object> all = new LinkedHashMap<>();
-    all.put(NONE, range(0, SILVER_MIN - 1));
-    all.put(SILVER, range(SILVER_MIN, GOLD_MIN - 1));
-    all.put(GOLD, range(GOLD_MIN, PLATINUM_MIN - 1));
-    all.put(PLATINUM, range(PLATINUM_MIN, null));
+    all.put(NONE, range(0, silver - 1));
+    all.put(SILVER, range(silver, gold - 1));
+    all.put(GOLD, range(gold, platinum - 1));
+    all.put(PLATINUM, range(platinum, null));
     return all;
   }
 
-  /** Points for an order: floor(rupees / 100). Order value in paise. */
+  /** Points for an order: floor(rupees / earnRateRsPerPoint). Order value in paise. */
   public static int pointsForOrderPaise(long orderTotalPaise) {
+    return pointsForOrderPaise(orderTotalPaise, DEFAULT_EARN_RATE_RS);
+  }
+
+  public static int pointsForOrderPaise(long orderTotalPaise, int earnRateRsPerPoint) {
     if (orderTotalPaise <= 0) {
       return 0;
     }
+    int rate = Math.max(1, earnRateRsPerPoint);
     long rupees = orderTotalPaise / 100;
-    return (int) (rupees / 100);
+    return (int) (rupees / rate);
   }
 
   private static Map<String, Object> range(int min, Integer max) {

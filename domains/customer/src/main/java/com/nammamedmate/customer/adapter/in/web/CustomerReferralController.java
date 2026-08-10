@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.nammamedmate.customer.application.ReferralService;
 import com.nammamedmate.customer.application.ReferralService.ApplyCommand;
+import com.nammamedmate.customer.application.ReferralService.InviteCommand;
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.security.MedmatePrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +34,14 @@ public class CustomerReferralController {
     return ApiResponse.ok(service.getMyReferral(principal));
   }
 
+  @PostMapping("/invite")
+  @Operation(summary = "Log referral share and return share payload")
+  public ApiResponse<Map<String, Object>> invite(
+      @AuthenticationPrincipal MedmatePrincipal principal, @RequestBody InviteRequest body) {
+    String channel = body == null ? null : body.channel();
+    return ApiResponse.ok(service.invite(principal, new InviteCommand(channel)));
+  }
+
   @PostMapping("/apply")
   @Operation(summary = "Apply a referrer's code before first order")
   public ApiResponse<Map<String, Object>> apply(
@@ -43,4 +52,7 @@ public class CustomerReferralController {
 
   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
   public record ApplyRequest(String referrerCode) {}
+
+  @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+  public record InviteRequest(String channel) {}
 }

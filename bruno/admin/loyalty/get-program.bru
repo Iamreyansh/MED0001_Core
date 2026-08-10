@@ -1,0 +1,71 @@
+meta {
+  name: get-program
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/loyalty/program
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("program envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("earn_rate_rs_per_point");
+    expect(body.data).to.have.property("tier_thresholds");
+    expect(body.data).to.have.property("min_points_per_redemption");
+  });
+}
+
+docs {
+  GET /api/v1/admin/loyalty/program — program settings (admin_super | admin_operations | admin_finance).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/loyalty/program
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "earn_rate_rs_per_point": 100,
+            "redemption_rate_rs_per_point": 1.00,
+            "tier_thresholds": {
+              "SILVER": 12,
+              "GOLD": 50,
+              "PLATINUM": 120
+            },
+            "max_redemption_pct_per_order": 20,
+            "min_points_per_redemption": 10,
+            "points_expiry_days": 365
+          }
+        }
+      '''
+    }
+  }
+}

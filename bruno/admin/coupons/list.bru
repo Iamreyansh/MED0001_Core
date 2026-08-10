@@ -1,0 +1,89 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/coupons?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.coupons && body.data.coupons[0]) {
+    bru.setEnvVar("couponCode", body.data.coupons[0].code);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("coupons");
+    expect(body.data).to.have.property("chips");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/coupons — list coupons with chips.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/coupons?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "chips": {
+              "active_count": 3,
+              "total_redemptions": 0,
+              "discount_spend_rs": 0,
+              "marketing_spend_rs": 85000000
+            },
+            "coupons": [
+              {
+                "code": "NAMMA25",
+                "type": "PERCENTAGE",
+                "value": 25,
+                "scope": "ALL_ORDERS",
+                "min_order": 199,
+                "max_discount": 100,
+                "budget_total": 50000000,
+                "budget_used": 0,
+                "redemptions": 0,
+                "status": "ACTIVE",
+                "is_rx_specific": false,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2099-12-31T23:59:59Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 3, "has_next": false }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,77 @@
+meta {
+  name: patch-program
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/loyalty/program
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "max_redemption_pct_per_order": 20,
+    "points_expiry_days": 365
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first (admin_super)");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("updated_at");
+    expect(body.data).to.have.property("updated_by");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/loyalty/program — update settings (admin_super only).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/loyalty/program
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "earn_rate_rs_per_point": 100,
+        "max_redemption_pct_per_order": 25,
+        "points_expiry_days": 365
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "updated_at": "2026-07-24T10:00:00Z",
+            "updated_by": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+          }
+        }
+      '''
+    }
+  }
+}

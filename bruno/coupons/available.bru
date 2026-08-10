@@ -1,0 +1,79 @@
+meta {
+  name: available
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/coupons/available
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run customer OTP verify first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("available envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("coupons");
+    expect(body.meta).to.have.property("total");
+  });
+}
+
+docs {
+  GET /api/v1/coupons/available — ACTIVE non-expired coupons for customer segment.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/coupons/available
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "coupons": [
+              {
+                "code": "NAMMA25",
+                "type": "PERCENTAGE",
+                "value": 25,
+                "description": "25% off your order, max Rs 100",
+                "min_order_value": 199,
+                "valid_until": "2099-12-31T23:59:59Z"
+              },
+              {
+                "code": "FREEDEL",
+                "type": "FREE_DELIVERY",
+                "value": 0,
+                "description": "Free delivery on your order",
+                "min_order_value": 0,
+                "valid_until": "2099-12-31T23:59:59Z"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 2, "total": 2, "has_next": false }
+        }
+      '''
+    }
+  }
+}

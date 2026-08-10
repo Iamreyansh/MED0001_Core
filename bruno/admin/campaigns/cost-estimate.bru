@@ -1,0 +1,101 @@
+meta {
+  name: cost-estimate
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/campaigns/cost-estimate?channel=WHATSAPP&segment_id={{segmentId}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  channel: WHATSAPP
+  segment_id: {{segmentId}}
+  ~message_length: 160
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("segmentId")) {
+    bru.setEnvVar("segmentId", "a0130004-0000-4000-8000-000000000002");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("estimate envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.estimated_recipients).to.be.a("number");
+    expect(body.data.estimated_cost_paise).to.be.at.least(0);
+  });
+}
+
+docs {
+  GET /api/v1/admin/campaigns/cost-estimate — preview recipients and cost (ops|super).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns/cost-estimate?channel=WHATSAPP&segment_id=a0130004-0000-4000-8000-000000000002
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "estimated_recipients": 12400,
+            "estimated_cost_paise": 1054000,
+            "cost_per_recipient_paise": 85,
+            "channel_rate_card": {
+              "WHATSAPP": "Rs 0.85 per message (utility template)"
+            }
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_SEGMENT
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns/cost-estimate?channel=WHATSAPP&segment_id=00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_SEGMENT",
+            "message": "segment_id does not exist"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,61 @@
+meta {
+  name: click
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/banners/{{bannerId}}/click
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run customer OTP verify first");
+  }
+  if (!bru.getEnvVar("bannerId")) {
+    throw new Error("bannerId missing — run banners/list or admin create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("click envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.logged).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/banners/:id/click — increment click counter.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/banners/{{bannerId}}/click
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": { "logged": true }
+        }
+      '''
+    }
+  }
+}

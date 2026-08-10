@@ -18,6 +18,16 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 class CustomerConfigTest {
 
   @Test
+  void stubLoyaltyCartPort_empty() {
+    CustomerConfig config = new CustomerConfig();
+    assertThat(
+            config
+                .stubLoyaltyCartPort()
+                .findCartItemTotalPaise(UUID.randomUUID(), UUID.randomUUID()))
+        .isEmpty();
+  }
+
+  @Test
   void noActiveOrdersPort_returnsFalse() {
     CustomerConfig config = new CustomerConfig();
     assertThat(config.noActiveOrdersPort().hasActiveOrders(UUID.randomUUID())).isFalse();

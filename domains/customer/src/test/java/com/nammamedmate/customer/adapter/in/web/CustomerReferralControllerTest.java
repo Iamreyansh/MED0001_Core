@@ -6,8 +6,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.customer.adapter.in.web.CustomerReferralController.ApplyRequest;
+import com.nammamedmate.customer.adapter.in.web.CustomerReferralController.InviteRequest;
 import com.nammamedmate.customer.application.ReferralService;
 import com.nammamedmate.customer.application.ReferralService.ApplyCommand;
+import com.nammamedmate.customer.application.ReferralService.InviteCommand;
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -38,6 +40,28 @@ class CustomerReferralControllerTest {
   void get_delegates() {
     when(service.getMyReferral(customer)).thenReturn(Map.of("referral_code", "MEDRAM7"));
     assertThat(controller.get(customer).data()).containsEntry("referral_code", "MEDRAM7");
+  }
+
+  @Test
+  void invite_delegates() {
+    when(service.invite(eq(customer), any(InviteCommand.class)))
+        .thenReturn(Map.of("channel", "WHATSAPP"));
+    ApiResponse<Map<String, Object>> response =
+        controller.invite(customer, new InviteRequest("WHATSAPP"));
+    assertThat(response.data()).containsEntry("channel", "WHATSAPP");
+    ArgumentCaptor<InviteCommand> captor = ArgumentCaptor.forClass(InviteCommand.class);
+    org.mockito.Mockito.verify(service).invite(eq(customer), captor.capture());
+    assertThat(captor.getValue().channel()).isEqualTo("WHATSAPP");
+  }
+
+  @Test
+  void invite_nullBody() {
+    when(service.invite(eq(customer), any(InviteCommand.class)))
+        .thenReturn(Map.of("channel", "SMS"));
+    controller.invite(customer, null);
+    ArgumentCaptor<InviteCommand> captor = ArgumentCaptor.forClass(InviteCommand.class);
+    org.mockito.Mockito.verify(service).invite(eq(customer), captor.capture());
+    assertThat(captor.getValue().channel()).isNull();
   }
 
   @Test

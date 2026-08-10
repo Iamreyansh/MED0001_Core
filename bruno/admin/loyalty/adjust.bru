@@ -1,0 +1,124 @@
+meta {
+  name: adjust
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/loyalty/customers/{{customerId}}/adjust
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "points": 50,
+    "reason": "Compensation for delayed order",
+    "reference_order_id": "{{orderId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first (admin_super)");
+  }
+  if (!bru.getEnvVar("customerId")) {
+    throw new Error("customerId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("loyaltyAdjustTxId", body.data.transaction_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("adjust envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("points_adjusted");
+    expect(body.data).to.have.property("points_balance_after");
+    expect(body.data).to.have.property("transaction_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/loyalty/customers/:id/adjust — admin_super manual ADJUST.
+  Errors: ADJUSTMENT_WOULD_EXCEED_BALANCE, FORBIDDEN
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/loyalty/customers/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/adjust
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "points": 50,
+        "reason": "Compensation for delayed order ORD-20260720-001234",
+        "reference_order_id": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "customer_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "points_adjusted": 50,
+            "points_balance_after": 118,
+            "transaction_id": "cccccccc-dddd-4eee-8fff-000000000000",
+            "adjusted_by": "dddddddd-eeee-4fff-8000-111111111111",
+            "adjusted_at": "2026-07-24T11:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 ADJUSTMENT_WOULD_EXCEED_BALANCE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/loyalty/customers/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/adjust
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "points": -500,
+        "reason": "Too large debit"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ADJUSTMENT_WOULD_EXCEED_BALANCE",
+            "message": "Adjustment exceeds current balance"
+          }
+        }
+      '''
+    }
+  }
+}

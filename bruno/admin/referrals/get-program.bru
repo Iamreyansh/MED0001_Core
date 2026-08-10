@@ -1,0 +1,65 @@
+meta {
+  name: get-program
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/referrals/program
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("program envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("reward_for_referrer_rs");
+    expect(body.data).to.have.property("is_active");
+  });
+}
+
+docs {
+  GET /api/v1/admin/referrals/program — program settings (read-only for admin_operations).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/referrals/program
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "reward_for_referrer_rs": 100.00,
+            "reward_for_referee_rs": 100.00,
+            "is_active": true,
+            "reward_expiry_days": 365,
+            "conditions": "Reward credited after referee's first DELIVERED order. One code per customer."
+          }
+        }
+      '''
+    }
+  }
+}

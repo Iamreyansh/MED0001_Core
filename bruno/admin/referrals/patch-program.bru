@@ -1,0 +1,116 @@
+meta {
+  name: patch-program
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/referrals/program
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reward_for_referrer_rs": 150,
+    "reward_for_referee_rs": 100,
+    "is_active": true,
+    "reward_expiry_days": 365,
+    "conditions": "Updated conditions text."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first (admin_super)");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("updated_at");
+    expect(body.data).to.have.property("updated_by");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/referrals/program — admin_super only.
+  Errors: 403 FORBIDDEN
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/referrals/program
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reward_for_referrer_rs": 150,
+        "reward_for_referee_rs": 100,
+        "is_active": true,
+        "reward_expiry_days": 365,
+        "conditions": "Updated conditions text."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "updated_at": "2026-07-24T10:00:00Z",
+            "updated_by": "a1b2c3d4-e5f6-7890-a123-456789abcdef"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  description: admin_operations cannot patch settings.
+  request: {
+    url: {{baseUrl}}/api/v1/admin/referrals/program
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "is_active": false
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Only admin_super may update program settings"
+          }
+        }
+      '''
+    }
+  }
+}

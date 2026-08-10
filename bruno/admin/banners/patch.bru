@@ -1,0 +1,83 @@
+meta {
+  name: patch
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/banners/{{bannerId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "headline": "Monsoon Mega Sale",
+    "priority": 2
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("bannerId")) {
+    throw new Error("bannerId missing — run admin/banners/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("id");
+    expect(body.data).to.have.property("updated_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/banners/:id — update banner fields.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners/{{bannerId}}
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "headline": "Monsoon Mega Sale",
+        "priority": 2
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "b0130002-0000-4000-8000-000000000001",
+            "updated_at": "2026-07-24T09:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

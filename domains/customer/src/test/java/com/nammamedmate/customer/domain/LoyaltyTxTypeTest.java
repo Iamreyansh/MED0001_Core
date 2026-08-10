@@ -13,6 +13,7 @@ class LoyaltyTxTypeTest {
     assertThat(LoyaltyTxType.parseOptional(null)).isNull();
     assertThat(LoyaltyTxType.parseOptional(" ")).isNull();
     assertThat(LoyaltyTxType.parseOptional("earn")).isEqualTo(LoyaltyTxType.EARN);
+    assertThat(LoyaltyTxType.parseOptional("REDEEM")).isEqualTo(LoyaltyTxType.REDEEM);
     assertThatThrownBy(() -> LoyaltyTxType.parseOptional("NOPE"))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("VALIDATION_ERROR");

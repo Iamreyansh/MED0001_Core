@@ -13,6 +13,7 @@ public final class CartPricing {
   public static final long FREE_DELIVERY_THRESHOLD_PAISE = 19_900L;
   public static final long FLAT50_MIN_ITEM_TOTAL_PAISE = 39_900L;
   public static final long FLAT50_OFF_PAISE = 5_000L;
+  public static final long NAMMA25_MAX_CAP_PAISE = 10_000L;
 
   public enum CouponType {
     PERCENT,
@@ -101,7 +102,7 @@ public final class CartPricing {
     }
     long discount =
         switch (code) {
-          case "NAMMA25" -> (itemTotalPaise * 25L) / 100L;
+          case "NAMMA25" -> Math.min((itemTotalPaise * 25L) / 100L, NAMMA25_MAX_CAP_PAISE);
           case "FLAT50" -> FLAT50_OFF_PAISE;
           case "FREEDEL" -> 0L;
           default -> 0L;

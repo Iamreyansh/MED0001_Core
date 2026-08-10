@@ -1,0 +1,125 @@
+meta {
+  name: redeem
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customers/me/loyalty/redeem
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "points_to_redeem": 20,
+    "cart_id": "{{cartId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("cartId")) {
+    throw new Error("cartId missing — run carts create/get first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("loyaltyRedemptionTxId", body.data.redemption_transaction_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("redeem envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("points_redeemed");
+    expect(body.data).to.have.property("wallet_credit_applied_rs");
+    expect(body.data).to.have.property("points_balance_after");
+    expect(body.data).to.have.property("redemption_transaction_id");
+  });
+}
+
+docs {
+  POST /api/v1/customers/me/loyalty/redeem — redeem points at checkout (min 10, max 20% cart).
+  Errors: INSUFFICIENT_POINTS, BELOW_MINIMUM_REDEMPTION, EXCEEDS_REDEMPTION_CAP, CART_NOT_FOUND
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/loyalty/redeem
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "points_to_redeem": 20,
+        "cart_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "points_redeemed": 20,
+            "wallet_credit_applied_rs": 20,
+            "points_balance_after": 48,
+            "redemption_transaction_id": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 EXCEEDS_REDEMPTION_CAP
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/loyalty/redeem
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "points_to_redeem": 50,
+        "cart_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "EXCEEDS_REDEMPTION_CAP",
+            "message": "Redemption exceeds 20% of cart value"
+          }
+        }
+      '''
+    }
+  }
+}

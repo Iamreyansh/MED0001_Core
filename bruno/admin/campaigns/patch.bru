@@ -1,0 +1,124 @@
+meta {
+  name: patch
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/campaigns/{{campaignId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Monsoon Reactivation - Updated",
+    "budget_cap": 20000
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("campaignId")) {
+    throw new Error("campaignId missing — run admin/campaigns/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or 409", function () {
+    const status = res.getStatus();
+    expect([200, 409]).to.include(status);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.id).to.be.a("string");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(["CAMPAIGN_ALREADY_RUNNING", "CAMPAIGN_COMPLETED"]).to.include(body.error.code);
+    }
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/campaigns/:id — edit DRAFT/SCHEDULED/PAUSED only; RUNNING/COMPLETED → 409.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns/c0130003-0000-4000-8000-000000000001
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "name": "Monsoon Reactivation - Updated",
+        "budget_cap": 20000
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "c0130003-0000-4000-8000-000000000001",
+            "name": "Monsoon Reactivation - Updated",
+            "status": "DRAFT",
+            "funnel": { "sent": 0, "delivered": 0, "opened": 0, "clicked": 0, "converted": 0 },
+            "economics": { "total_cost_rs": 0.00, "revenue_attributed_rs": 0.00, "roi_pct": 0.0 },
+            "timeline": []
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 CAMPAIGN_ALREADY_RUNNING
+  request: {
+    url: {{baseUrl}}/api/v1/admin/campaigns/c0130003-0000-4000-8000-000000000001
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "name": "Cannot edit"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CAMPAIGN_ALREADY_RUNNING",
+            "message": "Campaign cannot be edited while RUNNING"
+          }
+        }
+      '''
+    }
+  }
+}

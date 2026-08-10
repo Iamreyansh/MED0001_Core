@@ -43,6 +43,7 @@ import com.nammamedmate.order.application.port.out.OrderNoteStore;
 import com.nammamedmate.order.application.port.out.OrderStatusEventStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
+import com.nammamedmate.order.application.port.out.PlatformCouponPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.PriceCeilingPort;
 import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
@@ -112,6 +113,21 @@ public class OrderConfig {
   @ConditionalOnMissingBean(DeliveryFeePort.class)
   DeliveryFeePort deliveryFeePort() {
     return new StubDeliveryFeeAdapter();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(PlatformCouponPort.class)
+  PlatformCouponPort platformCouponPort() {
+    return (couponCode, itemTotalPaise) -> {
+      var applied =
+          com.nammamedmate.order.domain.CartPricing.applyCoupon(couponCode, itemTotalPaise);
+      return new PlatformCouponPort.Quote(
+          applied.code(),
+          applied.type(),
+          applied.discountPaise(),
+          applied.type() == com.nammamedmate.order.domain.CartPricing.CouponType.FREE_DELIVERY,
+          applied.message());
+    };
   }
 
   @Bean

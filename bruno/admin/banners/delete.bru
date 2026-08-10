@@ -1,0 +1,90 @@
+meta {
+  name: delete
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/banners/{{bannerId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first (admin_super)");
+  }
+  if (!bru.getEnvVar("bannerId")) {
+    throw new Error("bannerId missing — run admin/banners/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.deleted).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/admin/banners/:id — hard delete (admin_super only).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners/{{bannerId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "b0130002-0000-4000-8000-000000000001",
+            "deleted": true
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 BANNER_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/banners/00000000-0000-4000-8000-000000000000
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "BANNER_NOT_FOUND",
+            "message": "Banner ID does not exist"
+          }
+        }
+      '''
+    }
+  }
+}

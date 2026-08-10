@@ -16,9 +16,9 @@
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
 | Phase 2 | 34 | 34 |
-| Phase 3 | 32 | 10 |
+| Phase 3 | 32 | 16 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **84** |
+| **Total** | **129** | **90** |
 
 ---
 
@@ -204,12 +204,12 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-013 | [STORY-001](./EPIC-013-marketing-growth/STORY-001-coupon-management.md) | Coupon Management | pending | — | — |
-| EPIC-013 | [STORY-002](./EPIC-013-marketing-growth/STORY-002-banner-cms-management.md) | Banner CMS Management | pending | — | — |
-| EPIC-013 | [STORY-003](./EPIC-013-marketing-growth/STORY-003-campaign-management.md) | Campaign Management | pending | — | — |
-| EPIC-013 | [STORY-004](./EPIC-013-marketing-growth/STORY-004-customer-segmentation.md) | Customer Segmentation | pending | — | — |
-| EPIC-013 | [STORY-005](./EPIC-013-marketing-growth/STORY-005-referral-program.md) | Referral Program | pending | — | — |
-| EPIC-013 | [STORY-006](./EPIC-013-marketing-growth/STORY-006-loyalty-program.md) | Loyalty Program | pending | — | — |
+| EPIC-013 | [STORY-001](./EPIC-013-marketing-growth/STORY-001-coupon-management.md) | Coupon Management | done | 2026-08-10 | `domains/marketing`; V091 coupons+redemptions; seed NAMMA25/FLAT50/FREEDEL; PlatformCouponPort cart bridge; budget auto-pause+09:00 IST digest; SegmentUsagePort wired |
+| EPIC-013 | [STORY-002](./EPIC-013-marketing-growth/STORY-002-banner-cms-management.md) | Banner CMS Management | done | 2026-08-10 | `domains/marketing`; V092 banners; 15m expiry job; Redis impression throttle+in-mem fallback; CTR=clicks/impressions×100; Http image validator opt-in |
+| EPIC-013 | [STORY-003](./EPIC-013-marketing-growth/STORY-003-campaign-management.md) | Campaign Management | done | 2026-08-10 | `domains/marketing`; V093 campaigns+timeline+interactions; stub dispatch; 48h attributeOrder port; PATCH for immutability; SegmentUsagePort includes campaigns |
+| EPIC-013 | [STORY-004](./EPIC-013-marketing-growth/STORY-004-customer-segmentation.md) | Customer Segmentation | done | 2026-08-10 | `domains/marketing`; V090 segments+memberships+snapshots+compute_jobs; nightly 02:00 IST; in-process job poller; MarketingBridgeConfig JDBC metrics; SegmentUsagePort wired via coupons+campaigns |
+| EPIC-013 | [STORY-005](./EPIC-013-marketing-growth/STORY-005-referral-program.md) | Referral Program | done | 2026-08-10 | extend `domains/customer`+marketing admin façade; V094 settings+share_events; keep MED**** + `/customers/me/referral/apply` + EPIC-002 error codes; order.delivered consumer |
+| EPIC-013 | [STORY-006](./EPIC-013-marketing-growth/STORY-006-loyalty-program.md) | Loyalty Program | done | 2026-08-10 | extend `domains/customer`+marketing admin; V095 settings+FIFO expiry; redeem; order.delivered award; LoyaltyTierReadPort real; keep EPIC-002 GET contracts |
 
 ### EPIC-015 (`EPIC-015-support-disputes`)
 
