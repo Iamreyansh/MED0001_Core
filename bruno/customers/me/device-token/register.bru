@@ -1,0 +1,124 @@
+meta {
+  name: register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customers/me/device-token
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "token": "fcm-token-string-abc123",
+    "platform": "ANDROID",
+    "device_id": "{{deviceId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+  if (!bru.getEnvVar("deviceId")) {
+    bru.setEnvVar("deviceId", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.device_id) {
+    bru.setEnvVar("deviceId", body.data.device_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("register envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.registered).to.equal(true);
+    expect(body.data.platform).to.equal("ANDROID");
+  });
+}
+
+docs {
+  POST /api/v1/customers/me/device-token — register/refresh FCM token.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/device-token
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "token": "fcm-token-string-abc123",
+        "platform": "ANDROID",
+        "device_id": "device-uuid-from-app"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "registered": true,
+            "device_id": "device-uuid-from-app",
+            "platform": "ANDROID"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PLATFORM
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/device-token
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "token": "fcm-token",
+        "platform": "WINDOWS",
+        "device_id": "device-uuid-from-app"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PLATFORM",
+            "message": "Platform not IOS or ANDROID"
+          }
+        }
+      '''
+    }
+  }
+}

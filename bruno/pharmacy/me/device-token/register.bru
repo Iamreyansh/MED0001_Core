@@ -1,0 +1,89 @@
+meta {
+  name: register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/pharmacy/me/device-token
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "token": "fcm-pharmacy-token-abc",
+    "platform": "ANDROID",
+    "device_id": "{{pharmacyDeviceId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy login first");
+  }
+  if (!bru.getEnvVar("pharmacyDeviceId")) {
+    bru.setEnvVar("pharmacyDeviceId", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.device_id) {
+    bru.setEnvVar("pharmacyDeviceId", body.data.device_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("register envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.registered).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/pharmacy/me/device-token — pharmacy_staff register FCM token.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/me/device-token
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "token": "fcm-pharmacy-token-abc",
+        "platform": "ANDROID",
+        "device_id": "pharmacy-device-uuid"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "registered": true,
+            "device_id": "pharmacy-device-uuid",
+            "platform": "ANDROID"
+          }
+        }
+      '''
+    }
+  }
+}

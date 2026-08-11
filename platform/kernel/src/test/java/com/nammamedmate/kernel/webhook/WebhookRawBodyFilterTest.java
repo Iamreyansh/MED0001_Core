@@ -85,6 +85,40 @@ class WebhookRawBodyFilterTest {
   }
 
   @Test
+  void cachesBodyForWhatsAppWebhookPaths() throws Exception {
+    WebhookRawBodyFilter filter = new WebhookRawBodyFilter();
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/api/v1/notifications/whatsapp/webhook");
+    byte[] payload = "{\"object\":\"whatsapp_business_account\"}".getBytes(StandardCharsets.UTF_8);
+    request.setContent(payload);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain chain =
+        (req, res) -> {
+          CachedBodyHttpServletRequest cached = (CachedBodyHttpServletRequest) req;
+          assertThat(WebhookRawBodyFilter.rawBody(cached)).isEqualTo(payload);
+        };
+    filter.doFilter(request, response, chain);
+  }
+
+  @Test
+  void cachesBodyForSmsAndEmailWebhookPaths() throws Exception {
+    WebhookRawBodyFilter filter = new WebhookRawBodyFilter();
+    for (String path :
+        new String[] {"/api/v1/notifications/sms/webhook", "/api/v1/notifications/email/webhook"}) {
+      MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
+      byte[] payload = "[]".getBytes(StandardCharsets.UTF_8);
+      request.setContent(payload);
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      FilterChain chain =
+          (req, res) -> {
+            CachedBodyHttpServletRequest cached = (CachedBodyHttpServletRequest) req;
+            assertThat(WebhookRawBodyFilter.rawBody(cached)).isEqualTo(payload);
+          };
+      filter.doFilter(request, response, chain);
+    }
+  }
+
+  @Test
   void skipsNonWebhookPaths() throws Exception {
     WebhookRawBodyFilter filter = new WebhookRawBodyFilter();
     HttpServletRequest request = mock(HttpServletRequest.class);

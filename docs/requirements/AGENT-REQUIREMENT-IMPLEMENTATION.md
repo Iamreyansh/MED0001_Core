@@ -16,9 +16,9 @@
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
 | Phase 2 | 34 | 34 |
-| Phase 3 | 32 | 21 |
+| Phase 3 | 32 | 27 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **95** |
+| **Total** | **129** | **101** |
 
 ---
 
@@ -225,12 +225,12 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-017 | [STORY-001](./EPIC-017-notifications-comms/STORY-001-push-notification-service.md) | Push Notification Service | pending | — | — |
-| EPIC-017 | [STORY-002](./EPIC-017-notifications-comms/STORY-002-sms-service.md) | SMS Service | pending | — | — |
-| EPIC-017 | [STORY-003](./EPIC-017-notifications-comms/STORY-003-whatsapp-business-api.md) | WhatsApp Business API | pending | — | — |
-| EPIC-017 | [STORY-004](./EPIC-017-notifications-comms/STORY-004-email-service.md) | Email Service | pending | — | — |
-| EPIC-017 | [STORY-005](./EPIC-017-notifications-comms/STORY-005-notification-preferences.md) | Notification Preferences | pending | — | — |
-| EPIC-017 | [STORY-006](./EPIC-017-notifications-comms/STORY-006-notification-history.md) | Notification History | pending | — | — |
+| EPIC-017 | [STORY-001](./EPIC-017-notifications-comms/STORY-001-push-notification-service.md) | Push Notification Service | done | 2026-08-11 | `domains/notification`; V101 device_tokens+push_broadcasts+logs; StubFCM; BroadcastScheduler in-process; opened via POST /push/opened; PreferenceGatePort allow-all until STORY-005; Bruno notifications/push + device-token |
+| EPIC-017 | [STORY-002](./EPIC-017-notifications-comms/STORY-002-sms-service.md) | SMS Service | done | 2026-08-11 | `domains/notification`; V102 sms_templates+delivery_logs; MSG91→Twilio stub fallback; DND/IST promo window; webhook; Bruno admin/notifications/sms |
+| EPIC-017 | [STORY-003](./EPIC-017-notifications-comms/STORY-003-whatsapp-business-api.md) | WhatsApp Business API | done | 2026-08-11 | `domains/notification`; V103 whatsapp_templates+logs+optouts+sessions; StubMeta; HMAC webhook; Bruno notifications/whatsapp |
+| EPIC-017 | [STORY-004](./EPIC-017-notifications-comms/STORY-004-email-service.md) | Email Service | done | 2026-08-11 | `domains/notification`; V104 email_templates+logs+bounces+unsubscribes; SendGrid→SES stub; Handlebars; thin unsubscribe; Bruno notifications/email |
+| EPIC-017 | [STORY-005](./EPIC-017-notifications-comms/STORY-005-notification-preferences.md) | Notification Preferences | done | 2026-08-11 | `domains/notification`; V105 prefs+audit; PreferenceGateService wired to all channels; unsubscribe JWT; Bruno customers/pharmacy notification-preferences |
+| EPIC-017 | [STORY-006](./EPIC-017-notifications-comms/STORY-006-notification-history.md) | Notification History | done | 2026-08-11 | `domains/notification`; V106 in_app+dispatch_log view; TTL scheduler IST; worker CustomerNotificationRequestedHandler; CSV export stub; Bruno customers/me/notifications + admin history |
 
 ### EPIC-018 (`EPIC-018-medicine-schedule`)
 

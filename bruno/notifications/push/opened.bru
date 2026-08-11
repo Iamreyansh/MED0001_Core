@@ -1,0 +1,80 @@
+meta {
+  name: opened
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/notifications/push/opened
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "log_id": "{{pushLogId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+  if (!bru.getEnvVar("pushLogId")) {
+    throw new Error("pushLogId missing — run notifications/push/send first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("opened envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.opened).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/notifications/push/opened — mark deep-link open (AC-006).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/push/opened
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "log_id": "a1000001-0000-4000-8000-000000000001"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "opened": true,
+            "log_id": "a1000001-0000-4000-8000-000000000001"
+          }
+        }
+      '''
+    }
+  }
+}

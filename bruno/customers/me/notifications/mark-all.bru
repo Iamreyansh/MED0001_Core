@@ -1,0 +1,77 @@
+meta {
+  name: mark-all
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/customers/me/notifications
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "mark_all_read": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.marked_read_count !== undefined) {
+    bru.setEnvVar("markedReadCount", String(body.data.marked_read_count));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("marked_read_count", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.marked_read_count).to.be.a("number");
+  });
+}
+
+docs {
+  PUT /api/v1/customers/me/notifications — mark all read.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/notifications
+    method: put
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "mark_all_read": true
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "marked_read_count": 8,
+            "updated_at": "2026-07-24T08:30:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

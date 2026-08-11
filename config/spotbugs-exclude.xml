@@ -83,6 +83,35 @@
       <Class name="com.nammamedmate.marketing.application.port.out.CampaignDispatchPort$DispatchResult"/>
       <Class name="com.nammamedmate.marketing.application.port.out.SegmentStore$PagedMemberships"/>
       <Class name="com.nammamedmate.marketing.domain.Segment"/>
+      <Class name="com.nammamedmate.notification.domain.PushBroadcast"/>
+      <Class name="com.nammamedmate.notification.domain.SmsDeliveryLog"/>
+      <Class name="com.nammamedmate.notification.domain.WhatsAppTemplate"/>
+      <Class name="com.nammamedmate.notification.domain.WhatsAppDeliveryLog"/>
+      <Class name="com.nammamedmate.notification.domain.PreferenceAuditEntry"/>
+      <Class name="com.nammamedmate.notification.domain.InAppNotification"/>
+      <Class name="com.nammamedmate.notification.domain.DispatchLogEntry"/>
+      <Class name="com.nammamedmate.notification.application.InAppNotificationService$HistoryPage"/>
+      <Class name="com.nammamedmate.notification.application.port.out.InAppNotificationStore$ListFilter"/>
+      <Class name="com.nammamedmate.notification.application.port.out.InAppNotificationStore$Page"/>
+      <Class name="com.nammamedmate.notification.application.port.out.DispatchLogStore$ListFilter"/>
+      <Class name="com.nammamedmate.notification.application.port.out.DispatchLogStore$Page"/>
+      <Class name="com.nammamedmate.notification.application.port.out.FcmClientPort$PushRequest"/>
+      <Class name="com.nammamedmate.notification.application.port.out.MetaWhatsAppClientPort$SendRequest"/>
+      <Class name="com.nammamedmate.notification.application.port.out.MetaWhatsAppClientPort$SubmitTemplateRequest"/>
+      <Class name="com.nammamedmate.notification.application.PushSendService$LogPage"/>
+      <Class name="com.nammamedmate.notification.application.SmsSendService$SendCommand"/>
+      <Class name="com.nammamedmate.notification.application.SmsAdminService$LogPage"/>
+      <Class name="com.nammamedmate.notification.application.WhatsAppSendService$SendCommand"/>
+      <Class name="com.nammamedmate.notification.application.WhatsAppAdminService$LogPage"/>
+      <Class name="com.nammamedmate.notification.domain.EmailDeliveryLog"/>
+      <Class name="com.nammamedmate.notification.domain.EmailTemplate"/>
+      <Class name="com.nammamedmate.notification.application.EmailSendService$SendCommand"/>
+      <Class name="com.nammamedmate.notification.application.EmailAdminService$LogPage"/>
+      <Class name="com.nammamedmate.notification.application.port.out.SendGridClientPort$SendRequest"/>
+      <Class name="com.nammamedmate.notification.application.port.out.SendGridClientPort$Attachment"/>
+      <Class name="com.nammamedmate.notification.application.port.out.SesClientPort$SendRequest"/>
+      <Class name="com.nammamedmate.notification.application.port.out.SesClientPort$Attachment"/>
+      <Class name="com.nammamedmate.notification.application.port.out.AttachmentFetcherPort$FetchResult"/>
     </Or>
   </Match>
 </FindBugsFilter>

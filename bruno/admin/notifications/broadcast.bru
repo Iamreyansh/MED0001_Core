@@ -1,0 +1,128 @@
+meta {
+  name: broadcast
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/notifications/broadcast
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "audience": "ALL_CUSTOMERS",
+    "title": "Namma MedMate is now live in Whitefield!",
+    "body": "Get medicines delivered in 45 minutes. Try now!",
+    "data": { "screen": "HOME" },
+    "schedule_at": null
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.broadcast_id) {
+    bru.setEnvVar("broadcastId", body.data.broadcast_id);
+  }
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("broadcast envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("QUEUED");
+    expect(body.data).to.have.property("broadcast_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/notifications/broadcast — queue audience push (admin_super).
+}
+
+example {
+  name: 202 Accepted
+  request: {
+    url: {{baseUrl}}/api/v1/admin/notifications/broadcast
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "audience": "ALL_CUSTOMERS",
+        "title": "Namma MedMate is now live in Whitefield!",
+        "body": "Get medicines delivered in 45 minutes. Try now!",
+        "data": { "screen": "HOME" },
+        "schedule_at": null
+      }
+    }
+  }
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "broadcast_id": "b1000001-0000-4000-8000-000000000001",
+            "audience": "ALL_CUSTOMERS",
+            "status": "QUEUED",
+            "estimated_recipients": 4820,
+            "scheduled_at": null,
+            "queued_at": "2026-07-24T01:40:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_AUDIENCE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/notifications/broadcast
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "audience": "EVERYONE",
+        "title": "Hi",
+        "body": "Body"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_AUDIENCE",
+            "message": "audience not in allowed set"
+          }
+        }
+      '''
+    }
+  }
+}

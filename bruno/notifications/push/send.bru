@@ -1,0 +1,143 @@
+meta {
+  name: send
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/notifications/push/send
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "recipient_type": "CUSTOMER",
+    "recipient_ids": ["{{customerId}}"],
+    "title": "Your order is out for delivery!",
+    "body": "Ramesh is on the way. ETA: 12 minutes.",
+    "data": {
+      "order_id": "{{orderId}}",
+      "screen": "ORDER_TRACKING"
+    },
+    "image_url": "https://cdn.nammamedmate.in/icons/delivery.png",
+    "action_url": "nmmedmate://order/{{orderId}}",
+    "priority": "HIGH"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("customerId")) {
+    bru.setEnvVar("customerId", crypto.randomUUID());
+  }
+  if (!bru.getEnvVar("orderId")) {
+    bru.setEnvVar("orderId", crypto.randomUUID());
+  }
+  if (!bru.getEnvVar("internalServiceToken")) {
+    throw new Error("internalServiceToken missing — set in Bruno env (medmate.internal.service-token)");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.log_ids && body.data.log_ids[0]) {
+    bru.setEnvVar("pushLogId", body.data.log_ids[0]);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("send envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("sent");
+    expect(body.data).to.have.property("tokens_targeted");
+    expect(body.data.log_ids).to.be.an("array");
+  });
+}
+
+docs {
+  POST /api/v1/notifications/push/send — internal S2S push (X-Internal-Token).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/push/send
+    method: post
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "recipient_type": "CUSTOMER",
+        "recipient_ids": ["c0000001-0000-4000-8000-000000000001"],
+        "title": "Your order is out for delivery!",
+        "body": "Ramesh is on the way.",
+        "data": { "screen": "ORDER_TRACKING" },
+        "priority": "HIGH"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "sent": 1,
+            "failed": 0,
+            "tokens_targeted": 1,
+            "log_ids": ["a1000001-0000-4000-8000-000000000001"]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 PAYLOAD_TOO_LARGE
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/push/send
+    method: post
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "recipient_type": "CUSTOMER",
+        "recipient_ids": ["c0000001-0000-4000-8000-000000000001"],
+        "title": "oversized-payload-placeholder",
+        "body": "body",
+        "priority": "NORMAL"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PAYLOAD_TOO_LARGE",
+            "message": "Serialized payload exceeds 4 KB"
+          }
+        }
+      '''
+    }
+  }
+}

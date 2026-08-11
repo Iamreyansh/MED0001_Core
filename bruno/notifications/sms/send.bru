@@ -1,0 +1,138 @@
+meta {
+  name: send
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/notifications/sms/send
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "to_phone": "+919876543210",
+    "template_id": "OTP_VERIFICATION",
+    "variables": {
+      "1": "482910",
+      "2": "10"
+    },
+    "priority": "OTP"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("internalServiceToken")) {
+    throw new Error("internalServiceToken missing — set in Bruno env (medmate.internal.service-token)");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.log_id) {
+      bru.setEnvVar("smsLogId", body.data.log_id);
+    }
+    if (body.data.provider_message_id) {
+      bru.setEnvVar("smsProviderMessageId", body.data.provider_message_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("send envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("log_id");
+    expect(body.data).to.have.property("provider");
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  POST /api/v1/notifications/sms/send — internal S2S SMS (X-Internal-Token). DLT template required.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/sms/send
+    method: post
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "to_phone": "+919876543210",
+        "template_id": "OTP_VERIFICATION",
+        "variables": { "1": "482910", "2": "10" },
+        "priority": "OTP"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "log_id": "a1000001-0000-4000-8000-000000000001",
+            "to_phone": "+919876543210",
+            "template_id": "OTP_VERIFICATION",
+            "provider": "MSG91",
+            "provider_message_id": "msg91-abc123",
+            "status": "SENT",
+            "cost_rs": 0.12,
+            "sent_at": "2026-07-24T08:20:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PHONE_FORMAT
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/sms/send
+    method: post
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "to_phone": "9876543210",
+        "template_id": "OTP_VERIFICATION",
+        "variables": { "1": "482910", "2": "10" }
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PHONE_FORMAT",
+            "message": "Phone must be E.164 format"
+          }
+        }
+      '''
+    }
+  }
+}

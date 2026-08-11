@@ -1,2 +1,2 @@
-/** Domain module shell for notification. Business logic lands via epic stories. */
+/** Domain module for EPIC-017 notifications and communications. */
 package com.nammamedmate.notification;
