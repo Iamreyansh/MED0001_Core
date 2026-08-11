@@ -1,0 +1,79 @@
+meta {
+  name: unregister
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/customers/me/device-token
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "device_id": "{{deviceId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+  if (!bru.getEnvVar("deviceId")) {
+    throw new Error("deviceId missing — run device-token/register first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("unregister envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.unregistered).to.equal(true);
+  });
+}
+
+docs {
+  DELETE /api/v1/customers/me/device-token — deactivate token on logout.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/device-token
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "device_id": "device-uuid-from-app"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "unregistered": true
+          }
+        }
+      '''
+    }
+  }
+}

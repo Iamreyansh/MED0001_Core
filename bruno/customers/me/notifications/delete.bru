@@ -1,0 +1,96 @@
+meta {
+  name: delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/customers/me/notifications/{{inAppNotificationId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+  if (!bru.getEnvVar("inAppNotificationId")) {
+    throw new Error("inAppNotificationId missing — run customers/me/notifications/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or 422", function () {
+    const status = res.getStatus();
+    expect([200, 422]).to.include(status);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.deleted).to.equal(true);
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error.code).to.equal("CANNOT_DELETE_ORDER_UPDATE");
+    }
+  });
+}
+
+docs {
+  DELETE /api/v1/customers/me/notifications/:id — PROMO/SYSTEM only; ORDER_UPDATE → 422.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/notifications/n0000001-0000-4000-8000-000000000002
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "deleted": true
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 CANNOT_DELETE_ORDER_UPDATE
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/notifications/n0000001-0000-4000-8000-000000000001
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CANNOT_DELETE_ORDER_UPDATE",
+            "message": "ORDER_UPDATE notifications cannot be deleted"
+          }
+        }
+      '''
+    }
+  }
+}

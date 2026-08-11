@@ -1,0 +1,89 @@
+meta {
+  name: logs
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/notifications/push/logs?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~recipient_type: CUSTOMER
+  ~status: SENT
+  ~date_from: 2026-07-01T00:00:00Z
+  ~date_to: 2026-07-31T23:59:59Z
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.logs && body.data.logs[0]) {
+    bru.setEnvVar("pushLogId", body.data.logs[0].log_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("logs envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.logs).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/notifications/push/logs — admin_super delivery logs.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/notifications/push/logs?page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "logs": [
+              {
+                "log_id": "a1000001-0000-4000-8000-000000000001",
+                "recipient_type": "CUSTOMER",
+                "recipient_id": "c0000001-0000-4000-8000-000000000001",
+                "recipient_name": "Ravi Kumar",
+                "title": "Your order is out for delivery!",
+                "priority": "HIGH",
+                "status": "DELIVERED",
+                "sent_at": "2026-07-24T08:14:22Z",
+                "delivered_at": "2026-07-24T08:14:24Z",
+                "opened_at": "2026-07-24T08:16:01Z",
+                "error_message": null
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

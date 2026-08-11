@@ -1,0 +1,119 @@
+meta {
+  name: patch
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/notification-preferences
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "channels": {
+      "sms": false
+    },
+    "categories": {
+      "low_stock_alerts": false
+    }
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy owner login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.updated_at) {
+    bru.setEnvVar("pharmacyPrefsUpdatedAt", body.data.updated_at);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.updated).to.equal(true);
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/notification-preferences — pharmacy_owner only (staff → 403).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/notification-preferences
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channels": { "sms": false },
+        "categories": { "low_stock_alerts": false }
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "updated": true,
+            "updated_at": "2026-08-11T08:32:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/notification-preferences
+    method: patch
+    headers: {
+      Authorization: Bearer {{staffAccessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channels": { "sms": false }
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Only pharmacy_owner may update preferences"
+          }
+        }
+      '''
+    }
+  }
+}

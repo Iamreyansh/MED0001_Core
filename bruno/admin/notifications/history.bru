@@ -1,0 +1,121 @@
+meta {
+  name: history
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/notifications/history?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~channel: SMS
+  ~status: FAILED
+  ~recipient_type: CUSTOMER
+  ~date_from: 2026-07-01T00:00:00Z
+  ~date_to: 2026-07-31T23:59:59Z
+  ~export: csv
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.history && body.data.history[0]) {
+    bru.setEnvVar("dispatchId", body.data.history[0].dispatch_id);
+  }
+  if (body && body.success && body.data && body.data.export_url) {
+    bru.setEnvVar("notificationHistoryExportUrl", body.data.export_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("history envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.history).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/notifications/history — admin_super + admin_operations; export=csv → export_url.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/notifications/history?channel=SMS&status=FAILED&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "history": [
+              {
+                "dispatch_id": "d0000001-0000-4000-8000-000000000001",
+                "recipient_id": null,
+                "recipient_name": null,
+                "recipient_type": null,
+                "channel": "SMS",
+                "type": "OTP_VERIFICATION",
+                "title": "OTP_VERIFICATION",
+                "status": "FAILED",
+                "sent_at": "2026-07-24T08:14:22Z",
+                "delivered_at": null
+              }
+            ],
+            "export_url": null
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 CSV export
+  request: {
+    url: {{baseUrl}}/api/v1/admin/notifications/history?export=csv&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "history": [],
+            "export_url": "data:text/csv;base64,ZGlzcGF0Y2hfaWQ..."
+          },
+          "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}

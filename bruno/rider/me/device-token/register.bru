@@ -1,0 +1,89 @@
+meta {
+  name: register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rider/me/device-token
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "token": "fcm-rider-token-abc",
+    "platform": "IOS",
+    "device_id": "{{riderDeviceId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/rider verify-otp first");
+  }
+  if (!bru.getEnvVar("riderDeviceId")) {
+    bru.setEnvVar("riderDeviceId", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.device_id) {
+    bru.setEnvVar("riderDeviceId", body.data.device_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("register envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.registered).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/rider/me/device-token — rider register FCM token.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/rider/me/device-token
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "token": "fcm-rider-token-abc",
+        "platform": "IOS",
+        "device_id": "rider-device-uuid"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "registered": true,
+            "device_id": "rider-device-uuid",
+            "platform": "IOS"
+          }
+        }
+      '''
+    }
+  }
+}

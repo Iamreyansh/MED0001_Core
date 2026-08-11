@@ -1,0 +1,79 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/notification-preferences
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run pharmacy login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.pharmacy_id) {
+    bru.setEnvVar("pharmacyId", body.data.pharmacy_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("pharmacy prefs envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.categories.order_alerts.can_disable).to.equal(false);
+    expect(body.data.categories.kyc_updates.can_disable).to.equal(false);
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/notification-preferences — pharmacy_owner + pharmacy_staff.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/notification-preferences
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "a0000001-0000-4000-8000-0000000000aa",
+            "channels": {
+              "push": { "enabled": true, "can_disable": true },
+              "sms": { "enabled": true, "can_disable": true },
+              "whatsapp": { "enabled": true, "can_disable": true },
+              "email": { "enabled": true, "can_disable": true }
+            },
+            "categories": {
+              "order_alerts": { "enabled": true, "can_disable": false },
+              "settlement_updates": { "enabled": true, "can_disable": true },
+              "kyc_updates": { "enabled": true, "can_disable": false },
+              "low_stock_alerts": { "enabled": true, "can_disable": true },
+              "compliance_reminders": { "enabled": true, "can_disable": false }
+            },
+            "updated_at": "2026-08-11T08:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}

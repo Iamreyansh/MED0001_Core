@@ -1,0 +1,114 @@
+meta {
+  name: webhook
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/notifications/sms/webhook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Msg91-Signature: {{smsWebhookSignature}}
+}
+
+body:json {
+  {
+    "provider_message_id": "{{smsProviderMessageId}}",
+    "delivered_at": "2026-07-24T08:20:04Z"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("smsProviderMessageId")) {
+    bru.setEnvVar("smsProviderMessageId", "msg91-abc123");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.provider_message_id) {
+    bru.setEnvVar("smsProviderMessageId", body.data.provider_message_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("webhook envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.updated).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/notifications/sms/webhook — public MSG91 delivery callback; updates delivered_at.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/sms/webhook
+    method: post
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "provider_message_id": "msg91-abc123",
+        "delivered_at": "2026-07-24T08:20:04Z"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "updated": true,
+            "provider_message_id": "msg91-abc123"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 LOG_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/sms/webhook
+    method: post
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "provider_message_id": "missing-msg-id"
+      }
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "LOG_NOT_FOUND",
+            "message": "SMS log not found for provider message id"
+          }
+        }
+      '''
+    }
+  }
+}

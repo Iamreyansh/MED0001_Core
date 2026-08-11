@@ -3,16 +3,20 @@ package com.nammamedmate.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nammamedmate.notification.adapter.in.messaging.CustomerNotificationRequestedHandler;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
@@ -24,9 +28,16 @@ class SqsMessagePollerTest {
 
   @Mock private SqsClient sqsClient;
 
+  private static SqsNoOpHandler noOpHandler() {
+    @SuppressWarnings("unchecked")
+    ObjectProvider<CustomerNotificationRequestedHandler> provider = mock(ObjectProvider.class);
+    lenient().when(provider.getIfAvailable()).thenReturn(null);
+    return new SqsNoOpHandler(provider);
+  }
+
   @Test
   void blankQueueUrlDoesNotStartThread() {
-    SqsMessagePoller poller = new SqsMessagePoller(sqsClient, new SqsNoOpHandler(), "  ");
+    SqsMessagePoller poller = new SqsMessagePoller(sqsClient, noOpHandler(), "  ");
     poller.start();
     assertThat(poller.isRunning()).isFalse();
     poller.stop();
@@ -34,7 +45,7 @@ class SqsMessagePollerTest {
 
   @Test
   void nullQueueUrlTreatedAsBlank() {
-    SqsMessagePoller poller = new SqsMessagePoller(sqsClient, new SqsNoOpHandler(), null);
+    SqsMessagePoller poller = new SqsMessagePoller(sqsClient, noOpHandler(), null);
     poller.start();
     assertThat(poller.isRunning()).isFalse();
   }
@@ -47,7 +58,7 @@ class SqsMessagePollerTest {
         .thenReturn(ReceiveMessageResponse.builder().messages(List.of(message)).build());
 
     SqsMessagePoller poller =
-        new SqsMessagePoller(sqsClient, new SqsNoOpHandler(), "https://sqs.example/q");
+        new SqsMessagePoller(sqsClient, noOpHandler(), "https://sqs.example/q");
     poller.pollOnce();
 
     verify(sqsClient).deleteMessage(any(DeleteMessageRequest.class));
@@ -56,7 +67,7 @@ class SqsMessagePollerTest {
   @Test
   void processDeletesAfterHandle() {
     SqsMessagePoller poller =
-        new SqsMessagePoller(sqsClient, new SqsNoOpHandler(), "https://sqs.example/q");
+        new SqsMessagePoller(sqsClient, noOpHandler(), "https://sqs.example/q");
     Message message = Message.builder().body("x").receiptHandle("rh").build();
     poller.process(message);
     verify(sqsClient).deleteMessage(any(DeleteMessageRequest.class));
@@ -67,7 +78,7 @@ class SqsMessagePollerTest {
     when(sqsClient.receiveMessage(any(ReceiveMessageRequest.class)))
         .thenReturn(ReceiveMessageResponse.builder().messages(List.of()).build());
     SqsMessagePoller poller =
-        new SqsMessagePoller(sqsClient, new SqsNoOpHandler(), "https://sqs.example/q");
+        new SqsMessagePoller(sqsClient, noOpHandler(), "https://sqs.example/q");
     poller.start();
     assertThat(poller.isRunning()).isTrue();
     poller.start();
@@ -82,7 +93,7 @@ class SqsMessagePollerTest {
     when(sqsClient.receiveMessage(any(ReceiveMessageRequest.class)))
         .thenThrow(new RuntimeException("boom"));
     SqsMessagePoller poller =
-        new SqsMessagePoller(sqsClient, new SqsNoOpHandler(), "https://sqs.example/q");
+        new SqsMessagePoller(sqsClient, noOpHandler(), "https://sqs.example/q");
     poller.start();
     Thread.sleep(120);
     poller.stop();
@@ -92,7 +103,7 @@ class SqsMessagePollerTest {
   @Test
   void sleepQuietlyRestoresInterruptFlag() throws Exception {
     SqsMessagePoller poller =
-        new SqsMessagePoller(sqsClient, new SqsNoOpHandler(), "https://sqs.example/q");
+        new SqsMessagePoller(sqsClient, noOpHandler(), "https://sqs.example/q");
     AtomicBoolean interrupted = new AtomicBoolean();
     Thread t =
         new Thread(

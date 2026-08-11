@@ -1,0 +1,65 @@
+meta {
+  name: count
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customers/me/notifications/count
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.unread_count !== undefined) {
+    bru.setEnvVar("unreadNotificationCount", String(body.data.unread_count));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("unread_count is number", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.unread_count).to.be.a("number");
+  });
+}
+
+docs {
+  GET /api/v1/customers/me/notifications/count — badge count (0 not null).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/notifications/count
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "unread_count": 0
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,135 @@
+meta {
+  name: patch
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/customers/me/notification-preferences
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "channels": {
+      "whatsapp": false,
+      "email": true
+    },
+    "categories": {
+      "promotions": false,
+      "offers": false
+    }
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.updated_at) {
+    bru.setEnvVar("customerPrefsUpdatedAt", body.data.updated_at);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.updated).to.equal(true);
+    expect(body.data.channels.whatsapp).to.equal(false);
+  });
+}
+
+docs {
+  PATCH /api/v1/customers/me/notification-preferences — mandatory categories cannot be disabled.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/notification-preferences
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "channels": { "whatsapp": false },
+        "categories": { "promotions": false }
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "updated": true,
+            "channels": {
+              "push": true,
+              "sms": true,
+              "whatsapp": false,
+              "email": true
+            },
+            "categories": {
+              "order_updates": true,
+              "account_critical": true,
+              "promotions": false,
+              "refill_reminders": true,
+              "offers": true
+            },
+            "updated_at": "2026-08-11T08:30:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 CANNOT_DISABLE_MANDATORY_CATEGORY
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/notification-preferences
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "categories": { "order_updates": false }
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CANNOT_DISABLE_MANDATORY_CATEGORY",
+            "message": "Category order_updates cannot be disabled"
+          }
+        }
+      '''
+    }
+  }
+}

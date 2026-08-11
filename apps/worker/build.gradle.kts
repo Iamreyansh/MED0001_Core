@@ -7,6 +7,7 @@ dependencies {
     implementation(project(":platform:messaging"))
     implementation(project(":platform:observability"))
     implementation(project(":domains:pharmacy"))
+    implementation(project(":domains:notification"))
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-json")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")

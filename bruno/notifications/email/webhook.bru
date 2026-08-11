@@ -1,0 +1,116 @@
+meta {
+  name: webhook
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/notifications/email/webhook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Twilio-Email-Event-Webhook-Signature: {{emailWebhookSignature}}
+}
+
+body:json {
+  [
+    {
+      "email": "ravi.kumar@example.com",
+      "event": "delivered",
+      "sg_message_id": "{{emailProviderMessageId}}"
+    }
+  ]
+}
+
+script:pre-request {
+  // optional: chain after send so emailProviderMessageId is set
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("emailWebhookProcessed", String(body.data.processed));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("webhook envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("processed");
+  });
+}
+
+docs {
+  POST /api/v1/notifications/email/webhook — SendGrid events (delivered/bounce/spamreport/open/click).
+}
+
+example {
+  name: 200 OK delivered
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/email/webhook
+    method: post
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      [
+        {
+          "email": "ravi.kumar@example.com",
+          "event": "delivered",
+          "sg_message_id": "sg-abc123"
+        }
+      ]
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": { "processed": 1 }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 OK spamreport
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/email/webhook
+    method: post
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      [
+        {
+          "email": "spam.user@example.com",
+          "event": "spamreport",
+          "sg_message_id": "sg-spam-1"
+        }
+      ]
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": { "processed": 1 }
+        }
+      '''
+    }
+  }
+}

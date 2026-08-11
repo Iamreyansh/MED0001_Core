@@ -1,0 +1,97 @@
+meta {
+  name: read
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customers/me/notifications/{{inAppNotificationId}}/read
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer verify-otp first");
+  }
+  if (!bru.getEnvVar("inAppNotificationId")) {
+    throw new Error("inAppNotificationId missing — run customers/me/notifications/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("inAppNotificationId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("marked read", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_read).to.equal(true);
+    expect(body.data.read_at).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/customers/me/notifications/:id/read
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/notifications/n0000001-0000-4000-8000-000000000001/read
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "n0000001-0000-4000-8000-000000000001",
+            "is_read": true,
+            "read_at": "2026-07-24T08:28:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 NOTIFICATION_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/customers/me/notifications/00000000-0000-4000-8000-000000000099/read
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "NOTIFICATION_NOT_FOUND",
+            "message": "Notification not found"
+          }
+        }
+      '''
+    }
+  }
+}

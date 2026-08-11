@@ -1,0 +1,127 @@
+meta {
+  name: templates-create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/notifications/sms/templates
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "template_id": "REFUND_PROCESSED",
+    "content": "Refund of Rs {{1}} for order #{{2}} processed. It will reflect in {{3}} working days. - NMMATE",
+    "category": "TRANSACTIONAL",
+    "dlt_template_id": "1007164875432115",
+    "sender_id": "NMMATE"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.template_id) {
+    bru.setEnvVar("smsTemplateId", body.data.template_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("template_id");
+    expect(body.data.is_active).to.equal(true);
+  });
+}
+
+docs {
+  POST /api/v1/admin/notifications/sms/templates — admin_super; template must already exist on DLT portal.
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/notifications/sms/templates
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "template_id": "REFUND_PROCESSED",
+        "content": "Refund of Rs {{1}} for order #{{2}} processed. It will reflect in {{3}} working days. - NMMATE",
+        "category": "TRANSACTIONAL",
+        "dlt_template_id": "1007164875432115",
+        "sender_id": "NMMATE"
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "template_id": "REFUND_PROCESSED",
+            "category": "TRANSACTIONAL",
+            "is_active": true,
+            "created_at": "2026-07-24T01:45:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 TEMPLATE_ALREADY_EXISTS
+  request: {
+    url: {{baseUrl}}/api/v1/admin/notifications/sms/templates
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "template_id": "OTP_VERIFICATION",
+        "content": "duplicate",
+        "category": "OTP",
+        "dlt_template_id": "1007164875432101"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "TEMPLATE_ALREADY_EXISTS",
+            "message": "template_id already registered"
+          }
+        }
+      '''
+    }
+  }
+}

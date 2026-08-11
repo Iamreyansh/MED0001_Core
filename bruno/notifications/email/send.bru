@@ -1,0 +1,144 @@
+meta {
+  name: send
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/notifications/email/send
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "to_email": "ravi.kumar@example.com",
+    "to_name": "Ravi Kumar",
+    "template_id": "ORDER_CONFIRMATION",
+    "variables": {
+      "customer_name": "Ravi Kumar",
+      "order_id": "ORD-8821",
+      "total_amount": "Rs 504.00",
+      "track_url": "https://app.nammamedmate.in/track/uuid-order-1"
+    }
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("internalServiceToken")) {
+    throw new Error("internalServiceToken missing — set in Bruno env (medmate.internal.service-token)");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    if (body.data.log_id) {
+      bru.setEnvVar("emailLogId", body.data.log_id);
+    }
+    if (body.data.provider_message_id) {
+      bru.setEnvVar("emailProviderMessageId", body.data.provider_message_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("send envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("log_id");
+    expect(body.data).to.have.property("provider");
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  POST /api/v1/notifications/email/send — internal S2S email (X-Internal-Token).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/email/send
+    method: post
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "to_email": "ravi.kumar@example.com",
+        "to_name": "Ravi Kumar",
+        "template_id": "ORDER_CONFIRMATION",
+        "variables": {
+          "customer_name": "Ravi Kumar",
+          "order_id": "ORD-8821",
+          "total_amount": "Rs 504.00",
+          "track_url": "https://app.nammamedmate.in/track/uuid-order-1"
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "log_id": "e1000001-0000-4000-8000-000000000001",
+            "to_email": "ravi.kumar@example.com",
+            "template_id": "ORDER_CONFIRMATION",
+            "provider": "SENDGRID",
+            "provider_message_id": "sg-abc123",
+            "status": "SENT",
+            "sent_at": "2026-07-24T08:25:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 RECIPIENT_HARD_BOUNCED
+  request: {
+    url: {{baseUrl}}/api/v1/notifications/email/send
+    method: post
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "to_email": "bounced@example.com",
+        "template_id": "ORDER_CONFIRMATION",
+        "variables": { "customer_name": "X", "order_id": "1", "total_amount": "Rs 1", "track_url": "https://x" }
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RECIPIENT_HARD_BOUNCED",
+            "message": "Address has a hard bounce record"
+          }
+        }
+      '''
+    }
+  }
+}
