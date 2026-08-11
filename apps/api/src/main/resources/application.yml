@@ -197,6 +197,10 @@ medmate:
     jobs:
       enabled: true
       retry-delay-ms: 30000
+  medicine-schedule:
+    jobs:
+      enabled: true
+    due-dispatch-delay-ms: 60000
 
   outbox:
     dispatch:

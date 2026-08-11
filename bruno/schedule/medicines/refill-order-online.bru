@@ -1,0 +1,111 @@
+meta {
+  name: refill-order-online
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/schedule/medicines/{{scheduleMedicineId}}/refill/order-online
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("scheduleMedicineId")) {
+    throw new Error("scheduleMedicineId missing — run schedule/medicines/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("order-online envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.redirect_url).to.be.a("string").that.includes("medmate://search");
+    expect(body.data.web_redirect_url).to.be.a("string").that.includes("https://app.medmate.in/search");
+  });
+}
+
+docs {
+  POST /api/v1/schedule/medicines/:id/refill/order-online — deep link intent (no order created).
+  Errors: 404 MEDICINE_NOT_FOUND
+}
+
+example {
+  name: 200 OK
+  description: Deep link with master_id.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/medicines/b2c3d4e5-f6a7-4890-b123-456789abcdef/refill/order-online
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "medicine_name": "Metformin 500mg",
+            "master_medicine_id": "c3d4e5f6-a7b8-4901-c234-56789abcdef0",
+            "redirect_url": "medmate://search?query=Metformin+500mg&master_id=c3d4e5f6-a7b8-4901-c234-56789abcdef0",
+            "web_redirect_url": "https://app.medmate.in/search?query=Metformin+500mg&master_id=c3d4e5f6-a7b8-4901-c234-56789abcdef0"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 MEDICINE_NOT_FOUND
+  description: Unknown medicine id.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/medicines/00000000-0000-4000-8000-000000000001/refill/order-online
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 404
+      text: Not Found
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MEDICINE_NOT_FOUND",
+            "message": "Medicine not found"
+          }
+        }
+      '''
+    }
+  }
+}

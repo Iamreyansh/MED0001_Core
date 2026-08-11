@@ -1,0 +1,79 @@
+meta {
+  name: delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/schedule/medicines/{{scheduleMedicineId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("scheduleMedicineId")) {
+    throw new Error("scheduleMedicineId missing — run schedule/medicines/create first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_active).to.equal(false);
+    expect(body.data.ended_on_date).to.be.a("string").that.is.not.empty;
+    expect(body.data.reminders_cancelled).to.be.a("number");
+  });
+}
+
+docs {
+  DELETE /api/v1/schedule/medicines/:medicine_id — soft archive (is_active=false, ended_on_date=today IST).
+}
+
+example {
+  name: 200 OK
+  description: Soft-deleted medicine with reminders cancelled.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/medicines/{{scheduleMedicineId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "medicine_id": "b2c3d4e5-f6a7-4890-b123-456789abcdef",
+            "is_active": false,
+            "ended_on_date": "2026-07-24",
+            "reminders_cancelled": 14
+          }
+        }
+      '''
+    }
+  }
+}

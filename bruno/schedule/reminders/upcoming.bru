@@ -1,0 +1,83 @@
+meta {
+  name: upcoming
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/reminders/upcoming?member_id={{scheduleSelfMemberId}}&hours_ahead=24
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("upcoming envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.upcoming_doses).to.be.an("array");
+    expect(body.data.count).to.be.a("number");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/reminders/upcoming — upcoming UPCOMING doses within hours_ahead (max 48).
+}
+
+example {
+  name: 200 OK
+  description: Next 24h upcoming doses.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/reminders/upcoming?hours_ahead=24
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "upcoming_doses": [
+              {
+                "dose_log_id": "c3d4e5f6-a7b8-4901-c234-56789abcdef0",
+                "medicine_name": "Metformin 500mg",
+                "dose": "1 tablet",
+                "slot": "NIGHT",
+                "scheduled_at": "2026-07-24T21:00:00+05:30",
+                "status": "UPCOMING",
+                "hours_until": 8.75
+              }
+            ],
+            "count": 1
+          }
+        }
+      '''
+    }
+  }
+}

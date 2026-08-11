@@ -1,0 +1,96 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/refill-alerts
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  ~member_id: {{scheduleSelfMemberId}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.alerts && body.data.alerts[0]) {
+    bru.setEnvVar("scheduleMedicineId", body.data.alerts[0].medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("refill alerts envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("refill_alerts_count");
+    expect(body.data.alerts).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/refill-alerts — medicines currently in alert (units <= remind, remind > 0).
+}
+
+example {
+  name: 200 OK
+  description: Alert list for member.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/refill-alerts
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member": { "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde", "name": "Priya Sharma" },
+            "refill_alerts_count": 1,
+            "alerts": [
+              {
+                "medicine_id": "b2c3d4e5-f6a7-4890-b123-456789abcdef",
+                "medicine_name": "Metformin 500mg",
+                "strength": "500mg",
+                "form": "TABLET",
+                "units_in_hand": 8,
+                "refill_remind_at_units": 10,
+                "doses_per_day": 2,
+                "approx_days_left": 4,
+                "master_medicine_id": null,
+                "can_order_online": false,
+                "alert_level": "WARNING"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

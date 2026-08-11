@@ -1,2 +1,2 @@
-/** Domain module shell for medicine-schedule. Business logic lands via epic stories. */
+/** EPIC-018 medicine schedule — care circle, medicines, reminders, adherence. */
 package com.nammamedmate.medicine_schedule;

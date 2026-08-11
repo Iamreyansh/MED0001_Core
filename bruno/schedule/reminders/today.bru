@@ -1,0 +1,97 @@
+meta {
+  name: today
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/reminders/today?member_id={{scheduleSelfMemberId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.dose_groups && body.data.dose_groups[0]
+      && body.data.dose_groups[0].doses && body.data.dose_groups[0].doses[0]) {
+    bru.setEnvVar("scheduleDoseLogId", body.data.dose_groups[0].doses[0].dose_log_id);
+    bru.setEnvVar("scheduleDoseMedicineId", body.data.dose_groups[0].doses[0].medicine_id);
+    bru.setEnvVar("scheduleDoseSlot", body.data.dose_groups[0].doses[0].slot);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("today envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.dose_groups).to.be.an("array");
+    expect(body.data.summary).to.be.an("object");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/reminders/today — doses grouped by reminder_time for a care-circle member.
+}
+
+example {
+  name: 200 OK
+  description: Today's reminders grouped by time.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/reminders/today?member_id={{scheduleSelfMemberId}}
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member": { "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde", "name": "Priya Sharma" },
+            "date": "2026-07-24",
+            "dose_groups": [
+              {
+                "time_label": "8:00 AM",
+                "reminder_time": "08:00",
+                "doses": [
+                  {
+                    "dose_log_id": "c3d4e5f6-a7b8-4901-c234-56789abcdef0",
+                    "medicine_id": "b2c3d4e5-f6a7-4890-b123-456789abcdef",
+                    "medicine_name": "Metformin 500mg",
+                    "slot": "MORNING",
+                    "status": "UPCOMING",
+                    "taken_at": null
+                  }
+                ]
+              }
+            ],
+            "summary": { "total": 2, "taken": 0, "skipped": 0, "missed": 0, "upcoming": 2 }
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,102 @@
+meta {
+  name: chart
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/adherence/chart?member_id={{scheduleSelfMemberId}}&weeks=12
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.weeks && body.data.weeks.length) {
+    bru.setEnvVar("scheduleAdherenceWeekStart", body.data.weeks[0].week_start);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("chart envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.weeks).to.be.an("array");
+    if (body.data.weeks.length) {
+      expect(body.data.weeks[0]).to.have.property("status");
+      expect(body.data.weeks[0]).to.have.property("week_label");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/schedule/adherence/chart — weekly series (HIGH ≥85, MEDIUM 60–84, LOW <60).
+}
+
+example {
+  name: 200 OK
+  description: Twelve-week chart; HIGH band when pct ≥ 85.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/adherence/chart?weeks=12
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member": {
+              "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+              "name": "Priya Sharma"
+            },
+            "weeks": [
+              {
+                "week_start": "2026-07-14",
+                "week_end": "2026-07-20",
+                "week_label": "Jul 14-20",
+                "adherence_pct": 92.8,
+                "total_doses": 28,
+                "taken": 26,
+                "status": "HIGH"
+              },
+              {
+                "week_start": "2026-07-07",
+                "week_end": "2026-07-13",
+                "week_label": "Jul 7-13",
+                "adherence_pct": 78.5,
+                "total_doses": 28,
+                "taken": 22,
+                "status": "MEDIUM"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

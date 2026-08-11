@@ -1,0 +1,118 @@
+meta {
+  name: delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/schedule/care-circle/{{careCircleMemberId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("careCircleMemberId")) {
+    throw new Error("careCircleMemberId missing — run schedule/care-circle/create first");
+  }
+}
+
+script:post-response {
+  // Member removed; clear env for downstream.
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("careCircleMemberId", "");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("delete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.member_id).to.be.a("string").that.is.not.empty;
+    expect(body.data).to.have.property("medicines_archived");
+    expect(body.data).to.have.property("reminders_cancelled");
+    expect(body.data.deleted_at).to.be.a("string");
+  });
+}
+
+docs {
+  DELETE /api/v1/schedule/care-circle/:member_id — soft-delete member (not SELF).
+  Errors: 400 CANNOT_DELETE_SELF, 403 MEMBER_ACCESS_DENIED, 404 MEMBER_NOT_FOUND
+}
+
+example {
+  name: 200 OK
+  description: Member removed; cascade archives medicines/reminders.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle/{{careCircleMemberId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+            "name": "Rajesh Sharma",
+            "medicines_archived": 0,
+            "reminders_cancelled": 0,
+            "deleted_at": "2026-07-24T08:10:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 CANNOT_DELETE_SELF
+  description: Attempt to delete SELF member.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle/{{careCircleSelfMemberId}}
+    method: delete
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CANNOT_DELETE_SELF",
+            "message": "Self member cannot be deleted"
+          }
+        }
+      '''
+    }
+  }
+}

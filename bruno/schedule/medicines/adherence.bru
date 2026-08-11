@@ -1,0 +1,122 @@
+meta {
+  name: adherence
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/medicines/{{scheduleMedicineId}}/adherence
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("scheduleMedicineId")) {
+    throw new Error("scheduleMedicineId missing — run schedule/medicines/create or list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.medicine_id) {
+    bru.setEnvVar("scheduleMedicineId", body.data.medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("medicine adherence envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("all_time_pct");
+    expect(body.data).to.have.property("total_doses_scheduled");
+    expect(body.data.missed_days_list).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/medicines/:medicine_id/adherence — per-medicine adherence history.
+}
+
+example {
+  name: 200 OK
+  description: All-time and windowed adherence for one medicine.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/medicines/c3d4e5f6-a7b8-4901-c234-56789abcdef0/adherence
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "medicine_id": "c3d4e5f6-a7b8-4901-c234-56789abcdef0",
+            "medicine_name": "Metformin 500mg",
+            "member_name": "Priya Sharma",
+            "last_7_days_pct": 92.8,
+            "last_30_days_pct": 87.5,
+            "all_time_pct": 84.2,
+            "total_doses_scheduled": 368,
+            "total_doses_taken": 310,
+            "total_missed": 34,
+            "total_skipped": 24,
+            "missed_days_list": ["2026-07-12", "2026-07-05", "2026-06-28"]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 MEDICINE_ACCESS_DENIED
+  description: Medicine owned by another customer.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/medicines/d4e5f6a7-b8c9-4012-d345-6789abcdef01/adherence
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+      text: Forbidden
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MEDICINE_ACCESS_DENIED",
+            "message": "Medicine does not belong to this customer"
+          }
+        }
+      '''
+    }
+  }
+}

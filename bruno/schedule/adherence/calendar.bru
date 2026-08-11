@@ -1,0 +1,110 @@
+meta {
+  name: calendar
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/adherence/calendar?member_id={{scheduleSelfMemberId}}&month=2026-07
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.month) {
+    bru.setEnvVar("scheduleAdherenceMonth", body.data.month);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("calendar envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.days).to.be.an("array");
+    expect(body.data).to.have.property("month_adherence_pct");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/adherence/calendar — monthly day heatmap (PERFECT/PARTIAL/MISSED/NO_DOSES).
+}
+
+example {
+  name: 200 OK
+  description: July calendar with PARTIAL and NO_DOSES days.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/adherence/calendar?month=2026-07
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member": {
+              "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+              "name": "Priya Sharma"
+            },
+            "month": "2026-07",
+            "month_adherence_pct": 88.5,
+            "days": [
+              {
+                "date": "2026-07-01",
+                "total_doses": 4,
+                "taken": 4,
+                "skipped": 0,
+                "missed": 0,
+                "pct": 100.0,
+                "status": "PERFECT"
+              },
+              {
+                "date": "2026-07-02",
+                "total_doses": 4,
+                "taken": 3,
+                "skipped": 0,
+                "missed": 1,
+                "pct": 75.0,
+                "status": "PARTIAL"
+              },
+              {
+                "date": "2026-07-10",
+                "total_doses": 0,
+                "taken": 0,
+                "skipped": 0,
+                "missed": 0,
+                "pct": null,
+                "status": "NO_DOSES"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

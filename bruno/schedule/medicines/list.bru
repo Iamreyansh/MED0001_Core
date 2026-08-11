@@ -1,0 +1,91 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/medicines
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  ~member_id: {{careCircleMemberId}}
+  ~is_active: true
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.member && body.data.member.member_id) {
+    bru.setEnvVar("scheduleSelfMemberId", body.data.member.member_id);
+  }
+  if (body && body.success && body.data && body.data.medicines && body.data.medicines.length) {
+    bru.setEnvVar("scheduleMedicineId", body.data.medicines[0].medicine_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.member).to.be.an("object");
+    expect(body.data.medicines).to.be.an("array");
+    expect(body.data.total_medicines).to.be.a("number");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/medicines — list medicines for a member (defaults to SELF).
+}
+
+example {
+  name: 200 OK
+  description: Self member schedule list.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/medicines
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member": {
+              "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+              "name": "Priya Sharma",
+              "relationship": "SELF"
+            },
+            "medicines": [],
+            "total_medicines": 0
+          }
+        }
+      '''
+    }
+  }
+}

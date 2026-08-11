@@ -16,9 +16,9 @@
 |-------|-------|------|
 | Phase 1 | 46 | 46 |
 | Phase 2 | 34 | 34 |
-| Phase 3 | 32 | 27 |
+| Phase 3 | 32 | 32 |
 | Phase 4 | 17 | 0 |
-| **Total** | **129** | **101** |
+| **Total** | **129** | **106** |
 
 ---
 
@@ -236,11 +236,11 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-018 | [STORY-001](./EPIC-018-medicine-schedule/STORY-001-medicine-schedule-crud.md) | Medicine Schedule CRUD - Add, Manage & Remove Medicines | pending | — | — |
-| EPIC-018 | [STORY-002](./EPIC-018-medicine-schedule/STORY-002-care-circle-management.md) | Care Circle Management - Family Member Scheduling | pending | — | — |
-| EPIC-018 | [STORY-003](./EPIC-018-medicine-schedule/STORY-003-dose-reminder-engine.md) | Dose Reminder Engine - Push Notification Scheduling & Delivery | pending | — | — |
-| EPIC-018 | [STORY-004](./EPIC-018-medicine-schedule/STORY-004-adherence-tracking.md) | Adherence Tracking - Stats, Calendar, and Streaks | pending | — | — |
-| EPIC-018 | [STORY-005](./EPIC-018-medicine-schedule/STORY-005-refill-alerts.md) | Refill Alerts - Supply Tracking and Reorder | pending | — | — |
+| EPIC-018 | [STORY-001](./EPIC-018-medicine-schedule/STORY-001-medicine-schedule-crud.md) | Medicine Schedule CRUD - Add, Manage & Remove Medicines | done | 2026-08-11 | `domains/medicine-schedule`; V108 schedule_medicine; ReminderRecalcPort stub 7×slots until STORY-003; Bruno schedule/medicines |
+| EPIC-018 | [STORY-002](./EPIC-018-medicine-schedule/STORY-002-care-circle-management.md) | Care Circle Management - Family Member Scheduling | done | 2026-08-11 | `domains/medicine-schedule`; V107 care_circle_member; stubs MemberCascade/TodayAdherence/RefillAlert until 001/003/005; Bruno schedule/care-circle |
+| EPIC-018 | [STORY-003](./EPIC-018-medicine-schedule/STORY-003-dose-reminder-engine.md) | Dose Reminder Engine - Push Notification Scheduling & Delivery | done | 2026-08-11 | `domains/medicine-schedule`; V109 dose_log+reminder_schedule; ReminderRecalcService real; IST jobs 00:00/02:00+due dispatch; outbox dose_reminder; Bruno reminders+mark |
+| EPIC-018 | [STORY-004](./EPIC-018-medicine-schedule/STORY-004-adherence-tracking.md) | Adherence Tracking - Stats, Calendar, and Streaks | done | 2026-08-11 | `domains/medicine-schedule`; compute-on-read DoseLog; ×100 formula (story −100 typo); Bruno schedule/adherence |
+| EPIC-018 | [STORY-005](./EPIC-018-medicine-schedule/STORY-005-refill-alerts.md) | Refill Alerts - Supply Tracking and Reorder | done | 2026-08-11 | `domains/medicine-schedule`; V110 refill_log+share_token; 00:30 IST decrement; daily refill push outbox; public share permitAll; Bruno refill-alerts+share |
 
 ---
 

@@ -1,0 +1,145 @@
+meta {
+  name: mark
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/schedule/medicines/{{scheduleMedicineId}}/doses/{{scheduleDoseDate}}/{{scheduleDoseSlot}}/mark
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "status": "TAKEN"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("scheduleMedicineId")) {
+    throw new Error("scheduleMedicineId missing — run schedule/medicines/create first");
+  }
+  if (!bru.getEnvVar("scheduleDoseDate")) {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    bru.setEnvVar("scheduleDoseDate", `${yyyy}-${mm}-${dd}`);
+  }
+  if (!bru.getEnvVar("scheduleDoseSlot")) {
+    bru.setEnvVar("scheduleDoseSlot", "MORNING");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.dose_log_id) {
+    bru.setEnvVar("scheduleDoseLogId", body.data.dose_log_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("mark envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("TAKEN");
+    expect(body.data.dose_log_id).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/schedule/medicines/:id/doses/:date/:slot/mark — TAKEN|SKIPPED.
+  Errors: 400 DOSE_LOG_LOCKED, INVALID_STATUS; 404 DOSE_LOG_NOT_FOUND; 403 MEDICINE_ACCESS_DENIED
+}
+
+example {
+  name: 200 OK
+  description: Mark morning dose taken.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/medicines/b2c3d4e5-f6a7-4890-b123-456789abcdef/doses/2026-07-24/MORNING/mark
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "status": "TAKEN"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "dose_log_id": "c3d4e5f6-a7b8-4901-c234-56789abcdef0",
+            "medicine_name": "Metformin 500mg",
+            "date": "2026-07-24",
+            "slot": "MORNING",
+            "status": "TAKEN",
+            "taken_at": "2026-07-24T08:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 DOSE_LOG_LOCKED
+  description: Dose older than yesterday.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/medicines/b2c3d4e5-f6a7-4890-b123-456789abcdef/doses/2026-07-22/MORNING/mark
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "status": "TAKEN"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "DOSE_LOG_LOCKED",
+            "message": "Dose log is locked and can no longer be modified"
+          }
+        }
+      '''
+    }
+  }
+}
