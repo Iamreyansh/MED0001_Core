@@ -1,0 +1,108 @@
+meta {
+  name: kpis
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/overview?period=7D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.kpis) {
+    bru.setEnvVar("analyticsGmvPaise", String(body.data.kpis.gmv.value));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("overview KPI envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpis");
+    expect(body.data.kpis).to.have.property("gmv");
+    expect(body.data.kpis).to.have.property("take_rate_pct");
+    expect(body.data.kpis.gmv).to.have.property("wow_delta_pct");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/overview — KPI cards for period. EPIC-016/STORY-001.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/overview?period=7D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "7D",
+            "date_from": "2026-07-16T18:30:00Z",
+            "date_to": "2026-07-24T18:29:59Z",
+            "kpis": {
+              "gmv": { "value": 4820000, "unit": "paise", "wow_delta_pct": 12.4 },
+              "orders_count": { "value": 3841, "wow_delta_pct": 8.2 },
+              "aov": { "value": 1255, "unit": "paise", "wow_delta_pct": 3.9 },
+              "net_revenue": { "value": 4580000, "unit": "paise", "wow_delta_pct": 11.1 },
+              "net_margin_pct": { "value": 18.4, "wow_delta_pct": -0.6 },
+              "take_rate_pct": { "value": 14.2, "wow_delta_pct": 0.3 },
+              "active_customers": { "value": 2140, "wow_delta_pct": 5.8 },
+              "repeat_customer_pct": { "value": 38.5, "wow_delta_pct": 2.1 }
+            },
+            "generated_at": "2026-07-24T16:00:00Z",
+            "data_source": "LIVE"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 MISSING_DATE_RANGE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/overview?period=CUSTOM
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MISSING_DATE_RANGE",
+            "message": "CUSTOM period requires date_from and date_to"
+          }
+        }
+      '''
+    }
+  }
+}

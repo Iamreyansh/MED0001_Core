@@ -1,0 +1,102 @@
+meta {
+  name: favorite-toggle
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/pharmacy/analytics/reports/GSTR-1-DRAFT/favorite
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "is_favorite": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — owner JWT required");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("analyticsFavoriteReportId", body.data.report_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("favorite envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.is_favorite).to.equal(true);
+  });
+}
+
+docs {
+  PATCH /api/v1/pharmacy/analytics/reports/:report_id/favorite — owner only (staff → 403). EPIC-016/STORY-004.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/analytics/reports/GSTR-1-DRAFT/favorite
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "is_favorite": true
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": { "report_id": "GSTR-1-DRAFT", "is_favorite": true },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN staff
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/analytics/reports/GSTR-1-DRAFT/favorite
+    method: patch
+    headers: {
+      Authorization: Bearer {{staffAccessToken}}
+    }
+    body:json: {
+      {
+        "is_favorite": true
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "FORBIDDEN", "message": "Only pharmacy owner can toggle report favorites" }
+        }
+      '''
+    }
+  }
+}

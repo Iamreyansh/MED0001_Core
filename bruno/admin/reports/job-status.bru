@@ -1,0 +1,80 @@
+meta {
+  name: job-status
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/reports/jobs/{{adminReportJobId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminReportJobId")) {
+    throw new Error("adminReportJobId missing — run reports/generate first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("job envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("job_id");
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  GET /api/v1/admin/reports/jobs/:job_id — poll async job. EPIC-016/STORY-006.
+}
+
+example {
+  name: 200 OK completed
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "report_id": "GMV_COMMISSION_PAYOUTS",
+            "status": "COMPLETED",
+            "progress_pct": 100,
+            "row_count": 15420,
+            "file_size_kb": 2840,
+            "download_url": "https://s3.example/gmv.csv",
+            "expires_at": "2026-07-31T01:35:00Z",
+            "completed_at": "2026-07-24T01:34:58Z",
+            "error_message": null
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 JOB_NOT_FOUND
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "JOB_NOT_FOUND",
+            "message": "Job not found"
+          }
+        }
+      '''
+    }
+  }
+}

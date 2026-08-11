@@ -1,0 +1,111 @@
+meta {
+  name: acquisition
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/growth/acquisition?period=30D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("growthTotalNewUsers", String(body.data.total_new_users));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("acquisition envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("total_new_users");
+    expect(body.data).to.have.property("sources");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/growth/acquisition — acquisition source mix + CAC. EPIC-016/STORY-003.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/growth/acquisition?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "30D",
+            "total_new_users": 812,
+            "sources": [
+              {
+                "source": "ORGANIC",
+                "new_users": 412,
+                "pct": 50.7,
+                "orders": 680,
+                "gmv_paise": 842000,
+                "cac_rs": 0
+              },
+              {
+                "source": "REFERRAL",
+                "new_users": 198,
+                "pct": 24.4,
+                "orders": 312,
+                "gmv_paise": 384000,
+                "cac_rs": 42
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PERIOD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/growth/acquisition?period=TODAY
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PERIOD",
+            "message": "period not in allowed set"
+          }
+        }
+      '''
+    }
+  }
+}

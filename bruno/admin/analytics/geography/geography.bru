@@ -1,0 +1,110 @@
+meta {
+  name: geography
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/geography?period=7D&sort=gmv&order=desc
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.zones && body.data.zones.length) {
+    bru.setEnvVar("analyticsZoneId", body.data.zones[0].zone_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("geography envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("zones");
+    expect(body.data).to.have.property("total_zones");
+    expect(body.data).to.have.property("dark_zones_count");
+    expect(body.data.period).to.equal("7D");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/geography — zone GMV/orders/SLA; is_dark when riders_online=0.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/geography?period=7D&sort=gmv&order=desc
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "7D",
+            "zones": [
+              {
+                "zone_id": "a0000001-0000-4000-8000-000000000001",
+                "zone_name": "Indiranagar",
+                "gmv_paise": 980000,
+                "orders": 820,
+                "aov_paise": 1195,
+                "pharmacies_count": 8,
+                "riders_online": 12,
+                "sla_adherence_pct": 95.1,
+                "avg_delivery_minutes": 28.4,
+                "is_dark": false
+              }
+            ],
+            "total_zones": 1,
+            "dark_zones_count": 0
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PERIOD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/geography?period=90D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PERIOD",
+            "message": "period not in allowed set"
+          }
+        }
+      '''
+    }
+  }
+}

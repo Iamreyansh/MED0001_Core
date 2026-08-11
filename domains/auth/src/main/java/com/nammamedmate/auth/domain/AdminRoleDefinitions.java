@@ -142,6 +142,7 @@ public final class AdminRoleDefinitions {
               "finance:read",
               "crm:read",
               "crm:write",
+              "analytics:read",
               "orders:*",
               "riders:*",
               "logistics:*"),
@@ -262,6 +263,7 @@ public final class AdminRoleDefinitions {
     m.put("taxes:read", "View GST and tax reports");
     m.put("taxes:export", "Export tax reports as CSV/PDF for filing");
     m.put("analytics:finance", "Access finance-specific analytics dashboards and revenue reports");
+    m.put("analytics:read", "View platform overview and operations analytics dashboards");
     m.put("customers:read", "View customer profiles for financial investigation");
     m.put("wallet:credit", "Manually credit customer wallets for refunds or goodwill");
     m.put("tickets:read", "View support tickets");

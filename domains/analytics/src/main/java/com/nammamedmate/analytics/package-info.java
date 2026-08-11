@@ -1,2 +1,2 @@
-/** Domain module shell for analytics. Business logic lands via epic stories. */
+/** Domain module for EPIC-016 analytics and reporting. */
 package com.nammamedmate.analytics;

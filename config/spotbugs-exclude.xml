@@ -112,6 +112,11 @@
       <Class name="com.nammamedmate.notification.application.port.out.SesClientPort$SendRequest"/>
       <Class name="com.nammamedmate.notification.application.port.out.SesClientPort$Attachment"/>
       <Class name="com.nammamedmate.notification.application.port.out.AttachmentFetcherPort$FetchResult"/>
+      <Class name="com.nammamedmate.analytics.application.ReportLibraryService$GenerateResult"/>
+      <Class name="com.nammamedmate.analytics.application.ReportLibraryService$HistoryResult"/>
+      <Class name="com.nammamedmate.analytics.application.PharmacyAnalyticsService$PageResult"/>
+      <Class name="com.nammamedmate.analytics.adapter.in.web.AdminReportsController$GenerateRequest"/>
+      <Class name="com.nammamedmate.analytics.adapter.in.web.AdminReportsController$ScheduleRequest"/>
     </Or>
   </Match>
 </FindBugsFilter>

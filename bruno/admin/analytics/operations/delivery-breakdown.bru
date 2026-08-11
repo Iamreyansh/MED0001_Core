@@ -1,0 +1,114 @@
+meta {
+  name: delivery-breakdown
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/operations/delivery-breakdown?period=7D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.platform_aggregate) {
+    const total = body.data.platform_aggregate.total_minutes;
+    if (total) {
+      bru.setEnvVar("analyticsDeliveryP50", String(total.p50));
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("delivery breakdown has P50/P90 segments", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.platform_aggregate).to.have.property("pharmacy_prep_minutes");
+    expect(body.data.platform_aggregate.pharmacy_prep_minutes).to.have.property("p50");
+    expect(body.data.platform_aggregate.pharmacy_prep_minutes).to.have.property("p90");
+    expect(body.data).to.have.property("by_zone");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/operations/delivery-breakdown — P50/P90 via PERCENTILE_CONT.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/operations/delivery-breakdown?period=7D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "7D",
+            "platform_aggregate": {
+              "pharmacy_prep_minutes": { "p50": 7.5, "p90": 14.2 },
+              "rider_pickup_minutes": { "p50": 5.1, "p90": 10.8 },
+              "delivery_minutes": { "p50": 18.4, "p90": 31.6 },
+              "total_minutes": { "p50": 31.0, "p90": 56.6 }
+            },
+            "by_zone": [
+              {
+                "zone_id": "a0000001-0000-4000-8000-000000000001",
+                "zone_name": "Indiranagar",
+                "pharmacy_prep_minutes": { "p50": 6.8, "p90": 12.4 },
+                "rider_pickup_minutes": { "p50": 4.9, "p90": 9.8 },
+                "delivery_minutes": { "p50": 17.2, "p90": 28.9 },
+                "total_minutes": { "p50": 28.9, "p90": 51.1 },
+                "sla_adherence_pct": 95.1
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PERIOD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/operations/delivery-breakdown?period=BAD
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PERIOD",
+            "message": "period not in allowed set"
+          }
+        }
+      '''
+    }
+  }
+}

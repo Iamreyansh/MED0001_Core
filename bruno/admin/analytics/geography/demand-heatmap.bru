@@ -1,0 +1,105 @@
+meta {
+  name: demand-heatmap
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/geography/demand-heatmap?zone_id={{analyticsZoneId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.zones && body.data.zones.length) {
+    bru.setEnvVar("analyticsHeatmapZoneId", body.data.zones[0].zone_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("demand-heatmap envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.computed_over_days).to.equal(28);
+    expect(body.data).to.have.property("zones");
+    if (body.data.zones.length) {
+      expect(body.data.zones[0].hourly.length).to.equal(24);
+    }
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/geography/demand-heatmap — precomputed 28-day hourly averages (never live-scans orders).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/geography/demand-heatmap
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "computed_over_days": 28,
+            "zones": [
+              {
+                "zone_id": "a0000001-0000-4000-8000-000000000001",
+                "zone_name": "Indiranagar",
+                "hourly": [
+                  { "hour_of_day": 0, "avg_orders": 0.1, "peak_day": null },
+                  { "hour_of_day": 8, "avg_orders": 8.2, "peak_day": "MONDAY" }
+                ]
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ZONE_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/geography/demand-heatmap?zone_id=00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ZONE_NOT_FOUND",
+            "message": "zone_id does not exist"
+          }
+        }
+      '''
+    }
+  }
+}

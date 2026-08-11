@@ -1,0 +1,75 @@
+meta {
+  name: accounts-gst
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/analytics/accounts-gst?period=30D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.gst_liability) {
+    bru.setEnvVar("adminAnalyticsNetGst", String(body.data.gst_liability.net_payable_paise));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin pharmacy accounts-gst envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("pl_card");
+    expect(body.data.gst_liability.slab_breakdown).to.be.an("array");
+    expect(body.data.day_book).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{pharmacy_id}/analytics/accounts-gst — ops/super. EPIC-016/STORY-004.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/pharmacies/550e8400-e29b-41d4-a716-446655440000/analytics/accounts-gst?period=FY
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pl_card": {},
+            "gst_liability": {
+              "net_payable_paise": 0,
+              "slab_breakdown": []
+            },
+            "day_book": []
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

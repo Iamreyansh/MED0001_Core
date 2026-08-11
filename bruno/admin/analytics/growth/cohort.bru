@@ -1,0 +1,101 @@
+meta {
+  name: cohort
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/growth/cohort?cohort_count=12
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.last_computed_at) {
+    bru.setEnvVar("growthCohortLastComputedAt", String(body.data.last_computed_at));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cohort heatmap envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("weeks_header");
+    expect(body.data).to.have.property("cohorts");
+    expect(body.data).to.have.property("last_computed_at");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/growth/cohort — precomputed weekly retention heatmap. EPIC-016/STORY-003.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/growth/cohort?cohort_count=12
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "weeks_header": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            "cohorts": [
+              {
+                "cohort_week": "2026-W17",
+                "cohort_size": 284,
+                "retention_pcts": [100, 48.2, 38.4, 30.6, 27.8, 24.3, 22.1, 20.5, 19.8, 18.2, null, null, null]
+              }
+            ],
+            "last_computed_at": "2026-07-20T03:14:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 COHORT_COUNT_TOO_LARGE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/growth/cohort?cohort_count=27
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "COHORT_COUNT_TOO_LARGE",
+            "message": "cohort_count max is 26"
+          }
+        }
+      '''
+    }
+  }
+}

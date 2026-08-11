@@ -1,0 +1,76 @@
+meta {
+  name: overview
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/analytics/overview?period=30D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("adminPharmacyAnalyticsPeriod", body.data.period);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin pharmacy overview envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("financials");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{pharmacy_id}/analytics/overview — ops/super. EPIC-016/STORY-004.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/pharmacies/550e8400-e29b-41d4-a716-446655440000/analytics/overview?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "550e8400-e29b-41d4-a716-446655440000",
+            "period": "30D",
+            "financials": {
+              "net_revenue_paise": 2840000,
+              "gross_profit_paise": 682000,
+              "margin_pct": 24.0,
+              "units_sold": 4120,
+              "net_gst_paise": 142000
+            }
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

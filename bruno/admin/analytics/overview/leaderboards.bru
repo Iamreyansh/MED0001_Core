@@ -1,0 +1,117 @@
+meta {
+  name: leaderboards
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/overview/leaderboards?period=7D&top_n=10&export=csv
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.export_url) {
+    bru.setEnvVar("analyticsLeaderboardExportUrl", String(body.data.export_url));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("leaderboards envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("top_pharmacies");
+    expect(body.data).to.have.property("top_riders");
+    expect(body.data.export_url).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/overview/leaderboards — top pharmacies/riders; export=csv returns 1h URL. EPIC-016/STORY-001.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/overview/leaderboards?period=7D&top_n=10&export=csv
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "top_pharmacies": [
+              {
+                "rank": 1,
+                "pharmacy_id": "11111111-1111-4111-8111-111111111111",
+                "name": "Apollo Pharmacy - Indiranagar",
+                "area": "Indiranagar",
+                "rating": 4.8,
+                "orders": 412,
+                "gmv_paise": 620000,
+                "fill_rate_pct": 96.2
+              }
+            ],
+            "top_riders": [
+              {
+                "rank": 1,
+                "rider_id": "22222222-2222-4222-8222-222222222222",
+                "name": "Ramesh Kumar",
+                "zone": "Indiranagar",
+                "trips": 184,
+                "on_time_pct": 97.8,
+                "rating": 4.9,
+                "earnings_paise": 28400
+              }
+            ],
+            "export_url": "file:///tmp/medmate-analytics-exports/exports-analytics-leaderboards.csv?ttl=3600"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 EXPORT_TOO_LARGE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/overview/leaderboards?period=7D&top_n=51&export=csv
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "EXPORT_TOO_LARGE",
+            "message": "top_n > 50 with export=csv"
+          }
+        }
+      '''
+    }
+  }
+}

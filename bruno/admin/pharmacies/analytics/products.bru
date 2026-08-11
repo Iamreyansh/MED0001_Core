@@ -1,0 +1,68 @@
+meta {
+  name: products
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/analytics/products?period=30D&sort=revenue&order=desc
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.products && body.data.products.length) {
+    bru.setEnvVar("adminAnalyticsProductId", body.data.products[0].product_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin pharmacy products envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.products).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{pharmacy_id}/analytics/products — ops/super. EPIC-016/STORY-004.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/pharmacies/550e8400-e29b-41d4-a716-446655440000/analytics/products?period=30D&dead_stock_only=true
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "products": []
+          },
+          "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}

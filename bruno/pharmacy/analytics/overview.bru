@@ -1,0 +1,106 @@
+meta {
+  name: overview
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/analytics/overview?period=30D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/pharmacy/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("pharmacyAnalyticsPeriod", body.data.period);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("overview envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("financials");
+    expect(body.data).to.have.property("channel_mix");
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/analytics/overview — Growth+ plan. EPIC-016/STORY-004.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/analytics/overview?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "pharmacy_id": "550e8400-e29b-41d4-a716-446655440000",
+            "period": "30D",
+            "date_from": "2026-06-24",
+            "date_to": "2026-07-24",
+            "financials": {
+              "net_revenue_paise": 2840000,
+              "gross_profit_paise": 682000,
+              "margin_pct": 24.0,
+              "units_sold": 4120,
+              "net_gst_paise": 142000
+            },
+            "top_items": [],
+            "channel_mix": { "online_pct": 68.4, "counter_pct": 31.6 },
+            "payment_mix": [{ "method": "UPI", "pct": 54.2 }]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 PLAN_UPGRADE_REQUIRED
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/analytics/overview?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PLAN_UPGRADE_REQUIRED",
+            "message": "Pharmacy analytics requires Growth plan or higher",
+            "details": { "upgrade_url": "/pharmacy/subscription/plans" }
+          }
+        }
+      '''
+    }
+  }
+}

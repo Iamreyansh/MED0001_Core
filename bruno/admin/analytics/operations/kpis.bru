@@ -1,0 +1,105 @@
+meta {
+  name: kpis
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/operations?period=TODAY
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.kpis && body.data.kpis.live_orders_now) {
+    bru.setEnvVar("analyticsLiveOrders", String(body.data.kpis.live_orders_now.value));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("operations KPI envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpis");
+    expect(body.data.kpis).to.have.property("sla_adherence_pct");
+    expect(body.data.kpis).to.have.property("fill_rate_pct");
+    expect(body.data.kpis).to.have.property("live_orders_now");
+    expect(body.data.kpis.live_orders_now).to.have.property("value");
+    expect(body.data.kpis.live_orders_now.refresh_seconds).to.equal(30);
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/operations — ops KPI cards. period=TODAY includes live_orders_now.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/operations?period=TODAY
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "TODAY",
+            "kpis": {
+              "sla_adherence_pct": { "value": 92.4, "wow_delta_pct": -1.2 },
+              "fill_rate_pct": { "value": 94.8, "wow_delta_pct": 0.5 },
+              "avg_prep_minutes": { "value": 8.2, "wow_delta_pct": -0.4 },
+              "avg_delivery_minutes": { "value": 34.6, "wow_delta_pct": 2.1 },
+              "cancel_rate_pct": { "value": 4.1, "wow_delta_pct": 0.3 },
+              "live_orders_now": { "value": 47, "unit": "orders", "refresh_seconds": 30 }
+            },
+            "generated_at": "2026-07-24T01:15:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ZONE_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/operations?period=TODAY&zone_id=00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ZONE_NOT_FOUND",
+            "message": "zone_id does not exist"
+          }
+        }
+      '''
+    }
+  }
+}

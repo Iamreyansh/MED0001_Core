@@ -1,0 +1,67 @@
+meta {
+  name: reports-catalogue
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pharmacy/analytics/reports-catalogue
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.reports && body.data.reports.length) {
+    bru.setEnvVar("analyticsReportId", body.data.reports[0].report_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("catalogue has 9 reports", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.reports).to.have.lengthOf(9);
+  });
+}
+
+docs {
+  GET /api/v1/pharmacy/analytics/reports-catalogue — EPIC-016/STORY-004.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/pharmacy/analytics/reports-catalogue
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "reports": [
+              { "report_id": "GSTR-1-DRAFT", "name": "GSTR-1 Draft", "group": "GST", "is_favorite": false }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

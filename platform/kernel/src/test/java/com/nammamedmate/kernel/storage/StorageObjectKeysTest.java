@@ -11,6 +11,7 @@ class StorageObjectKeysTest {
   void avatarAndExport_useTypedPrefixes() {
     assertThat(StorageObjectKeys.avatar("ramesh.png")).isEqualTo("avatars/ramesh.png");
     assertThat(StorageObjectKeys.export("customers-1.csv")).isEqualTo("exports/customers-1.csv");
+    assertThat(StorageObjectKeys.report("gmv.csv")).isEqualTo("reports/gmv.csv");
   }
 
   @Test

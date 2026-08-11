@@ -359,7 +359,7 @@ class RbacServicesTest {
     assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_compliance"))
         .contains("taxes:read", "taxes:export");
     assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_operations"))
-        .contains("pharmacies:suspend", "orders:dispatch", "orders:*");
+        .contains("pharmacies:suspend", "orders:dispatch", "orders:*", "analytics:read");
     assertThat(AdminRoleDefinitions.enforcementPermissionsFor("admin_support"))
         .contains("pharmacies:read", "finance:read");
     assertThat(AdminRoleDefinitions.liveExtras()).containsKey("admin_finance");
