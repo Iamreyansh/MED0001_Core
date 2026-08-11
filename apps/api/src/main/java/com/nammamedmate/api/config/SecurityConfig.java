@@ -248,6 +248,13 @@ public class SecurityConfig {
                     .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/admin/consults", "/api/v1/admin/consults/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    // EPIC-018 medicine schedule (public share before CUSTOMER catch-all)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/schedule/share/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/schedule/reminders/bulk-schedule")
+                    .permitAll()
+                    .requestMatchers("/api/v1/schedule/**")
+                    .hasRole("CUSTOMER")
                     // EPIC-015 STORY-001..005 support + knowledge base
                     .requestMatchers(HttpMethod.GET, "/api/v1/support/help")
                     .permitAll()

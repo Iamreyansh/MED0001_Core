@@ -1,0 +1,98 @@
+meta {
+  name: summary
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/care-circle/{{careCircleMemberId}}/summary
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  const memberId = bru.getEnvVar("careCircleMemberId") || bru.getEnvVar("careCircleSelfMemberId");
+  if (!memberId) {
+    throw new Error("careCircleMemberId missing — run schedule/care-circle/list or create first");
+  }
+  bru.setVar("summaryMemberId", memberId);
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.member).to.be.an("object");
+    expect(body.data.today).to.be.an("object");
+    expect(body.data).to.have.property("this_week_adherence_pct");
+    expect(body.data.refill_alerts).to.be.an("array");
+    expect(body.data.medicines).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/care-circle/:member_id/summary — member schedule summary.
+  refill_alerts / medicines stub empty until STORY-001/005.
+}
+
+example {
+  name: 200 OK
+  description: Summary structure (adherence/refills stubbed until later stories).
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle/{{careCircleMemberId}}/summary
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member": {
+              "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+              "name": "Rajesh Sharma",
+              "age": 68,
+              "relationship": "PARENT",
+              "avatar_emoji": "👴"
+            },
+            "today": {
+              "total_doses": 0,
+              "taken": 0,
+              "skipped": 0,
+              "missed": 0,
+              "upcoming": 0,
+              "adherence_pct": null
+            },
+            "this_week_adherence_pct": null,
+            "refill_alerts": [],
+            "medicines": []
+          }
+        }
+      '''
+    }
+  }
+}

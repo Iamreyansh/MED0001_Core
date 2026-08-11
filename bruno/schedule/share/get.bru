@@ -1,0 +1,111 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/share/{{scheduleShareToken}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("scheduleShareToken")) {
+    throw new Error("scheduleShareToken missing — run schedule/refill-alerts/share first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("public share envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.medicines).to.be.an("array");
+    expect(body.data).to.have.property("member_name");
+    expect(body.data).to.have.property("share_expires_at");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/share/:token — public read-only schedule (no auth).
+  Errors: 404 SHARE_LINK_NOT_FOUND; 410 SHARE_LINK_EXPIRED
+}
+
+example {
+  name: 200 OK
+  description: Shared schedule without adherence.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/share/abc123XYZ012345678901234567890
+    method: get
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member_name": "Priya Sharma",
+            "share_expires_at": "2026-08-23T07:00:00Z",
+            "medicines": [
+              {
+                "medicine_name": "Metformin 500mg",
+                "dose": "1 tablet",
+                "form": "TABLET",
+                "food_instruction": "AFTER",
+                "dose_slots": [
+                  { "slot": "MORNING", "time": "08:00 AM" },
+                  { "slot": "NIGHT", "time": "09:00 PM" }
+                ],
+                "condition_name": "Type 2 Diabetes",
+                "prescribed_by": "Dr. Anil Sharma"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 410 SHARE_LINK_EXPIRED
+  description: Token past expires_at.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/share/expiredToken
+    method: get
+  }
+
+  response: {
+    status: {
+      code: 410
+      text: Gone
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "SHARE_LINK_EXPIRED",
+            "message": "Share link has expired"
+          }
+        }
+      '''
+    }
+  }
+}

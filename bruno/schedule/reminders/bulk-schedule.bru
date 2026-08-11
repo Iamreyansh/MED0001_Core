@@ -1,0 +1,137 @@
+meta {
+  name: bulk-schedule
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/schedule/reminders/bulk-schedule
+  body: json
+  auth: none
+}
+
+headers {
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "customer_id": "{{scheduleCustomerId}}",
+    "days_ahead": 7
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("internalServiceToken")) {
+    throw new Error("internalServiceToken missing — set in Bruno env (medmate.internal.service-token)");
+  }
+  if (!bru.getEnvVar("scheduleCustomerId") && bru.getEnvVar("customerId")) {
+    bru.setEnvVar("scheduleCustomerId", bru.getEnvVar("customerId"));
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("scheduleRemindersCreated", String(body.data.reminders_created));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("bulk-schedule envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.customer_id).to.be.a("string");
+    expect(body.data.reminders_created).to.be.a("number");
+    expect(body.data.scheduled_through).to.be.a("string");
+  });
+}
+
+docs {
+  POST /api/v1/schedule/reminders/bulk-schedule — internal rolling-window schedule (X-Internal-Token).
+  Errors: 401 UNAUTHORIZED; 400 VALIDATION_ERROR
+}
+
+example {
+  name: 200 OK
+  description: Bulk schedule for customer with active medicines.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/reminders/bulk-schedule
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "customer_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+        "days_ahead": 7
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "customer_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+            "reminders_created": 28,
+            "reminders_cancelled": 0,
+            "scheduled_through": "2026-07-30",
+            "processed_at": "2026-07-24T00:05:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  description: Missing or invalid internal token.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/reminders/bulk-schedule
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: bad
+    }
+    body:json: {
+      {
+        "customer_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Invalid or missing X-Internal-Token"
+          }
+        }
+      '''
+    }
+  }
+}

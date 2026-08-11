@@ -1,0 +1,136 @@
+meta {
+  name: update
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/schedule/care-circle/{{careCircleMemberId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "Rajesh Sharma",
+    "age": 69
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+  if (!bru.getEnvVar("careCircleMemberId")) {
+    throw new Error("careCircleMemberId missing — run schedule/care-circle/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.member_id) {
+    bru.setEnvVar("careCircleMemberId", body.data.member_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("update envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.member_id).to.be.a("string").that.is.not.empty;
+    expect(body.data.age).to.equal(69);
+    expect(body.data.updated_at).to.be.a("string");
+  });
+}
+
+docs {
+  PATCH /api/v1/schedule/care-circle/:member_id — update member details.
+  Errors: 403 MEMBER_ACCESS_DENIED, 404 MEMBER_NOT_FOUND
+}
+
+example {
+  name: 200 OK
+  description: Member age updated.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle/{{careCircleMemberId}}
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "name": "Rajesh Sharma",
+        "age": 69
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+            "name": "Rajesh Sharma",
+            "age": 69,
+            "updated_at": "2026-07-24T08:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 MEMBER_ACCESS_DENIED
+  description: Member belongs to another customer.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle/{{careCircleMemberId}}
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "age": 70
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+      text: Forbidden
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MEMBER_ACCESS_DENIED",
+            "message": "Member does not belong to this customer"
+          }
+        }
+      '''
+    }
+  }
+}

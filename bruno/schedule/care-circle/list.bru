@@ -1,0 +1,106 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/care-circle
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (!(body && body.success && body.data && Array.isArray(body.data.members))) {
+    return;
+  }
+  const self = body.data.members.find((m) => m.is_self);
+  if (self && self.member_id) {
+    bru.setEnvVar("careCircleSelfMemberId", self.member_id);
+  }
+  const other = body.data.members.find((m) => !m.is_self);
+  if (other && other.member_id) {
+    bru.setEnvVar("careCircleMemberId", other.member_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("list envelope with today_adherence_pct", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.members).to.be.an("array");
+    expect(body.data.total_members).to.be.a("number");
+    expect(body.data.can_add_more).to.be.a("boolean");
+    if (body.data.members.length > 0) {
+      expect(body.data.members[0]).to.have.property("today_adherence_pct");
+      expect(body.data.members[0]).to.have.property("member_id");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/schedule/care-circle — list care circle members (ensures SELF exists).
+}
+
+example {
+  name: 200 OK
+  description: Family dashboard list with adherence fields.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "members": [
+              {
+                "member_id": "8f14e45f-ceea-467a-9571-d2a0f3c8b9d1",
+                "name": "Priya Sharma",
+                "age": 0,
+                "relationship": "SELF",
+                "avatar_emoji": "👤",
+                "avatar_color": "#6B7280",
+                "is_self": true,
+                "medicines_count": 0,
+                "today_doses_total": 0,
+                "today_doses_taken": 0,
+                "today_adherence_pct": null,
+                "refill_alerts_count": 0
+              }
+            ],
+            "total_members": 1,
+            "can_add_more": true
+          }
+        }
+      '''
+    }
+  }
+}

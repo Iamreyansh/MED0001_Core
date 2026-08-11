@@ -1,0 +1,186 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/schedule/care-circle
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "Rajesh Sharma",
+    "age": 68,
+    "relationship": "PARENT",
+    "avatar_emoji": "👴",
+    "avatar_color": "#10B981"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.member_id) {
+    bru.setEnvVar("careCircleMemberId", body.data.member_id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("create envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.member_id).to.be.a("string").that.is.not.empty;
+    expect(body.data.relationship).to.equal("PARENT");
+    expect(body.data.is_self).to.equal(false);
+  });
+}
+
+docs {
+  POST /api/v1/schedule/care-circle — add family member (max 10 including SELF).
+  Errors: 400 CARE_CIRCLE_LIMIT_REACHED, INVALID_AGE, INVALID_AVATAR_COLOR
+}
+
+example {
+  name: 201 Created
+  description: Family member added.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "name": "Rajesh Sharma",
+        "age": 68,
+        "relationship": "PARENT",
+        "avatar_emoji": "👴",
+        "avatar_color": "#10B981"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 201
+      text: Created
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+            "name": "Rajesh Sharma",
+            "age": 68,
+            "relationship": "PARENT",
+            "avatar_emoji": "👴",
+            "avatar_color": "#10B981",
+            "is_self": false,
+            "created_at": "2026-07-24T07:00:00Z"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 CARE_CIRCLE_LIMIT_REACHED
+  description: Already has 10 members including SELF.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "name": "Overflow",
+        "age": 20,
+        "relationship": "OTHER"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "CARE_CIRCLE_LIMIT_REACHED",
+            "message": "Care circle already has the maximum of 10 members"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_AVATAR_COLOR
+  description: avatar_color is not a hex code.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/care-circle
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "name": "Rajesh Sharma",
+        "age": 68,
+        "relationship": "PARENT",
+        "avatar_color": "not_a_color"
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_AVATAR_COLOR",
+            "message": "avatar_color must be a hex color (#RRGGBB)"
+          }
+        }
+      '''
+    }
+  }
+}

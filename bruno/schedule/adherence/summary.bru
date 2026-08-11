@@ -1,0 +1,122 @@
+meta {
+  name: summary
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/adherence?member_id={{scheduleSelfMemberId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.member) {
+    bru.setEnvVar("scheduleSelfMemberId", body.data.member.member_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("summary envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.member).to.be.an("object");
+    expect(body.data).to.have.property("this_week_pct");
+    expect(body.data).to.have.property("current_streak_days");
+    expect(body.data).to.have.property("monthly_adherence");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/adherence — adherence summary (streaks, all-time %, monthly).
+}
+
+example {
+  name: 200 OK
+  description: Summary for self member.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/adherence
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "member": {
+              "member_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+              "name": "Priya Sharma"
+            },
+            "this_week_pct": 88.5,
+            "current_streak_days": 5,
+            "longest_streak_days": 14,
+            "total_days_tracked": 92,
+            "all_time_pct": 84.2,
+            "monthly_adherence": [
+              { "month": "2026-07", "pct": 88.5, "days_tracked": 24 },
+              { "month": "2026-06", "pct": 82.1, "days_tracked": 30 }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 MEMBER_ACCESS_DENIED
+  description: Member belongs to another customer.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/adherence?member_id=b2c3d4e5-f6a7-4890-b123-456789abcdef
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+      text: Forbidden
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MEMBER_ACCESS_DENIED",
+            "message": "Member does not belong to this customer"
+          }
+        }
+      '''
+    }
+  }
+}

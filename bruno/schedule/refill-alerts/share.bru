@@ -1,0 +1,118 @@
+meta {
+  name: share
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/schedule/refill-alerts/share
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  ~member_id: {{scheduleSelfMemberId}}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/customer/verify-otp first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.token) {
+    bru.setEnvVar("scheduleShareToken", body.data.token);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("share link envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.token).to.be.a("string").with.lengthOf(32);
+    expect(body.data.share_link).to.include(body.data.token);
+    expect(body.data.expires_at).to.be.a("string");
+  });
+}
+
+docs {
+  GET /api/v1/schedule/refill-alerts/share — 30-day public schedule share token.
+  Errors: 403 MEMBER_ACCESS_DENIED
+}
+
+example {
+  name: 200 OK
+  description: Share link generated.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/refill-alerts/share
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "share_link": "https://app.medmate.in/schedule/share/abc123XYZ012345678901234567890",
+            "token": "abc123XYZ012345678901234567890",
+            "expires_at": "2026-08-23T07:00:00Z",
+            "member_name": "Priya Sharma",
+            "medicines_count": 3
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 MEMBER_ACCESS_DENIED
+  description: Member belongs to another customer.
+
+  request: {
+    url: {{baseUrl}}/api/v1/schedule/refill-alerts/share?member_id=00000000-0000-4000-8000-000000000099
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 403
+      text: Forbidden
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MEMBER_ACCESS_DENIED",
+            "message": "Member does not belong to this customer"
+          }
+        }
+      '''
+    }
+  }
+}
