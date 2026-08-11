@@ -1,0 +1,70 @@
+meta {
+  name: sales-register
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/analytics/sales-register?period=30D&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.sales && body.data.sales.length) {
+    bru.setEnvVar("adminAnalyticsSaleId", body.data.sales[0].sale_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin pharmacy sales-register envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.sales).to.be.an("array");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{pharmacy_id}/analytics/sales-register — ops/super. EPIC-016/STORY-004.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/pharmacies/550e8400-e29b-41d4-a716-446655440000/analytics/sales-register?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "sales": [],
+            "totals": { "total_sales": 0, "total_revenue_paise": 0, "total_gst_paise": 0 }
+          },
+          "meta": { "page": 1, "limit": 20, "total": 0, "has_next": false }
+        }
+      '''
+    }
+  }
+}

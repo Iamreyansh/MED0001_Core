@@ -1,0 +1,113 @@
+meta {
+  name: supply-gap
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/geography/supply-gap?period=7D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.summary) {
+    bru.setEnvVar("analyticsCriticalZones", String(body.data.summary.critical_zones));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("supply-gap envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("summary");
+    expect(body.data).to.have.property("zones");
+    expect(body.data.summary).to.have.property("critical_zones");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/geography/supply-gap — gap severity + ADD_RIDERS/ADD_PHARMACIES/EXPAND_ZONE.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/geography/supply-gap?period=7D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "7D",
+            "summary": {
+              "critical_zones": 1,
+              "high_zones": 0,
+              "moderate_zones": 0,
+              "low_zones": 1
+            },
+            "zones": [
+              {
+                "zone_id": "a0000002-0000-4000-8000-000000000002",
+                "zone_name": "Whitefield",
+                "demand_score": 8.4,
+                "supply_score": 2.1,
+                "gap_pct": 75.0,
+                "gap_severity": "CRITICAL",
+                "pharmacy_coverage_pct": 88.0,
+                "suggestion": "ADD_RIDERS",
+                "current_riders_avg": 1.2,
+                "current_pharmacies": 3
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PERIOD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/geography/supply-gap?period=TODAY
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PERIOD",
+            "message": "period not in allowed set"
+          }
+        }
+      '''
+    }
+  }
+}

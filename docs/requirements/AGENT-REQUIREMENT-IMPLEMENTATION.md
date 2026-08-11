@@ -17,8 +17,8 @@
 | Phase 1 | 46 | 46 |
 | Phase 2 | 34 | 34 |
 | Phase 3 | 32 | 32 |
-| Phase 4 | 17 | 0 |
-| **Total** | **129** | **106** |
+| Phase 4 | 17 | 6 |
+| **Total** | **129** | **112** |
 
 ---
 
@@ -251,12 +251,12 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-016 | [STORY-001](./EPIC-016-analytics-reporting/STORY-001-platform-overview-analytics.md) | Platform Overview Analytics | pending | — | — |
-| EPIC-016 | [STORY-002](./EPIC-016-analytics-reporting/STORY-002-operations-sla-analytics.md) | Operations & SLA Analytics | pending | — | — |
-| EPIC-016 | [STORY-003](./EPIC-016-analytics-reporting/STORY-003-growth-cohort-analytics.md) | Growth & Cohort Analytics | pending | — | — |
-| EPIC-016 | [STORY-004](./EPIC-016-analytics-reporting/STORY-004-pharmacy-analytics.md) | Pharmacy Analytics | pending | — | — |
-| EPIC-016 | [STORY-005](./EPIC-016-analytics-reporting/STORY-005-geography-analytics.md) | Geography Analytics | pending | — | — |
-| EPIC-016 | [STORY-006](./EPIC-016-analytics-reporting/STORY-006-report-library.md) | Report Library | pending | — | — |
+| EPIC-016 | [STORY-001](./EPIC-016-analytics-reporting/STORY-001-platform-overview-analytics.md) | Platform Overview Analytics | done | 2026-08-12 | `domains/analytics`; V111 snapshots+mix; ×100 pct math; ops/super only (`analytics:read`); LocalAnalyticsExportStore stub; Bruno `admin/analytics/overview/` |
+| EPIC-016 | [STORY-002](./EPIC-016-analytics-reporting/STORY-002-operations-sla-analytics.md) | Operations & SLA Analytics | done | 2026-08-12 | `domains/analytics`; V112 ops+cancel; 15m IST 06–23; status map PENDING_ACCEPTANCE/READY_FOR_PICKUP; Bruno `admin/analytics/operations/` |
+| EPIC-016 | [STORY-003](./EPIC-016-analytics-reporting/STORY-003-growth-cohort-analytics.md) | Growth & Cohort Analytics | done | 2026-08-12 | `domains/analytics`; V113 cohort+acquisition+spend; StubAcquisitionSourcePort ORGANIC; Sunday 03:00 IST cohort job; Bruno `admin/analytics/growth/` |
+| EPIC-016 | [STORY-004](./EPIC-016-analytics-reporting/STORY-004-pharmacy-analytics.md) | Pharmacy Analytics | done | 2026-08-12 | `domains/analytics`; V114 daily+favorites+dead_stock_flag; AnalyticsPlanBridgeConfig; admin path mirror; PATCH favorite for AC-008; Bruno pharmacy+admin analytics |
+| EPIC-016 | [STORY-005](./EPIC-016-analytics-reporting/STORY-005-geography-analytics.md) | Geography Analytics | done | 2026-08-12 | `domains/analytics`; V115 zone daily+hourly; dark outbox `analytics.zone.dark`; nightly heatmap; Bruno `admin/analytics/geography/` |
+| EPIC-016 | [STORY-006](./EPIC-016-analytics-reporting/STORY-006-report-library.md) | Report Library | done | 2026-08-12 | `domains/analytics`; V116 +14 seeds; category RBAC on jobStatus; support strips COMPLIANCE downloads; in-process poller+06:00 IST; Bruno `admin/reports/` |
 
 ### EPIC-019 (`EPIC-019-automation-rules-engine`)
 

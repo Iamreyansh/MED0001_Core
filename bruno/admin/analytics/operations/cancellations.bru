@@ -1,0 +1,127 @@
+meta {
+  name: cancellations
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/operations/cancellations?period=7D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.summary) {
+    bru.setEnvVar("analyticsCancelTotal", String(body.data.summary.total_cancellations));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("cancellations envelope with actors", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("summary");
+    expect(body.data).to.have.property("by_stage");
+    expect(body.data).to.have.property("by_reason");
+    expect(body.data.by_stage).to.have.property("pre_accept");
+    expect(body.data.by_stage).to.have.property("post_accept");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/operations/cancellations — reasons by customer/pharmacy/system.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/operations/cancellations?period=7D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "7D",
+            "summary": {
+              "total_cancellations": 421,
+              "cancel_rate_pct": 4.1
+            },
+            "by_stage": {
+              "pre_accept": { "count": 198, "pct": 47.0 },
+              "post_accept": { "count": 223, "pct": 53.0 }
+            },
+            "by_reason": [
+              { "reason": "out_of_stock", "actor": "pharmacy", "count": 142, "pct": 33.7 },
+              { "reason": "changed_mind", "actor": "customer", "count": 112, "pct": 26.6 },
+              { "reason": "no_rider_available", "actor": "system", "count": 78, "pct": 18.5 },
+              { "reason": "wrong_address", "actor": "customer", "count": 45, "pct": 10.7 },
+              { "reason": "payment_failed", "actor": "system", "count": 28, "pct": 6.6 },
+              { "reason": "closing_soon", "actor": "pharmacy", "count": 16, "pct": 3.9 }
+            ],
+            "top_pharmacies_by_cancellation": [
+              {
+                "pharmacy_id": "b0000005-0000-4000-8000-000000000005",
+                "name": "Medplus - HSR Layout",
+                "cancellations": 38,
+                "cancel_rate_pct": 12.4
+              }
+            ],
+            "by_zone": [
+              {
+                "zone_id": "a0000003-0000-4000-8000-000000000003",
+                "zone_name": "Whitefield",
+                "cancellations": 89,
+                "cancel_rate_pct": 7.8
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/operations/cancellations?period=7D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Operations analytics access required"
+          }
+        }
+      '''
+    }
+  }
+}

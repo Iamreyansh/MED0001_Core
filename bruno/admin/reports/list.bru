@@ -1,0 +1,96 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/reports
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.reports && body.data.reports.length) {
+    bru.setEnvVar("adminReportId", body.data.reports[0].report_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reports envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("reports");
+  });
+}
+
+docs {
+  GET /api/v1/admin/reports — list report library. EPIC-016/STORY-006.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/reports
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "reports": [
+              {
+                "report_id": "GMV_COMMISSION_PAYOUTS",
+                "name": "GMV, Commission & Payouts Summary",
+                "category": "FINANCE",
+                "description": "Platform-wide GMV, commission earned, and rider/pharmacy payouts for the period.",
+                "cadence": "MONTHLY",
+                "format": "CSV",
+                "last_run_at": null,
+                "next_run_at": null,
+                "is_scheduled_enabled": false
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Role cannot access this report category"
+          }
+        }
+      '''
+    }
+  }
+}

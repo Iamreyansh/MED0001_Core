@@ -1,0 +1,102 @@
+meta {
+  name: fulfilment-funnel
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/operations/fulfilment-funnel?period=7D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.funnel) && body.data.funnel.length) {
+    bru.setEnvVar("analyticsFunnelPlaced", String(body.data.funnel[0].count));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("funnel has 5 stages; placed drop_off null", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.funnel).to.have.lengthOf(5);
+    expect(body.data.funnel[0].stage).to.equal("orders_placed");
+    expect(body.data.funnel[0].drop_off_pct).to.equal(null);
+    expect(body.data.funnel[4].stage).to.equal("delivered");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/operations/fulfilment-funnel — five-stage funnel.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/operations/fulfilment-funnel?period=7D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "7D",
+            "funnel": [
+              { "stage": "orders_placed", "count": 3841, "drop_off_pct": null },
+              { "stage": "accepted", "count": 3726, "drop_off_pct": 3.0 },
+              { "stage": "packed", "count": 3534, "drop_off_pct": 5.2 },
+              { "stage": "out_for_delivery", "count": 3498, "drop_off_pct": 1.0 },
+              { "stage": "delivered", "count": 3420, "drop_off_pct": 2.2 }
+            ],
+            "overall_completion_rate_pct": 89.0
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PERIOD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/operations/fulfilment-funnel?period=BAD
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PERIOD",
+            "message": "period not in allowed set"
+          }
+        }
+      '''
+    }
+  }
+}

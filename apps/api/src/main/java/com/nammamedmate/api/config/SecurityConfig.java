@@ -128,6 +128,14 @@ public class SecurityConfig {
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/inventory", "/api/v1/pharmacy/inventory/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    // EPIC-016 STORY-004 pharmacy analytics (Growth+ gated in service)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/analytics/accounts-gst")
+                    .hasRole("PHARMACY_OWNER")
+                    .requestMatchers(
+                        HttpMethod.PATCH, "/api/v1/pharmacy/analytics/reports/*/favorite")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/pharmacy/analytics", "/api/v1/pharmacy/analytics/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/pos", "/api/v1/pharmacy/pos/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/offers")
@@ -387,6 +395,26 @@ public class SecurityConfig {
                     .requestMatchers(
                         "/api/v1/admin/crm/analytics", "/api/v1/admin/crm/analytics/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_FINANCE")
+                    // EPIC-016 STORY-006 report library
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/reports/history")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_FINANCE",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_COMPLIANCE",
+                        "ADMIN_SUPPORT")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/reports/jobs/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER",
+                        "ADMIN_FINANCE",
+                        "ADMIN_OPERATIONS",
+                        "ADMIN_COMPLIANCE",
+                        "ADMIN_SUPPORT")
+                    .requestMatchers("/api/v1/admin/reports", "/api/v1/admin/reports/**")
+                    .hasAnyRole(
+                        "ADMIN_SUPER", "ADMIN_FINANCE", "ADMIN_OPERATIONS", "ADMIN_COMPLIANCE")
+                    .requestMatchers("/api/v1/admin/analytics", "/api/v1/admin/analytics/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers("/api/v1/admin/crm", "/api/v1/admin/crm/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
                     // EPIC-013 STORY-004 customer segments
@@ -589,6 +617,12 @@ public class SecurityConfig {
                         "ADMIN_FINANCE",
                         "ADMIN_SUPPORT",
                         "ADMIN_COMPLIANCE")
+                    // EPIC-016 STORY-004 admin pharmacy analytics impersonation (before
+                    // pharmacies/**)
+                    .requestMatchers(
+                        "/api/v1/admin/pharmacies/*/analytics",
+                        "/api/v1/admin/pharmacies/*/analytics/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers("/api/v1/admin/pharmacies/**")
                     .hasAnyRole(
                         "ADMIN_SUPER",

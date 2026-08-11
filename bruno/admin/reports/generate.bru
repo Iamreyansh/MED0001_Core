@@ -1,0 +1,111 @@
+meta {
+  name: generate
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/reports/{{adminReportId}}/generate
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "period_from": "2026-07-01",
+    "period_to": "2026-07-31",
+    "filters": {},
+    "format": "CSV",
+    "async": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("adminReportId")) {
+    bru.setEnvVar("adminReportId", "GMV_COMMISSION_PAYOUTS");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.job_id) {
+    bru.setEnvVar("adminReportJobId", body.data.job_id);
+  }
+}
+
+tests {
+  test("HTTP 200 or 202", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+  test("generate envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("report_id");
+    expect(body.data).to.have.property("status");
+  });
+}
+
+docs {
+  POST /api/v1/admin/reports/:report_id/generate — on-demand report. EPIC-016/STORY-006.
+}
+
+example {
+  name: 202 Accepted async
+  request: {
+    url: {{baseUrl}}/api/v1/admin/reports/GMV_COMMISSION_PAYOUTS/generate
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "period_from": "2026-07-01",
+        "period_to": "2026-07-31",
+        "filters": {},
+        "format": "CSV",
+        "async": true
+      }
+    }
+  }
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "job_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "report_id": "GMV_COMMISSION_PAYOUTS",
+            "status": "QUEUED",
+            "estimated_rows": 15420,
+            "queued_at": "2026-07-24T01:30:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 TOO_MANY_JOBS
+  response: {
+    status: { code: 429 text: Too Many Requests }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "TOO_MANY_JOBS",
+            "message": "More than 5 active jobs for this user"
+          }
+        }
+      '''
+    }
+  }
+}

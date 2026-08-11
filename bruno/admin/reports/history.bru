@@ -1,0 +1,73 @@
+meta {
+  name: history
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/reports/history?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("history envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("history");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/reports/history — generated report history. EPIC-016/STORY-006.
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "history": [
+              {
+                "job_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                "report_id": "GMV_COMMISSION_PAYOUTS",
+                "report_name": "GMV, Commission & Payouts Summary",
+                "category": "FINANCE",
+                "period_from": "2026-07-01",
+                "period_to": "2026-07-31",
+                "generated_at": "2026-07-24T01:34:58Z",
+                "generated_by": "SCHEDULER",
+                "row_count": 15420,
+                "size_kb": 2840,
+                "download_url": "https://s3.example/gmv.csv",
+                "expires_at": "2026-07-31T01:34:58Z",
+                "status": "COMPLETED"
+              }
+            ]
+          },
+          "meta": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "has_next": false
+          }
+        }
+      '''
+    }
+  }
+}

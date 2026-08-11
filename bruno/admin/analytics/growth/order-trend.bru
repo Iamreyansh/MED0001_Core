@@ -1,0 +1,101 @@
+meta {
+  name: order-trend
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/growth/order-trend?period=30D&granularity=DAILY
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.trend) && body.data.trend.length) {
+    bru.setEnvVar("growthTrendFirstDate", String(body.data.trend[0].date));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("order-trend envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("granularity");
+    expect(body.data).to.have.property("trend");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/growth/order-trend — daily/weekly new vs returning orders. EPIC-016/STORY-003.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/growth/order-trend?period=30D&granularity=DAILY
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "30D",
+            "granularity": "DAILY",
+            "trend": [
+              {
+                "date": "2026-06-24",
+                "total_orders": 118,
+                "new_customer_orders": 28,
+                "returning_customer_orders": 90
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_GRANULARITY
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/growth/order-trend?period=30D&granularity=MONTHLY
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_GRANULARITY",
+            "message": "granularity must be DAILY or WEEKLY"
+          }
+        }
+      '''
+    }
+  }
+}

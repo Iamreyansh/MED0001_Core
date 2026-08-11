@@ -1,0 +1,101 @@
+meta {
+  name: schedule
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/reports/{{adminReportId}}/schedule
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "enabled": true,
+    "cadence": "WEEKLY",
+    "email_recipients": ["finance@nammamedmate.in"],
+    "format": "CSV"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminReportId")) {
+    bru.setEnvVar("adminReportId", "GMV_COMMISSION_PAYOUTS");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("schedule envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("is_scheduled_enabled");
+    expect(body.data).to.have.property("next_run_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/reports/:report_id/schedule — enable/disable schedule. EPIC-016/STORY-006.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/reports/GMV_COMMISSION_PAYOUTS/schedule
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "enabled": true,
+        "cadence": "WEEKLY",
+        "email_recipients": ["finance@nammamedmate.in"],
+        "format": "CSV"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "report_id": "GMV_COMMISSION_PAYOUTS",
+            "is_scheduled_enabled": true,
+            "cadence": "WEEKLY",
+            "next_run_at": "2026-07-28T00:30:00Z",
+            "email_recipients": ["finance@nammamedmate.in"],
+            "updated_by": "11111111-1111-4111-8111-111111111111",
+            "updated_at": "2026-07-24T01:32:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 MISSING_RECIPIENTS
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MISSING_RECIPIENTS",
+            "message": "enabled=true requires email_recipients"
+          }
+        }
+      '''
+    }
+  }
+}

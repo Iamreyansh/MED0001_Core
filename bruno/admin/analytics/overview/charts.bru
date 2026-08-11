@@ -1,0 +1,111 @@
+meta {
+  name: charts
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/overview/charts?period=7D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.gmv_trend)) {
+    bru.setEnvVar("analyticsTrendDays", String(body.data.gmv_trend.length));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("charts envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("gmv_trend");
+    expect(body.data).to.have.property("category_mix");
+    expect(body.data).to.have.property("payment_mix");
+    expect(body.data).to.have.property("sales_by_zone");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/overview/charts — GMV trend, category/payment mix, zone sales. EPIC-016/STORY-001.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/overview/charts?period=7D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "gmv_trend": [
+              { "date": "2026-07-17", "gmv_paise": 612000 },
+              { "date": "2026-07-24", "gmv_paise": 814000 }
+            ],
+            "category_mix": [
+              { "category": "OTC_MEDICINES", "gmv_paise": 1920000, "pct": 39.8 }
+            ],
+            "payment_mix": [
+              { "method": "UPI", "orders": 1920, "pct": 50.0 }
+            ],
+            "sales_by_zone": [
+              {
+                "zone_id": "a0000001-0000-4000-8000-000000000001",
+                "zone_name": "Indiranagar",
+                "gmv_paise": 980000,
+                "orders": 820
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PERIOD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/overview/charts?period=YEAR
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PERIOD",
+            "message": "period not in allowed set"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -31,6 +31,10 @@ public final class StorageObjectKeys {
     return key(EXPORTS, objectName);
   }
 
+  public static String report(String objectName) {
+    return key(REPORTS, objectName);
+  }
+
   public static String key(String prefix, String objectName) {
     if (prefix == null || prefix.isBlank()) {
       throw new IllegalArgumentException("prefix required");

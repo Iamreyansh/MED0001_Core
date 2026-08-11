@@ -1,0 +1,74 @@
+meta {
+  name: report-run
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/pharmacies/{{pharmacyId}}/analytics/reports/{{adminAnalyticsReportId}}?period=30D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("pharmacyId")) {
+    throw new Error("pharmacyId missing");
+  }
+  if (!bru.getEnvVar("adminAnalyticsReportId")) {
+    bru.setEnvVar("adminAnalyticsReportId", "SALES-REGISTER");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.export_url) {
+    bru.setEnvVar("adminAnalyticsExportUrl", body.data.export_url);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin report envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("report_id");
+    expect(body.data).to.have.property("columns");
+  });
+}
+
+docs {
+  GET /api/v1/admin/pharmacies/{pharmacy_id}/analytics/reports/:report_id — ops/super. EPIC-016/STORY-004.
+}
+
+example {
+  name: 200 OK inline
+  request: {
+    url: {{baseUrl}}/api/v1/admin/pharmacies/550e8400-e29b-41d4-a716-446655440000/analytics/reports/SALES-REGISTER?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "report_id": "SALES-REGISTER",
+            "columns": [],
+            "rows": []
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

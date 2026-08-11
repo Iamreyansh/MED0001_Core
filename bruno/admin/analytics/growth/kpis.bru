@@ -1,0 +1,105 @@
+meta {
+  name: kpis
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/analytics/growth?period=30D
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.kpis && body.data.kpis.month1_retention_pct) {
+    bru.setEnvVar("growthMonth1CohortWeek", String(body.data.kpis.month1_retention_pct.cohort_week || ""));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("growth KPI envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kpis");
+    expect(body.data.kpis).to.have.property("active_customers");
+    expect(body.data.kpis).to.have.property("month1_retention_pct");
+    expect(body.data.kpis.month1_retention_pct).to.have.property("cohort_week");
+  });
+}
+
+docs {
+  GET /api/v1/admin/analytics/growth — growth KPI cards (7D/30D/90D/CUSTOM). EPIC-016/STORY-003.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/growth?period=30D
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "period": "30D",
+            "kpis": {
+              "active_customers": { "value": 4820, "wow_delta_pct": 6.4 },
+              "new_customers": { "value": 812, "wow_delta_pct": 12.1 },
+              "repeat_rate_pct": { "value": 41.2, "wow_delta_pct": 1.8 },
+              "month1_retention_pct": {
+                "value": 38.5,
+                "cohort_week": "2026-W24",
+                "wow_delta_pct": -2.3
+              }
+            },
+            "generated_at": "2026-07-24T01:20:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_PERIOD
+  request: {
+    url: {{baseUrl}}/api/v1/admin/analytics/growth?period=TODAY
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_PERIOD",
+            "message": "period not in allowed set"
+          }
+        }
+      '''
+    }
+  }
+}
