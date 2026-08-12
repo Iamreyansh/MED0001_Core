@@ -1,0 +1,125 @@
+meta {
+  name: patch
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/monitoring/incidents/{{monitoringIncidentId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "status": "INVESTIGATING",
+    "update_message": "Looking at payment gateway dashboards"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("monitoringIncidentId")) {
+    bru.setEnvVar("monitoringIncidentId", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("monitoringIncidentId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("status patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("previous_status");
+    expect(body.data).to.have.property("new_status");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/monitoring/incidents/{id} — EPIC-020/STORY-003 forward-only status.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/incidents/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "status": "INVESTIGATING",
+        "update_message": "Looking at payment gateway dashboards"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "incident_number": "INC-20260724-001",
+            "previous_status": "DETECTED",
+            "new_status": "INVESTIGATING",
+            "updated_by": "11111111-1111-4111-8111-111111111111",
+            "updated_at": "2026-07-24T10:05:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_STATUS_TRANSITION
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/incidents/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "status": "DETECTED",
+        "update_message": "backward"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_STATUS_TRANSITION",
+            "message": "Status can only move forward"
+          }
+        }
+      '''
+    }
+  }
+}

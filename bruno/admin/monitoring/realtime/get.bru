@@ -1,0 +1,99 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/monitoring/realtime
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("monitoringDataAgeSeconds", String(body.data.data_age_seconds));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("realtime envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("gmv_last_hour_paise");
+    expect(body.data).to.have.property("data_age_seconds");
+    expect(body.data).to.have.property("zone_coverage");
+  });
+}
+
+docs {
+  GET /api/v1/admin/monitoring/realtime — EPIC-020/STORY-001.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/realtime
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "gmv_last_hour_paise": 612000,
+            "orders_per_minute": 2.8,
+            "dispatch_success_rate_pct": 97.4,
+            "sla_adherence_pct": 92.8,
+            "payment_success_rate_pct": 98.9,
+            "zone_coverage": { "healthy": 9, "stretched": 2, "dark": 1 },
+            "active_automations": 8,
+            "pending_approvals": 3,
+            "as_of": "2026-07-24T10:00:00Z",
+            "data_age_seconds": 42
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/realtime
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "FORBIDDEN", "message": "Insufficient role" }
+        }
+      '''
+    }
+  }
+}

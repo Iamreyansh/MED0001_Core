@@ -17,8 +17,8 @@
 | Phase 1 | 46 | 46 |
 | Phase 2 | 34 | 34 |
 | Phase 3 | 32 | 32 |
-| Phase 4 | 17 | 14 |
-| **Total** | **129** | **120** |
+| Phase 4 | 17 | 17 |
+| **Total** | **129** | **129** |
 
 ---
 
@@ -275,6 +275,6 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-020 | [STORY-001](./EPIC-020-observability-self-healing/STORY-001-realtime-monitoring-alerting.md) | Real-Time Monitoring & Alerting | pending | — | — |
-| EPIC-020 | [STORY-002](./EPIC-020-observability-self-healing/STORY-002-auto-remediation.md) | Auto-Remediation | pending | — | — |
-| EPIC-020 | [STORY-003](./EPIC-020-observability-self-healing/STORY-003-slo-incident-management.md) | SLO & Incident Management | pending | — | — |
+| EPIC-020 | [STORY-001](./EPIC-020-observability-self-healing/STORY-001-realtime-monitoring-alerting.md) | Real-Time Monitoring & Alerting | done | 2026-08-12 | `domains/observability-ops`; V125 metric_samples+alerts+SLO seeds; Postgres 60s (not Timescale); ErrorBudget SRE formula; ids-only outbox critical_page; stubs for metrics/admins; Bruno admin/monitoring |
+| EPIC-020 | [STORY-002](./EPIC-020-observability-self-healing/STORY-002-auto-remediation.md) | Auto-Remediation | done | 2026-08-12 | `domains/observability-ops`; V126 playbooks+remediation_log; RemediationJob; stubs rider/pharmacy/payment/api; PATCH playbooks SUPER-only; Bruno remediation-*; AC-001..008 |
+| EPIC-020 | [STORY-003](./EPIC-020-observability-self-healing/STORY-003-slo-incident-management.md) | SLO & Incident Management | done | 2026-08-13 | `domains/observability-ops`; V127 monitoring_incidents + slo history incident_count; Redis INC# w/ in-mem fallback; auto-create/postmortem/SLO snapshot jobs; Bruno incidents+slo/history; AC-001..009 |

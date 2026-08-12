@@ -1,0 +1,81 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/monitoring/remediation-actions?page=1
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.remediation_actions && body.data.remediation_actions.length) {
+    bru.setEnvVar("remediationActionId", body.data.remediation_actions[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("remediation_actions envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("remediation_actions");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/monitoring/remediation-actions — EPIC-020/STORY-002.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/remediation-actions?page=1
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "remediation_actions": [
+              {
+                "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "alert_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "action_type": "REQUEST_RIDERS",
+                "trigger_type": "AUTO",
+                "target_entity_type": "ZONE",
+                "target_entity_id": "11111111-1111-4111-8111-111111111111",
+                "target_entity_name": "Whitefield",
+                "action_details": { "riders_notified": 8, "notifications_sent": 8 },
+                "status": "SUCCESS",
+                "triggered_at": "2026-07-24T09:52:00Z",
+                "completed_at": "2026-07-24T09:52:04Z",
+                "triggered_by": "SYSTEM"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

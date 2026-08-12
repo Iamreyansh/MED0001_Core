@@ -1,0 +1,130 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/monitoring/remediation-actions
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "action_type": "REQUEST_RIDERS",
+    "target_entity_type": "ZONE",
+    "target_entity_id": "{{zoneId}}",
+    "reason": "Manual rider request during peak hours"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("zoneId")) {
+    bru.setEnvVar("zoneId", "11111111-1111-4111-8111-111111111111");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.remediation_id) {
+    bru.setEnvVar("remediationActionId", body.data.remediation_id);
+  }
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("initiated envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("remediation_id");
+    expect(body.data.status).to.equal("INITIATED");
+  });
+}
+
+docs {
+  POST /api/v1/admin/monitoring/remediation-actions — EPIC-020/STORY-002 manual trigger.
+}
+
+example {
+  name: 202 Accepted
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/remediation-actions
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "action_type": "REQUEST_RIDERS",
+        "target_entity_type": "ZONE",
+        "target_entity_id": "11111111-1111-4111-8111-111111111111",
+        "reason": "Manual rider request during peak hours"
+      }
+    }
+  }
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "remediation_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "action_type": "REQUEST_RIDERS",
+            "target_entity_id": "11111111-1111-4111-8111-111111111111",
+            "status": "INITIATED",
+            "triggered_at": "2026-07-24T10:05:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 RATE_LIMITED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/remediation-actions
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "action_type": "REQUEST_RIDERS",
+        "target_entity_type": "ZONE",
+        "target_entity_id": "11111111-1111-4111-8111-111111111111",
+        "reason": "too soon"
+      }
+    }
+  }
+  response: {
+    status: { code: 429 text: Too Many Requests }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RATE_LIMITED",
+            "message": "Same action + entity triggered too recently"
+          }
+        }
+      '''
+    }
+  }
+}

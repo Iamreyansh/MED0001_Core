@@ -1,0 +1,14 @@
+package com.nammamedmate.observability_ops.domain;
+
+public enum AlertType {
+  GMV_DROP,
+  DISPATCH_FAILURE,
+  ZONE_DARK,
+  PAYOUT_SPIKE,
+  PAYMENT_FAILURE,
+  SLA_BREACH_RATE,
+  SLO_ERROR_BUDGET_EXHAUSTED,
+  LOW_FILL_RATE,
+  PAYMENT_JOB_FAILURE,
+  API_ERROR_RATE_HIGH
+}

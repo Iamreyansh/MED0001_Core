@@ -1,0 +1,103 @@
+meta {
+  name: history
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/monitoring/slo/history?slo_name=payment_success&period_from=2026-07-01&period_to=2026-07-31
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.history && body.data.history.length) {
+    bru.setEnvVar("monitoringSloName", body.data.history[0].slo_name);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("slo history envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("history");
+  });
+}
+
+docs {
+  GET /api/v1/admin/monitoring/slo/history — EPIC-020/STORY-003 compliance history.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/slo/history?slo_name=payment_success&period_from=2026-07-01&period_to=2026-07-31
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "history": [
+              {
+                "slo_name": "payment_success",
+                "period_from": "2026-07-01",
+                "period_to": "2026-07-31",
+                "target_pct": 99.0,
+                "actual_pct": 99.4,
+                "compliant": true,
+                "error_budget_consumed_pct": -40.0,
+                "incident_count": 1,
+                "recorded_at": "2026-08-01T00:05:00Z"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/slo/history
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Insufficient role"
+          }
+        }
+      '''
+    }
+  }
+}

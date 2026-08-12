@@ -1,0 +1,82 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/monitoring/incidents?page=1
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.incidents && body.data.incidents.length) {
+    bru.setEnvVar("monitoringIncidentId", body.data.incidents[0].id);
+    bru.setEnvVar("monitoringIncidentNumber", body.data.incidents[0].incident_number);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("incidents envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("incidents");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/monitoring/incidents — EPIC-020/STORY-003.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/incidents?page=1
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "incidents": [
+              {
+                "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "incident_number": "INC-20260724-001",
+                "title": "Payment gateway degraded",
+                "severity": "P1",
+                "status": "MITIGATING",
+                "detected_at": "2026-07-24T08:00:00Z",
+                "resolved_at": null,
+                "duration_minutes": 62,
+                "affected_services": ["PAYMENT_GATEWAY", "ORDER_MANAGEMENT"],
+                "impacted_gmv_rs": 42000.00,
+                "postmortem_filed": false,
+                "created_by": "SYSTEM"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}
