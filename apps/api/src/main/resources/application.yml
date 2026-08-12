@@ -205,6 +205,9 @@ medmate:
     seed:
       # AC-007: ApplicationRunner initializes seed rules on api boot (idempotent).
       initialize-on-startup: true
+  observability:
+    jobs:
+      enabled: true
 
   outbox:
     dispatch:

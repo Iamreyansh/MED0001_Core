@@ -1,0 +1,132 @@
+meta {
+  name: patch
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/monitoring/remediation-playbooks/{{remediationPlaybookId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "is_enabled": false,
+    "threshold": {
+      "dark_duration_minutes": 45
+    }
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("remediationPlaybookId")) {
+    bru.setEnvVar("remediationPlaybookId", "02000002-0001-4000-8000-000000000001");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.playbook_id) {
+    bru.setEnvVar("remediationPlaybookId", body.data.playbook_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("playbook patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("playbook_id");
+    expect(body.data).to.have.property("is_enabled");
+    expect(body.data).to.have.property("updated_by");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/monitoring/remediation-playbooks/:id — EPIC-020/STORY-002 (admin_super).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/remediation-playbooks/02000002-0001-4000-8000-000000000001
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "is_enabled": false,
+        "threshold": {
+          "dark_duration_minutes": 45
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "playbook_id": "02000002-0001-4000-8000-000000000001",
+            "is_enabled": false,
+            "threshold": {
+              "dark_duration_minutes": 45,
+              "max_notifications_per_rider": 3,
+              "notification_cooldown_hours": 2
+            },
+            "updated_by": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "updated_at": "2026-07-24T10:08:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/remediation-playbooks/02000002-0001-4000-8000-000000000001
+    method: patch
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "is_enabled": false
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "admin_super required"
+          }
+        }
+      '''
+    }
+  }
+}

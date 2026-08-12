@@ -418,6 +418,19 @@ public class SecurityConfig {
                         "ADMIN_SUPER", "ADMIN_FINANCE", "ADMIN_OPERATIONS", "ADMIN_COMPLIANCE")
                     .requestMatchers("/api/v1/admin/analytics", "/api/v1/admin/analytics/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    // EPIC-020 monitoring: support alerts list; finance metrics subset
+                    // (service-enforced)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/monitoring/alerts")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_SUPPORT")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/monitoring/metrics")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/monitoring/incidents")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_SUPPORT", "ADMIN_FINANCE")
+                    .requestMatchers(
+                        HttpMethod.PATCH, "/api/v1/admin/monitoring/remediation-playbooks/**")
+                    .hasRole("ADMIN_SUPER")
+                    .requestMatchers("/api/v1/admin/monitoring", "/api/v1/admin/monitoring/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     // EPIC-019 STORY-005 activity: finance read-only on financial action types
                     .requestMatchers(HttpMethod.GET, "/api/v1/admin/automation/activity/stats")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")

@@ -1,0 +1,79 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/monitoring/remediation-playbooks
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.playbooks && body.data.playbooks.length) {
+    bru.setEnvVar("remediationPlaybookId", body.data.playbooks[0].id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("playbooks envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("playbooks");
+  });
+}
+
+docs {
+  GET /api/v1/admin/monitoring/remediation-playbooks — EPIC-020/STORY-002.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/remediation-playbooks
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "playbooks": [
+              {
+                "id": "02000002-0001-4000-8000-000000000001",
+                "alert_type": "ZONE_DARK",
+                "auto_remediation_action": "REQUEST_RIDERS",
+                "description": "Send push notifications to offline riders in the dark zone to come online.",
+                "threshold": {
+                  "dark_duration_minutes": 30,
+                  "max_notifications_per_rider": 3,
+                  "notification_cooldown_hours": 2
+                },
+                "is_enabled": true,
+                "last_triggered_at": "2026-07-24T09:52:00Z"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

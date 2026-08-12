@@ -1,0 +1,96 @@
+meta {
+  name: postmortem
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/admin/monitoring/incidents/{{monitoringIncidentId}}/postmortem
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("monitoringIncidentId")) {
+    bru.setEnvVar("monitoringIncidentId", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("monitoringIncidentId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("postmortem envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.postmortem_filed).to.equal(true);
+  });
+}
+
+docs {
+  PUT /api/v1/admin/monitoring/incidents/{id}/postmortem — EPIC-020/STORY-003 mark filed.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/incidents/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/postmortem
+    method: put
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "incident_number": "INC-20260724-001",
+            "postmortem_filed": true
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 INCIDENT_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/incidents/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/postmortem
+    method: put
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INCIDENT_NOT_FOUND",
+            "message": "Incident not found"
+          }
+        }
+      '''
+    }
+  }
+}

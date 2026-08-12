@@ -1,2 +1,2 @@
-/** Domain module shell for observability-ops. Business logic lands via epic stories. */
+/** EPIC-020 Observability & Self-Healing — realtime monitoring & alerting. */
 package com.nammamedmate.observability_ops;

@@ -1,0 +1,99 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/monitoring/metrics?metric_name=sla_pct&period_minutes=60
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("monitoringMetricCurrent", String(body.data.current_value));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("metrics envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.metric_name).to.equal("sla_pct");
+    expect(body.data.data_points).to.be.an("array");
+  });
+}
+
+docs {
+  GET /api/v1/admin/monitoring/metrics — EPIC-020/STORY-001.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/metrics?metric_name=sla_pct&period_minutes=180
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "metric_name": "sla_pct",
+            "period_minutes": 180,
+            "data_points": [
+              { "timestamp": "2026-07-24T07:00:00Z", "value": 94.2 },
+              { "timestamp": "2026-07-24T07:01:00Z", "value": null }
+            ],
+            "current_value": 94.2,
+            "slo_target": 95.0
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_METRIC
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/metrics?metric_name=nope
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_METRIC",
+            "message": "metric_name not in supported set"
+          }
+        }
+      '''
+    }
+  }
+}

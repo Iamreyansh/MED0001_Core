@@ -1,0 +1,130 @@
+meta {
+  name: resolve
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/monitoring/incidents/{{monitoringIncidentId}}/resolve
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "root_cause": "Provider outage in ap-south-1",
+    "fix_applied": "Failed over to secondary PSP",
+    "prevention_steps": "Add multi-PSP health probe alert"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("monitoringIncidentId")) {
+    bru.setEnvVar("monitoringIncidentId", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("monitoringIncidentId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("resolve envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RESOLVED");
+    expect(body.data).to.have.property("duration_minutes");
+  });
+}
+
+docs {
+  POST /api/v1/admin/monitoring/incidents/{id}/resolve — EPIC-020/STORY-003.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/incidents/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/resolve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "root_cause": "Provider outage in ap-south-1",
+        "fix_applied": "Failed over to secondary PSP",
+        "prevention_steps": "Add multi-PSP health probe alert"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "incident_number": "INC-20260724-001",
+            "status": "RESOLVED",
+            "resolved_at": "2026-07-24T11:00:00Z",
+            "duration_minutes": 60,
+            "actual_impacted_gmv_rs": 42000.00,
+            "postmortem_required": true,
+            "postmortem_deadline": "2026-07-26T11:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 MISSING_REQUIRED_FIELDS
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/incidents/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/resolve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "root_cause": " ",
+        "fix_applied": "fix",
+        "prevention_steps": "prevent"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "MISSING_REQUIRED_FIELDS",
+            "message": "root_cause, fix_applied, prevention_steps required"
+          }
+        }
+      '''
+    }
+  }
+}

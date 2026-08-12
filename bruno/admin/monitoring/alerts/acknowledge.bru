@@ -1,0 +1,114 @@
+meta {
+  name: acknowledge
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/monitoring/alerts/{{monitoringAlertId}}/acknowledge
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "notes": "Investigating via Bruno collection"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("monitoringAlertId")) {
+    throw new Error("monitoringAlertId missing — run alerts/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("monitoringAlertAcked", String(body.data.acknowledged));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("acknowledge envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.acknowledged).to.equal(true);
+    expect(body.data).to.have.property("alert_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/monitoring/alerts/:id/acknowledge — EPIC-020/STORY-001.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/alerts/11111111-1111-4111-8111-111111111111/acknowledge
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "notes": "Investigating zone dark alert."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "alert_id": "11111111-1111-4111-8111-111111111111",
+            "acknowledged": true,
+            "acknowledged_by": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "acknowledged_at": "2026-07-24T10:02:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ALREADY_ACKNOWLEDGED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/monitoring/alerts/11111111-1111-4111-8111-111111111111/acknowledge
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "notes": "retry"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ALREADY_ACKNOWLEDGED",
+            "message": "Alert already acknowledged"
+          }
+        }
+      '''
+    }
+  }
+}
