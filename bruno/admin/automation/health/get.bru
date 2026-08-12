@@ -1,0 +1,83 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/health
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.kill_switch_status) {
+    bru.setEnvVar("automationKillSwitchStatus", body.data.kill_switch_status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("health envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("kill_switch_status");
+    expect(body.data).to.have.property("rules_active");
+    expect(body.data).to.have.property("manual_actions_saved_estimate");
+    expect(body.data).to.have.property("data_as_of");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/health — cached 60s dashboard. admin_super | admin_operations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/health
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rules_active": 8,
+            "rules_simulating": 1,
+            "rules_inactive": 3,
+            "actions_today": 284,
+            "actions_this_week": 1842,
+            "manual_actions_saved_estimate": 18420,
+            "exceptions_raised_today": 2,
+            "pending_approvals": 3,
+            "kill_switch_status": "ACTIVE",
+            "last_kill_switch_change": {
+              "action": "RESUME",
+              "changed_by": "admin@nammamedmate.in",
+              "changed_at": "2026-07-20T14:00:00Z",
+              "reason": "Incident resolved. Resuming automation."
+            },
+            "data_as_of": "2026-07-24T09:50:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,157 @@
+meta {
+  name: create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/workflows
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "PHARMACY_ONBOARDING_{{$timestamp}}",
+    "description": "Onboarding journey after KYC",
+    "trigger_id": "pharmacy_kyc_submitted",
+    "steps": [
+      {
+        "step_id": "s1",
+        "type": "ACTION",
+        "action_id": "send_notification",
+        "params": { "template": "KYC_APPROVED", "channel": "WHATSAPP" },
+        "next_step_id_on_true": "s2",
+        "next_step_id_on_false": null
+      },
+      {
+        "step_id": "s2",
+        "type": "WAIT",
+        "wait_duration_hours": 24,
+        "next_step_id_on_true": "s3",
+        "next_step_id_on_false": null
+      },
+      {
+        "step_id": "s3",
+        "type": "BRANCH",
+        "condition": { "field": "pharmacy.is_live", "operator": "eq", "value": true },
+        "next_step_id_on_true": null,
+        "next_step_id_on_false": null
+      }
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.id) {
+    bru.setEnvVar("automationWorkflowId", body.data.id);
+  }
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("created inactive", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("INACTIVE");
+    expect(body.data).to.have.property("id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/workflows — create workflow (always INACTIVE).
+}
+
+example {
+  name: 201 Created
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/workflows
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "name": "PHARMACY_ONBOARDING",
+        "trigger_id": "pharmacy_kyc_submitted",
+        "steps": [
+          {
+            "step_id": "s1",
+            "type": "ACTION",
+            "action_id": "send_notification",
+            "params": { "template": "KYC_APPROVED" },
+            "next_step_id_on_true": null
+          }
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 201 text: Created }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "id": "22222222-2222-4222-8222-222222222222",
+            "name": "PHARMACY_ONBOARDING",
+            "status": "INACTIVE",
+            "steps_count": 1,
+            "version": 1,
+            "created_at": "2026-07-24T02:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 STEP_LIMIT_EXCEEDED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/workflows
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "name": "TooManySteps",
+        "trigger_id": "invoice_overdue",
+        "steps": []
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "STEP_LIMIT_EXCEEDED",
+            "message": "A workflow may have at most 20 steps"
+          }
+        }
+      '''
+    }
+  }
+}

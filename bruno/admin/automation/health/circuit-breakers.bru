@@ -1,0 +1,78 @@
+meta {
+  name: circuit-breakers
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/health/circuit-breakers
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("circuit-breakers envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("circuit_breakers");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/health/circuit-breakers — per action_type OPEN/CLOSED.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/health/circuit-breakers
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "circuit_breakers": [
+              {
+                "action_type": "auto_assign_rider",
+                "fires_last_hour": 24,
+                "threshold": 50,
+                "circuit_status": "CLOSED",
+                "opened_at": null,
+                "reset_at": null
+              },
+              {
+                "action_type": "apply_wallet_credit",
+                "fires_last_hour": 52,
+                "threshold": 50,
+                "circuit_status": "OPEN",
+                "opened_at": "2026-07-24T09:30:00Z",
+                "reset_at": "2026-07-24T10:00:00Z"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

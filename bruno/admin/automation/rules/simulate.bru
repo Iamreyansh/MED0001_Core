@@ -1,0 +1,125 @@
+meta {
+  name: simulate
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/rules/{{automationRuleId}}/simulate
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "sample_size": 100,
+    "dry_run": true
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationRuleId")) {
+    throw new Error("automationRuleId missing — run rules/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.simulation_id) {
+    bru.setEnvVar("automationSimulationId", body.data.simulation_id);
+  }
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("RUNNING simulation", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("RUNNING");
+    expect(body.data).to.have.property("simulation_id");
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/rules/:id/simulate — batch historical simulation (202).
+}
+
+example {
+  name: 202 Accepted
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/33333333-3333-4333-8333-333333333333/simulate
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "sample_size": 100,
+        "dry_run": true
+      }
+    }
+  }
+  response: {
+    status: { code: 202 text: Accepted }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "simulation_id": "44444444-4444-4444-8444-444444444444",
+            "rule_id": "33333333-3333-4333-8333-333333333333",
+            "status": "RUNNING",
+            "sample_size": 100,
+            "started_at": "2026-07-24T09:30:00Z",
+            "estimated_completion_seconds": 15
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 RULE_IS_ACTIVE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/33333333-3333-4333-8333-333333333333/simulate
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "sample_size": 100,
+        "dry_run": true
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RULE_IS_ACTIVE",
+            "message": "Cannot batch-simulate an ACTIVE rule"
+          }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,174 @@
+meta {
+  name: evaluate
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/rules/evaluate
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "rule_id": "{{automationRuleId}}",
+    "event": {
+      "trigger_id": "order_unassigned",
+      "entity_type": "ORDER",
+      "entity_id": "{{automationEntityId}}",
+      "payload": {
+        "order_id": "{{automationEntityId}}",
+        "zone_id": "zone-blore-central",
+        "coverage_status": "OK",
+        "minutes_unassigned": 7
+      },
+      "fired_at": "2026-07-24T08:07:00Z"
+    },
+    "dry_run": true,
+    "conditions": [
+      { "field": "coverage_status", "operator": "not_eq", "value": "NO_RIDERS" }
+    ],
+    "actions": [
+      { "action_id": "auto_assign_rider", "params": { "order_id": "{{automationEntityId}}" } }
+    ],
+    "dedup_window_seconds": 300
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("automationRuleId")) {
+    bru.setEnvVar("automationRuleId", crypto.randomUUID());
+  }
+  if (!bru.getEnvVar("automationEntityId")) {
+    bru.setEnvVar("automationEntityId", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("automationEvalMs", String(body.data.evaluation_ms));
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("evaluate envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("conditions_met");
+    expect(body.data).to.have.property("evaluation_ms");
+    expect(body.data.evaluation_ms).to.be.at.most(500);
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/rules/evaluate — internal S2S evaluate (X-Internal-Token).
+  Optional conditions/actions used when rule_id is not yet in STORY-002 store.
+}
+
+example {
+  name: 200 OK
+  description: Conditions met dry_run
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/evaluate
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "rule_id": "11111111-1111-4111-8111-111111111111",
+        "event": {
+          "trigger_id": "order_unassigned",
+          "entity_type": "ORDER",
+          "entity_id": "22222222-2222-4222-8222-222222222222",
+          "payload": {
+            "coverage_status": "OK"
+          },
+          "fired_at": "2026-07-24T08:07:00Z"
+        },
+        "dry_run": true,
+        "conditions": [
+          { "field": "coverage_status", "operator": "not_eq", "value": "NO_RIDERS" }
+        ],
+        "actions": [
+          { "action_id": "auto_assign_rider", "params": { "order_id": "22222222-2222-4222-8222-222222222222" } }
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rule_id": "11111111-1111-4111-8111-111111111111",
+            "conditions_met": true,
+            "conditions_evaluated": [
+              { "field": "coverage_status", "operator": "not_eq", "value": "NO_RIDERS", "result": true }
+            ],
+            "actions_dispatched": [
+              { "action_id": "auto_assign_rider", "status": "DRY_RUN", "activity_log_id": null }
+            ],
+            "duplicate_skipped": false,
+            "outcome": "RULE_FIRED",
+            "evaluation_ms": 12
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/evaluate
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: bad-token
+    }
+    body:json: {
+      {
+        "rule_id": "11111111-1111-4111-8111-111111111111",
+        "event": {
+          "trigger_id": "order_unassigned",
+          "entity_type": "ORDER",
+          "entity_id": "22222222-2222-4222-8222-222222222222",
+          "payload": {},
+          "fired_at": "2026-07-24T08:07:00Z"
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 401 text: Unauthorized }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Invalid or missing X-Internal-Token"
+          }
+        }
+      '''
+    }
+  }
+}

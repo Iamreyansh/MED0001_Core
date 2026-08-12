@@ -261,6 +261,9 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/schedule/reminders/bulk-schedule")
                     .permitAll()
+                    // EPIC-019: internal rules evaluate (X-Internal-Token validated in service)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/automation/rules/evaluate")
+                    .permitAll()
                     .requestMatchers("/api/v1/schedule/**")
                     .hasRole("CUSTOMER")
                     // EPIC-015 STORY-001..005 support + knowledge base
@@ -414,6 +417,34 @@ public class SecurityConfig {
                     .hasAnyRole(
                         "ADMIN_SUPER", "ADMIN_FINANCE", "ADMIN_OPERATIONS", "ADMIN_COMPLIANCE")
                     .requestMatchers("/api/v1/admin/analytics", "/api/v1/admin/analytics/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    // EPIC-019 STORY-005 activity: finance read-only on financial action types
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/automation/activity/stats")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/automation/activity/*/rollback")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/admin/automation/activity",
+                        "/api/v1/admin/automation/activity/*")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    // EPIC-019 STORY-006 approvals: finance can list/get/resolve FINANCE only
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/automation/approvals/stats")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .requestMatchers(
+                        "/api/v1/admin/automation/approvals",
+                        "/api/v1/admin/automation/approvals/**")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
+                    // EPIC-019 STORY-007 kill switch: admin_super only (before catch-all)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/automation/kill-switch")
+                    .hasRole("ADMIN_SUPER")
+                    // EPIC-019 STORY-008 seed initialize: admin_super only
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/automation/seed-rules/initialize")
+                    .hasRole("ADMIN_SUPER")
+                    // EPIC-019 STORY-001 automation registries (evaluate is permitAll above)
+                    .requestMatchers("/api/v1/admin/automation", "/api/v1/admin/automation/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
                     .requestMatchers("/api/v1/admin/crm", "/api/v1/admin/crm/**")
                     .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")

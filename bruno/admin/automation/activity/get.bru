@@ -1,0 +1,117 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/activity/{{automationActionId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationActionId")) {
+    throw new Error("automationActionId missing — run admin/automation/activity/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.action_id) {
+    bru.setEnvVar("automationActionId", body.data.action_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("activity detail envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("action_id");
+    expect(body.data).to.have.property("before_state");
+    expect(body.data).to.have.property("after_state");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/activity/:action_id — detail with before/after snapshots.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/activity/33333333-3333-4333-8333-333333333333
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "action_id": "33333333-3333-4333-8333-333333333333",
+            "rule_id": "11111111-1111-4111-8111-111111111111",
+            "rule_name": "Auto-assign unassigned orders",
+            "trigger_event_id": "55555555-5555-4555-8555-555555555555",
+            "trigger_event": {
+              "trigger_id": "order_unassigned",
+              "entity_type": "ORDER",
+              "entity_id": "22222222-2222-4222-8222-222222222222",
+              "payload": { "minutes_unassigned": 7 },
+              "fired_at": "2026-07-24T08:07:00Z"
+            },
+            "conditions_evaluated": [
+              { "field": "zone.coverage_status", "operator": "not_eq", "value": "NO_RIDERS", "resolved_value": "ADEQUATE", "result": true }
+            ],
+            "action_type": "auto_assign_rider",
+            "action_params": { "order_id": "22222222-2222-4222-8222-222222222222" },
+            "before_state": { "order_status": "PLACED", "rider_id": null },
+            "after_state": { "order_status": "ACCEPTED", "rider_id": "88888888-8888-4888-8888-888888888888" },
+            "status": "EXECUTED",
+            "actor": "AUTOMATION",
+            "triggered_at": "2026-07-24T08:07:00Z",
+            "executed_at": "2026-07-24T08:07:01Z",
+            "execution_ms": 420,
+            "rolled_back": false,
+            "rollback_action_id": null
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ACTION_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/activity/99999999-9999-4999-8999-999999999999
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "ACTION_NOT_FOUND", "message": "Action not found" }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,96 @@
+meta {
+  name: patch
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/automation/rules/{{automationRuleId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "conditions": [
+      {
+        "field": "zone_id",
+        "operator": "zone_in",
+        "value": ["zone-blore-central"]
+      }
+    ]
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationRuleId")) {
+    throw new Error("automationRuleId missing — run rules/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rule_id) {
+    bru.setEnvVar("automationRuleId", body.data.rule_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("patch envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("status");
+    expect(body.data).to.have.property("updated_at");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/automation/rules/:id — edit resets ACTIVE → INACTIVE with RULE_EDITED.
+}
+
+example {
+  name: 200 OK RULE_EDITED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/11111111-1111-4111-8111-111111111111
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "conditions": [
+          { "field": "zone.coverage_status", "operator": "not_eq", "value": "NO_RIDERS" }
+        ]
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rule_id": "11111111-1111-4111-8111-111111111111",
+            "status": "INACTIVE",
+            "status_reset_reason": "RULE_EDITED",
+            "updated_at": "2026-07-24T09:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

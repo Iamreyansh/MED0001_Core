@@ -1,0 +1,103 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/seed-rules
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.seed_rules) && body.data.seed_rules.length) {
+    const withId = body.data.seed_rules.find((r) => r.rule_id);
+    if (withId) {
+      bru.setEnvVar("automationSeedRuleId", withId.rule_id);
+      bru.setEnvVar("automationSeedRuleKey", withId.seed_rule_key);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("seed-rules list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("seed_rules");
+    expect(body.data).to.have.property("seed_workflows");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/seed-rules — list seed rules and workflows. admin_super, admin_operations.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/seed-rules
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "seed_rules": [
+              {
+                "rule_id": "11111111-1111-4111-8111-111111111111",
+                "seed_rule_key": "AUTO_ASSIGN_UNASSIGNED_ORDERS",
+                "name": "Auto-Assign Unassigned Orders",
+                "status": "INACTIVE",
+                "fire_count": 0,
+                "simulation_run": false,
+                "last_simulated_at": null,
+                "simulation_risk": null,
+                "recommended_next_step": "RUN_SIMULATION"
+              },
+              {
+                "rule_id": "66666666-6666-4666-8666-666666666666",
+                "seed_rule_key": "AUTO_FLAG_SCHEDULE_X",
+                "name": "Auto-Flag Schedule X Sales",
+                "status": "ACTIVE",
+                "fire_count": 48,
+                "simulation_run": true,
+                "last_simulated_at": "2026-01-02T14:00:00Z",
+                "simulation_risk": "LOW",
+                "recommended_next_step": null
+              }
+            ],
+            "seed_workflows": [
+              {
+                "workflow_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+                "seed_workflow_key": "DUNNING_LADDER",
+                "name": "Invoice Dunning Ladder",
+                "status": "INACTIVE",
+                "active_executions": 0
+              }
+            ],
+            "initialized_at": "2026-01-01T00:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

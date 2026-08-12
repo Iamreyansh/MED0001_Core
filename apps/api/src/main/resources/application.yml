@@ -201,6 +201,10 @@ medmate:
     jobs:
       enabled: true
     due-dispatch-delay-ms: 60000
+  automation:
+    seed:
+      # AC-007: ApplicationRunner initializes seed rules on api boot (idempotent).
+      initialize-on-startup: true
 
   outbox:
     dispatch:

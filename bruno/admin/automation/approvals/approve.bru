@@ -1,0 +1,146 @@
+meta {
+  name: approve
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/approvals/{{automationApprovalId}}/approve
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "notes": "Verified payout amount matches settlement register. Approved."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationApprovalId")) {
+    throw new Error("automationApprovalId missing — run admin/automation/approvals/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.activity_log_id) {
+    bru.setEnvVar("automationActionId", body.data.activity_log_id);
+  }
+}
+
+tests {
+  test("HTTP 200 or conflict", function () {
+    expect([200, 403, 404, 409, 410]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("status");
+      expect(body.data).to.have.property("action_executed");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/approvals/:id/approve — execute proposed action (HUMAN actor).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/approve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "notes": "Verified payout amount matches settlement register. Approved."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "approval_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "APPROVED",
+            "action_executed": true,
+            "activity_log_id": "33333333-3333-4333-8333-333333333333",
+            "approved_by": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "approved_at": "2026-07-24T09:45:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 410 APPROVAL_EXPIRED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/approve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "notes": "too late"
+      }
+    }
+  }
+  response: {
+    status: { code: 410 text: Gone }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "APPROVAL_EXPIRED", "message": "Approval has expired" }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/approve
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "notes": "finance on ADMIN"
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "FORBIDDEN", "message": "Finance can only resolve FINANCE approvals" }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,121 @@
+meta {
+  name: patch-status
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/automation/rules/{{automationRuleId}}/status
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "status": "SIMULATING"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationRuleId")) {
+    throw new Error("automationRuleId missing — run rules/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rule_id) {
+    bru.setEnvVar("automationRuleId", body.data.rule_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("status change envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("previous_status");
+    expect(body.data).to.have.property("new_status");
+  });
+}
+
+docs {
+  PATCH /api/v1/admin/automation/rules/:id/status — ACTIVE requires admin_super; ops may set SIMULATING/INACTIVE.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/11111111-1111-4111-8111-111111111111/status
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "status": "ACTIVE"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rule_id": "11111111-1111-4111-8111-111111111111",
+            "previous_status": "INACTIVE",
+            "new_status": "ACTIVE",
+            "updated_by": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "updated_at": "2026-07-24T09:05:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/11111111-1111-4111-8111-111111111111/status
+    method: patch
+    mode: json
+    headers: {
+      Authorization: Bearer {{opsAccessToken}}
+    }
+    body:json: {
+      {
+        "status": "ACTIVE"
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Only admin_super can activate rules"
+          }
+        }
+      '''
+    }
+  }
+}

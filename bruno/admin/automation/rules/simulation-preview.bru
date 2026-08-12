@@ -1,0 +1,153 @@
+meta {
+  name: simulation-preview
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/rules/{{automationRuleId}}/simulation-preview
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "entity_type": "ORDER",
+    "entity_id": "{{automationEntityId}}"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationRuleId")) {
+    throw new Error("automationRuleId missing — run rules/create first");
+  }
+  if (!bru.getEnvVar("automationEntityId")) {
+    bru.setEnvVar("automationEntityId", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data) {
+    bru.setEnvVar("automationWouldFire", String(body.data.would_fire));
+  }
+}
+
+tests {
+  test("HTTP 200 or known error", function () {
+    const status = res.getStatus();
+    expect([200, 404, 422]).to.include(status);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("would_fire");
+      expect(body.data).to.have.property("conditions_evaluated");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/rules/:id/simulation-preview — evaluate rule against one entity.
+}
+
+example {
+  name: 200 would_fire true
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/33333333-3333-4333-8333-333333333333/simulation-preview
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "entity_type": "PHARMACY",
+        "entity_id": "55555555-5555-4555-8555-555555555555"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rule_id": "33333333-3333-4333-8333-333333333333",
+            "entity_type": "PHARMACY",
+            "entity_id": "55555555-5555-4555-8555-555555555555",
+            "entity_name": "Medplus - HSR Layout",
+            "conditions_evaluated": [
+              {
+                "field": "invoice.status",
+                "operator": "eq",
+                "value": "OVERDUE",
+                "resolved_value": "OVERDUE",
+                "result": true
+              }
+            ],
+            "would_fire": true,
+            "actions_that_would_fire": [
+              {
+                "action": "send_notification",
+                "params": { "template": "INVOICE_OVERDUE_DAY0", "channel": "WHATSAPP" },
+                "would_require_approval": false,
+                "is_reversible": true
+              }
+            ],
+            "would_be_rate_limited": false,
+            "would_be_deduplicated": false,
+            "evaluated_at": "2026-07-24T09:35:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 ENTITY_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/33333333-3333-4333-8333-333333333333/simulation-preview
+    method: post
+    mode: json
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "entity_type": "PHARMACY",
+        "entity_id": "99999999-9999-4999-8999-999999999999"
+      }
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "ENTITY_NOT_FOUND",
+            "message": "entity_id not found"
+          }
+        }
+      '''
+    }
+  }
+}
