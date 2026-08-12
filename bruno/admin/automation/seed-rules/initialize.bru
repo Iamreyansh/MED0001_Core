@@ -1,0 +1,129 @@
+meta {
+  name: initialize
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/seed-rules/initialize
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.rules) && body.data.rules.length) {
+    const created = body.data.rules.find((r) => r.rule_id);
+    if (created) {
+      bru.setEnvVar("automationSeedRuleId", created.rule_id);
+      bru.setEnvVar("automationSeedRuleKey", created.seed_rule_key);
+    }
+    const wf = body.data.rules.find((r) => r.workflow_id);
+    if (wf) {
+      bru.setEnvVar("automationSeedWorkflowId", wf.workflow_id);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200 or 403", function () {
+    expect([200, 403]).to.include(res.getStatus());
+  });
+  test("initialize envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("created");
+      expect(body.data).to.have.property("already_existed");
+      expect(body.data).to.have.property("rules");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/seed-rules/initialize — idempotent seed of 6 catalog rules + 3 workflows. admin_super only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/seed-rules/initialize
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "created": 0,
+            "already_existed": 6,
+            "workflows_created": 0,
+            "workflows_already_existed": 3,
+            "rules": [
+              { "seed_rule_key": "AUTO_ASSIGN_UNASSIGNED_ORDERS", "rule_id": "11111111-1111-4111-8111-111111111111", "result": "ALREADY_EXISTS" },
+              { "seed_rule_key": "AUTO_RELEASE_DUE_PAYOUTS", "rule_id": "22222222-2222-4222-8222-222222222222", "result": "ALREADY_EXISTS" },
+              { "seed_rule_key": "AUTO_DUNNING_OVERDUE_INVOICES", "rule_id": null, "result": "USES_WORKFLOW", "workflow_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1" },
+              { "seed_rule_key": "AUTO_ESCALATE_BREACHED_TICKETS", "rule_id": "44444444-4444-4444-8444-444444444444", "result": "ALREADY_EXISTS" },
+              { "seed_rule_key": "AUTO_SAVE_PLAY_HEALTH_DROP", "rule_id": "55555555-5555-4555-8555-555555555555", "result": "ALREADY_EXISTS" },
+              { "seed_rule_key": "AUTO_FLAG_SCHEDULE_X", "rule_id": "66666666-6666-4666-8666-666666666666", "result": "ALREADY_EXISTS" }
+            ],
+            "initialized_at": "2026-07-24T10:00:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/seed-rules/initialize
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {}
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "FORBIDDEN", "message": "Only admin_super can initialize seed rules" }
+        }
+      '''
+    }
+  }
+}

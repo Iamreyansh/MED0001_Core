@@ -1,0 +1,112 @@
+meta {
+  name: reject
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/approvals/{{automationApprovalId}}/reject
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "Payout disputed - pharmacy issued incorrect invoices for this period. Holding pending investigation."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationApprovalId")) {
+    throw new Error("automationApprovalId missing — run admin/automation/approvals/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or client error", function () {
+    expect([200, 400, 403, 404, 409]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data.status).to.equal("REJECTED");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/approvals/:id/reject — cancel action; alternative fires if configured.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/reject
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "Payout disputed - pharmacy issued incorrect invoices for this period. Holding pending investigation."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "approval_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "status": "REJECTED",
+            "alternative_action_fired": false,
+            "rejected_by": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "rejected_at": "2026-07-24T09:46:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 REASON_REQUIRED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/reject
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": ""
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "REASON_REQUIRED", "message": "reason is required" }
+        }
+      '''
+    }
+  }
+}

@@ -1,0 +1,89 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/activity?status=EXECUTED&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  status: EXECUTED
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.activity) && body.data.activity[0]) {
+    bru.setEnvVar("automationActionId", body.data.activity[0].action_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("activity list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("activity");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/activity — paginated feed (status, rule_id, trigger_category, entity_type, date_from/to).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/activity?status=EXECUTED&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "activity": [
+              {
+                "action_id": "33333333-3333-4333-8333-333333333333",
+                "rule_name": "Auto-assign unassigned orders",
+                "trigger_event": "order_unassigned",
+                "entity_type": "ORDER",
+                "entity_id": "22222222-2222-4222-8222-222222222222",
+                "entity_name": "ORD-8821 (Ravi Kumar)",
+                "action_type": "auto_assign_rider",
+                "action_params": { "order_id": "22222222-2222-4222-8222-222222222222" },
+                "status": "EXECUTED",
+                "actor": "AUTOMATION",
+                "triggered_at": "2026-07-24T08:07:00Z",
+                "executed_at": "2026-07-24T08:07:01Z",
+                "override_by": null,
+                "rolled_back": false
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 1, "has_next": false }
+        }
+      '''
+    }
+  }
+}

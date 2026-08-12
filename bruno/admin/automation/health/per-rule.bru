@@ -1,0 +1,78 @@
+meta {
+  name: per-rule
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/health/per-rule
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.rules) && body.data.rules.length) {
+    bru.setEnvVar("automationRuleId", body.data.rules[0].rule_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("per-rule envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("rules");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/health/per-rule — 24h fire/success metrics per rule.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/health/per-rule
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rules": [
+              {
+                "rule_id": "11111111-1111-4111-8111-111111111111",
+                "name": "Auto-assign unassigned orders",
+                "status": "ACTIVE",
+                "fire_count_24h": 48,
+                "success_rate_pct": 97.9,
+                "exception_count_24h": 1,
+                "last_error": "Dispatch API timeout after 5s",
+                "last_error_at": "2026-07-24T06:42:00Z",
+                "avg_execution_ms": 387,
+                "last_fired_at": "2026-07-24T09:07:00Z"
+              }
+            ]
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

@@ -1,2 +1,2 @@
-/** Domain module shell for automation. Business logic lands via epic stories. */
+/** Domain module for EPIC-019 automation and rules engine. */
 package com.nammamedmate.automation;

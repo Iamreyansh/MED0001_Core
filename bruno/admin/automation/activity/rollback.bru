@@ -1,0 +1,148 @@
+meta {
+  name: rollback
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/activity/{{automationActionId}}/rollback
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "Rule misconfigured; suspension was not warranted."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationActionId")) {
+    throw new Error("automationActionId missing — run admin/automation/activity/list first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.rollback_action_id) {
+    bru.setEnvVar("automationRollbackActionId", body.data.rollback_action_id);
+  }
+}
+
+tests {
+  test("HTTP 200 or 422", function () {
+    const status = res.getStatus();
+    expect([200, 422, 404]).to.include(status);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("rollback_action_id");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/activity/:action_id/rollback — reverse suspend_entity or apply_wallet_credit.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/activity/33333333-3333-4333-8333-333333333333/rollback
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "Rule misconfigured; suspension was not warranted."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rollback_action_id": "44444444-4444-4444-8444-444444444444",
+            "original_action_id": "33333333-3333-4333-8333-333333333333",
+            "action_type": "ROLLBACK",
+            "rolled_back_action": "suspend_entity",
+            "entity_type": "PHARMACY",
+            "entity_id": "66666666-6666-4666-8666-666666666666",
+            "result": "Entity reactivated successfully.",
+            "executed_at": "2026-07-24T09:40:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 NOT_ROLLBACKABLE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/activity/33333333-3333-4333-8333-333333333333/rollback
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "try payout"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "NOT_ROLLBACKABLE", "message": "Action type is not rollbackable" }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 ALREADY_ROLLED_BACK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/activity/33333333-3333-4333-8333-333333333333/rollback
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "reason": "again"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "ALREADY_ROLLED_BACK", "message": "Action has already been rolled back" }
+        }
+      '''
+    }
+  }
+}

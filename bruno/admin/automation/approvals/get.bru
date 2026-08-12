@@ -1,0 +1,123 @@
+meta {
+  name: get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/approvals/{{automationApprovalId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationApprovalId")) {
+    throw new Error("automationApprovalId missing — run admin/automation/approvals/list first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or 404", function () {
+    expect([200, 404]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("approval_id");
+      expect(body.data).to.have.property("proposed_action");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error.code).to.equal("APPROVAL_NOT_FOUND");
+    }
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/approvals/:id — trigger context and proposed action impact.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "approval_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "rule_name": "Auto-release due payouts",
+            "trigger_context": {
+              "trigger_event": "payout_cycle_reached",
+              "entity_type": "PHARMACY",
+              "entity_id": "22222222-2222-4222-8222-222222222222",
+              "entity_name": "Apollo Pharmacy - Indiranagar",
+              "payload": {
+                "payout_amount_paise": 4800000,
+                "payout_period": "2026-07-01 to 2026-07-15",
+                "orders_count": 412
+              }
+            },
+            "conditions_met": [
+              { "field": "payout.amount", "operator": "amount_gt", "value": 5000000, "resolved_value": 4800000, "result": false }
+            ],
+            "proposed_action": {
+              "action_type": "release_payout",
+              "params": {
+                "entity_type": "PHARMACY",
+                "entity_id": "22222222-2222-4222-8222-222222222222",
+                "amount_paise": 4800000,
+                "mode": "IMPS"
+              }
+            },
+            "estimated_impact": "Release Rs 48,000 to Apollo Pharmacy - Indiranagar.",
+            "why_requires_approval": "Amount Rs 48000 exceeds value cap (Rs 40000).",
+            "urgency": "URGENT",
+            "triggered_at": "2026-07-24T07:00:00Z",
+            "expires_at": "2026-07-24T11:00:00Z",
+            "status": "PENDING"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 APPROVAL_NOT_FOUND
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals/99999999-9999-4999-8999-999999999999
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "APPROVAL_NOT_FOUND", "message": "Approval not found" }
+        }
+      '''
+    }
+  }
+}

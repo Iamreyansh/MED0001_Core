@@ -1,0 +1,93 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/approvals?status=PENDING&page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  status: PENDING
+  page: 1
+  limit: 20
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.approvals) && body.data.approvals[0]) {
+    bru.setEnvVar("automationApprovalId", body.data.approvals[0].approval_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("approvals list envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("chips");
+    expect(body.data).to.have.property("approvals");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/approvals — queue list (status default PENDING, urgency, page, limit).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals?status=PENDING&page=1&limit=20
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "chips": {
+              "pending_count": 3,
+              "urgent_count": 1,
+              "approved_today": 8,
+              "rejected_today": 1
+            },
+            "approvals": [
+              {
+                "approval_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "rule_name": "Auto-release due payouts",
+                "action_type": "release_payout",
+                "entity_type": "PHARMACY",
+                "entity_id": "22222222-2222-4222-8222-222222222222",
+                "entity_name": "Apollo Pharmacy - Indiranagar",
+                "amount_rs": 48000,
+                "urgency": "URGENT",
+                "triggered_at": "2026-07-24T07:00:00Z",
+                "expires_at": "2026-07-24T11:00:00Z",
+                "status": "PENDING"
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 3, "has_next": false }
+        }
+      '''
+    }
+  }
+}

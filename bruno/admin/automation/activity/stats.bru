@@ -1,0 +1,71 @@
+meta {
+  name: stats
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/activity/stats
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("stats envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("manual_actions_saved_estimate");
+    expect(body.data).to.have.property("pending_approvals_count");
+    expect(body.data).to.have.property("exceptions_raised_today");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/activity/stats — automation health KPIs.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/activity/stats
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "rules_active": 8,
+            "rules_simulating": 1,
+            "rules_inactive": 3,
+            "actions_last_24h": 284,
+            "actions_this_week": 1842,
+            "manual_actions_saved_estimate": 1842,
+            "exceptions_raised_today": 2,
+            "pending_approvals_count": 0,
+            "last_action_at": "2026-07-24T09:38:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

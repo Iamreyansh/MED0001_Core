@@ -1,0 +1,86 @@
+meta {
+  name: list-executions
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/workflows/{{automationWorkflowId}}/executions?page=1
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationWorkflowId")) {
+    throw new Error("automationWorkflowId missing — run workflows/create first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.executions) && body.data.executions[0]) {
+    bru.setEnvVar("automationExecutionId", body.data.executions[0].execution_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("executions envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("executions");
+    expect(body.meta).to.have.property("page");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/workflows/:id/executions — execution history.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/workflows/11111111-1111-4111-8111-111111111111/executions?page=1
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "executions": [
+              {
+                "execution_id": "33333333-3333-4333-8333-333333333333",
+                "entity_type": "PHARMACY",
+                "entity_id": "44444444-4444-4444-8444-444444444444",
+                "entity_name": "Medplus - HSR Layout",
+                "started_at": "2026-07-17T10:00:00Z",
+                "current_step": "s3",
+                "current_step_type": "WAIT",
+                "wait_until": "2026-07-24T10:00:00Z",
+                "status": "RUNNING",
+                "workflow_version": 1
+              }
+            ]
+          },
+          "meta": { "page": 1, "limit": 20, "total": 6, "has_next": false }
+        }
+      '''
+    }
+  }
+}

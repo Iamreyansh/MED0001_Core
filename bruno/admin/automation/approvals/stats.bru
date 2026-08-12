@@ -1,0 +1,75 @@
+meta {
+  name: stats
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/approvals/stats
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200 or 403", function () {
+    expect([200, 403]).to.include(res.getStatus());
+  });
+  test("stats envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("avg_response_time_minutes");
+      expect(body.data).to.have.property("approval_rate_pct");
+      expect(body.data.period_days).to.equal(7);
+    } else {
+      expect(body.success).to.equal(false);
+    }
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/approvals/stats — 7-day queue KPIs (super/ops only).
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/approvals/stats
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "avg_response_time_minutes": 18.4,
+            "approval_rate_pct": 88.9,
+            "rejection_rate_pct": 11.1,
+            "expiry_rate_pct": 4.2,
+            "top_pending_categories": [
+              { "category": "FINANCE", "count": 2 },
+              { "category": "ADMIN", "count": 1 }
+            ],
+            "period_days": 7
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

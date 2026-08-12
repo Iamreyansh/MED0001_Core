@@ -1,0 +1,103 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/triggers
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && Array.isArray(body.data.triggers) && body.data.triggers.length) {
+    bru.setEnvVar("automationTriggerId", body.data.triggers[0].trigger_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("triggers envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.total_triggers).to.be.at.least(28);
+    expect(body.data.triggers[0]).to.have.property("available_context_vars");
+    expect(body.data.triggers[0]).to.have.property("available_conditions");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/triggers — list trigger registry. EPIC-019/STORY-001.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/triggers
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "triggers": [
+              {
+                "trigger_id": "order_unassigned",
+                "category": "DISPATCH",
+                "name": "Order Unassigned",
+                "description": "Fires when an order has been placed but no rider assigned for N minutes.",
+                "parameters": [
+                  { "name": "duration_minutes", "type": "integer", "required": true }
+                ],
+                "available_conditions": ["zone_in", "time_of_day_between", "day_of_week_in"],
+                "available_context_vars": ["order.id", "order.zone_id", "order.placed_at", "order.priority"]
+              }
+            ],
+            "total_triggers": 34
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 UNAUTHORIZED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/triggers
+    method: get
+  }
+  response: {
+    status: { code: 401 text: Unauthorized }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Full authentication is required to access this resource"
+          }
+        }
+      '''
+    }
+  }
+}

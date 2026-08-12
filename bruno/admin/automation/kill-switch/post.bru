@@ -1,0 +1,176 @@
+meta {
+  name: post
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/automation/kill-switch
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "action": "PAUSE",
+    "reason": "Runaway payout automation detected. Pausing all rules while investigating."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.kill_switch_status) {
+    bru.setEnvVar("automationKillSwitchStatus", body.data.kill_switch_status);
+  }
+}
+
+tests {
+  test("HTTP 200 or conflict", function () {
+    expect([200, 400, 403, 409]).to.include(res.getStatus());
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+      expect(body.data).to.have.property("kill_switch_status");
+      expect(body.data).to.have.property("estimated_effect_within_seconds");
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error).to.have.property("code");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/admin/automation/kill-switch — PAUSE or RESUME all automation. admin_super only.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/kill-switch
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "action": "PAUSE",
+        "reason": "Runaway payout automation detected. Pausing all rules while investigating."
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "kill_switch_status": "PAUSED",
+            "action": "PAUSE",
+            "executed_by": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "executed_at": "2026-07-24T09:52:00Z",
+            "reason": "Runaway payout automation detected. Pausing all rules while investigating.",
+            "estimated_effect_within_seconds": 60
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 REASON_REQUIRED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/kill-switch
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "action": "PAUSE",
+        "reason": ""
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "REASON_REQUIRED", "message": "reason is required" }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 FORBIDDEN
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/kill-switch
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "action": "PAUSE",
+        "reason": "ops cannot pause"
+      }
+    }
+  }
+  response: {
+    status: { code: 403 text: Forbidden }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "FORBIDDEN", "message": "Only admin_super can use the kill switch" }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 ALREADY_IN_STATE
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/kill-switch
+    method: post
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+    body:json: {
+      {
+        "action": "PAUSE",
+        "reason": "already paused"
+      }
+    }
+  }
+  response: {
+    status: { code: 409 text: Conflict }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": { "code": "ALREADY_IN_STATE", "message": "Kill switch is already PAUSED" }
+        }
+      '''
+    }
+  }
+}

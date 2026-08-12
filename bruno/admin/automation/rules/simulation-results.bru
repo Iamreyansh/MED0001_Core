@@ -1,0 +1,114 @@
+meta {
+  name: simulation-results
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/automation/rules/{{automationRuleId}}/simulation-results/{{automationSimulationId}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("automationRuleId")) {
+    throw new Error("automationRuleId missing — run rules/create first");
+  }
+  if (!bru.getEnvVar("automationSimulationId")) {
+    throw new Error("automationSimulationId missing — run rules/simulate first");
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("automationSimulationStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("status");
+    expect(body.data).to.have.property("simulation_id");
+  });
+}
+
+docs {
+  GET /api/v1/admin/automation/rules/:id/simulation-results/:simulation_id — RUNNING while processing, COMPLETED with risk + impact.
+}
+
+example {
+  name: 200 COMPLETED
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/33333333-3333-4333-8333-333333333333/simulation-results/44444444-4444-4444-8444-444444444444
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "simulation_id": "44444444-4444-4444-8444-444444444444",
+            "rule_id": "33333333-3333-4333-8333-333333333333",
+            "status": "COMPLETED",
+            "sample_size": 100,
+            "events_scanned": 100,
+            "entities_matched": 48,
+            "conditions_failed_count": 52,
+            "actions_that_would_fire": [],
+            "false_positive_risk": "LOW",
+            "risk_details": "All actions are reversible notifications or low-impact; no financial impact.",
+            "estimated_impact_summary": "Would have fired 48 times in the last 7 days, affecting 48 orders, executing auto_assign_rider for 48 orders.",
+            "completed_at": "2026-07-24T09:30:18Z",
+            "started_at": "2026-07-24T09:30:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 RUNNING
+  request: {
+    url: {{baseUrl}}/api/v1/admin/automation/rules/33333333-3333-4333-8333-333333333333/simulation-results/44444444-4444-4444-8444-444444444444
+    method: get
+    headers: {
+      Authorization: Bearer {{accessToken}}
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "simulation_id": "44444444-4444-4444-8444-444444444444",
+            "rule_id": "33333333-3333-4333-8333-333333333333",
+            "status": "RUNNING",
+            "sample_size": 100,
+            "started_at": "2026-07-24T09:30:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}

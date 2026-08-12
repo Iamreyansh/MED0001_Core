@@ -17,8 +17,8 @@
 | Phase 1 | 46 | 46 |
 | Phase 2 | 34 | 34 |
 | Phase 3 | 32 | 32 |
-| Phase 4 | 17 | 6 |
-| **Total** | **129** | **112** |
+| Phase 4 | 17 | 14 |
+| **Total** | **129** | **120** |
 
 ---
 
@@ -262,14 +262,14 @@
 
 | Epic | Story | Title | Status | Completed | Notes |
 |------|-------|-------|--------|-----------|-------|
-| EPIC-019 | [STORY-001](./EPIC-019-automation-rules-engine/STORY-001-rules-engine-core.md) | Rules Engine Core | pending | — | — |
-| EPIC-019 | [STORY-002](./EPIC-019-automation-rules-engine/STORY-002-rule-crud-management.md) | Rule CRUD Management | pending | — | — |
-| EPIC-019 | [STORY-003](./EPIC-019-automation-rules-engine/STORY-003-workflow-journey-builder.md) | Workflow / Journey Builder | pending | — | — |
-| EPIC-019 | [STORY-004](./EPIC-019-automation-rules-engine/STORY-004-rule-simulation.md) | Rule Simulation | pending | — | — |
-| EPIC-019 | [STORY-005](./EPIC-019-automation-rules-engine/STORY-005-activity-log-audit.md) | Activity Log & Audit | pending | — | — |
-| EPIC-019 | [STORY-006](./EPIC-019-automation-rules-engine/STORY-006-approvals-queue.md) | Approvals Queue | pending | — | — |
-| EPIC-019 | [STORY-007](./EPIC-019-automation-rules-engine/STORY-007-automation-health-killswitch.md) | Automation Health & Kill Switch | pending | — | — |
-| EPIC-019 | [STORY-008](./EPIC-019-automation-rules-engine/STORY-008-seed-automations.md) | Seed Automations | pending | — | — |
+| EPIC-019 | [STORY-001](./EPIC-019-automation-rules-engine/STORY-001-rules-engine-core.md) | Rules Engine Core | done | 2026-08-12 | `domains/automation`; V117 registries (34 triggers, 16 actions incl. mass_payout+flag_prescription); InMemoryRuleLookup until STORY-002; thin kill JDBC; in-mem dedup; S2S evaluate; Bruno admin/automation |
+| EPIC-019 | [STORY-002](./EPIC-019-automation-rules-engine/STORY-002-rule-crud-management.md) | Rule CRUD Management | done | 2026-08-12 | `domains/automation`; V118 automation_rules; JDBC lookup replaces in-mem; rate-limit in-mem ponytail→Redis; StubRuleAudit until STORY-005; Bruno rules CRUD |
+| EPIC-019 | [STORY-003](./EPIC-019-automation-rules-engine/STORY-003-workflow-journey-builder.md) | Workflow / Journey Builder | done | 2026-08-12 | `domains/automation`; V119 workflows+executions; WAIT scheduler; cancel endpoint; bulk-resume deferred; Bruno workflows |
+| EPIC-019 | [STORY-004](./EPIC-019-automation-rules-engine/STORY-004-rule-simulation.md) | Rule Simulation | done | 2026-08-12 | `domains/automation`; V120 simulations + simulating_started_at; async jobs; GET RUNNING not 425; preview from trigger_events; Bruno simulate/preview |
+| EPIC-019 | [STORY-005](./EPIC-019-automation-rules-engine/STORY-005-activity-log-audit.md) | Activity Log & Audit | done | 2026-08-12 | `domains/automation`; V121 activity_log JDBC; rollback suspend/wallet stub; finance filter; Glacier out of V1; Bruno activity |
+| EPIC-019 | [STORY-006](./EPIC-019-automation-rules-engine/STORY-006-approvals-queue.md) | Approvals Queue | done | 2026-08-12 | `domains/automation`; V122 approvals; engine enqueue on cap; 4h expiry; finance category gate; notify stub; Bruno approvals |
+| EPIC-019 | [STORY-007](./EPIC-019-automation-rules-engine/STORY-007-automation-health-killswitch.md) | Automation Health & Kill Switch | done | 2026-08-12 | `domains/automation`; V123 kill+circuits+deferred; DB+5s cache not Redis; ×100 success_rate; Bruno health/kill-switch |
+| EPIC-019 | [STORY-008](./EPIC-019-automation-rules-engine/STORY-008-seed-automations.md) | Seed Automations | done | 2026-08-12 | `domains/automation`; V124 seed catalog; 6 rules+3 workflows INACTIVE; bootstrap runner; escalate stub; support_sla_breaching; Bruno seed-rules |
 
 ### EPIC-020 (`EPIC-020-observability-self-healing`)
 
