@@ -4,10 +4,12 @@ import com.nammamedmate.prescription.application.port.out.OcrPort;
 import com.nammamedmate.prescription.domain.PrescriptionRecord.MedicineExtracted;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/** Dev/stub OCR — deterministic extract until real OCR queue lands. */
+/** Local/dev OCR only — never active on staging/prod. */
 @Component
+@Profile("!prod & !staging")
 public class StubOcrClient implements OcrPort {
 
   @Override

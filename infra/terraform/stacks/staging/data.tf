@@ -24,8 +24,10 @@ resource "aws_db_instance" "this" {
   storage_encrypted            = true
   kms_key_id                   = aws_kms_key.this.arn
   backup_retention_period      = 7
+  backup_window                = "18:30-19:00"
   skip_final_snapshot          = true
   deletion_protection          = true
+  copy_tags_to_snapshot        = true
   multi_az                     = false
   publicly_accessible          = false
   apply_immediately            = true
@@ -91,6 +93,13 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "uploads" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
   bucket = aws_s3_bucket.uploads.id
   rule {
@@ -99,6 +108,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
     filter {}
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
+    }
+  }
+  rule {
+    id     = "expire-noncurrent"
+    status = "Enabled"
+    filter {}
+    noncurrent_version_expiration {
+      noncurrent_days = 30
     }
   }
 }

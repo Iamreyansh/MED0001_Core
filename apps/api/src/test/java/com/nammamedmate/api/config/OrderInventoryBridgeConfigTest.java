@@ -138,6 +138,27 @@ class OrderInventoryBridgeConfigTest {
                     null,
                     java.time.Instant.parse("2026-01-01T00:00:00Z"),
                     java.time.Instant.parse("2026-01-01T00:00:00Z"))));
+    when(batches.tryDeductQuantity(any(), anyInt(), any()))
+        .thenAnswer(
+            inv ->
+                Optional.of(
+                    new ProductBatch(
+                        inv.getArgument(0),
+                        productId,
+                        pharmacy,
+                        "B1",
+                        java.time.LocalDate.of(2027, 1, 1),
+                        null,
+                        10,
+                        8,
+                        100,
+                        120,
+                        true,
+                        null,
+                        null,
+                        null,
+                        java.time.Instant.parse("2026-01-01T00:00:00Z"),
+                        java.time.Instant.parse("2026-01-01T00:00:00Z"))));
     doAnswer(
             inv -> {
               RowCallbackHandler h = inv.getArgument(1);

@@ -25,7 +25,7 @@ import org.springframework.beans.factory.ObjectProvider;
 class DomainEventRouterTest {
 
   @Test
-  void routesKnownTypesAndIgnoresBlank() {
+  void routesKnownTypesAndRejectsBlank() {
     CustomerNotificationRequestedHandler notes = mock(CustomerNotificationRequestedHandler.class);
     NotificationDispatchConsumer dispatch = mock(NotificationDispatchConsumer.class);
     AutoKycOutboxConsumer kyc = mock(AutoKycOutboxConsumer.class);
@@ -34,8 +34,8 @@ class DomainEventRouterTest {
     OrderDeliveredCampaignConsumer campaigns = mock(OrderDeliveredCampaignConsumer.class);
     DomainEventRouter router = router(notes, dispatch, kyc, loyalty, referral, campaigns, null);
 
-    router.handle(null);
-    router.handle("  ");
+    assertThatThrownBy(() -> router.handle(null)).isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> router.handle("  ")).isInstanceOf(IllegalStateException.class);
     verifyNoInteractions(notes, kyc);
 
     router.handle("{\"type\":\"customer.notification.requested\"}");
@@ -49,10 +49,14 @@ class DomainEventRouterTest {
     verify(referral).accept(any(OutboxMessage.class));
     verify(campaigns).accept(any(OutboxMessage.class));
 
-    router.handle("{\"type\":\"unknown.event\"}");
-    router.handle("{\"type\":\"order.placed\"}");
+    assertThatThrownBy(() -> router.handle("{\"type\":\"unknown.event\"}"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> router.handle("{\"type\":\"order.placed\"}"))
+        .isInstanceOf(IllegalStateException.class);
     router.handle("{\"type\":\"pharmacy.kyc.async_check_requested\"}");
-    router.handle("{\"event_id\":\"11111111-1111-4111-8111-111111111111\"}");
+    assertThatThrownBy(
+            () -> router.handle("{\"event_id\":\"11111111-1111-4111-8111-111111111111\"}"))
+        .isInstanceOf(IllegalStateException.class);
     router.handle(
         "{\"type\":\"customer.notification.requested\",\"eventId\":\"11111111-1111-4111-8111-111111111111\"}");
   }
@@ -100,11 +104,14 @@ class DomainEventRouterTest {
   }
 
   @Test
-  void unknownNonDispatchableAcks() {
+  void unknownNonDispatchableFailsClosed() {
     NotificationDispatchConsumer dispatch = mock(NotificationDispatchConsumer.class);
     when(dispatch.tryHandle(anyString())).thenReturn(false);
-    router(null, dispatch, null, null, null, null, null)
-        .handle("{\"type\":\"automation.action.executed\"}");
+    assertThatThrownBy(
+            () ->
+                router(null, dispatch, null, null, null, null, null)
+                    .handle("{\"type\":\"automation.action.executed\"}"))
+        .isInstanceOf(IllegalStateException.class);
     verify(dispatch).tryHandle(anyString());
     verify(dispatch, never()).handleMessage(anyString());
   }
@@ -154,7 +161,8 @@ class DomainEventRouterTest {
     assertThatThrownBy(() -> empty.handle("{\"type\":\"order.delivered\"}"))
         .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(() -> empty.handle("{bad")).isInstanceOf(IllegalStateException.class);
-    empty.handle("{\"type\":\"unknown.event\"}");
+    assertThatThrownBy(() -> empty.handle("{\"type\":\"unknown.event\"}"))
+        .isInstanceOf(IllegalStateException.class);
   }
 
   @Test

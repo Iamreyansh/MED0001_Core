@@ -61,6 +61,7 @@ public class PaymentConfig {
         || StubRazorpayGatewayClient.DEFAULT_WEBHOOK_SECRET.equals(webhookSecret)
         || StubRazorpayGatewayClient.DEFAULT_KEY_ID.equals(keyId)
         || "rzp_live_replace_me".equals(keyId)
+        || "rzp_test_replace_me".equals(keyId)
         || "replace_me".equals(keySecret)) {
       throw new IllegalStateException(
           "medmate.razorpay.* must not use stub/default secrets in staging/prod");
@@ -78,7 +79,9 @@ public class PaymentConfig {
           "medmate.razorpayx.key-id and key-secret must be set for staging/prod");
     }
     if (StubRazorpayXPayoutClient.DEFAULT_KEY_ID.equals(keyId)
-        || StubRazorpayXPayoutClient.DEFAULT_KEY_SECRET.equals(keySecret)) {
+        || StubRazorpayXPayoutClient.DEFAULT_KEY_SECRET.equals(keySecret)
+        || "rzp_test_replace_me".equals(keyId)
+        || "replace_me".equals(keySecret)) {
       throw new IllegalStateException(
           "medmate.razorpayx.* must not use stub/default secrets in staging/prod");
     }

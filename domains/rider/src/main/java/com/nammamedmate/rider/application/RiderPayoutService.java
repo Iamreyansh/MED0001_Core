@@ -4,6 +4,7 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.messaging.ProviderOperationStore;
 import com.nammamedmate.rider.application.port.out.PlatformPricingConfigStore;
 import com.nammamedmate.rider.application.port.out.RazorpayRoutePort;
 import com.nammamedmate.rider.application.port.out.RazorpayRoutePort.PayoutResult;
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +46,7 @@ public class RiderPayoutService {
   private final PlatformPricingConfigStore config;
   private final OutboxPublisher outbox;
   private final Clock clock;
+  private final ProviderOperationStore providerOps;
 
   public RiderPayoutService(
       RiderStore riders,
@@ -52,6 +56,19 @@ public class RiderPayoutService {
       PlatformPricingConfigStore config,
       OutboxPublisher outbox,
       Clock clock) {
+    this(riders, earnings, payouts, razorpay, config, outbox, clock, null);
+  }
+
+  @Autowired
+  public RiderPayoutService(
+      RiderStore riders,
+      RiderTripEarningsStore earnings,
+      RiderPayoutStore payouts,
+      RazorpayRoutePort razorpay,
+      PlatformPricingConfigStore config,
+      OutboxPublisher outbox,
+      Clock clock,
+      @Nullable ProviderOperationStore providerOps) {
     this.riders = riders;
     this.earnings = earnings;
     this.payouts = payouts;
@@ -59,6 +76,7 @@ public class RiderPayoutService {
     this.config = config;
     this.outbox = outbox;
     this.clock = clock;
+    this.providerOps = providerOps;
   }
 
   /** AC-003: compute previous Mon–Sun cycle for all eligible riders. */
@@ -267,7 +285,17 @@ public class RiderPayoutService {
 
   private Map<String, Object> attemptDisburse(PayoutRecord p, UUID releasedBy, boolean manual) {
     Instant now = clock.instant();
-    PayoutResult result = razorpay.disburse(p.riderId(), p.netPayoutPaise(), p.id());
+    String opKey = "rider-payout:" + p.id();
+    PayoutResult result = replayRiderPayout(opKey);
+    if (result == null) {
+      if (providerOps != null) {
+        providerOps.ensurePending("PAYOUT", opKey, "razorpay");
+      }
+      result = razorpay.disburse(p.riderId(), p.netPayoutPaise(), p.id());
+      if (providerOps != null && result.success()) {
+        providerOps.markSent("PAYOUT", opKey, result.razorpayPayoutId());
+      }
+    }
     if (result.success()) {
       PayoutRecord released =
           copy(
@@ -397,6 +425,17 @@ public class RiderPayoutService {
     data.put("released_by", p.releasedBy() == null ? null : p.releasedBy().toString());
     data.put("released_at", p.releasedAt() == null ? null : p.releasedAt().toString());
     return data;
+  }
+
+  private PayoutResult replayRiderPayout(String opKey) {
+    if (providerOps == null) {
+      return null;
+    }
+    return providerOps
+        .find("PAYOUT", opKey)
+        .filter(ProviderOperationStore.Operation::hasProviderRef)
+        .map(op -> new PayoutResult(true, op.providerRef(), op.providerRef(), null))
+        .orElse(null);
   }
 
   private static PayoutRecord copy(

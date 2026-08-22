@@ -24,4 +24,9 @@ public interface OutboxStore {
   void markPublished(OutboxMessage message);
 
   void markFailed(OutboxMessage message, String error);
+
+  /** After max attempts the row is skipped by {@link #claimUnpublished}. */
+  default void markPoisoned(OutboxMessage message, String error) {
+    markFailed(message, error);
+  }
 }

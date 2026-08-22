@@ -160,21 +160,7 @@ public class JdbcPharmacyRegistrationStore implements PharmacyRegistrationStore 
 
   @Override
   public void activateAfterAutoKyc(UUID pharmacyId, UUID zoneId, Instant at) {
-    jdbc.update(
-        """
-        UPDATE pharmacies SET
-          status = 'ACTIVE',
-          is_online = TRUE,
-          zone_id = ?,
-          plan = 'FREE',
-          activated_at = COALESCE(activated_at, ?),
-          updated_at = ?
-        WHERE id = ? AND deleted_at IS NULL
-        """,
-        zoneId,
-        Timestamp.from(at),
-        Timestamp.from(at),
-        pharmacyId);
+    // D8: auto-KYC never activates — method retained for binary compat; no-op.
   }
 
   private PharmacyRecord mapRow(ResultSet rs, int rowNum) throws SQLException {

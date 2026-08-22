@@ -2,6 +2,7 @@ package com.nammamedmate.order.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.messaging.ProviderOperationStore;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.order.application.port.out.OrderCancellationStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
@@ -51,6 +52,7 @@ public class RefundService implements RefundInitiatorPort {
   private final WalletPort wallet;
   private final Clock clock;
   private final TransactionTemplate tx;
+  private final ProviderOperationStore providerOps;
 
   public RefundService(
       RefundStore refunds,
@@ -59,7 +61,18 @@ public class RefundService implements RefundInitiatorPort {
       RazorpayPaymentPort razorpay,
       WalletPort wallet,
       Clock clock) {
-    this(refunds, cancellations, orders, razorpay, wallet, clock, null);
+    this(refunds, cancellations, orders, razorpay, wallet, clock, null, null);
+  }
+
+  public RefundService(
+      RefundStore refunds,
+      OrderCancellationStore cancellations,
+      OrderStore orders,
+      RazorpayPaymentPort razorpay,
+      WalletPort wallet,
+      Clock clock,
+      @Nullable PlatformTransactionManager transactionManager) {
+    this(refunds, cancellations, orders, razorpay, wallet, clock, transactionManager, null);
   }
 
   @Autowired
@@ -70,7 +83,8 @@ public class RefundService implements RefundInitiatorPort {
       RazorpayPaymentPort razorpay,
       WalletPort wallet,
       Clock clock,
-      @Nullable PlatformTransactionManager transactionManager) {
+      @Nullable PlatformTransactionManager transactionManager,
+      @Nullable ProviderOperationStore providerOps) {
     this.refunds = refunds;
     this.cancellations = cancellations;
     this.orders = orders;
@@ -78,6 +92,7 @@ public class RefundService implements RefundInitiatorPort {
     this.wallet = wallet;
     this.clock = clock;
     this.tx = transactionManager == null ? null : new TransactionTemplate(transactionManager);
+    this.providerOps = providerOps;
   }
 
   private <T> T inTx(Supplier<T> action) {
@@ -421,11 +436,22 @@ public class RefundService implements RefundInitiatorPort {
     inTx(() -> refunds.insert(refund));
 
     try {
-      RazorpayPaymentPort.RefundResult rz = razorpay.refund(paymentId, amountPaise);
+      String opKey = "order-refund:" + id;
+      RazorpayPaymentPort.RefundResult rz = replayRefund(opKey, amountPaise);
+      if (rz == null) {
+        if (providerOps != null) {
+          providerOps.ensurePending("REFUND", opKey, "razorpay");
+        }
+        rz = razorpay.refund(paymentId, amountPaise);
+        if (providerOps != null) {
+          providerOps.markSent("REFUND", opKey, rz.razorpayRefundId());
+        }
+      }
+      final RazorpayPaymentPort.RefundResult gateway = rz;
       LocalDate expectedBy = addBusinessDays(LocalDate.ofInstant(now, IST), 5);
       inTx(
           () -> {
-            refund.setRazorpayRefundId(rz.razorpayRefundId());
+            refund.setRazorpayRefundId(gateway.razorpayRefundId());
             refund.setExpectedBy(expectedBy);
             refunds.update(refund);
             refreshOrderPaymentStatus(order.id(), now);
@@ -443,6 +469,17 @@ public class RefundService implements RefundInitiatorPort {
       throw new AppException("RAZORPAY_REFUND_FAILED", "Failed to initiate Razorpay refund", 502);
     }
     return refund;
+  }
+
+  private RazorpayPaymentPort.RefundResult replayRefund(String opKey, long amountPaise) {
+    if (providerOps == null) {
+      return null;
+    }
+    return providerOps
+        .find("REFUND", opKey)
+        .filter(ProviderOperationStore.Operation::hasProviderRef)
+        .map(op -> new RazorpayPaymentPort.RefundResult(op.providerRef(), amountPaise))
+        .orElse(null);
   }
 
   static LocalDate addBusinessDays(LocalDate start, int days) {

@@ -40,6 +40,11 @@ public interface ConsultStore {
     return List.of();
   }
 
+  /** NOW-slot REQUESTED consults with no doctor, FIFO by created_at. */
+  default List<Consult> findQueuedNowUnassigned() {
+    return List.of();
+  }
+
   /** Active queue rows sorted IN_CALL → CALLING → DOCTOR_REVIEWING → REQUESTED, then created_at. */
   List<QueueItem> listActiveQueue();
 

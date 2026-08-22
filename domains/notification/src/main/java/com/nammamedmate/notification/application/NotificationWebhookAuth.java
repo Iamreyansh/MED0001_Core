@@ -51,10 +51,31 @@ public class NotificationWebhookAuth {
 
   public static void validateSecretsForDeployedProfile(String smsSecret, String emailSecret) {
     if (blankOrDefault(smsSecret, DEFAULT_SMS_SECRET)
-        || blankOrDefault(emailSecret, DEFAULT_EMAIL_SECRET)) {
+        || blankOrDefault(emailSecret, DEFAULT_EMAIL_SECRET)
+        || isPlaceholder(smsSecret)
+        || isPlaceholder(emailSecret)) {
       throw new IllegalStateException(
           "medmate.sms.webhook-secret and medmate.email.webhook-secret must be injected");
     }
+  }
+
+  public static void validateVendorKeysForDeployedProfile(
+      String msg91, String fcm, String sendgrid, String whatsapp) {
+    if (isPlaceholder(msg91)
+        || isPlaceholder(fcm)
+        || isPlaceholder(sendgrid)
+        || isPlaceholder(whatsapp)) {
+      throw new IllegalStateException(
+          "comms vendor keys must be injected (not blank or replace_me) in staging/prod");
+    }
+  }
+
+  static boolean isPlaceholder(String value) {
+    if (value == null || value.isBlank()) {
+      return true;
+    }
+    String v = value.trim();
+    return "replace_me".equals(v) || "changeme".equalsIgnoreCase(v);
   }
 
   private static boolean blankOrDefault(String secret, String defaultSecret) {

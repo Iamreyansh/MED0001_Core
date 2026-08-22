@@ -11,6 +11,7 @@ import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
 import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
+import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.WalletPort;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -74,18 +75,39 @@ public class PaymentOrderBridgeConfig {
 
   @Bean
   @Primary
-  WalletPort paymentWalletPort(WalletService walletService) {
+  WalletPort paymentWalletPort(WalletService walletService, FinancialLedgerWriterPort ledger) {
     return (customerId, orderId, amountPaise, description) -> {
       Map<String, Object> result =
           walletService.debitForOrder(customerId, orderId, amountPaise, description);
+      long debitPaise = 0L;
       Object debited = result.get("amount_debited");
       if (debited instanceof BigDecimal bd) {
-        return bd.movePointRight(2).longValueExact();
+        debitPaise = bd.movePointRight(2).longValueExact();
+      } else if (debited instanceof Number n) {
+        debitPaise = BigDecimal.valueOf(n.doubleValue()).movePointRight(2).longValue();
       }
-      if (debited instanceof Number n) {
-        return BigDecimal.valueOf(n.doubleValue()).movePointRight(2).longValue();
+      if (debitPaise > 0
+          && ledger != null
+          && !Boolean.TRUE.equals(result.get("already_processed"))) {
+        Object tx = result.get("transaction_id");
+        UUID txId =
+            tx instanceof UUID u
+                ? u
+                : tx != null ? UUID.fromString(tx.toString()) : UUID.randomUUID();
+        ledger.append(
+            "WALLET_DEBIT",
+            txId,
+            "WALLET",
+            0L,
+            debitPaise,
+            description == null || description.isBlank() ? "Payment wallet debit" : description,
+            Map.of(
+                "customer_id",
+                customerId == null ? "" : customerId.toString(),
+                "order_id",
+                orderId == null ? "" : orderId.toString()));
       }
-      return 0L;
+      return debitPaise;
     };
   }
 

@@ -12,6 +12,8 @@ import org.springframework.jdbc.core.RowMapper;
 /** Persists domain events to {@code outbox_message} and claims them with {@code SKIP LOCKED}. */
 public final class JdbcOutboxStore implements OutboxStore {
 
+  static final int MAX_ATTEMPTS = 8;
+
   private static final RowMapper<OutboxMessage> MAPPER =
       (rs, rowNum) ->
           new OutboxMessage(
@@ -53,6 +55,8 @@ public final class JdbcOutboxStore implements OutboxStore {
          WHERE id IN (
            SELECT id FROM outbox_message
             WHERE published = FALSE
+              AND poisoned = FALSE
+              AND attempts < ?
               AND (locked_at IS NULL OR locked_at < ?)
             ORDER BY created_at ASC
             LIMIT ?
@@ -63,6 +67,7 @@ public final class JdbcOutboxStore implements OutboxStore {
         MAPPER,
         leaseUntil,
         owner,
+        MAX_ATTEMPTS,
         Timestamp.from(now),
         limit);
   }
@@ -77,9 +82,34 @@ public final class JdbcOutboxStore implements OutboxStore {
 
   @Override
   public void markFailed(OutboxMessage message, String error) {
+    String text = error == null ? "transport failed" : error;
+    int poisoned =
+        jdbc.update(
+            """
+            UPDATE outbox_message
+               SET last_error = ?, locked_at = NULL, poisoned = TRUE
+             WHERE id = ? AND attempts >= ?
+            """,
+            text,
+            message.id(),
+            MAX_ATTEMPTS);
+    if (poisoned == 0) {
+      jdbc.update(
+          "UPDATE outbox_message SET last_error = ?, locked_at = NULL WHERE id = ?",
+          text,
+          message.id());
+    }
+  }
+
+  @Override
+  public void markPoisoned(OutboxMessage message, String error) {
     jdbc.update(
-        "UPDATE outbox_message SET last_error = ?, locked_at = NULL WHERE id = ?",
-        error == null ? "transport failed" : error,
+        """
+        UPDATE outbox_message
+           SET last_error = ?, locked_at = NULL, poisoned = TRUE
+         WHERE id = ?
+        """,
+        error == null ? "poisoned" : error,
         message.id());
   }
 }

@@ -28,7 +28,7 @@ jobs:
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN != '' && vars.AWS_CI_ROLE_ARN || vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - uses: ./.github/actions/setup-java
         with:
@@ -42,6 +42,16 @@ jobs:
         run: make bruno-check
       - name: Spotless, unit + integration tests, JaCoCo 100%, SpotBugs, ArchUnit
         run: make check
+      - name: OWASP dependency analysis
+        run: make dependency-check
+      - name: Filesystem vulnerability scan (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
       - name: Save Gradle cache to S3
         if: success() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         run: scripts/ci-gradle-s3-cache.sh save

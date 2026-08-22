@@ -277,6 +277,52 @@ public class JdbcCustomerProfileStore implements CustomerProfileStore {
         """,
         Timestamp.from(deletedAt),
         id);
+    jdbc.update(
+        """
+        UPDATE prescription SET
+          patient_name = 'REDACTED',
+          doctor_name = 'REDACTED',
+          notes = NULL,
+          medicines_extracted = NULL,
+          updated_at = ?
+        WHERE customer_id = ? AND deleted_at IS NULL
+        """,
+        Timestamp.from(deletedAt),
+        id);
+    jdbc.update(
+        """
+        UPDATE consults SET
+          patient_name = 'REDACTED',
+          patient_phone = '0000000000',
+          symptoms = NULL,
+          feedback_text = NULL,
+          updated_at = ?
+        WHERE customer_id = ? AND deleted_at IS NULL
+        """,
+        Timestamp.from(deletedAt),
+        id);
+    jdbc.update(
+        """
+        UPDATE support_tickets SET
+          subject = 'REDACTED',
+          resolution_summary = NULL,
+          csat_feedback = NULL
+        WHERE customer_id = ? AND deleted_at IS NULL
+        """,
+        id);
+    jdbc.update(
+        """
+        UPDATE schedule_medicine SET
+          medicine_name = 'REDACTED',
+          prescribed_by = NULL,
+          notes = NULL,
+          condition_name = NULL,
+          is_active = FALSE,
+          updated_at = ?
+        WHERE customer_id = ?
+        """,
+        Timestamp.from(deletedAt),
+        id);
   }
 
   static String escapeIlike(String raw) {

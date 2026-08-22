@@ -58,7 +58,7 @@ class PharmacyPosControllerTest {
         .thenReturn(Map.of("customer_id", UUID.randomUUID().toString()));
     when(cartService.applyDiscount(any(), eq(cartId), any(), any()))
         .thenReturn(Map.of("discount_type", "FLAT_RS"));
-    when(checkoutService.checkout(any(), eq(cartId), any(), any(), any(), any()))
+    when(checkoutService.checkout(any(), eq(cartId), any(), any(), any(), any(), any()))
         .thenReturn(Map.of("invoice_id", UUID.randomUUID().toString()));
 
     ResponseEntity<ApiResponse<Map<String, Object>>> created =
@@ -90,6 +90,7 @@ class PharmacyPosControllerTest {
                 .checkout(
                     principal,
                     cartId,
+                    null,
                     new PharmacyPosController.CheckoutRequest(
                         "CASH", BigDecimal.valueOf(100), null, null))
                 .getStatusCode())
@@ -102,8 +103,8 @@ class PharmacyPosControllerTest {
     controller.search(principal, cartId, null);
     controller.attachCustomer(principal, cartId, null);
     controller.applyDiscount(principal, cartId, null);
-    controller.checkout(principal, cartId, null);
+    controller.checkout(principal, cartId, null, null);
     verify(checkoutService)
-        .checkout(eq(principal), eq(cartId), isNull(), isNull(), isNull(), isNull());
+        .checkout(eq(principal), eq(cartId), isNull(), isNull(), isNull(), isNull(), isNull());
   }
 }

@@ -56,4 +56,22 @@ public final class SchedulerLease {
       return false;
     }
   }
+
+  /** Owner-checked release so a later instance cannot drop another owner's lock. */
+  public boolean release(String jobName) {
+    if (jobName == null || jobName.isBlank()) {
+      return false;
+    }
+    return jdbc.update(
+            """
+            UPDATE scheduler_lease
+               SET locked_until = ?
+             WHERE job_name = ?
+               AND locked_by = ?
+            """,
+            java.sql.Timestamp.from(clock.instant().minusSeconds(1)),
+            jobName.trim(),
+            instanceId)
+        > 0;
+  }
 }

@@ -246,6 +246,7 @@ public class PharmacyRxQueueService {
     Instant now = clock.instant();
     queueStore.markApproved(
         entry.id(), medicines, principal.subject(), now, normalizedNotes, duplicate, now);
+    prescriptionStore.updateStatus(entry.rxId(), "APPROVED", now);
     if (entry.orderId() != null) {
       orderLines.replaceOrderLines(entry.orderId(), medicines);
     }
@@ -281,6 +282,7 @@ public class PharmacyRxQueueService {
     PrescriptionRecord rx = requireRx(entry.rxId());
     Instant now = clock.instant();
     queueStore.markRejected(entry.id(), code, message, principal.subject(), now, now);
+    prescriptionStore.updateStatus(entry.rxId(), "REJECTED", now);
     notifications.notifyCustomerRxRejected(rx.customerId(), rxId, code, message);
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("rx_id", rxId);
@@ -308,6 +310,7 @@ public class PharmacyRxQueueService {
     UUID saleId = pos.createSaleRecord(pharmacyId, principal.subject(), entry.orderId(), meds);
     scheduleRegister.recordDispense(pharmacyId, rxId, principal.subject(), meds);
     queueStore.markDispensed(entry.id(), principal.subject(), now, now);
+    prescriptionStore.updateStatus(entry.rxId(), "DISPENSED", now);
     if (entry.orderId() != null) {
       orderStatus.markReadyForPickup(entry.orderId());
     }

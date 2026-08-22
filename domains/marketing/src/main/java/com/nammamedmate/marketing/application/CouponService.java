@@ -418,6 +418,11 @@ public class CouponService {
     if (c.budgetTotalPaise() > 0 && c.budgetUsedPaise() >= c.budgetTotalPaise()) {
       return invalid(null, null, 0L, "COUPON_BUDGET_EXHAUSTED");
     }
+    if (c.maxRedemptionsTotal() != null
+        && c.maxRedemptionsTotal() > 0
+        && store.countRedemptions(c.id()) >= c.maxRedemptionsTotal()) {
+      return invalid(null, null, 0L, "COUPON_MAX_REDEMPTIONS");
+    }
     if (store.countRedemptionsForCustomer(c.id(), customerId) >= c.maxPerUser()) {
       return invalid(null, null, 0L, "COUPON_PER_USER_LIMIT");
     }
@@ -521,6 +526,11 @@ public class CouponService {
     if (c.budgetTotalPaise() > 0 && c.budgetUsedPaise() >= c.budgetTotalPaise()) {
       throw new AppException("COUPON_BUDGET_EXHAUSTED", "Coupon budget is exhausted", 422);
     }
+    if (c.maxRedemptionsTotal() != null
+        && c.maxRedemptionsTotal() > 0
+        && store.countRedemptions(c.id()) >= c.maxRedemptionsTotal()) {
+      throw new AppException("COUPON_MAX_REDEMPTIONS", "Coupon redemption cap reached", 422);
+    }
     if (customerId != null
         && store.countRedemptionsForCustomer(c.id(), customerId) >= c.maxPerUser()) {
       throw new AppException("COUPON_PER_USER_LIMIT", "Coupon already used the maximum times", 422);
@@ -582,7 +592,16 @@ public class CouponService {
       UUID customerId,
       long discountAppliedPaise,
       long orderTotalPaise) {
-    Coupon c = requireCoupon(couponCode);
+    String normalized = normalizeCode(couponCode);
+    Coupon c =
+        store
+            .findByCodeForUpdate(normalized)
+            .orElseThrow(() -> new AppException("COUPON_NOT_FOUND", "Coupon not found", 404));
+    if (c.maxRedemptionsTotal() != null
+        && c.maxRedemptionsTotal() > 0
+        && c.redemptionsCount() >= c.maxRedemptionsTotal()) {
+      throw new AppException("COUPON_MAX_REDEMPTIONS", "Coupon redemption cap reached", 422);
+    }
     Instant now = clock.instant();
     store.insertRedemption(
         Ids.newId(), c.id(), orderId, customerId, discountAppliedPaise, orderTotalPaise, now);

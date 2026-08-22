@@ -33,7 +33,6 @@ public final class SqsEventDispatcher {
         dispatched++;
       } catch (RuntimeException ex) {
         store.markFailed(message, ex.getMessage());
-        break;
       }
     }
     return dispatched;

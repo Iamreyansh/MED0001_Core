@@ -181,7 +181,8 @@ public class JdbcMetricSourceAdapter implements MetricSourcePort {
 
   @Override
   public BigDecimal apiP99CompliancePct30d() {
-    return new BigDecimal("99.0");
+    // No ALB/CloudWatch latency feed yet — never claim fake SLO compliance.
+    return BigDecimal.ZERO;
   }
 
   @Override

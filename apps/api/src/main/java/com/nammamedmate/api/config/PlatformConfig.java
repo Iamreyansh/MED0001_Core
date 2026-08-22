@@ -10,10 +10,16 @@ import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.kernel.storage.PresignedUrlService;
 import com.nammamedmate.kernel.storage.S3PresignedUrlService;
+import com.nammamedmate.messaging.ConsumerInbox;
+import com.nammamedmate.messaging.JdbcConsumerInbox;
 import com.nammamedmate.messaging.JdbcOutboxStore;
+import com.nammamedmate.messaging.JdbcProviderOperationStore;
+import com.nammamedmate.messaging.JdbcWebhookInbox;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.messaging.OutboxStore;
+import com.nammamedmate.messaging.ProviderOperationStore;
 import com.nammamedmate.messaging.SchedulerLease;
+import com.nammamedmate.messaging.WebhookInbox;
 import com.nammamedmate.messaging.SqsEventDispatcher;
 import com.nammamedmate.messaging.SqsOutboxTransport;
 import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
@@ -169,6 +175,21 @@ public class PlatformConfig {
     return new SchedulerLease(jdbcTemplate, clock);
   }
 
+  @Bean
+  ConsumerInbox consumerInbox(JdbcTemplate jdbcTemplate) {
+    return new JdbcConsumerInbox(jdbcTemplate);
+  }
+
+  @Bean
+  ProviderOperationStore providerOperationStore(JdbcTemplate jdbcTemplate) {
+    return new JdbcProviderOperationStore(jdbcTemplate);
+  }
+
+  @Bean
+  WebhookInbox webhookInbox(JdbcTemplate jdbcTemplate) {
+    return new JdbcWebhookInbox(jdbcTemplate);
+  }
+
   @Bean(destroyMethod = "close")
   @ConditionalOnMissingBean(SqsClient.class)
   SqsClient sqsClient() {
@@ -271,6 +292,18 @@ public class PlatformConfig {
     return args ->
         com.nammamedmate.payment.PaymentConfig.validateRazorpayXSecretsForDeployedProfile(
             keyId, keySecret, true);
+  }
+
+  @Bean
+  @Profile({"prod", "staging"})
+  org.springframework.boot.ApplicationRunner commsVendorSecretsGuard(
+      @Value("${medmate.msg91.auth-key:}") String msg91,
+      @Value("${medmate.fcm.server-key:}") String fcm,
+      @Value("${medmate.sendgrid.api-key:}") String sendgrid,
+      @Value("${medmate.whatsapp.access-token:}") String whatsapp) {
+    return args ->
+        com.nammamedmate.notification.application.NotificationWebhookAuth
+            .validateVendorKeysForDeployedProfile(msg91, fcm, sendgrid, whatsapp);
   }
 
   @Bean

@@ -43,7 +43,7 @@ class JdbcMetricSourceAdapterTest {
     assertThat(adapter.payoutHourlyAvg7dPaise()).isEqualTo(30L);
     assertThat(adapter.activeAutomations()).isEqualTo(30);
     assertThat(adapter.pendingApprovals()).isEqualTo(30);
-    assertThat(adapter.apiP99CompliancePct30d()).isEqualByComparingTo("99.0");
+    assertThat(adapter.apiP99CompliancePct30d()).isEqualByComparingTo("0");
 
     when(jdbc.query(anyString(), any(ResultSetExtractor.class)))
         .thenAnswer(

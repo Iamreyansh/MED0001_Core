@@ -6,6 +6,7 @@ import com.nammamedmate.automation.adapter.in.messaging.AutomationTriggerConsume
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredLoyaltyConsumer;
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredReferralConsumer;
 import com.nammamedmate.marketing.adapter.in.messaging.OrderDeliveredCampaignConsumer;
+import com.nammamedmate.messaging.ConsumerInbox;
 import com.nammamedmate.messaging.OutboxMessage;
 import com.nammamedmate.notification.adapter.in.messaging.CustomerNotificationRequestedHandler;
 import com.nammamedmate.notification.adapter.in.messaging.NotificationDispatchConsumer;
@@ -17,6 +18,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /** Routes SQS domain-event payloads to idempotent consumers. Failures propagate for retry/DLQ. */
@@ -33,6 +35,7 @@ public class DomainEventRouter {
   private final ObjectProvider<OrderDeliveredReferralConsumer> referral;
   private final ObjectProvider<OrderDeliveredCampaignConsumer> campaigns;
   private final ObjectProvider<AutomationTriggerConsumer> automation;
+  private final ConsumerInbox inbox;
 
   public DomainEventRouter(
       ObjectMapper objectMapper,
@@ -43,6 +46,29 @@ public class DomainEventRouter {
       ObjectProvider<OrderDeliveredReferralConsumer> referral,
       ObjectProvider<OrderDeliveredCampaignConsumer> campaigns,
       ObjectProvider<AutomationTriggerConsumer> automation) {
+    this(
+        objectMapper,
+        notifications,
+        dispatch,
+        autoKyc,
+        loyalty,
+        referral,
+        campaigns,
+        automation,
+        null);
+  }
+
+  @Autowired
+  public DomainEventRouter(
+      ObjectMapper objectMapper,
+      ObjectProvider<CustomerNotificationRequestedHandler> notifications,
+      ObjectProvider<NotificationDispatchConsumer> dispatch,
+      ObjectProvider<AutoKycOutboxConsumer> autoKyc,
+      ObjectProvider<OrderDeliveredLoyaltyConsumer> loyalty,
+      ObjectProvider<OrderDeliveredReferralConsumer> referral,
+      ObjectProvider<OrderDeliveredCampaignConsumer> campaigns,
+      ObjectProvider<AutomationTriggerConsumer> automation,
+      ConsumerInbox inbox) {
     this.objectMapper = objectMapper;
     this.notifications = notifications;
     this.dispatch = dispatch;
@@ -51,12 +77,12 @@ public class DomainEventRouter {
     this.referral = referral;
     this.campaigns = campaigns;
     this.automation = automation;
+    this.inbox = inbox;
   }
 
   public void handle(String messageBody) {
     if (messageBody == null || messageBody.isBlank()) {
-      log.warn("Received empty SQS payload — ack without requeue");
-      return;
+      throw new IllegalStateException("Empty SQS payload");
     }
     Map<String, Object> root;
     try {
@@ -65,14 +91,24 @@ public class DomainEventRouter {
       throw new IllegalStateException("Failed to parse domain event", e);
     }
     String type = root.get("type") == null ? "" : String.valueOf(root.get("type"));
-    OutboxMessage envelope =
-        new OutboxMessage(eventId(root), type, messageBody, Instant.now(), false);
+    if (type.isBlank()) {
+      throw new IllegalStateException("Domain event missing type");
+    }
+    UUID id = eventId(root);
+    if (inbox != null && inbox.alreadyProcessed("domain-event-router", id)) {
+      log.info("Duplicate event skipped type={} id={}", type, id);
+      return;
+    }
+    OutboxMessage envelope = new OutboxMessage(id, type, messageBody, Instant.now(), false);
     if (isKnownNotificationType(type)) {
       routeNotification(type, messageBody);
     } else {
       routeDomain(type, envelope, messageBody);
     }
     Optional.ofNullable(automation.getIfAvailable()).ifPresent(c -> c.accept(envelope));
+    if (inbox != null) {
+      inbox.claim("domain-event-router", id);
+    }
   }
 
   private void routeDomain(String type, OutboxMessage envelope, String messageBody) {
@@ -116,7 +152,10 @@ public class DomainEventRouter {
     if (consumer != null && consumer.tryHandle(messageBody)) {
       return;
     }
-    log.info("No dedicated consumer for type={} length={}", type, messageBody.length());
+    if (automation.getIfAvailable() != null) {
+      return;
+    }
+    throw new IllegalStateException("Unsupported event type: " + type);
   }
 
   static boolean isKnownNotificationType(String type) {
@@ -138,11 +177,13 @@ public class DomainEventRouter {
           "observability.alert.critical_page",
           "observability.incident.declared",
           "observability.incident.postmortem_reminder",
-          "inventory.po.sent" ->
+          "inventory.po.sent",
+          "pharmacy.kyc.expiry_alert" ->
           true;
       default ->
           type.startsWith("support.notification.")
               || type.startsWith("pharmacy.notification.")
+              || type.startsWith("rider.notification.")
               || type.startsWith("marketing.notification.")
               || type.startsWith("crm.account.");
     };

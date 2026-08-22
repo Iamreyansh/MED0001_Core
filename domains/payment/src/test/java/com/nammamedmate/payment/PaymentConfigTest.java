@@ -219,6 +219,16 @@ class PaymentConfigTest {
                     StubRazorpayXPayoutClient.DEFAULT_KEY_SECRET,
                     true))
         .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                PaymentConfig.validateRazorpaySecretsForDeployedProfile(
+                    "rzp_test_replace_me", "replace_me", "wh", true))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                PaymentConfig.validateRazorpayXSecretsForDeployedProfile(
+                    "rzp_test_replace_me", "replace_me", true))
+        .isInstanceOf(IllegalStateException.class);
 
     Environment env = mock(Environment.class);
     when(env.getActiveProfiles()).thenReturn(new String[] {"prod"});

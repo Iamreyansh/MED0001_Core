@@ -216,11 +216,16 @@ public class OrderInventoryBridgeConfig {
       UUID orderId) {
     UUID productId = findProductId(jdbc, pharmacyId, medicineId);
     if (productId == null || fefo == null || batches == null) {
+      // Catalogue/sellable-only stock: no FEFO batch ledger for this SKU.
       return;
     }
     Instant now = Instant.now();
     int remaining = quantity;
-    for (ProductBatch batch : fefo.listPosEligibleBatches(pharmacyId, productId)) {
+    List<ProductBatch> eligible = fefo.listPosEligibleBatches(pharmacyId, productId);
+    if (eligible.isEmpty()) {
+      throw new AppException("ITEMS_OUT_OF_STOCK", "FEFO batches empty for deduct", 422);
+    }
+    for (ProductBatch batch : eligible) {
       if (remaining <= 0) {
         break;
       }
@@ -228,8 +233,9 @@ public class OrderInventoryBridgeConfig {
       if (take <= 0) {
         continue;
       }
-      int after = batch.quantityCurrent() - take;
-      batches.updateQuantities(batch.id(), batch.quantityReceived(), after, after > 0, now);
+      if (batches.tryDeductQuantity(batch.id(), take, now).isEmpty()) {
+        throw new AppException("ITEMS_OUT_OF_STOCK", "FEFO concurrent stock race", 422);
+      }
       batches.insertStockMovement(
           UUID.randomUUID(),
           pharmacyId,
@@ -241,6 +247,9 @@ public class OrderInventoryBridgeConfig {
           null,
           now);
       remaining -= take;
+    }
+    if (remaining > 0) {
+      throw new AppException("ITEMS_OUT_OF_STOCK", "FEFO batches incomplete for deduct", 422);
     }
     batches.refreshProductDenorm(pharmacyId, productId, now);
   }
@@ -286,7 +295,7 @@ public class OrderInventoryBridgeConfig {
                     pharmacyId,
                     productId,
                     batch.id(),
-                    "RETURN",
+                    "RELEASE",
                     restore,
                     "ORDER_RELEASE:" + orderId,
                     null,

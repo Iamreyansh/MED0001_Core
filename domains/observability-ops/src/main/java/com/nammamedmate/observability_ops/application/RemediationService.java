@@ -56,6 +56,10 @@ public class RemediationService {
   private final OnlineAdminDirectoryPort admins;
   private final Clock clock;
 
+  @org.springframework.beans.factory.annotation.Value(
+      "${medmate.observability.auto-remediate:true}")
+  private boolean autoRemediate = true;
+
   public RemediationService(
       RemediationPlaybookStore playbooks,
       RemediationLogStore logs,
@@ -210,6 +214,9 @@ public class RemediationService {
   /** Cron entry: evaluate open alerts + stub-sourced conditions for enabled playbooks. */
   @Transactional
   public void runAutoCycle() {
+    if (!autoRemediate) {
+      return;
+    }
     Instant now = Instant.now(clock);
     processOpenAlerts(now);
     processFillRate(now);

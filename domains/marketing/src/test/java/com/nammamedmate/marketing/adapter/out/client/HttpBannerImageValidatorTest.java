@@ -172,5 +172,14 @@ class HttpBannerImageValidatorTest {
     assertThatThrownBy(() -> validator.validate("https://127.0.0.1:1/no-listen.jpg"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("INVALID_IMAGE_URL");
+    assertThatThrownBy(() -> validator.validate("http://169.254.169.254/latest/meta-data"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("INVALID_IMAGE_URL");
+    assertThatThrownBy(() -> validator.validate("http://10.0.0.1/secret.jpg"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("INVALID_IMAGE_URL");
+    assertThatThrownBy(() -> validator.validate("http://metadata.google.internal/x.jpg"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("INVALID_IMAGE_URL");
   }
 }

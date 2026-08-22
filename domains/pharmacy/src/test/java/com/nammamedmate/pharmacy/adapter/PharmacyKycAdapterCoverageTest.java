@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -761,8 +762,9 @@ class PharmacyKycAdapterCoverageTest {
     com.nammamedmate.pharmacy.adapter.out.persistence.JdbcPharmacyRegistrationStore pharmacyStore =
         new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcPharmacyRegistrationStore(
             jdbc, mapper);
+    // D8: auto-KYC activation helper is intentionally a no-op.
     pharmacyStore.activateAfterAutoKyc(PID, ZONE_ID, NOW);
-    verify(jdbc).update(contains("is_online = TRUE"), eq(ZONE_ID), any(), any(), eq(PID));
+    verify(jdbc, never()).update(contains("is_online = TRUE"), eq(ZONE_ID), any(), any(), eq(PID));
   }
 
   private static ResultSet mockAutoKycJobRs() throws Exception {

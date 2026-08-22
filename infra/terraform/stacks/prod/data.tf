@@ -24,8 +24,11 @@ resource "aws_db_instance" "this" {
   storage_encrypted            = true
   kms_key_id                   = aws_kms_key.this.arn
   backup_retention_period      = 7
-  skip_final_snapshot          = true
+  backup_window                = "18:30-19:00"
+  skip_final_snapshot          = false
+  final_snapshot_identifier    = "${local.name}-postgres-final"
   deletion_protection          = true
+  copy_tags_to_snapshot        = true
   multi_az                     = true
   publicly_accessible          = false
   apply_immediately            = true
@@ -60,13 +63,13 @@ resource "aws_elasticache_replication_group" "redis" {
   engine                     = "valkey"
   engine_version             = "8.0"
   node_type                  = "cache.t4g.micro"
-  num_cache_clusters         = 1
+  num_cache_clusters         = 2
   subnet_group_name          = aws_elasticache_subnet_group.this.name
   security_group_ids         = [aws_security_group.data.id]
   at_rest_encryption_enabled = true
   transit_encryption_enabled = true
   auth_token                 = random_password.redis.result
-  automatic_failover_enabled = false
+  automatic_failover_enabled = true
 }
 
 resource "random_password" "redis" {
@@ -96,6 +99,13 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "uploads" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
   bucket = aws_s3_bucket.uploads.id
   rule {
@@ -104,6 +114,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
     filter {}
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
+    }
+  }
+  rule {
+    id     = "expire-noncurrent"
+    status = "Enabled"
+    filter {}
+    noncurrent_version_expiration {
+      noncurrent_days = 30
     }
   }
 }

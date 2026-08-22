@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,6 +61,9 @@ class CouponServiceTest {
   @BeforeEach
   void setUp() {
     service = new CouponService(store, segments, notifications, Clock.fixed(NOW, ZoneOffset.UTC));
+    lenient()
+        .when(store.findByCodeForUpdate(anyString()))
+        .thenAnswer(inv -> store.findByCode(inv.getArgument(0)));
   }
 
   @Test

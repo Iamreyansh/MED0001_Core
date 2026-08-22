@@ -15,6 +15,7 @@ import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
 import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutRequest;
 import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.SettlementNotificationPort;
+import com.nammamedmate.messaging.ProviderOperationStore;
 import com.nammamedmate.payment.application.port.out.TcsRegisterWriterPort;
 import com.nammamedmate.payment.domain.MoneyFormats;
 import com.nammamedmate.payment.domain.SettlementStatuses;
@@ -55,6 +56,7 @@ public class SettlementFacadeService {
   private final TcsRegisterWriterPort tcsRegister;
   private final Clock clock;
   private final TransactionTemplate tx;
+  private final ProviderOperationStore providerOps;
 
   public SettlementFacadeService(
       PharmacySettlementPort settlements,
@@ -63,7 +65,26 @@ public class SettlementFacadeService {
       SettlementNotificationPort notifications,
       TcsRegisterWriterPort tcsRegister,
       Clock clock) {
-    this(settlements, razorpayx, ledger, notifications, tcsRegister, clock, null);
+    this(settlements, razorpayx, ledger, notifications, tcsRegister, clock, null, null);
+  }
+
+  public SettlementFacadeService(
+      PharmacySettlementPort settlements,
+      RazorpayXPayoutPort razorpayx,
+      FinancialLedgerWriterPort ledger,
+      SettlementNotificationPort notifications,
+      TcsRegisterWriterPort tcsRegister,
+      Clock clock,
+      @Nullable PlatformTransactionManager transactionManager) {
+    this(
+        settlements,
+        razorpayx,
+        ledger,
+        notifications,
+        tcsRegister,
+        clock,
+        transactionManager,
+        null);
   }
 
   @Autowired
@@ -74,7 +95,8 @@ public class SettlementFacadeService {
       SettlementNotificationPort notifications,
       TcsRegisterWriterPort tcsRegister,
       Clock clock,
-      @Nullable PlatformTransactionManager transactionManager) {
+      @Nullable PlatformTransactionManager transactionManager,
+      @Nullable ProviderOperationStore providerOps) {
     this.settlements = settlements;
     this.razorpayx = razorpayx;
     this.ledger = ledger;
@@ -82,6 +104,7 @@ public class SettlementFacadeService {
     this.tcsRegister = tcsRegister;
     this.clock = clock;
     this.tx = transactionManager == null ? null : new TransactionTemplate(transactionManager);
+    this.providerOps = providerOps;
   }
 
   private <T> T inTx(Supplier<T> action) {
@@ -214,14 +237,25 @@ public class SettlementFacadeService {
 
     try {
       // Outside DB TX — must not share a rollback boundary with claim/finalize
-      PayoutResult payout =
-          razorpayx.initiatePayout(
-              new PayoutRequest(
-                  settlement.pharmacyId(),
-                  settlementId,
-                  settlement.netPayablePaise(),
-                  last4FromMasked(bank.accountNumberMasked()),
-                  bank.ifsc()));
+      String opKey = "settlement:" + settlementId;
+      PayoutResult payout = replayPayout(opKey);
+      if (payout == null) {
+        if (providerOps != null) {
+          providerOps.ensurePending("PAYOUT", opKey, "razorpayx");
+        }
+        payout =
+            razorpayx.initiatePayout(
+                new PayoutRequest(
+                    settlement.pharmacyId(),
+                    settlementId,
+                    settlement.netPayablePaise(),
+                    last4FromMasked(bank.accountNumberMasked()),
+                    bank.ifsc()));
+        if (providerOps != null) {
+          providerOps.markSent("PAYOUT", opKey, payout.razorpayxPayoutId());
+        }
+      }
+      final PayoutResult confirmed = payout;
 
       inTx(
           () -> {
@@ -229,7 +263,7 @@ public class SettlementFacadeService {
                 settlementId,
                 principal.subject(),
                 now,
-                payout.razorpayxPayoutId(),
+                confirmed.razorpayxPayoutId(),
                 notes,
                 key,
                 now)) {
@@ -246,8 +280,15 @@ public class SettlementFacadeService {
                 now);
             notifications.settlementReleased(
                 settlement.pharmacyId(), settlementId, settlement.netPayablePaise());
+            if (providerOps != null) {
+              providerOps.markSucceeded(
+                  "PAYOUT", "settlement:" + settlementId, confirmed.razorpayxPayoutId());
+            }
           });
     } catch (RuntimeException ex) {
+      if (providerOps != null) {
+        providerOps.markAmbiguous("PAYOUT", "settlement:" + settlementId, null, ex.getMessage());
+      }
       inTx(() -> settlements.markReleaseFailed(settlementId, key, now));
       if (ex instanceof AppException app) {
         if ("RAZORPAY_PAYOUT_FAILED".equals(app.code()) || "RAZORPAY_ERROR".equals(app.code())) {
@@ -577,6 +618,17 @@ public class SettlementFacadeService {
       return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
     }
     return pct.setScale(1, RoundingMode.HALF_UP);
+  }
+
+  private PayoutResult replayPayout(String opKey) {
+    if (providerOps == null) {
+      return null;
+    }
+    return providerOps
+        .find("PAYOUT", opKey)
+        .filter(ProviderOperationStore.Operation::hasProviderRef)
+        .map(op -> new PayoutResult(op.providerRef(), 24))
+        .orElse(null);
   }
 
   private static String last4FromMasked(String masked) {

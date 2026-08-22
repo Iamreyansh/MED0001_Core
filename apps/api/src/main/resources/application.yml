@@ -210,6 +210,7 @@ medmate:
   observability:
     jobs:
       enabled: true
+    auto-remediate: true
 
   outbox:
     dispatch:

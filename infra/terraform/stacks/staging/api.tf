@@ -77,6 +77,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
           aws_secretsmanager_secret.razorpayx.arn,
           aws_secretsmanager_secret.kyc.arn,
           aws_secretsmanager_secret.comms.arn,
+          aws_secretsmanager_secret.internal.arn,
           data.aws_secretsmanager_secret.maps_geocode.arn
         ]
       },
@@ -240,7 +241,10 @@ locals {
     { name = "MEDMATE_RAZORPAY_KEY_ID", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_id::" },
     { name = "MEDMATE_RAZORPAY_KEY_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_secret::" },
     { name = "MEDMATE_RAZORPAY_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:webhook_secret::" },
+    { name = "MEDMATE_RAZORPAYX_KEY_ID", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:key_id::" },
+    { name = "MEDMATE_RAZORPAYX_KEY_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:key_secret::" },
     { name = "MEDMATE_RAZORPAYX_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:webhook_secret::" },
+    { name = "MEDMATE_INTERNAL_SERVICE_TOKEN", valueFrom = "${aws_secretsmanager_secret.internal.arn}:service_token::" },
     { name = "MEDMATE_KYC_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.kyc.arn}:webhook_secret::" },
     { name = "MEDMATE_MSG91_AUTH_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:msg91_auth_key::" },
     { name = "MEDMATE_FCM_SERVER_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_server_key::" },
@@ -353,7 +357,32 @@ resource "aws_ecs_service" "api" {
     enable   = true
     rollback = true
   }
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
   depends_on = [aws_lb_listener.https]
+}
+
+resource "aws_appautoscaling_target" "api" {
+  max_capacity       = 4
+  min_capacity       = 1
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.api.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "api_cpu" {
+  name               = "${local.name}-api-cpu"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.api.resource_id
+  scalable_dimension = aws_appautoscaling_target.api.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.api.service_namespace
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value = 70
+  }
 }
 
 resource "aws_ecs_service" "worker" {
@@ -372,6 +401,40 @@ resource "aws_ecs_service" "worker" {
   deployment_circuit_breaker {
     enable   = true
     rollback = true
+  }
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+}
+
+resource "aws_appautoscaling_target" "worker" {
+  max_capacity       = 4
+  min_capacity       = 1
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.worker.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "worker_queue_depth" {
+  name               = "${local.name}-worker-sqs"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.worker.resource_id
+  scalable_dimension = aws_appautoscaling_target.worker.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.worker.service_namespace
+  target_tracking_scaling_policy_configuration {
+    customized_metric_specification {
+      metric_name = "ApproximateNumberOfMessagesVisible"
+      namespace   = "AWS/SQS"
+      statistic   = "Average"
+      unit        = "Count"
+      dimensions {
+        name  = "QueueName"
+        value = aws_sqs_queue.domain_events.name
+      }
+    }
+    target_value       = 20
+    scale_in_cooldown  = 120
+    scale_out_cooldown = 60
   }
 }
 

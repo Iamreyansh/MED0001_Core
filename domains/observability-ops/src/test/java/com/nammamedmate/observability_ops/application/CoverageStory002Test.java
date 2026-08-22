@@ -59,7 +59,7 @@ class CoverageStory002Test {
   private MedmatePrincipal finance;
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     playbooks = new Playbooks();
     logs = new Logs();
     alerts = new Alerts();
@@ -83,6 +83,12 @@ class CoverageStory002Test {
             notify,
             admins,
             Clock.fixed(T0, ZoneOffset.UTC));
+    var flag = RemediationService.class.getDeclaredField("autoRemediate");
+    flag.setAccessible(true);
+    flag.set(remediation, false);
+    remediation.runAutoCycle();
+    flag.set(remediation, true);
+
     superAdmin =
         new MedmatePrincipal(UUID.randomUUID(), AuthRole.ADMIN_SUPER, null, TokenScope.FULL, "j");
     ops =

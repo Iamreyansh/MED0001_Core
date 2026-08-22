@@ -155,16 +155,17 @@
       "path": "docs/requirements/EPIC-002-customer-management/STORY-005-loyalty-referrals.md",
       "acceptance_criteria": [
         "Given a customer with `points_earned_lifetime: 50`, when `GET /customers/me/loyalty` is called, then `tier: \"GOLD\"` is returned and `tier_progress.next_tier` is `\"PLATINUM\"` with correct `points_needed` value.",
-        "Given a customer applies referral code `MEDRAM7`, when the referee's first order reaches `DELIVERED` status, then within 5 minutes both the referrer and the referee receive a Rs 100 wallet credit (`reason: REFERRAL`), and the `ReferralEvent` status transitions from `PENDING` to `REWARDED`.",
-        "Given a customer who has already applied a referral code, when `POST /customers/me/referral/apply` is called again, then `409 REFERRAL_ALREADY_USED` is returned.",
-        "Given a customer tries to apply their own referral code (same customer ID), when `POST /customers/me/referral/apply` is called, then `422 SELF_REFERRAL_NOT_ALLOWED` is returned.",
+        "Given a customer binds referral code `MEDRAM7` only during OTP signup (D15), when the referee's first order reaches `DELIVERED`, then within 5 minutes both referrer and referee receive Rs 100 wallet credit (`reason: REFERRAL`) and ReferralEvent becomes `REWARDED`.",
+        "Given a customer who already bound a referral at OTP signup (D15), when another referral binding is attempted, then `409 REFERRAL_ALREADY_USED` is returned.",
+        "Given a customer tries to use their own referral code during OTP signup (D15), then `422 SELF_REFERRAL_NOT_ALLOWED` is returned.",
         "Given a customer's first order is cancelled before delivery, when the cancellation event is processed, then the `ReferralEvent` status transitions from `PENDING` to `CANCELLED` and no wallet credits are issued.",
         "Given an order with value Rs 350 is delivered, when the loyalty points award job runs, then 3 points are credited (`floor(350/100) = 3`), a `LoyaltyTransaction` record with `type: EARN` and `points: 3` is created, and `points_earned_lifetime` is incremented.",
         "Given a customer at GOLD tier with 80 `points_earned_lifetime`, when a points reversal brings `points_balance` below the GOLD threshold but `points_earned_lifetime` remains 80, then the tier remains `GOLD` (tier is one-way ratchet based on lifetime points)."
       ],
       "ac_count": 7,
       "tracker_status": "staging-deployed",
-      "verified": false
+      "verified": false,
+      "decision": "D15"
     },
     {
       "id": "EPIC-003/STORY-001",
@@ -205,7 +206,7 @@
       "path": "docs/requirements/EPIC-003-pharmacy-onboarding-kyc/STORY-003-auto-kyc-verification.md",
       "acceptance_criteria": [
         "**Given** `kyc_auto_verification_enabled=true` and a pharmacy submits KYC, **when** `/kyc/submit` is called, **then** an `AutoKycJob` is created and GSTIN check runs synchronously (within 10s), while Drug Licence and FSSAI checks are dispatched to the async queue.",
-        "**Given** all three checks return `PASS` within the async window, **when** the final check resolves, **then** pharmacy `status` changes to `ACTIVE`, `is_online` is set to `true`, zone is assigned from pincode mapping, and a welcome notification is sent via WhatsApp and email.",
+        "**Given** all three checks return `PASS` within the async window, **when** the final check resolves, **then** (D8) pharmacy stays `KYC_SUBMITTED` / pending manual review, `auto_activated` remains false, and `pharmacy.kyc.manual_review_required` is published \u2014 auto-KYC never activates.",
         "**Given** FSSAI check returns `FAIL`, **when** the result is recorded, **then** pharmacy remains `KYC_SUBMITTED`, an admin KYC task is created in the review queue, and the auto-verify result with the FAIL detail is attached to that task.",
         "**Given** the GSTN API returns a business name with Levenshtein distance > 5 tokens from the platform `business_name`, **when** GSTIN check resolves, **then** check status is `PASS` but an admin flag `BUSINESS_NAME_MISMATCH` with `severity=WARN` is added.",
         "**Given** the Drug Licence API returns an expiry date < 90 days from today, **when** the result is received, **then** Drug Licence check status is `FAIL` with reason `LICENCE_EXPIRING_SOON`.",
@@ -214,8 +215,9 @@
         "**Given** `kyc_auto_verification_enabled=false`, **when** an admin calls POST `/api/v1/admin/pharmacies/:id/kyc/auto-verify`, **then** HTTP 503 `FEATURE_FLAG_DISABLED` is returned."
       ],
       "ac_count": 8,
-      "tracker_status": "pending",
-      "verified": false
+      "tracker_status": "in_progress",
+      "verified": false,
+      "decision": "D8"
     },
     {
       "id": "EPIC-003/STORY-004",
@@ -293,14 +295,15 @@
         "**Given** PATCH `/api/v1/admin/pharmacies/:id/commission` with `commission_pct=25.0`, **then** HTTP 400 `INVALID_COMMISSION_PCT` is returned (exceeds 20% max).",
         "**Given** PATCH `/api/v1/admin/pharmacies/:id/commission` with `effective_from` = today, **then** HTTP 400 `EFFECTIVE_FROM_MUST_BE_FUTURE` is returned.",
         "**Given** a valid commission change is submitted, **then** a `CommissionHistory` record is created and an `AuditLog` entry is written with `action=COMMISSION_CHANGED`, `before_value`, `after_value`, and `actor_id`.",
-        "**Given** a pharmacy's annual GMV YTD exceeds Rs 5,00,000, **then** `tcs_applicable=true` and `tcs_deducted = GMV - 1%` in the settlement; below threshold, `tcs_deducted=0`.",
+        "**Given** any pharmacy settlement GMV (D6), **then** TCS is always 1% of settlement GMV; the \u20b95L threshold applies only to TDS 194-O, not TCS.",
         "**Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/release` on a settlement in `PENDING_RELEASE` status with a verified bank account, **then** RazorpayX payout is initiated, settlement status changes to `RELEASED`, and the pharmacy owner receives a payout confirmation email with UTR.",
         "**Given** POST `/release` is called on a settlement in `HELD` status, **then** HTTP 409 `SETTLEMENT_HELD` is returned.",
         "**Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold` with a `reason`, **then** settlement status changes to `HELD`, the pharmacy owner is notified via email with the hold reason, and the reason is recorded in the settlement record."
       ],
       "ac_count": 8,
       "tracker_status": "staging-deployed",
-      "verified": false
+      "verified": false,
+      "decision": "D6"
     },
     {
       "id": "EPIC-004/STORY-004",
@@ -861,11 +864,12 @@
         "**Given** a pharmacy tries to advance an order from `PACKING` directly to `OUT_FOR_DELIVERY`, **when** the status PATCH is submitted, **then** the API returns HTTP 422 with `INVALID_STATUS_TRANSITION`.",
         "**Given** `GET /api/v1/orders/:order_id/tracking` is called while the order is `OUT_FOR_DELIVERY`, **when** the response is returned, **then** `steps[4].completed = true` and `steps[5].completed = false`, and `eta_minutes` is populated.",
         "**Given** an order transitions through all states to `DELIVERED`, **when** `GET /api/v1/orders/:order_id/timeline` is called, **then** all 6 events are listed with non-null timestamps in chronological order.",
-        "**Given** no rider is assigned within 30 minutes of `READY_FOR_PICKUP`, **when** the escalation job runs, **then** an alert is sent to admin_operations."
+        "**Given** no rider is assigned within 30 minutes of `READY_FOR_PICKUP`, **when** the escalation job runs, **then** (D10) the order is cancelled with a canonical refund and an alert is sent to admin_operations."
       ],
       "ac_count": 8,
       "tracker_status": "staging-deployed",
-      "verified": false
+      "verified": false,
+      "decision": "D10"
     },
     {
       "id": "EPIC-010/STORY-006",
@@ -1104,7 +1108,8 @@
       ],
       "ac_count": 8,
       "tracker_status": "staging-deployed",
-      "verified": false
+      "verified": false,
+      "decision": "D6"
     },
     {
       "id": "EPIC-012/STORY-004",
@@ -1287,11 +1292,11 @@
       "id": "EPIC-013/STORY-005",
       "path": "docs/requirements/EPIC-013-marketing-growth/STORY-005-referral-program.md",
       "acceptance_criteria": [
-        "Customer receives a unique 8-character referral code upon account creation.",
-        "Applying a valid referral code at signup returns HTTP 200 and creates a `PENDING` referral record.",
-        "Applying one's own referral code returns HTTP 400 `REFERRAL_SELF_REFERRAL`.",
-        "Attempting to apply a second referral code to an account that already has one returns HTTP 409 `REFERRAL_ALREADY_APPLIED`.",
-        "When referee's first order reaches DELIVERED, both referrer and referee receive Rs 100 wallet credit and referral status becomes CONVERTED.",
+        "Customer receives a unique MED**** referral code upon account creation (EPIC-002 contract kept).",
+        "Applying a valid referral code only during OTP signup (D15) returns HTTP 200 and creates a `PENDING` referral record (no post-signup apply endpoint).",
+        "Applying one's own referral code returns HTTP 422 `SELF_REFERRAL_NOT_ALLOWED`.",
+        "Attempting to apply a second referral code to an account that already has one returns HTTP 409 `REFERRAL_ALREADY_USED`.",
+        "When referee's first order reaches DELIVERED, both referrer and referee receive Rs 100 wallet credit and referral status becomes REWARDED (admin maps to CONVERTED).",
         "When `is_active = false`, applying a referral code returns HTTP 403 `REFERRAL_PROGRAM_PAUSED`.",
         "Admin overview KPI `referral_cac_rs = total_rewards_paid_rs / total_converted_referrals` matches arithmetic.",
         "Top-referrers leaderboard lists customers sorted by `converted` count descending.",
@@ -1300,7 +1305,8 @@
       ],
       "ac_count": 10,
       "tracker_status": "staging-deployed",
-      "verified": false
+      "verified": false,
+      "decision": "D15"
     },
     {
       "id": "EPIC-013/STORY-006",

@@ -2,10 +2,12 @@ package com.nammamedmate.analytics.adapter.out.client;
 
 import com.nammamedmate.analytics.application.port.out.AcquisitionSourcePort;
 import java.util.UUID;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /** Firebase UTM stub — every customer is ORGANIC until install events are wired. */
 @Component
+@Profile("!prod & !staging")
 public class StubAcquisitionSourcePort implements AcquisitionSourcePort {
 
   @Override

@@ -72,6 +72,19 @@ public class PosCheckoutService {
       BigDecimal amountPaid,
       String upiReference,
       String prescribingDoctor) {
+    return checkout(
+        principal, cartId, paymentMethod, amountPaid, upiReference, prescribingDoctor, null);
+  }
+
+  @Transactional
+  public Map<String, Object> checkout(
+      MedmatePrincipal principal,
+      UUID cartId,
+      String paymentMethod,
+      BigDecimal amountPaid,
+      String upiReference,
+      String prescribingDoctor,
+      String idempotencyKey) {
     PosCartService.requireStaff(principal);
     if (!rateLimiter.tryAcquire("pos:cart:checkout:" + principal.pharmacyId(), 30, 60)) {
       throw new AppException("RATE_LIMIT_EXCEEDED", "Too many requests", 429);
@@ -84,6 +97,9 @@ public class PosCheckoutService {
 
     Instant now = clock.instant();
     if (cart.status() == PosCartStatus.COMPLETED) {
+      if (idempotencyKey != null && !idempotencyKey.isBlank() && cart.invoiceId() != null) {
+        return replayCompleted(principal.pharmacyId(), cart, now);
+      }
       throw new AppException("CART_ALREADY_COMPLETED", "Cart already checked out", 409);
     }
     if (cart.status() == PosCartStatus.ABANDONED) {
@@ -298,6 +314,29 @@ public class PosCheckoutService {
     data.put("items_count", items.size());
     data.put("customer_name", cart.customerName());
     data.put("completed_at", now.toString());
+    return data;
+  }
+
+  private Map<String, Object> replayCompleted(UUID pharmacyId, PosCart cart, Instant now) {
+    Invoice invoice =
+        invoiceStore
+            .findById(pharmacyId, cart.invoiceId())
+            .orElseThrow(
+                () -> new AppException("INVOICE_NOT_FOUND", "Completed cart invoice missing", 404));
+    List<InvoiceItem> invoiceItems = invoiceStore.listItems(invoice.id());
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("invoice_id", invoice.id().toString());
+    data.put("invoice_number", invoice.invoiceNumber());
+    data.put("cart_id", cart.id().toString());
+    data.put("payment_method", invoice.paymentMethod().name());
+    data.put("amount_paid", MoneyMath.paiseToRupees(invoice.amountPaidPaise()));
+    data.put("change_due", MoneyMath.paiseToRupees(invoice.changeDuePaise()));
+    data.put("grand_total", MoneyMath.paiseToRupees(invoice.grandTotalPaise()));
+    data.put("invoice_pdf_url", invoice.invoicePdfUrl());
+    data.put("items_count", invoiceItems.size());
+    data.put("customer_name", cart.customerName());
+    data.put("completed_at", invoice.createdAt().toString());
+    data.put("idempotent_replay", true);
     return data;
   }
 

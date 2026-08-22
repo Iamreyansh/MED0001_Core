@@ -122,12 +122,17 @@ check: ## Full quality gates (unit + IT, JaCoCo 100%, Spotless, SpotBugs, ArchUn
 	$(GRADLE) check -x dependencyCheckAnalyze $(GRADLE_FLAGS)
 
 .PHONY: bruno-check
-bruno-check: ## Validate Bruno collection + payment idempotency header
+bruno-check: ## Validate Bruno collection + launch-scope acceptance matrix
 	@test -f $(ROOT)/bruno/payments/initiate.bru
 	@grep -q 'Idempotency-Key' $(ROOT)/bruno/payments/initiate.bru
 	@grep -q 'paymentIdempotencyKey' $(ROOT)/bruno/payments/initiate.bru
 	@test -f $(ROOT)/docs/requirements/acceptance-matrix.json
+	@python3 $(ROOT)/scripts/acceptance-ac-gate.py
 	@echo "Bruno + acceptance-matrix OK"
+
+.PHONY: bruno-run
+bruno-run: ## Execute Bruno against HEALTH_URL (set BRUNO_REQUIRED=1 to fail closed)
+	@$(ROOT)/scripts/bruno-run.sh
 
 .PHONY: check-all
 check-all: bruno-check ## check + OWASP dependencyCheckAnalyze

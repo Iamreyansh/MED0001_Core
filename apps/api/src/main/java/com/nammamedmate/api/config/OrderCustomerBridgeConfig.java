@@ -86,13 +86,28 @@ public class OrderCustomerBridgeConfig {
                 idempotencyKey,
                 "REFUND");
         Object tx = result.get("transaction_id");
-        if (tx instanceof UUID u) {
-          return u;
+        UUID txId =
+            tx instanceof UUID u ? u : tx != null ? UUID.fromString(tx.toString()) : null;
+        if (txId != null
+            && amountPaise > 0
+            && ledger != null
+            && !Boolean.TRUE.equals(result.get("already_processed"))) {
+          String note =
+              description == null || description.isBlank() ? "Wallet refund" : description;
+          ledger.append(
+              "WALLET_CREDIT",
+              txId,
+              "WALLET",
+              amountPaise,
+              0L,
+              note,
+              Map.of(
+                  "customer_id",
+                  customerId == null ? "" : customerId.toString(),
+                  "order_id",
+                  orderId == null ? "" : orderId.toString()));
         }
-        if (tx != null) {
-          return UUID.fromString(tx.toString());
-        }
-        return null;
+        return txId;
       }
     };
   }
@@ -124,8 +139,7 @@ public class OrderCustomerBridgeConfig {
                 """
                 SELECT EXISTS (
                   SELECT 1 FROM orders o
-                  JOIN saved_payment_methods m ON m.customer_id = o.customer_id
-                  WHERE m.id = ? AND m.deleted_at IS NULL
+                  WHERE o.saved_payment_method_id = ?
                     AND o.deleted_at IS NULL
                     AND o.status NOT IN ('DELIVERED','CANCELLED')
                 )

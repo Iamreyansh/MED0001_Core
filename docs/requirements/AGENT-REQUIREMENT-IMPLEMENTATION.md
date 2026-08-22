@@ -13,10 +13,12 @@
 
 ## Progress
 
-> 2026-08-22: production-integration remediations are `in_progress` (see
-> [PRODUCTION-READINESS-AUDIT.md](./PRODUCTION-READINESS-AUDIT.md) D1–D20).
+> 2026-08-22: integration re-audit verdict is **NO-GO** (see
+> [PRODUCTION-READINESS-AUDIT.md](./PRODUCTION-READINESS-AUDIT.md)). D1–D20
+> remain authoritative; platform/core remediations are in-tree pending staging
+> vendor + PITR evidence ([STAGING-PRODUCTION-PROMOTION.md](../runbooks/STAGING-PRODUCTION-PROMOTION.md)).
 > Staging SHA `319b4cf0…` remains live until a new SHA is applied. Do not mark
-> `staging-deployed` again until that deploy; `production-ready` waits for D2.
+> `production-ready` until D2 production evidence is retained.
 
 | Phase | Total | Staging-deployed | Production-ready |
 |-------|-------|------------------|------------------|

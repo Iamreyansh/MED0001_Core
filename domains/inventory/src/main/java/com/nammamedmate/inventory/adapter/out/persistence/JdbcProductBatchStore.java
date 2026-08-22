@@ -131,6 +131,31 @@ public class JdbcProductBatchStore implements ProductBatchStore {
   }
 
   @Override
+  public Optional<ProductBatch> tryDeductQuantity(UUID batchId, int quantity, Instant updatedAt) {
+    int updated =
+        jdbc.update(
+            """
+            UPDATE product_batch
+               SET quantity_current = quantity_current - ?,
+                   is_active = CASE WHEN quantity_current - ? > 0 THEN is_active ELSE FALSE END,
+                   updated_at = ?
+             WHERE id = ?
+               AND quantity_current >= ?
+               AND is_active = TRUE
+            """,
+            quantity,
+            quantity,
+            Timestamp.from(updatedAt),
+            batchId,
+            quantity);
+    if (updated == 0) {
+      return Optional.empty();
+    }
+    List<ProductBatch> rows = jdbc.query(SELECT_BATCH + " WHERE id = ?", ROW_MAPPER, batchId);
+    return rows.stream().findFirst();
+  }
+
+  @Override
   public ProductBatch topUpFromGrn(
       UUID batchId,
       int quantityReceived,

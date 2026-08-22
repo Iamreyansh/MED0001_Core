@@ -23,9 +23,25 @@ public class SchedulerLeaseAspect {
   @Around("@annotation(org.springframework.scheduling.annotation.Scheduled)")
   public Object aroundScheduled(ProceedingJoinPoint pjp) throws Throwable {
     String name = pjp.getSignature().toShortString();
-    if (!lease.tryAcquire(name, Duration.ofMinutes(10))) {
+    if (!lease.tryAcquire(name, ttlFor(name))) {
       return null;
     }
-    return pjp.proceed();
+    try {
+      return pjp.proceed();
+    } finally {
+      lease.release(name);
+    }
+  }
+
+  /** API is the sole scheduler owner; worker has no @Scheduled jobs. */
+  static Duration ttlFor(String jobName) {
+    String name = jobName == null ? "" : jobName;
+    if (name.contains("Outbox") || name.contains("dispatch")) {
+      return Duration.ofMinutes(2);
+    }
+    if (name.contains("anonymise") || name.contains("Maintenance")) {
+      return Duration.ofMinutes(30);
+    }
+    return Duration.ofMinutes(10);
   }
 }

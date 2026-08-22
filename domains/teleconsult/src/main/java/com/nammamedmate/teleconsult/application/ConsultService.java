@@ -343,13 +343,19 @@ public class ConsultService {
   @Transactional
   public int assignDueScheduled() {
     Instant now = clock.instant();
-    List<Consult> due = consultStore.findDueForScheduledAssign(now);
     int n = 0;
-    for (Consult existing : due) {
+    n += assignUnassigned(consultStore.findDueForScheduledAssign(now), now);
+    n += assignUnassigned(consultStore.findQueuedNowUnassigned(), now);
+    return n;
+  }
+
+  private int assignUnassigned(List<Consult> queue, Instant now) {
+    int n = 0;
+    for (Consult existing : queue) {
       Optional<TeleconsultDoctor> pick =
           TeleconsultDoctorService.selectLeastRecentlyAssigned(doctorStore.listAvailable());
       if (pick.isEmpty()) {
-        continue;
+        break;
       }
       TeleconsultDoctor assigned = pick.get();
       Instant assignedAt = now;

@@ -18,11 +18,12 @@ class HealthControllerTest {
   @Test
   void returnsUpWhenDatabaseAnswers() {
     JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    when(jdbc.queryForObject(anyString(), eq(Integer.class))).thenReturn(1);
+    when(jdbc.queryForObject(anyString(), eq(Integer.class))).thenReturn(1, 0);
     ResponseEntity<ApiResponse<Map<String, String>>> response = new HealthController(jdbc).health();
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody().success()).isTrue();
     assertThat(response.getBody().data()).containsEntry("status", "UP");
+    assertThat(response.getBody().data()).containsEntry("outbox", "UP");
   }
 
   @Test

@@ -8,6 +8,7 @@ import com.nammamedmate.security.JwtAuthenticationFilter;
 import com.nammamedmate.security.MfaChallengeRestrictionFilter;
 import com.nammamedmate.security.PosTokenRestrictionFilter;
 import com.nammamedmate.security.Rs256JwtService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -21,7 +22,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http, Rs256JwtService jwtService)
+  SecurityFilterChain securityFilterChain(
+      HttpSecurity http,
+      Rs256JwtService jwtService,
+      @Value("${medmate.internal.service-token:}") String internalToken)
       throws Exception {
     JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService);
     PosTokenRestrictionFilter posFilter = new PosTokenRestrictionFilter();
@@ -53,6 +57,7 @@ public class SecurityConfig {
                         "/api/v1/auth/pharmacy/pos-pin",
                         "/api/v1/auth/admin/login",
                         "/api/v1/auth/admin/complete-invite",
+                        "/api/v1/auth/admin/complete-reset",
                         "/api/v1/auth/refresh",
                         "/api/v1/pharmacy/register",
                         "/api/v1/pharmacy/register/verify-email",
@@ -725,6 +730,9 @@ public class SecurityConfig {
                     .authenticated())
         .addFilterBefore(new RequestIdFilter(), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(new WebhookRawBodyFilter(), UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(
+            new InternalServiceTokenFilter(internalToken),
+            UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(posFilter, JwtAuthenticationFilter.class)
         .addFilterAfter(mfaFilter, PosTokenRestrictionFilter.class);

@@ -154,7 +154,7 @@ class RbacPermissionsIT extends AbstractApiIT {
     @SuppressWarnings("unchecked")
     Map<String, Object> data =
         (Map<String, Object>) Objects.requireNonNull(financePerms.getBody()).get("data");
-    assertThat(data.get("permission_count")).isEqualTo(13);
+    assertThat(data.get("permission_count")).isEqualTo(14);
 
     ResponseEntity<Map> missing = get("/api/v1/admin/roles/admin_billing/permissions", token);
     assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);

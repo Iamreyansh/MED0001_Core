@@ -31,6 +31,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ConsultSessionService {
 
+  private static final Logger AUDIT = LoggerFactory.getLogger("medmate.audit.teleconsult.phone");
   private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
   private static final Set<String> ADMIN_ROLES =
       Set.of(AuthRole.ADMIN_SUPER.name(), AuthRole.ADMIN_OPERATIONS.name());
@@ -197,7 +200,17 @@ public class ConsultSessionService {
     statusCounts.put("total_active", totalActive);
 
     List<Map<String, Object>> pending =
-        consultStore.listActiveQueue().stream().map(item -> toQueueItem(item, now)).toList();
+        consultStore.listActiveQueue().stream()
+            .map(
+                item -> {
+                  AUDIT.info(
+                      "D18 phone disclosure actor={} consult_id={} at={}",
+                      actorId,
+                      item.consultId(),
+                      now);
+                  return toQueueItem(item, now);
+                })
+            .toList();
 
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("status_counts", statusCounts);

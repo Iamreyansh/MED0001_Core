@@ -1,0 +1,111 @@
+meta {
+  name: complete-reset
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/admin/complete-reset
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "reset_token": "{{adminResetToken}}",
+    "password": "Passw0rd!"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminResetToken")) {
+    throw new Error("adminResetToken missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("reset complete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("ACTIVE");
+  });
+}
+
+docs {
+  POST /api/v1/auth/admin/complete-reset — public consume of password-reset token.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/auth/admin/complete-reset
+    method: post
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "reset_token": "opaque-reset",
+        "password": "Passw0rd!"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "admin_id": "a0000001-0000-4000-8000-000000000001",
+            "email": "ops@nammamedmate.com",
+            "status": "ACTIVE"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 RESET_INVALID
+  request: {
+    url: {{baseUrl}}/api/v1/auth/admin/complete-reset
+    method: post
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "reset_token": "unknown",
+        "password": "Passw0rd!"
+      }
+    }
+  }
+  response: {
+    status: { code: 404 text: Not Found }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "RESET_INVALID",
+            "message": "Reset token is invalid"
+          }
+        }
+      '''
+    }
+  }
+}

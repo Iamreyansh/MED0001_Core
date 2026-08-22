@@ -55,6 +55,12 @@ public interface ProductBatchStore {
   ProductBatch updateQuantities(
       UUID batchId, int quantityReceived, int quantityCurrent, boolean isActive, Instant updatedAt);
 
+  /**
+   * Conditional deduct: succeeds only when {@code quantity_current >= quantity}. Returns empty when
+   * the race loses.
+   */
+  Optional<ProductBatch> tryDeductQuantity(UUID batchId, int quantity, Instant updatedAt);
+
   /** Top-up from GRN: qty delta + refresh PTR/MRP + link grn_item_id. */
   ProductBatch topUpFromGrn(
       UUID batchId,

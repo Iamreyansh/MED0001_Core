@@ -308,6 +308,20 @@ public class JdbcConsultStore implements ConsultStore {
   }
 
   @Override
+  public List<Consult> findQueuedNowUnassigned() {
+    return jdbc.query(
+        """
+        SELECT * FROM consults
+        WHERE deleted_at IS NULL
+          AND slot_type = 'NOW'
+          AND status = 'REQUESTED'
+          AND doctor_id IS NULL
+        ORDER BY created_at ASC
+        """,
+        this::mapRow);
+  }
+
+  @Override
   public List<QueueItem> listActiveQueue() {
     return jdbc.query(
         """

@@ -18,9 +18,9 @@ API_SVC="$(terraform output -raw api_service_name)"
 WORKER_SVC="$(terraform output -raw worker_service_name)"
 
 aws ecs update-service --region "$REGION" --cluster "$CLUSTER" --service "$API_SVC" \
-  --desired-count 1 --force-new-deployment >/dev/null
+  --force-new-deployment >/dev/null
 aws ecs update-service --region "$REGION" --cluster "$CLUSTER" --service "$WORKER_SVC" \
-  --desired-count 1 --force-new-deployment >/dev/null
+  --force-new-deployment >/dev/null
 echo "Forced new deployment: ${CLUSTER}/${API_SVC} + ${WORKER_SVC}"
 
 echo "Waiting for services-stable..."

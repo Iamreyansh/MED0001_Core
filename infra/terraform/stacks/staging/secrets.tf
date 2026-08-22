@@ -120,6 +120,27 @@ resource "random_password" "email_webhook" {
   special = false
 }
 
+resource "random_password" "internal_token" {
+  length  = 64
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "internal" {
+  name       = "${local.name}/internal"
+  kms_key_id = aws_kms_key.this.arn
+}
+
+resource "aws_secretsmanager_secret_version" "internal" {
+  secret_id = aws_secretsmanager_secret.internal.id
+  secret_string = jsonencode({
+    service_token = random_password.internal_token.result
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
 resource "aws_secretsmanager_secret" "comms" {
   name       = "${local.name}/comms"
   kms_key_id = aws_kms_key.this.arn

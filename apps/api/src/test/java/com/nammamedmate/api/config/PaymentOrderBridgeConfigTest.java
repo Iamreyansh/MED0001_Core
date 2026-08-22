@@ -34,7 +34,7 @@ class PaymentOrderBridgeConfigTest {
     WalletService wallets = mock(WalletService.class);
     when(wallets.debitForOrder(any(), any(), anyLong(), anyString()))
         .thenReturn(Map.of("amount_debited", new BigDecimal("12.50")));
-    WalletPort wallet = config.paymentWalletPort(wallets);
+    WalletPort wallet = config.paymentWalletPort(wallets, null);
     assertThat(wallet.debitForOrder(UUID.randomUUID(), UUID.randomUUID(), 1000, "x"))
         .isEqualTo(1250L);
 

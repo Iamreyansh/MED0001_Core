@@ -1,6 +1,7 @@
 package com.nammamedmate.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nammamedmate.integration.adapter.out.client.FailClosedGspClient;
 import com.nammamedmate.integration.adapter.out.client.LiveDigiLockerClient;
 import com.nammamedmate.integration.adapter.out.client.LiveDrugRegistryClient;
 import com.nammamedmate.integration.adapter.out.client.LiveFssaiClient;
@@ -156,8 +157,12 @@ public class IntegrationConfig {
       Clock clock,
       @Value("${medmate.gsp.client-id:}") String clientId,
       @Value("${medmate.gsp.client-secret:}") String clientSecret,
-      @Value("${medmate.gsp.base-url:https://gsp.example.invalid/v1}") String baseUrl) {
+      @Value("${medmate.gsp.base-url:https://gsp.example.invalid/v1}") String baseUrl,
+      @Value("${spring.profiles.active:}") String activeProfiles) {
     if (blank(clientId) || blank(clientSecret)) {
+      if (activeProfiles.contains("prod") || activeProfiles.contains("staging")) {
+        return new FailClosedGspClient();
+      }
       return new StubGspClient(clock);
     }
     return new LiveGspClient(
