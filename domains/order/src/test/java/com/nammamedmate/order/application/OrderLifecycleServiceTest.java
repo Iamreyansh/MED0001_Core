@@ -91,6 +91,13 @@ class OrderLifecycleServiceTest {
         rnd);
   }
 
+  @Test
+  void setInventoryAcceptsNullAndOverride() {
+    service.setInventory(null);
+    service.setInventory(
+        new com.nammamedmate.order.application.port.out.InventoryAvailabilityPort() {});
+  }
+
   private static PasswordEncoder hashEncoder() {
     return new PasswordEncoder() {
       @Override
@@ -254,7 +261,7 @@ class OrderLifecycleServiceTest {
   }
 
   @Test
-  void ac8_noRiderWithin30Min_escalatesAlertOnly() {
+  void ac8_noRiderWithin30Min_cancelsAndRefunds() {
     Order order = pendingOrder(PaymentMethod.COD);
     order.accept(T0);
     order.advanceTo(OrderStatus.PACKING, T0);
@@ -264,8 +271,7 @@ class OrderLifecycleServiceTest {
     service = buildService(clock, outboxStore, fixedOtp(1));
     assertThat(service.escalateMissingRiders()).isEqualTo(1);
     Order updated = orders.findById(order.id()).orElseThrow();
-    assertThat(updated.status()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
-    assertThat(updated.riderEscalationAt()).isNotNull();
+    assertThat(updated.status()).isEqualTo(OrderStatus.CANCELLED);
     assertThat(outboxStore.all().stream().anyMatch(m -> "order.rider.escalation".equals(m.type())))
         .isTrue();
   }

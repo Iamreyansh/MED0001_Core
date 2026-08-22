@@ -62,4 +62,18 @@ class NotificationWebhookAuthTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("HMAC failed");
   }
+
+  @Test
+  void deployedSecretsRejectDefaults() {
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateSecretsForDeployedProfile(
+                    NotificationWebhookAuth.DEFAULT_SMS_SECRET, "ok"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> NotificationWebhookAuth.validateSecretsForDeployedProfile("ok", " "))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> NotificationWebhookAuth.validateSecretsForDeployedProfile(null, "ok"))
+        .isInstanceOf(IllegalStateException.class);
+    NotificationWebhookAuth.validateSecretsForDeployedProfile("live-sms", "live-email");
+  }
 }

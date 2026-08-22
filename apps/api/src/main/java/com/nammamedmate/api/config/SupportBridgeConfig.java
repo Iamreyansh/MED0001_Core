@@ -3,7 +3,11 @@ package com.nammamedmate.api.config;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nammamedmate.order.application.RefundService;
 import com.nammamedmate.order.application.port.out.ExternalDisputeBannerPort;
+import com.nammamedmate.order.application.port.out.OrderStore;
+import com.nammamedmate.order.domain.ActorType;
+import com.nammamedmate.order.domain.Order;
 import com.nammamedmate.support.application.port.out.CustomerLookupPort;
 import com.nammamedmate.support.application.port.out.OrderContextPort;
 import com.nammamedmate.support.application.port.out.RefundPort;
@@ -111,10 +115,16 @@ public class SupportBridgeConfig {
 
   @Bean
   @Primary
-  RefundPort stubSupportRefundPort() {
-    // ponytail: record approval with fake txn until payment refund façade is wired for disputes
-    return (orderId, customerId, amountPaise, refundTo, disputeId) ->
-        new RefundPort.RefundResult("txn_" + UUID.randomUUID(), true);
+  RefundPort supportRefundPort(RefundService refunds, OrderStore orders) {
+    return (orderId, customerId, amountPaise, refundTo, disputeId) -> {
+      Order order =
+          orders
+              .findById(orderId)
+              .orElseThrow(() -> new IllegalStateException("Order not found for support refund"));
+      var plan = refunds.initiate(order, "SUPPORT_DISPUTE", ActorType.ADMIN, null);
+      String txn = plan.initiated() ? "refund-" + orderId : "none-" + orderId;
+      return new RefundPort.RefundResult(txn, plan.initiated());
+    };
   }
 
   @Bean

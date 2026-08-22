@@ -244,6 +244,39 @@ public class JdbcCustomerProfileStore implements CustomerProfileStore {
         Timestamp.from(deletedAt),
         Timestamp.from(deletedAt),
         id);
+    jdbc.update("UPDATE customers SET default_address_id = NULL WHERE id = ?", id);
+    jdbc.update(
+        """
+        UPDATE customer_addresses SET
+          flat_building = 'REDACTED',
+          area_locality = 'REDACTED',
+          city = 'REDACTED',
+          state = 'REDACTED',
+          pincode = '000000',
+          latitude = 0,
+          longitude = 0,
+          is_default = FALSE,
+          deleted_at = COALESCE(deleted_at, ?),
+          updated_at = ?
+        WHERE customer_id = ?
+        """,
+        Timestamp.from(deletedAt),
+        Timestamp.from(deletedAt),
+        id);
+    jdbc.update(
+        """
+        UPDATE saved_payment_methods SET
+          nickname = NULL,
+          upi_id = CASE WHEN type = 'UPI' THEN 'REDACTED' ELSE NULL END,
+          upi_handle = CASE WHEN type = 'UPI' THEN 'REDACTED' ELSE NULL END,
+          razorpay_token_id = CASE WHEN type = 'CARD' THEN 'REDACTED' ELSE NULL END,
+          card_last4 = CASE WHEN type = 'CARD' THEN '0000' ELSE NULL END,
+          is_default = FALSE,
+          deleted_at = COALESCE(deleted_at, ?)
+        WHERE customer_id = ?
+        """,
+        Timestamp.from(deletedAt),
+        id);
   }
 
   static String escapeIlike(String raw) {

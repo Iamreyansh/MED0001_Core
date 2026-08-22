@@ -26,7 +26,7 @@ resource "aws_db_instance" "this" {
   backup_retention_period      = 7
   skip_final_snapshot          = true
   deletion_protection          = true
-  multi_az                     = false
+  multi_az                     = true
   publicly_accessible          = false
   apply_immediately            = true
   performance_insights_enabled = false
@@ -64,9 +64,14 @@ resource "aws_elasticache_replication_group" "redis" {
   subnet_group_name          = aws_elasticache_subnet_group.this.name
   security_group_ids         = [aws_security_group.data.id]
   at_rest_encryption_enabled = true
-  # ponytail: TLS+AUTH adds Spring Redis client complexity; enable when threat model requires it.
-  transit_encryption_enabled = false
+  transit_encryption_enabled = true
+  auth_token                 = random_password.redis.result
   automatic_failover_enabled = false
+}
+
+resource "random_password" "redis" {
+  length  = 32
+  special = false
 }
 
 resource "aws_s3_bucket" "uploads" {

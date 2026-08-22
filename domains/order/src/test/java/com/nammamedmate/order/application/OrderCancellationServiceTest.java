@@ -75,6 +75,9 @@ class OrderCancellationServiceTest {
             new OutboxPublisher(outboxStore, new ObjectMapper()),
             rateLimiter,
             Clock.fixed(T0, ZoneOffset.UTC));
+    service.setInventory(null);
+    service.setInventory(
+        new com.nammamedmate.order.application.port.out.InventoryAvailabilityPort() {});
   }
 
   @Test

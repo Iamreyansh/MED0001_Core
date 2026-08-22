@@ -93,5 +93,23 @@ class OrderInventoryBridgeConfigTest {
     when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
     when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
     assertThat(port.listVisibleProducts(pharmacy, null, null, 1, 20).total()).isEqualTo(0);
+
+    when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(1);
+    port.reserveForOrder(
+        pharmacy, UUID.randomUUID(), List.of(new InventoryAvailabilityPort.ReserveLine(med, 2)));
+    when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(0, 1);
+    port.reserveForOrder(
+        pharmacy, UUID.randomUUID(), List.of(new InventoryAvailabilityPort.ReserveLine(med, 2)));
+    when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(0);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                port.reserveForOrder(
+                    pharmacy,
+                    UUID.randomUUID(),
+                    List.of(new InventoryAvailabilityPort.ReserveLine(med, 2))))
+        .isInstanceOf(com.nammamedmate.kernel.error.AppException.class);
+    port.reserveForOrder(pharmacy, UUID.randomUUID(), null);
+    port.deductForOrder(UUID.randomUUID());
+    port.releaseForOrder(UUID.randomUUID());
   }
 }

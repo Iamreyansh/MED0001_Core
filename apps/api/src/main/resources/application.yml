@@ -213,6 +213,8 @@ medmate:
     dispatch:
       enabled: true
       delay-ms: 5000
+  sqs:
+    queue-url: ${MEDMATE_SQS_DOMAIN_EVENTS_URL:}
 
 springdoc:
   api-docs:

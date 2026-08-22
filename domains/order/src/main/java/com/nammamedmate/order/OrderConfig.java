@@ -15,6 +15,7 @@ import com.nammamedmate.order.adapter.out.persistence.JdbcOrderNoteStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcOrderStatusEventStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcOrderStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcPharmacyCandidateStore;
+import com.nammamedmate.order.adapter.out.persistence.JdbcPriceCeilingAdapter;
 import com.nammamedmate.order.adapter.out.persistence.JdbcRefundStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcReorderAttemptLogStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcRxBroadcastStore;
@@ -23,7 +24,6 @@ import com.nammamedmate.order.adapter.out.persistence.LocalExportObjectStore;
 import com.nammamedmate.order.adapter.out.persistence.StubCodCollectionAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPrescriptionAdapter;
-import com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubRiderLookupAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubWalletPort;
 import com.nammamedmate.order.adapter.out.persistence.StubZoneMembershipAdapter;
@@ -186,8 +186,8 @@ public class OrderConfig {
 
   @Bean
   @ConditionalOnMissingBean(PriceCeilingPort.class)
-  PriceCeilingPort priceCeilingPort() {
-    return new StubPriceCeilingAdapter();
+  PriceCeilingPort priceCeilingPort(JdbcTemplate jdbc) {
+    return new JdbcPriceCeilingAdapter(jdbc);
   }
 
   @Bean

@@ -497,6 +497,7 @@ public class PosCartService {
     }
 
     long grand = Math.max(0L, subtotal - discount);
+    gstTotal = MoneyMath.gstAfterDiscount(gstTotal, subtotal, discount);
     cartStore.updateTotals(
         cart.id(),
         subtotal,

@@ -8,10 +8,13 @@ import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredReferralCons
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.kernel.storage.PresignedUrlService;
+import com.nammamedmate.kernel.storage.S3PresignedUrlService;
 import com.nammamedmate.messaging.JdbcOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.messaging.OutboxStore;
+import com.nammamedmate.messaging.SchedulerLease;
 import com.nammamedmate.messaging.SqsEventDispatcher;
+import com.nammamedmate.messaging.SqsOutboxTransport;
 import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
 import com.nammamedmate.security.AesGcmCipher;
 import com.nammamedmate.security.InMemoryTokenRevocationStore;
@@ -35,6 +38,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Configuration
 public class PlatformConfig {
@@ -159,19 +164,71 @@ public class PlatformConfig {
   }
 
   @Bean
+  SchedulerLease schedulerLease(JdbcTemplate jdbcTemplate, Clock clock) {
+    return new SchedulerLease(jdbcTemplate, clock);
+  }
+
+  @Bean(destroyMethod = "close")
+  @ConditionalOnMissingBean(SqsClient.class)
+  SqsClient sqsClient() {
+    return SqsClient.create();
+  }
+
+  @Bean
   SqsEventDispatcher sqsEventDispatcher(
       OutboxStore store,
+      ObjectProvider<SqsClient> sqs,
+      @Value("${medmate.sqs.queue-url:}") String queueUrl,
       AutoKycOutboxConsumer autoKycOutboxConsumer,
       OrderDeliveredReferralConsumer orderDeliveredReferralConsumer,
       OrderDeliveredLoyaltyConsumer orderDeliveredLoyaltyConsumer) {
+    String url = queueUrl == null ? "" : queueUrl.trim();
     return new SqsEventDispatcher(
         store,
         message -> {
+          if (!url.isEmpty()) {
+            new SqsOutboxTransport(sqs.getObject(), url).accept(message);
+            return;
+          }
           autoKycOutboxConsumer.accept(message);
           orderDeliveredReferralConsumer.accept(message);
           orderDeliveredLoyaltyConsumer.accept(message);
         },
         25);
+  }
+
+  @Bean
+  @Profile({"prod", "staging"})
+  org.springframework.boot.ApplicationRunner sqsQueueUrlGuard(
+      @Value("${medmate.sqs.queue-url:}") String queueUrl) {
+    return args -> {
+      if (queueUrl == null || queueUrl.isBlank()) {
+        throw new IllegalStateException(
+            "medmate.sqs.queue-url must be injected in deployed profiles");
+      }
+    };
+  }
+
+  @Bean
+  @Profile({"prod", "staging"})
+  org.springframework.boot.ApplicationRunner internalServiceTokenGuard(
+      @Value("${medmate.internal.service-token:}") String token) {
+    return args -> {
+      if (token == null || token.isBlank() || "local-internal-wallet-token".equals(token.trim())) {
+        throw new IllegalStateException(
+            "medmate.internal.service-token must be injected in deployed profiles");
+      }
+    };
+  }
+
+  @Bean
+  @Profile({"prod", "staging"})
+  org.springframework.boot.ApplicationRunner notificationWebhookSecretGuard(
+      @Value("${medmate.sms.webhook-secret:}") String smsSecret,
+      @Value("${medmate.email.webhook-secret:}") String emailSecret) {
+    return args ->
+        com.nammamedmate.notification.application.NotificationWebhookAuth
+            .validateSecretsForDeployedProfile(smsSecret, emailSecret);
   }
 
   @Bean
@@ -239,6 +296,7 @@ public class PlatformConfig {
   }
 
   @Bean
+  @Profile("!prod & !staging")
   @ConditionalOnMissingBean(PresignedUrlService.class)
   PresignedUrlService localPresignedUrlService(
       @Value("${medmate.s3.bucket:local-bucket}") String bucket) {
@@ -253,6 +311,21 @@ public class PlatformConfig {
         return new PresignedUrl("https://local.invalid/" + bucket + "/" + key + "?get=1", key, ttl);
       }
     };
+  }
+
+  @Bean(destroyMethod = "close")
+  @Profile({"prod", "staging"})
+  @ConditionalOnMissingBean(S3Presigner.class)
+  S3Presigner s3Presigner() {
+    return S3Presigner.create();
+  }
+
+  @Bean
+  @Profile({"prod", "staging"})
+  @ConditionalOnMissingBean(PresignedUrlService.class)
+  PresignedUrlService s3PresignedUrlService(
+      S3Presigner presigner, @Value("${medmate.s3.bucket}") String bucket) {
+    return new S3PresignedUrlService(presigner, bucket);
   }
 
   /** Staging/prod: default-credential S3 client for KYC PutObject (and future uploads). */

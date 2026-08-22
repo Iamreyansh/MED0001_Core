@@ -19,9 +19,13 @@ class SettlementDomainTest {
     assertThat(above.netPaidPaise()).isEqualTo(91_000_00L);
 
     var below = SettlementCalculator.compute(100_000_00L, new BigDecimal("8.00"), 1_000_00L);
-    assertThat(below.tcsApplicable()).isFalse();
-    assertThat(below.tcsDeductedPaise()).isZero();
-    assertThat(below.netPaidPaise()).isEqualTo(92_000_00L);
+    assertThat(below.tcsApplicable()).isTrue();
+    assertThat(below.tcsDeductedPaise()).isEqualTo(1_000_00L);
+    assertThat(below.netPaidPaise()).isEqualTo(91_000_00L);
+    assertThat(SettlementCalculator.tdsThresholdCrossed(1_000_00L)).isFalse();
+    assertThat(
+            SettlementCalculator.tdsThresholdCrossed(SettlementCalculator.TCS_THRESHOLD_PAISE + 1))
+        .isTrue();
   }
 
   @Test

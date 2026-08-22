@@ -19,6 +19,7 @@ import com.nammamedmate.order.application.port.out.OrderStatusEventStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort.PharmacyRow;
+import com.nammamedmate.order.application.port.out.PlatformCouponPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.PriceCeilingPort;
 import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
@@ -87,6 +88,16 @@ public class OrderPlacementService {
   private final ObjectMapper objectMapper;
   private final RateLimiter rateLimiter;
   private final Clock clock;
+  private PlatformCouponPort platformCoupons =
+      (code, total) -> {
+        var applied = com.nammamedmate.order.domain.CartPricing.applyCoupon(code, total);
+        return new PlatformCouponPort.Quote(
+            applied.code(),
+            applied.type(),
+            applied.discountPaise(),
+            applied.type() == com.nammamedmate.order.domain.CartPricing.CouponType.FREE_DELIVERY,
+            applied.message());
+      };
 
   public OrderPlacementService(
       CartService cartService,
@@ -173,6 +184,13 @@ public class OrderPlacementService {
     this.objectMapper = objectMapper;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setPlatformCoupons(PlatformCouponPort platformCoupons) {
+    if (platformCoupons != null) {
+      this.platformCoupons = platformCoupons;
+    }
   }
 
   @Transactional
@@ -346,6 +364,23 @@ public class OrderPlacementService {
     }
 
     orders.insert(order);
+    inventory.reserveForOrder(
+        cart.pharmacyId(),
+        orderId,
+        cart.items().stream()
+            .map(i -> new InventoryAvailabilityPort.ReserveLine(i.productId(), i.quantity()))
+            .toList());
+    if (cart.couponCode() != null && !cart.couponCode().isBlank()) {
+      platformCoupons.record(
+          cart.couponCode(),
+          orderId,
+          cart.customerId(),
+          bill.couponDiscountPaise(),
+          bill.itemTotalPaise());
+    }
+    if (cart.prescriptionId() != null) {
+      prescriptions.enqueueForPharmacy(cart.prescriptionId(), cart.pharmacyId(), orderId);
+    }
     feeQuote.ifPresent(q -> deliveryFees.lockSnapshot(orderId, q));
     cart.setStatus(CartStatus.CHECKED_OUT);
     cart.touch(now);

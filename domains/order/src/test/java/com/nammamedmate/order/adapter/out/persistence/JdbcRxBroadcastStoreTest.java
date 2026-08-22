@@ -93,7 +93,12 @@ class JdbcRxBroadcastStoreTest {
             ph,
             1.2,
             RxPharmacySlotStatus.QUOTED,
-            List.of(new QuotedMedicine("Metformin 500mg", 60, 25500)),
+            List.of(
+                new QuotedMedicine(
+                    "Metformin 500mg",
+                    60,
+                    25500,
+                    UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"))),
             22,
             28500L,
             now,
@@ -368,7 +373,7 @@ class JdbcRxBroadcastStoreTest {
         .thenReturn(
             p.medicinesAvailable() == null
                 ? null
-                : "[{\"name\":\"Metformin 500mg\",\"quantity\":60,\"price_paise\":25500}]");
+                : "[{\"name\":\"Metformin 500mg\",\"quantity\":60,\"price_paise\":25500,\"product_id\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\"},{\"name\":\"X\",\"quantity\":1,\"price_paise\":1,\"product_id\":\"not-a-uuid\"},{\"name\":\"Y\",\"quantity\":1,\"price_paise\":1,\"product_id\":\"  \"},{\"name\":\"Z\",\"quantity\":1,\"price_paise\":1}]");
     when(rs.getObject("delivery_eta_minutes")).thenReturn(p.deliveryEtaMinutes());
     when(rs.getObject("total_payable_paise")).thenReturn(p.totalPayablePaise());
     when(rs.getTimestamp("received_at")).thenReturn(Timestamp.from(p.receivedAt()));

@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Composition-root bridge: customer {@link GeocodePort} + rider {@link DistanceMatrixPort} →
@@ -38,12 +39,19 @@ public class IntegrationMapsBridgeConfig {
 
   @Bean
   @Primary
-  DistanceMatrixPort integrationDistanceMatrixPort(MapsService maps) {
+  DistanceMatrixPort integrationDistanceMatrixPort(MapsService maps, JdbcTemplate jdbc) {
     DistanceMatrixPort fallback = new StubDistanceMatrixAdapter();
     return new DistanceMatrixPort() {
       @Override
       public double distanceKm(UUID riderId, Double pharmacyLat, Double pharmacyLng) {
-        return fallback.distanceKm(riderId, pharmacyLat, pharmacyLng);
+        if (pharmacyLat == null || pharmacyLng == null) {
+          return fallback.distanceKm(riderId, pharmacyLat, pharmacyLng);
+        }
+        Double[] origin = lastRiderLatLng(jdbc, riderId);
+        if (origin == null) {
+          return fallback.distanceKm(riderId, pharmacyLat, pharmacyLng);
+        }
+        return estimateDriving(origin[0], origin[1], pharmacyLat, pharmacyLng).distanceKm();
       }
 
       @Override
@@ -72,6 +80,23 @@ public class IntegrationMapsBridgeConfig {
         return new RouteEstimate(km, minutes);
       }
     };
+  }
+
+  private static Double[] lastRiderLatLng(JdbcTemplate jdbc, UUID riderId) {
+    if (jdbc == null || riderId == null) {
+      return null;
+    }
+    var rows =
+        jdbc.query(
+            """
+            SELECT lat, lng FROM rider_locations
+             WHERE rider_id = ?
+             ORDER BY recorded_at DESC
+             LIMIT 1
+            """,
+            (rs, i) -> new Double[] {rs.getDouble("lat"), rs.getDouble("lng")},
+            riderId);
+    return rows.isEmpty() ? null : rows.getFirst();
   }
 
   private static String str(Object value) {

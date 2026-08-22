@@ -62,11 +62,12 @@ class RxQuoteIT extends AbstractApiIT {
         STAFF2,
         OWNER1_EMAIL,
         OWNER2_EMAIL);
-    jdbc.update("DELETE FROM pharmacies WHERE id IN (?, ?)", PH1, PH2);
+    jdbc.update(
+        "DELETE FROM pharmacies WHERE code IN ('PHM-RX1', 'PHM-RX2') OR id IN (?, ?)", PH1, PH2);
 
     String hash = new BCryptPasswordEncoder(12).encode(PASSWORD);
-    insertPharmacy(PH1, "Rx Sai", "PHM-RX1", 12.9350, 77.6130);
-    insertPharmacy(PH2, "Rx Apollo", "PHM-RX2", 12.9400, 77.6200);
+    insertPharmacy(PH1, "Rx Sai", "PHM-RX1", 15.0000, 75.0000);
+    insertPharmacy(PH2, "Rx Apollo", "PHM-RX2", 15.0020, 75.0020);
     jdbc.update(
         "INSERT INTO pharmacy_directory_metrics (pharmacy_id, rating, review_count, fill_rate_pct,"
             + " metrics_as_of, updated_at) VALUES (?, 4.60, 100, 95.00, NOW(), NOW())",
@@ -115,7 +116,7 @@ class RxQuoteIT extends AbstractApiIT {
           id, customer_id, label, flat_building, area_locality, city, state, pincode,
           latitude, longitude, is_default, created_at, updated_at
         ) VALUES (?, ?, 'Home', '12', 'Koramangala', 'Bengaluru', 'KA', '560034',
-          12.9345, 77.6125, true, NOW(), NOW())
+          15.0005, 75.0005, true, NOW(), NOW())
         """,
         addressId,
         customerId);
@@ -202,8 +203,24 @@ class RxQuoteIT extends AbstractApiIT {
                 Map.of(
                     "medicines_available",
                     List.of(
-                        Map.of("name", "Metformin 500mg", "qty", 60, "price", 255.00),
-                        Map.of("name", "Glipizide 5mg", "qty", 30, "price", 85.50)),
+                        Map.of(
+                            "name",
+                            "Metformin 500mg",
+                            "qty",
+                            60,
+                            "price",
+                            255.00,
+                            "product_id",
+                            UUID.randomUUID().toString()),
+                        Map.of(
+                            "name",
+                            "Glipizide 5mg",
+                            "qty",
+                            30,
+                            "price",
+                            85.50,
+                            "product_id",
+                            UUID.randomUUID().toString())),
                     "delivery_eta_minutes",
                     22)),
             Map.class);
@@ -218,7 +235,16 @@ class RxQuoteIT extends AbstractApiIT {
                 ph2Token,
                 Map.of(
                     "medicines_available",
-                    List.of(Map.of("name", "Metformin 500mg", "qty", 60, "price", 270.00)),
+                    List.of(
+                        Map.of(
+                            "name",
+                            "Metformin 500mg",
+                            "qty",
+                            60,
+                            "price",
+                            270.00,
+                            "product_id",
+                            UUID.randomUUID().toString())),
                     "delivery_eta_minutes",
                     18)),
             Map.class);

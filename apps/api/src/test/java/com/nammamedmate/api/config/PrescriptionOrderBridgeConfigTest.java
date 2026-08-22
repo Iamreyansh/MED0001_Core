@@ -90,6 +90,9 @@ class PrescriptionOrderBridgeConfigTest {
     assertThat(port.findForBroadcast(rx, cust).get().expired()).isTrue();
 
     assertThat(port.findForBroadcast(null, cust)).isEmpty();
+
+    port.enqueueForPharmacy(null, UUID.randomUUID(), null);
+    port.enqueueForPharmacy(rx, UUID.randomUUID(), UUID.randomUUID());
   }
 
   @Test

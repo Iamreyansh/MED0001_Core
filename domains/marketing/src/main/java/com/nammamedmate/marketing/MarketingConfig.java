@@ -2,8 +2,10 @@ package com.nammamedmate.marketing;
 
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.marketing.adapter.out.client.StubBannerImageValidator;
+import com.nammamedmate.marketing.adapter.out.client.StubCampaignDispatch;
 import com.nammamedmate.marketing.adapter.out.messaging.StubMarketingNotificationDispatch;
 import com.nammamedmate.marketing.application.port.out.BannerImageValidatorPort;
+import com.nammamedmate.marketing.application.port.out.CampaignDispatchPort;
 import com.nammamedmate.marketing.application.port.out.CampaignStore;
 import com.nammamedmate.marketing.application.port.out.CouponStore;
 import com.nammamedmate.marketing.application.port.out.CustomerGeoPort;
@@ -61,6 +63,12 @@ public class MarketingConfig {
     return (UUID segmentId) ->
         coupons.isSegmentReferencedByActiveCoupon(segmentId)
             || campaigns.isSegmentReferencedByActiveCampaign(segmentId);
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(CampaignDispatchPort.class)
+  CampaignDispatchPort stubCampaignDispatch() {
+    return new StubCampaignDispatch();
   }
 
   @Bean

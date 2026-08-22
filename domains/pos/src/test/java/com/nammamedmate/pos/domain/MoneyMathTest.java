@@ -44,5 +44,9 @@ class MoneyMathTest {
     assertThat(MoneyMath.rupeesToPaise(new BigDecimal("45.00"))).isEqualTo(4500L);
     assertThatThrownBy(() -> MoneyMath.rupeesToPaise(null))
         .isInstanceOf(IllegalArgumentException.class);
+    assertThat(MoneyMath.gstAfterDiscount(1200L, 10_000L, 2_000L)).isEqualTo(960L);
+    assertThat(MoneyMath.gstAfterDiscount(1200L, 10_000L, 0L)).isEqualTo(1200L);
+    assertThat(MoneyMath.gstAfterDiscount(0L, 10_000L, 100L)).isZero();
+    assertThat(MoneyMath.gstAfterDiscount(1200L, 0L, 100L)).isEqualTo(1200L);
   }
 }

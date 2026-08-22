@@ -216,4 +216,6 @@ Every story file (`STORY-XXX-name.md`) follows this structure:
 
 ---
 
+Production readiness mismatches and approved decisions live in [PRODUCTION-READINESS-AUDIT.md](./PRODUCTION-READINESS-AUDIT.md). Implementation status lives only in [AGENT-REQUIREMENT-IMPLEMENTATION.md](./AGENT-REQUIREMENT-IMPLEMENTATION.md).
+
 *This index is the single source of truth for all backend requirement documents. All epics and stories are in Draft status and will be refined during sprint planning.*

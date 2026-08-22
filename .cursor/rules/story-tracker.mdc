@@ -8,7 +8,8 @@ alwaysApply: true
 `docs/requirements/AGENT-REQUIREMENT-IMPLEMENTATION.md` is the single source of truth for story implementation status. Whenever you implement a story from `docs/requirements/` (via `/next-story`, `/implement-story`, or ad hoc):
 
 - Set the story's row to `in_progress` **before** coding.
-- Set it to `done` **only after** `make check` is green; fill Completed (`YYYY-MM-DD`) and Notes (target `domains/*` module + deviations), and update the Progress counts.
+- Set it to `staging-deployed` after the work is live on staging; fill Completed (`YYYY-MM-DD`) and Notes (target `domains/*` module + deviations), and update the Progress counts.
+- Set it to `production-ready` **only after** a production deploy. Do not use `done`.
 - If blocked (unmet dependency, missing infra), set `blocked` with the reason in Notes.
 - Pick stories in tracker order (phase → epic → story) unless the user names one.
 - Never record status inside STORY/EPIC docs — only in the tracker.

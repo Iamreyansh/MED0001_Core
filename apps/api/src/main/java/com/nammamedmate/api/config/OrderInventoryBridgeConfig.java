@@ -1,6 +1,7 @@
 package com.nammamedmate.api.config;
 
 import com.nammamedmate.inventory.application.port.out.InventoryAvailabilityQuery;
+import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.order.adapter.out.persistence.JdbcInventoryAvailabilityAdapter;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import java.util.ArrayList;
@@ -75,6 +76,115 @@ public class OrderInventoryBridgeConfig {
       @Override
       public Optional<String> medicineName(UUID medicineId) {
         return inventory.medicineName(medicineId).or(() -> catalogue.medicineName(medicineId));
+      }
+
+      @Override
+      public void reserveForOrder(UUID pharmacyId, UUID orderId, List<ReserveLine> lines) {
+        if (lines == null) {
+          return;
+        }
+        for (ReserveLine line : lines) {
+          if (line == null || line.medicineId() == null || line.quantity() <= 0) {
+            continue;
+          }
+          int updated =
+              jdbc.update(
+                  """
+                  UPDATE pharmacy_product
+                     SET total_stock_units = total_stock_units - ?, updated_at = NOW()
+                   WHERE pharmacy_id = ?
+                     AND master_medicine_id = ?
+                     AND deleted_at IS NULL
+                     AND total_stock_units >= ?
+                  """,
+                  line.quantity(),
+                  pharmacyId,
+                  line.medicineId(),
+                  line.quantity());
+          if (updated != 1) {
+            updated =
+                jdbc.update(
+                    """
+                    UPDATE pharmacy_catalogue_mapping
+                       SET stock_quantity = stock_quantity - ?, updated_at = NOW()
+                     WHERE pharmacy_id = ?
+                       AND master_medicine_id = ?
+                       AND stock_quantity >= ?
+                    """,
+                    line.quantity(),
+                    pharmacyId,
+                    line.medicineId(),
+                    line.quantity());
+          }
+          if (updated != 1) {
+            throw new AppException(
+                "ITEMS_OUT_OF_STOCK", "One or more items unavailable to reserve", 422);
+          }
+          jdbc.update(
+              """
+              INSERT INTO inventory_reservation
+                (id, order_id, pharmacy_id, medicine_id, quantity, status, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, 'RESERVED', NOW(), NOW())
+              ON CONFLICT (order_id, medicine_id) DO NOTHING
+              """,
+              UUID.randomUUID(),
+              orderId,
+              pharmacyId,
+              line.medicineId(),
+              line.quantity());
+        }
+      }
+
+      @Override
+      public void deductForOrder(UUID orderId) {
+        jdbc.update(
+            """
+            UPDATE inventory_reservation
+               SET status = 'DEDUCTED', updated_at = NOW()
+             WHERE order_id = ? AND status = 'RESERVED'
+            """,
+            orderId);
+      }
+
+      @Override
+      public void releaseForOrder(UUID orderId) {
+        jdbc.query(
+            """
+            SELECT pharmacy_id, medicine_id, quantity
+              FROM inventory_reservation
+             WHERE order_id = ? AND status = 'RESERVED'
+            """,
+            rs -> {
+              int restored =
+                  jdbc.update(
+                      """
+                      UPDATE pharmacy_product
+                         SET total_stock_units = total_stock_units + ?, updated_at = NOW()
+                       WHERE pharmacy_id = ? AND master_medicine_id = ? AND deleted_at IS NULL
+                      """,
+                      rs.getInt("quantity"),
+                      rs.getObject("pharmacy_id"),
+                      rs.getObject("medicine_id"));
+              if (restored != 1) {
+                jdbc.update(
+                    """
+                    UPDATE pharmacy_catalogue_mapping
+                       SET stock_quantity = stock_quantity + ?, updated_at = NOW()
+                     WHERE pharmacy_id = ? AND master_medicine_id = ?
+                    """,
+                    rs.getInt("quantity"),
+                    rs.getObject("pharmacy_id"),
+                    rs.getObject("medicine_id"));
+              }
+            },
+            orderId);
+        jdbc.update(
+            """
+            UPDATE inventory_reservation
+               SET status = 'RELEASED', updated_at = NOW()
+             WHERE order_id = ? AND status = 'RESERVED'
+            """,
+            orderId);
       }
     };
   }

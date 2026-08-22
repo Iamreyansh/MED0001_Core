@@ -43,16 +43,16 @@ class PaymentControllerTest {
   @Test
   void initiateVerifyGet() {
     UUID orderId = UUID.randomUUID();
-    when(payments.initiate(eq(principal), eq(orderId), eq(100L), eq("INR"), eq("UPI")))
+    when(payments.initiate(eq(principal), eq(orderId), eq(100L), eq("INR"), eq("UPI"), isNull()))
         .thenReturn(Map.of("payment_id", "p1"));
     ResponseEntity<ApiResponse<Map<String, Object>>> created =
         controller.initiate(
-            principal, new PaymentController.InitiateRequest(orderId, 100L, "INR", "UPI"));
+            principal, null, new PaymentController.InitiateRequest(orderId, 100L, "INR", "UPI"));
     assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     assertThat(created.getBody().data().get("payment_id")).isEqualTo("p1");
 
-    controller.initiate(principal, null);
-    verify(payments).initiate(eq(principal), isNull(), isNull(), isNull(), isNull());
+    controller.initiate(principal, "idem-1", null);
+    verify(payments).initiate(eq(principal), isNull(), isNull(), isNull(), isNull(), eq("idem-1"));
 
     when(payments.verify(eq(principal), eq("pay"), eq("ord"), eq("sig")))
         .thenReturn(Map.of("payment_status", "CAPTURED"));

@@ -64,7 +64,13 @@ class OrderPlacementIT extends AbstractApiIT {
     jdbc.update("DELETE FROM admin_auth_events WHERE admin_id = ?", OPS_ID);
     jdbc.update("DELETE FROM admin_staff WHERE id = ? OR email = ?", OPS_ID, OPS_EMAIL);
     jdbc.update("DELETE FROM medicine_master WHERE name LIKE 'OrderIT%'");
-    jdbc.update("DELETE FROM pharmacies WHERE id = ?", PH1);
+    jdbc.update(
+        "DELETE FROM pharmacy_catalogue_mapping WHERE pharmacy_id IN (SELECT id FROM pharmacies WHERE code = 'PHM-O1' OR id = ?)",
+        PH1);
+    jdbc.update(
+        "DELETE FROM pharmacy_directory_metrics WHERE pharmacy_id IN (SELECT id FROM pharmacies WHERE code = 'PHM-O1' OR id = ?)",
+        PH1);
+    jdbc.update("DELETE FROM pharmacies WHERE code = 'PHM-O1' OR id = ?", PH1);
 
     String hash = new BCryptPasswordEncoder(12).encode(PASSWORD);
     jdbc.update(
@@ -315,7 +321,7 @@ class OrderPlacementIT extends AbstractApiIT {
         "INSERT INTO pharmacies (id, name, business_name, city, subscription_plan, code, status,"
             + " is_online, admin_forced_offline, latitude, longitude, address, tagline, phone,"
             + " created_at, updated_at) VALUES (?, ?, ?, 'Bengaluru', 'GROWTH', ?, 'ACTIVE', true,"
-            + " false, ?, ?, ?::jsonb, 'tag', '+91-8022334455', NOW(), NOW())",
+            + " false, ?, ?, ?::jsonb, 'tag', '+91-8022330104', NOW(), NOW())",
         id,
         name,
         name,

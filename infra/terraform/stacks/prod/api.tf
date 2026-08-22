@@ -1,13 +1,13 @@
 resource "aws_ecr_repository" "api" {
   name                 = "${local.name}-api"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = true
   image_scanning_configuration { scan_on_push = true }
 }
 
 resource "aws_ecr_repository" "worker" {
   name                 = "${local.name}-worker"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = true
   image_scanning_configuration { scan_on_push = true }
 }
@@ -146,6 +146,41 @@ resource "aws_iam_role_policy" "ecs_task" {
   })
 }
 
+resource "aws_s3_bucket" "alb_logs" {
+  bucket = "${local.name}-alb-logs-105927215604"
+}
+
+resource "aws_s3_bucket_public_access_block" "alb_logs" {
+  bucket                  = aws_s3_bucket.alb_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowELBLogDelivery"
+      Effect    = "Allow"
+      Principal = { Service = "logdelivery.elasticloadbalancing.amazonaws.com" }
+      Action    = "s3:PutObject"
+      Resource  = "${aws_s3_bucket.alb_logs.arn}/*"
+    }]
+  })
+}
+
 resource "aws_lb" "this" {
   name               = "${local.name}-alb"
   internal           = false
@@ -153,6 +188,48 @@ resource "aws_lb" "this" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
   idle_timeout       = 300
+  access_logs {
+    bucket  = aws_s3_bucket.alb_logs.bucket
+    prefix  = "alb"
+    enabled = true
+  }
+  depends_on = [aws_s3_bucket_policy.alb_logs]
+}
+
+resource "aws_wafv2_web_acl" "alb" {
+  name  = "${local.name}-alb"
+  scope = "REGIONAL"
+  default_action {
+    allow {}
+  }
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${local.name}-alb-waf"
+    sampled_requests_enabled   = true
+  }
+  rule {
+    name     = "AWS-AWSManagedRulesCommonRuleSet"
+    priority = 1
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.name}-waf-common"
+      sampled_requests_enabled   = true
+    }
+  }
+}
+
+resource "aws_wafv2_web_acl_association" "alb" {
+  resource_arn = aws_lb.this.arn
+  web_acl_arn  = aws_wafv2_web_acl.alb.arn
 }
 
 resource "aws_lb_target_group" "api" {
@@ -201,7 +278,7 @@ resource "aws_ecs_cluster" "this" {
   name = local.name
   setting {
     name  = "containerInsights"
-    value = "disabled"
+    value = "enabled"
   }
 }
 
@@ -211,6 +288,8 @@ locals {
     { name = "SPRING_DATASOURCE_URL", value = "jdbc:postgresql://${aws_db_instance.this.address}:5432/medmate" },
     { name = "SPRING_DATA_REDIS_HOST", value = aws_elasticache_replication_group.redis.primary_endpoint_address },
     { name = "SPRING_DATA_REDIS_PORT", value = "6379" },
+    { name = "SPRING_DATA_REDIS_SSL_ENABLED", value = "true" },
+    { name = "SPRING_DATA_REDIS_PASSWORD", value = random_password.redis.result },
     { name = "MEDMATE_S3_BUCKET", value = aws_s3_bucket.uploads.bucket },
     { name = "MEDMATE_CDN_BASE_URL", value = local.cdn_base_url },
     { name = "MEDMATE_REFERRAL_JOIN_BASE_URL", value = "https://nammamedmate.com/join" },
@@ -318,7 +397,7 @@ resource "aws_ecs_service" "api" {
   name                               = "${local.name}-api"
   cluster                            = aws_ecs_cluster.this.id
   task_definition                    = aws_ecs_task_definition.api.arn
-  desired_count                      = 1
+  desired_count                      = 2
   launch_type                        = "FARGATE"
   health_check_grace_period_seconds  = 120
   deployment_maximum_percent         = 200
@@ -345,7 +424,7 @@ resource "aws_ecs_service" "worker" {
   name                               = "${local.name}-worker"
   cluster                            = aws_ecs_cluster.this.id
   task_definition                    = aws_ecs_task_definition.worker.arn
-  desired_count                      = 1
+  desired_count                      = 2
   launch_type                        = "FARGATE"
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 100

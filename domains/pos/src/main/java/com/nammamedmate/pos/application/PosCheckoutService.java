@@ -148,6 +148,7 @@ public class PosCheckoutService {
               MoneyMath.maxDiscountPaise(subtotal));
     }
     long grand = Math.max(0L, subtotal - discount);
+    gstTotal = MoneyMath.gstAfterDiscount(gstTotal, subtotal, discount);
 
     if (method == PaymentMethod.CREDIT) {
       long outstanding = khata.outstandingPaise(principal.pharmacyId(), cart.customerId());

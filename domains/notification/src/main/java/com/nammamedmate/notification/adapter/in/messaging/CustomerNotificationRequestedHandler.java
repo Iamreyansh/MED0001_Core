@@ -46,8 +46,10 @@ public class CustomerNotificationRequestedHandler {
         return;
       }
       handlePayload(payload);
+    } catch (RuntimeException e) {
+      throw e;
     } catch (Exception e) {
-      log.warn("Failed to handle notification event: {}", e.toString());
+      throw new IllegalStateException("Failed to handle notification event", e);
     }
   }
 

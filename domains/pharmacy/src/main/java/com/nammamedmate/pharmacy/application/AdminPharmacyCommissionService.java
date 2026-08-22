@@ -78,17 +78,17 @@ public class AdminPharmacyCommissionService {
     LocalDate today = LocalDate.now(clock.withZone(IST));
 
     long annualGmvYtd = orderMetrics.annualGmvYtdPaise(pharmacyId);
-    boolean tcsApplicable = annualGmvYtd > SettlementCalculator.TCS_THRESHOLD_PAISE;
+    boolean tdsThreshold = SettlementCalculator.tdsThresholdCrossed(annualGmvYtd);
 
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("pharmacy_id", pharmacyId.toString());
     data.put("business_name", pharmacy.businessName());
     data.put("current_commission_pct", scalePct(pharmacy.commissionPct()));
     data.put("pending_commission_change", pendingChange(pharmacyId));
-    data.put("tcs_applicable", tcsApplicable);
-    data.put("tcs_rate_pct", tcsApplicable ? TCS_RATE : BigDecimal.ZERO.setScale(2));
+    data.put("tcs_applicable", true);
+    data.put("tcs_rate_pct", TCS_RATE);
     data.put("annual_gmv_ytd", paiseToRupees(annualGmvYtd));
-    data.put("tcs_threshold_crossed", tcsApplicable);
+    data.put("tcs_threshold_crossed", tdsThreshold);
     data.put("current_period", currentPeriod(pharmacy, today, annualGmvYtd));
     data.putAll(bankSummary(pharmacyId));
     data.put("last_settlement_date", lastSettlementDate(pharmacyId));

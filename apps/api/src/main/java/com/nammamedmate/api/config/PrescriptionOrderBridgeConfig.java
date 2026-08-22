@@ -104,6 +104,34 @@ public class PrescriptionOrderBridgeConfig {
       return rows.stream().findFirst();
     }
 
+    @Override
+    public void enqueueForPharmacy(UUID prescriptionId, UUID pharmacyId, UUID orderId) {
+      if (prescriptionId == null || pharmacyId == null) {
+        return;
+      }
+      Instant now = clock.instant();
+      jdbc.update(
+          """
+          INSERT INTO pharmacy_rx_queue (
+            id, rx_id, pharmacy_id, order_id, received_at, status,
+            duplicate_warning, created_at, updated_at, deleted_at)
+          SELECT ?, ?, ?, ?, ?, 'PENDING_REVIEW', FALSE, ?, ?, NULL
+          WHERE NOT EXISTS (
+            SELECT 1 FROM pharmacy_rx_queue
+            WHERE rx_id = ? AND pharmacy_id = ? AND deleted_at IS NULL
+          )
+          """,
+          UUID.randomUUID(),
+          prescriptionId,
+          pharmacyId,
+          orderId,
+          Timestamp.from(now),
+          Timestamp.from(now),
+          Timestamp.from(now),
+          prescriptionId,
+          pharmacyId);
+    }
+
     private List<MedicineLine> parseMeds(String json) {
       if (json == null || json.isBlank()) {
         return List.of();

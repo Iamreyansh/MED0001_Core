@@ -22,4 +22,7 @@ public interface PrescriptionPort {
   Optional<PrescriptionRef> findVerified(UUID prescriptionId, UUID customerId);
 
   Optional<PrescriptionDetail> findForBroadcast(UUID prescriptionId, UUID customerId);
+
+  /** Lands an Rx order on the pharmacy review queue (no-op until bridged). */
+  default void enqueueForPharmacy(UUID prescriptionId, UUID pharmacyId, UUID orderId) {}
 }

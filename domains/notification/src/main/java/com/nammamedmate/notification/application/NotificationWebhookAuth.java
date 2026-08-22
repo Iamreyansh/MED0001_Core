@@ -49,7 +49,19 @@ public class NotificationWebhookAuth {
     return "sha256=" + hmacHex(emailSecret, rawBody);
   }
 
-  static boolean verify(String secret, String signatureHeader, byte[] rawBody) {
+  public static void validateSecretsForDeployedProfile(String smsSecret, String emailSecret) {
+    if (blankOrDefault(smsSecret, DEFAULT_SMS_SECRET)
+        || blankOrDefault(emailSecret, DEFAULT_EMAIL_SECRET)) {
+      throw new IllegalStateException(
+          "medmate.sms.webhook-secret and medmate.email.webhook-secret must be injected");
+    }
+  }
+
+  private static boolean blankOrDefault(String secret, String defaultSecret) {
+    return secret == null || secret.isBlank() || defaultSecret.equals(secret.trim());
+  }
+
+  public static boolean verify(String secret, String signatureHeader, byte[] rawBody) {
     if (signatureHeader == null || signatureHeader.isBlank()) {
       return false;
     }

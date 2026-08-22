@@ -56,6 +56,7 @@ class RxQuoteBroadcastServiceGapsTest {
   private static final UUID ADDR = UUID.fromString("22222222-2222-4222-8222-222222222222");
   private static final UUID RX = UUID.fromString("33333333-3333-4333-8333-333333333333");
   private static final UUID PH1 = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1");
+  private static final UUID PROD = UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
   private static final Instant T0 = Instant.parse("2026-08-08T10:00:00Z");
 
   @Mock private RxBroadcastStore store;
@@ -477,7 +478,7 @@ class RxQuoteBroadcastServiceGapsTest {
                     PH1,
                     1,
                     RxPharmacySlotStatus.QUOTED,
-                    List.of(new QuotedMedicine("A", 1, 100)),
+                    List.of(new QuotedMedicine("A", 1, 100, PROD)),
                     10,
                     3100L,
                     T0,
@@ -655,6 +656,43 @@ class RxQuoteBroadcastServiceGapsTest {
     withQty.put("price", 10.0);
     assertThat(service.submitQuote(pharmacyStaff, bc, List.of(withQty), 10).get("status"))
         .isEqualTo("QUOTED");
+    UUID prod = UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+    assertThat(
+            service
+                .submitQuote(
+                    pharmacyStaff,
+                    bc,
+                    List.of(
+                        Map.of(
+                            "name", "A", "qty", 1, "price", 10.0, "product_id", prod.toString())),
+                    10)
+                .get("status"))
+        .isEqualTo("QUOTED");
+    assertThat(
+            service
+                .submitQuote(
+                    pharmacyStaff,
+                    bc,
+                    List.of(Map.of("name", "A", "qty", 1, "price", 10.0, "medicine_id", prod)),
+                    10)
+                .get("status"))
+        .isEqualTo("QUOTED");
+    Map<String, Object> blankPid = new HashMap<>();
+    blankPid.put("name", "A");
+    blankPid.put("qty", 1);
+    blankPid.put("price", 10.0);
+    blankPid.put("product_id", "  ");
+    assertThat(service.submitQuote(pharmacyStaff, bc, List.of(blankPid), 10).get("status"))
+        .isEqualTo("QUOTED");
+    assertThatThrownBy(
+            () ->
+                service.submitQuote(
+                    pharmacyStaff,
+                    bc,
+                    List.of(Map.of("name", "A", "qty", 1, "price", 10.0, "product_id", "not-uuid")),
+                    10))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
     java.util.ArrayList<Map<String, Object>> onlyNull = new java.util.ArrayList<>();
     onlyNull.add(null);
     assertThatThrownBy(() -> service.submitQuote(pharmacyStaff, bc, onlyNull, 10))

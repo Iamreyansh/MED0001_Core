@@ -96,6 +96,19 @@ public final class MoneyMath {
     return Math.min(amount, eligibleSubtotalPaise);
   }
 
+  /** Scale inclusive GST to the post-discount taxable value. */
+  public static long gstAfterDiscount(
+      long gstOnSubtotalPaise, long subtotalPaise, long discountPaise) {
+    if (gstOnSubtotalPaise <= 0 || subtotalPaise <= 0 || discountPaise <= 0) {
+      return Math.max(0L, gstOnSubtotalPaise);
+    }
+    long net = Math.max(0L, subtotalPaise - discountPaise);
+    return BigDecimal.valueOf(gstOnSubtotalPaise)
+        .multiply(BigDecimal.valueOf(net))
+        .divide(BigDecimal.valueOf(subtotalPaise), 0, RoundingMode.HALF_UP)
+        .longValueExact();
+  }
+
   public static BigDecimal offerDiscountValueForApi(DiscountType type, long storedValue) {
     if (type == DiscountType.FLAT_RS) {
       return paiseToRupees(storedValue);

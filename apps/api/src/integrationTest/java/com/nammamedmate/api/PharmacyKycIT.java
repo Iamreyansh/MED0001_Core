@@ -59,6 +59,7 @@ class PharmacyKycIT extends AbstractApiIT {
     Map<String, Object> verifyData =
         (Map<String, Object>) Objects.requireNonNull(verify.getBody()).get("data");
     String accessToken = String.valueOf(verifyData.get("access_token"));
+    String pharmacyId = String.valueOf(verifyData.get("pharmacy_id"));
     assertThat(accessToken).isNotBlank();
 
     // List docs — empty
@@ -82,7 +83,7 @@ class PharmacyKycIT extends AbstractApiIT {
     Map<String, Object> gstinData =
         (Map<String, Object>) Objects.requireNonNull(gstinUpload.getBody()).get("data");
     assertThat(gstinData.get("status")).isEqualTo("UPLOADED");
-    assertThat(gstinData.get("signed_url")).asString().isNotBlank();
+    assertThat(gstinData.get("signed_url")).isNull();
     String gstinDocId = String.valueOf(gstinData.get("document_id"));
 
     // AC-003: Duplicate pending → 409 DOCUMENT_TYPE_ALREADY_PENDING
@@ -95,6 +96,10 @@ class PharmacyKycIT extends AbstractApiIT {
     uploadSmallDoc(accessToken, "FSSAI_CERTIFICATE", "2027-12-31");
     uploadSmallDoc(accessToken, "PAN_CARD", null);
     uploadSmallDoc(accessToken, "BANK_STATEMENT", null);
+
+    jdbc.update(
+        "UPDATE kyc_documents SET status = 'SCAN_CLEAN' WHERE pharmacy_id = ?::uuid AND status = 'UPLOADED'",
+        pharmacyId);
 
     // List — all docs present, ready to submit
     ResponseEntity<Map> fullList = getAuth("/api/v1/pharmacy/kyc/documents", accessToken);

@@ -121,9 +121,17 @@ integration-test: ## Integration tests (Testcontainers; apps with integrationTes
 check: ## Full quality gates (unit + IT, JaCoCo 100%, Spotless, SpotBugs, ArchUnit)
 	$(GRADLE) check -x dependencyCheckAnalyze $(GRADLE_FLAGS)
 
+.PHONY: bruno-check
+bruno-check: ## Validate Bruno collection + payment idempotency header
+	@test -f $(ROOT)/bruno/payments/initiate.bru
+	@grep -q 'Idempotency-Key' $(ROOT)/bruno/payments/initiate.bru
+	@grep -q 'paymentIdempotencyKey' $(ROOT)/bruno/payments/initiate.bru
+	@test -f $(ROOT)/docs/requirements/acceptance-matrix.json
+	@echo "Bruno + acceptance-matrix OK"
+
 .PHONY: check-all
-check-all: ## check + OWASP dependencyCheckAnalyze
-	$(GRADLE) check $(GRADLE_FLAGS)
+check-all: bruno-check ## check + OWASP dependencyCheckAnalyze
+	$(GRADLE) check dependencyCheckAnalyze $(GRADLE_FLAGS)
 
 .PHONY: dependency-check
 dependency-check: ## OWASP dependencyCheckAnalyze only

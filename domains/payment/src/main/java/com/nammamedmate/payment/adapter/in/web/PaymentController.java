@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -34,13 +35,19 @@ public class PaymentController {
   @Operation(summary = "Initiate Razorpay payment for an order")
   public ResponseEntity<ApiResponse<Map<String, Object>>> initiate(
       @AuthenticationPrincipal MedmatePrincipal principal,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
       @RequestBody(required = false) InitiateRequest body) {
     InitiateRequest req = body == null ? new InitiateRequest(null, null, null, null) : body;
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
             ApiResponse.ok(
                 payments.initiate(
-                    principal, req.orderId(), req.amountPaise(), req.currency(), req.method())));
+                    principal,
+                    req.orderId(),
+                    req.amountPaise(),
+                    req.currency(),
+                    req.method(),
+                    idempotencyKey)));
   }
 
   @PostMapping("/verify")

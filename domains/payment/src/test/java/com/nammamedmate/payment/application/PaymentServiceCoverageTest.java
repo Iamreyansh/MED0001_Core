@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -425,6 +426,53 @@ class PaymentServiceCoverageTest {
     assertThatThrownBy(() -> service.initiate(admin, orderId, 100L, "INR", "UPI"))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("FORBIDDEN");
+  }
+
+  @Test
+  void initiateReplaysAndRejectsConflictingIdempotencyKey() {
+    Payment existing =
+        new Payment(
+            UUID.randomUUID(),
+            orderId,
+            customerId,
+            1000,
+            0,
+            1000,
+            "INR",
+            PaymentMethod.UPI,
+            PaymentStatus.PENDING,
+            "order_rz",
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            null,
+            null,
+            null,
+            "idem-1",
+            NOW,
+            NOW);
+    when(store.findByIdempotencyKey("idem-1")).thenReturn(Optional.of(existing));
+    Map<String, Object> replay = service.initiate(customer, orderId, 1000L, "INR", "UPI", "idem-1");
+    assertThat(replay.get("payment_id")).isEqualTo(existing.id());
+
+    when(orders.findById(orderId)).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.initiate(customer, orderId, 1000L, "INR", "UPI", "  "))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+    when(store.findByIdempotencyKey("other")).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.initiate(customer, orderId, 1000L, "INR", "UPI", "other"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+
+    assertThatThrownBy(
+            () -> service.initiate(customer, UUID.randomUUID(), 1000L, "INR", "UPI", "idem-1"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("IDEMPOTENCY_KEY_CONFLICT");
+    Map<String, Object> nullOrderReplay =
+        service.initiate(customer, null, 1000L, "INR", "UPI", "idem-1");
+    assertThat(nullOrderReplay.get("payment_id")).isEqualTo(existing.id());
   }
 
   @Test

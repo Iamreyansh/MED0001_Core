@@ -91,6 +91,7 @@ public class SqsMessagePoller implements SmartLifecycle {
 
   void process(Message message) {
     handler.handle(message.body());
+    // ack only after a successful handle — failures stay visible for retry/DLQ
     sqsClient.deleteMessage(
         DeleteMessageRequest.builder()
             .queueUrl(queueUrl)

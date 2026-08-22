@@ -1,0 +1,1604 @@
+{
+  "version": 1,
+  "generated_from": "docs/requirements/**/STORY-*.md",
+  "story_count": 129,
+  "ac_count": 500,
+  "stories": [
+    {
+      "id": "EPIC-001/STORY-001",
+      "path": "docs/requirements/EPIC-001-auth-identity/STORY-001-customer-otp-auth.md",
+      "acceptance_criteria": [
+        "Given a valid Indian mobile number, when `send-otp` is called, then a 6-digit OTP is delivered via SMS within 5 seconds and a session record is created with a non-plaintext OTP hash and `expires_at` 10 minutes in the future.",
+        "Given a valid `session_id`, matching `phone`, and correct `otp`, when `verify-otp` is called within the expiry window, then a JWT access token (15 min TTL) and refresh token (30 day TTL) are returned along with the customer profile; `verified_at` is set on the session.",
+        "Given a valid session and correct `otp`, when `verify-otp` is called after `expires_at`, then `400 OTP_EXPIRED` is returned and no tokens are issued.",
+        "Given 3 consecutive wrong OTPs against the same session, when the 3rd verification fails, then the session `locked_at` is set, subsequent attempts return `400 OTP_SESSION_LOCKED`, and `send-otp` returns `429 OTP_RATE_LIMITED` for 30 minutes for that phone.",
+        "Given the same phone number has had 3 send-OTP calls within the past 60 minutes, when a 4th `send-otp` is called, then `429 OTP_RATE_LIMITED` is returned with a `retry_after_seconds` field indicating the wait time.",
+        "Given a phone number that has never been seen on the platform, when OTP verification succeeds, then `is_new_user: true` is returned in the response and a minimal Customer record is created with only the phone number populated.",
+        "Given a successfully verified OTP session, when `verify-otp` is called again with the same `session_id`, then `409 OTP_ALREADY_USED` is returned."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-001/STORY-002",
+      "path": "docs/requirements/EPIC-001-auth-identity/STORY-002-pharmacy-staff-auth.md",
+      "acceptance_criteria": [
+        "Given valid credentials (email + password), when `POST /auth/pharmacy/login` is called, then a 200 response is returned containing both tokens, the active pharmacy context, and the full list of pharmacies the staff member is assigned to.",
+        "Given a staff member assigned to 2 pharmacies and an active access token, when `POST /auth/pharmacy/switch-pharmacy` is called with the second pharmacy's ID, then a new access token is returned with the updated `pharmacy_id` claim and `role_in_pharmacy` reflects the staff's role at that pharmacy.",
+        "Given a staff member's `staff_id`, `pharmacy_id`, and correct 4-digit PIN, when `POST /auth/pharmacy/pos-pin` is called, then a 200 response is returned with an access token with `token_scope: \"pos\"` and TTL of exactly 4 hours (14400 seconds).",
+        "Given 5 consecutive wrong passwords within 10 minutes, when the 5th login fails, then the account is locked for 30 minutes, subsequent attempts return `403 ACCOUNT_LOCKED` with an `unlock_at` timestamp in the error details.",
+        "Given a POS-scoped token, when it is used to call a non-POS endpoint (e.g., staff management, reporting), then `403 FORBIDDEN` is returned with error code `POS_TOKEN_RESTRICTED`.",
+        "Given a staff member with no POS PIN configured, when `POST /auth/pharmacy/pos-pin` is called with their `staff_id`, then `403 POS_PIN_NOT_SET` is returned.",
+        "Given a `switch-pharmacy` request for a `pharmacy_id` the staff member is not assigned to, when the endpoint is called, then `403 FORBIDDEN` is returned."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-001/STORY-003",
+      "path": "docs/requirements/EPIC-001-auth-identity/STORY-003-admin-auth.md",
+      "acceptance_criteria": [
+        "Given a valid admin email and password for an `admin_super` with MFA enrolled, when `POST /auth/admin/login` is called, then `200 OK` is returned with `mfa_required: true` and a `mfa_challenge_token` with a 5-minute TTL; no full session tokens are issued at this stage.",
+        "Given a valid `mfa_challenge_token` and a correct TOTP code, when `POST /auth/admin/verify-mfa` is called, then `200 OK` is returned with a full access token (15 min TTL) and refresh token (8 hour TTL), and the login event is recorded in `AdminAuthEvent`.",
+        "Given an admin with `mfa_enabled: false`, when `POST /auth/admin/setup-mfa` is called, then a `totp_uri`, `totp_secret`, and exactly 8 unique backup codes are returned; calling setup-mfa again while `mfa_enabled: false` should replace the previous unenrolled secret.",
+        "Given a valid backup code, when `POST /auth/admin/verify-mfa` is called using it, then `used_backup_code: true` is returned, the code is permanently invalidated in the backup_codes JSONB array, and `backup_codes_remaining` is decremented.",
+        "Given 5 consecutive failed login attempts for the same admin email, when the 5th attempt fails, then the account is locked, `403 ACCOUNT_LOCKED` is returned on the 5th call, and all attempts are recorded in `AdminAuthEvent` with the correct `ip_address`.",
+        "Given an `admin_super` account with `mfa_enabled: false` (not yet enrolled), when login credentials are correct, then the response must NOT issue full session tokens; instead a specific error or forced-enrollment response must be returned to prevent bypassing MFA.",
+        "Given an expired `mfa_challenge_token` (older than 5 minutes), when `POST /auth/admin/verify-mfa` is called, then `401 CHALLENGE_TOKEN_EXPIRED` is returned."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-001/STORY-004",
+      "path": "docs/requirements/EPIC-001-auth-identity/STORY-004-token-management.md",
+      "acceptance_criteria": [
+        "Given a valid, unexpired refresh token, when `POST /auth/refresh` is called, then a new access token (15 min TTL) and a new refresh token are returned; the old refresh token's `rotated_at` is set and it can no longer be used.",
+        "Given a refresh token that has already been rotated (rotated_at is set), when `POST /auth/refresh` is called again with the old token, then `401 REFRESH_TOKEN_REUSED` is returned and ALL sessions for that user are immediately revoked.",
+        "Given an authenticated customer, when `GET /auth/me` is called with a valid access token, then the customer profile is returned including `role: \"customer\"`, wallet balance, and loyalty points.",
+        "Given an authenticated admin_super, when `GET /auth/me` is called, then the admin profile is returned with `role: \"admin_super\"` and `mfa_enabled: true`.",
+        "Given a user with 3 active sessions, when `POST /auth/logout-all` is called, then `sessions_revoked: 3` is returned and all 3 session records have `revoked_at` set.",
+        "Given an active session belonging to user A, when user B (same role, not admin) tries to `DELETE /auth/sessions/:session_id` using that session ID, then `403 FORBIDDEN` is returned.",
+        "Given a customer refresh token with a 30-day TTL, when it is used at day 31, then `401 REFRESH_TOKEN_EXPIRED` is returned."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-001/STORY-005",
+      "path": "docs/requirements/EPIC-001-auth-identity/STORY-005-rbac-permissions.md",
+      "acceptance_criteria": [
+        "Given an authenticated `admin_super`, when `GET /admin/roles` is called, then all 5 admin roles are returned with their correct permission sets, including `admin_super` showing `permissions: [\"*:*\"]`.",
+        "Given an authenticated `pharmacy_owner`, when `POST /pharmacy/roles` is called with a valid `name` and `permissions` array, then a new custom role is created scoped to the owner's active pharmacy and returned with a UUID.",
+        "Given a custom pharmacy role, when `PUT /pharmacy/roles/:id/permissions` is called with a new permissions array, then the permissions are fully replaced (not merged), and the `updated_at` timestamp is refreshed.",
+        "Given an authenticated `pharmacy_staff` (non-owner), when `POST /pharmacy/roles` is called, then `403 FORBIDDEN` is returned.",
+        "Given an API request with a token whose role is `admin_support`, when the request targets an endpoint requiring `pharmacies:suspend`, then `403 FORBIDDEN` is returned with error code `FORBIDDEN`.",
+        "Given a custom pharmacy role that is assigned to at least one staff member, when a `DELETE` is attempted (soft-delete), then the delete is rejected with `409 ROLE_IN_USE` until all assigned staff are reassigned.",
+        "Given `GET /admin/permissions`, when called with `resource=orders` query param, then only permissions for the `orders` resource are returned."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-002/STORY-001",
+      "path": "docs/requirements/EPIC-002-customer-management/STORY-001-customer-profile.md",
+      "acceptance_criteria": [
+        "Given an authenticated customer, when `GET /customers/me` is called, then the response includes `phone`, `name`, `segment`, `wallet_balance`, `loyalty_points`, and `loyalty_tier`.",
+        "Given a customer profile update with `preferred_language: \"de\"`, when `PATCH /customers/me` is called, then `400 VALIDATION_ERROR` is returned as `de` is not in the supported language list.",
+        "Given a customer with an order in `CONFIRMED` status, when `DELETE /customers/me` is called, then `409 ACTIVE_ORDERS_EXIST` is returned and `deletion_requested_at` is NOT set.",
+        "Given an admin with `customers:read` permission, when `GET /admin/customers` is called with `segment=VIP&is_flagged=false`, then only non-flagged VIP customers are returned in the paginated response.",
+        "Given an admin flags a customer with `reason: OTHER` but no `note`, then `400 VALIDATION_ERROR` is returned with a message indicating that `note` is required for the OTHER reason.",
+        "Given `POST /admin/customers/:id/notify` has been called 3 times for customer X within the last 24 hours, when a 4th call is made, then `429 NOTIFICATION_RATE_LIMITED` is returned.",
+        "Given a customer's `total_orders` reaches 12 via the nightly segment recomputation job, then their `segment` is updated from `REGULAR` to `LOYAL`."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-002/STORY-002",
+      "path": "docs/requirements/EPIC-002-customer-management/STORY-002-address-management.md",
+      "acceptance_criteria": [
+        "Given a customer with no saved addresses, when `POST /customers/me/addresses` is called with valid data, then the address is created and `is_default` is automatically set to `true` since it is the first address.",
+        "Given a customer with 10 saved addresses, when `POST /customers/me/addresses` is called, then `422 ADDRESS_LIMIT_REACHED` is returned and no address is created.",
+        "Given two addresses A (default) and B (not default), when `PATCH /addresses/B/set-default` is called, then address B has `is_default: true`, address A has `is_default: false`, and both changes occur in a single atomic transaction.",
+        "Given an address that is the delivery address of an active order (`status: CONFIRMED`), when `DELETE /customers/me/addresses/:id` is called, then `409 ADDRESS_IN_ACTIVE_ORDER` is returned.",
+        "Given valid GPS coordinates (12.9716, 77.5946), when `POST /customers/me/addresses/geocode` is called, then a `suggested_address` is returned with `city: \"Bengaluru\"` and a non-null `pincode`.",
+        "Given a `PUT /customers/me/addresses/:id` request with a pincode of `56006` (5 digits), when the endpoint is called, then `400 VALIDATION_ERROR` is returned specifying that pincode must be exactly 6 digits.",
+        "Given an address belonging to customer A, when customer B calls `DELETE /customers/me/addresses/:id` with that address ID, then `404 ADDRESS_NOT_FOUND` is returned (no cross-customer leakage)."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-002/STORY-003",
+      "path": "docs/requirements/EPIC-002-customer-management/STORY-003-wallet-management.md",
+      "acceptance_criteria": [
+        "Given a newly created customer, when `GET /customers/me/wallet` is called, then the response shows `balance: 0.00`, `lifetime_credited: 0.00`, and `lifetime_debited: 0.00`.",
+        "Given an admin_finance user, when `POST /admin/customers/:id/wallet/credit` is called with `amount: 100, reason: \"GOODWILL\"`, then a wallet transaction is created with `type: CREDIT`, `balance_after` is the previous balance + 100, and `expires_at` is exactly 365 days from `created_at`.",
+        "Given `max_wallet_credit_per_transaction` is Rs 1,000, when an admin tries to credit Rs 1,500, then `422 EXCEEDS_CREDIT_LIMIT` is returned.",
+        "Given an admin_support user (who lacks `finance:*` permission), when `POST /admin/customers/:id/wallet/credit` is called, then `403 FORBIDDEN` is returned.",
+        "Given a customer with wallet balance Rs 200 and an order total of Rs 350, when checkout is initiated, then the wallet balance of Rs 200 is deducted in full, the remaining Rs 150 is charged via the selected payment method, and a `DEBIT` wallet transaction is created with `balance_after: 0.00`.",
+        "Given a wallet credit that was issued 366 days ago, when the nightly expiry job runs, then a new `EXPIRED` transaction is inserted for that credit amount and the wallet `balance` is decremented accordingly.",
+        "Given `GET /customers/me/wallet/transactions?type=CREDIT`, then only transactions with `type: CREDIT` are returned in the paginated response."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-002/STORY-004",
+      "path": "docs/requirements/EPIC-002-customer-management/STORY-004-saved-payment-methods.md",
+      "acceptance_criteria": [
+        "Given a valid UPI ID, when `POST /customers/me/payment-methods/upi` is called, then Razorpay VPA validation is triggered; if the VPA is valid, a new saved method is created and the stored `upi_id` is encrypted at rest while only the masked `upi_handle` is returned in the response.",
+        "Given a customer with 5 saved UPI IDs, when `POST /customers/me/payment-methods/upi` is called with a 6th UPI ID, then `422 PAYMENT_METHOD_LIMIT_REACHED` is returned.",
+        "Given `POST /customers/me/payment-methods/card` is called with a `razorpay_token_id` but no `card_last4`, then `400 VALIDATION_ERROR` is returned with a message indicating `card_last4` is required.",
+        "Given a saved card is the payment source for an order in `CONFIRMED` status, when `DELETE /customers/me/payment-methods/:id` is called, then `409 PAYMENT_METHOD_IN_ACTIVE_ORDER` is returned.",
+        "Given two saved methods A (default) and B (not default), when `PATCH /payment-methods/B/set-default` is called, then B has `is_default: true` and A has `is_default: false` in the same atomic DB transaction.",
+        "Given `GET /customers/me/payment-methods`, then no full UPI IDs or card numbers are present in the response - only masked `upi_handle` and `card_last4` are visible.",
+        "Given a card payment method with type=CARD, the `razorpay_token_id` field must never appear in any customer-facing API response (it is internal only)."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-002/STORY-005",
+      "path": "docs/requirements/EPIC-002-customer-management/STORY-005-loyalty-referrals.md",
+      "acceptance_criteria": [
+        "Given a customer with `points_earned_lifetime: 50`, when `GET /customers/me/loyalty` is called, then `tier: \"GOLD\"` is returned and `tier_progress.next_tier` is `\"PLATINUM\"` with correct `points_needed` value.",
+        "Given a customer applies referral code `MEDRAM7`, when the referee's first order reaches `DELIVERED` status, then within 5 minutes both the referrer and the referee receive a Rs 100 wallet credit (`reason: REFERRAL`), and the `ReferralEvent` status transitions from `PENDING` to `REWARDED`.",
+        "Given a customer who has already applied a referral code, when `POST /customers/me/referral/apply` is called again, then `409 REFERRAL_ALREADY_USED` is returned.",
+        "Given a customer tries to apply their own referral code (same customer ID), when `POST /customers/me/referral/apply` is called, then `422 SELF_REFERRAL_NOT_ALLOWED` is returned.",
+        "Given a customer's first order is cancelled before delivery, when the cancellation event is processed, then the `ReferralEvent` status transitions from `PENDING` to `CANCELLED` and no wallet credits are issued.",
+        "Given an order with value Rs 350 is delivered, when the loyalty points award job runs, then 3 points are credited (`floor(350/100) = 3`), a `LoyaltyTransaction` record with `type: EARN` and `points: 3` is created, and `points_earned_lifetime` is incremented.",
+        "Given a customer at GOLD tier with 80 `points_earned_lifetime`, when a points reversal brings `points_balance` below the GOLD threshold but `points_earned_lifetime` remains 80, then the tier remains `GOLD` (tier is one-way ratchet based on lifetime points)."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-003/STORY-001",
+      "path": "docs/requirements/EPIC-003-pharmacy-onboarding-kyc/STORY-001-pharmacy-registration.md",
+      "acceptance_criteria": [
+        "**Given** a valid registration payload with all required fields, **when** POST `/api/v1/pharmacy/register` is called, **then** a `Pharmacy` record with `status=PENDING_KYC` and `plan=FREE` is created, a `pharmacy_owner` User is created and linked, and a 201 response is returned with `pharmacy_id`.",
+        "**Given** a GSTIN with an invalid checksum digit, **when** registration is attempted, **then** the API returns HTTP 400 with error code `INVALID_GSTIN` and no records are persisted.",
+        "**Given** an email that already exists in the platform (any role), **when** registration is attempted with that email, **then** the API returns HTTP 409 `EMAIL_ALREADY_REGISTERED`.",
+        "**Given** a successfully registered pharmacy, **when** the correct 6-digit OTP is submitted to `/register/verify-email`, **then** `email_verified=true` is set and a JWT access token with `pharmacy_owner` role is returned.",
+        "**Given** an OTP submitted after its 15-minute expiry, **when** `/register/verify-email` is called, **then** HTTP 400 `OTP_EXPIRED` is returned and no token is issued.",
+        "**Given** a pharmacy with `status=PENDING_KYC`, **when** GET `/api/v1/pharmacy/registration-status` is called with its JWT, **then** the response includes `kyc.documents_required=5`, `kyc.next_step`, and correct `profile_completeness_pct`.",
+        "**Given** the same Drug Licence number attempted in the same state, **when** a second registration is submitted, **then** HTTP 409 `DRUG_LICENCE_ALREADY_REGISTERED` is returned.",
+        "**Given** a phone number not in +91[6-9]XXXXXXXXX format, **when** registration is submitted, **then** HTTP 400 `INVALID_PHONE` is returned."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-003/STORY-002",
+      "path": "docs/requirements/EPIC-003-pharmacy-onboarding-kyc/STORY-002-kyc-document-upload.md",
+      "acceptance_criteria": [
+        "**Given** a pharmacy_owner uploads a PDF Drug Licence file with `expiry_date=2027-06-30`, **when** POST `/api/v1/pharmacy/kyc/documents` is called, **then** the document is saved with `status=UPLOADED`, a signed URL with 1-hour expiry is returned, and expiry alert notifications are scheduled for T-60 and T-30 days.",
+        "**Given** a file larger than 10 MB, **when** upload is attempted, **then** HTTP 400 `FILE_TOO_LARGE` is returned and no file is stored.",
+        "**Given** an UPLOADED document of type `GSTIN_CERTIFICATE` already exists, **when** the pharmacy attempts to upload another `GSTIN_CERTIFICATE`, **then** HTTP 409 `DOCUMENT_TYPE_ALREADY_PENDING` is returned.",
+        "**Given** all 5 required documents are uploaded, **when** POST `/api/v1/pharmacy/kyc/submit` is called, **then** pharmacy `status` changes to `KYC_SUBMITTED`, admin is notified via in-app notification, and `auto_kyc_triggered` reflects the feature flag state.",
+        "**Given** a document with `status=REJECTED`, **when** DELETE `/api/v1/pharmacy/kyc/documents/:document_id` is called by the pharmacy_owner, **then** the document record is soft-deleted and the pharmacy can upload a new document of the same type.",
+        "**Given** a document with `status=VERIFIED`, **when** DELETE is attempted by the pharmacy_owner, **then** HTTP 403 `CANNOT_DELETE_VERIFIED` is returned.",
+        "**Given** an admin calls POST `/api/v1/admin/pharmacies/:id/kyc/documents/:doc_id/verify` with `verified=false` and a rejection reason, **then** the document `status` changes to `REJECTED`, the rejection reason is stored, and the admin's ID and timestamp are recorded in `verified_by` and `verified_at`.",
+        "**Given** an admin accesses a signed document URL, **when** the URL is fetched, **then** access is logged in the audit trail with admin_id, document_id, and timestamp."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-003/STORY-003",
+      "path": "docs/requirements/EPIC-003-pharmacy-onboarding-kyc/STORY-003-auto-kyc-verification.md",
+      "acceptance_criteria": [
+        "**Given** `kyc_auto_verification_enabled=true` and a pharmacy submits KYC, **when** `/kyc/submit` is called, **then** an `AutoKycJob` is created and GSTIN check runs synchronously (within 10s), while Drug Licence and FSSAI checks are dispatched to the async queue.",
+        "**Given** all three checks return `PASS` within the async window, **when** the final check resolves, **then** pharmacy `status` changes to `ACTIVE`, `is_online` is set to `true`, zone is assigned from pincode mapping, and a welcome notification is sent via WhatsApp and email.",
+        "**Given** FSSAI check returns `FAIL`, **when** the result is recorded, **then** pharmacy remains `KYC_SUBMITTED`, an admin KYC task is created in the review queue, and the auto-verify result with the FAIL detail is attached to that task.",
+        "**Given** the GSTN API returns a business name with Levenshtein distance > 5 tokens from the platform `business_name`, **when** GSTIN check resolves, **then** check status is `PASS` but an admin flag `BUSINESS_NAME_MISMATCH` with `severity=WARN` is added.",
+        "**Given** the Drug Licence API returns an expiry date < 90 days from today, **when** the result is received, **then** Drug Licence check status is `FAIL` with reason `LICENCE_EXPIRING_SOON`.",
+        "**Given** the external Drug Licence API returns HTTP 500, **when** the error is received, **then** the check status is set to `ERROR`, retried up to 3 times with exponential backoff (10s, 30s, 90s), and after all retries exhausted, the job routes to the manual admin queue.",
+        "**Given** an admin calls GET `/api/v1/admin/pharmacies/:id/kyc/auto-verify-result`, **then** all `KycVerification` records for the latest job are returned including status, details, and any admin flags, with no raw API secrets in the response.",
+        "**Given** `kyc_auto_verification_enabled=false`, **when** an admin calls POST `/api/v1/admin/pharmacies/:id/kyc/auto-verify`, **then** HTTP 503 `FEATURE_FLAG_DISABLED` is returned."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-003/STORY-004",
+      "path": "docs/requirements/EPIC-003-pharmacy-onboarding-kyc/STORY-004-kyc-status-management.md",
+      "acceptance_criteria": [
+        "**Given** a pharmacy in `KYC_SUBMITTED` status, **when** an `admin_operations` user calls POST `/api/v1/admin/pharmacies/:id/approve` with a valid `commission_pct` and `zone_id`, **then** pharmacy `status` changes to `ACTIVE`, `is_online=true`, `commission_pct` and `zone_id` are set, and a WhatsApp + email welcome notification is sent to the pharmacy owner.",
+        "**Given** an `admin_compliance` user calls POST `/api/v1/admin/pharmacies/:id/approve`, **then** HTTP 403 `FORBIDDEN` is returned and no changes are made.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/reject` is called with `can_reapply=false`, **then** pharmacy `status=REJECTED`, `can_reapply=false` is set on the Pharmacy record, and the pharmacy owner receives a rejection notification with the reason.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/suspend` with `suspend_type=PERMANENT`, **then** `status=SUSPENDED`, `is_online=false`, `can_reapply=false`, and a WhatsApp + email notification is sent within 1 minute.",
+        "**Given** a pharmacy in `SUSPENDED` status, **when** POST `/api/v1/admin/pharmacies/:id/reactivate` is called with `notes`, **then** pharmacy `status=ACTIVE`, `is_online=true`, and an audit log entry with `action=PHARMACY_REACTIVATED` is written.",
+        "**Given** any approve/reject/suspend/reactivate action, **then** an `AuditLog` record is written with the correct `action`, `actor_id`, `actor_role`, `entity_id`, and `payload` including the reason/notes.",
+        "**Given** GET `/api/v1/admin/pharmacies?status=KYC_SUBMITTED`, **then** only pharmacies in `KYC_SUBMITTED` status are returned, sorted by `submitted_at` ascending (oldest first) by default.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/request-documents` with valid `document_types` and `message`, **then** the pharmacy owner receives an in-app + email + WhatsApp notification, and the KYC SLA timer resets."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-003/STORY-005",
+      "path": "docs/requirements/EPIC-003-pharmacy-onboarding-kyc/STORY-005-pharmacy-profile-update.md",
+      "acceptance_criteria": [
+        "**Given** a pharmacy_owner calls PATCH `/api/v1/pharmacy/profile` with a new `business_name`, **then** the change is NOT immediately applied; a `ProfileChangeRequest` is created with `status=PENDING_APPROVAL`, and the response lists `business_name` in `pending_approval_fields`.",
+        "**Given** a pharmacy_owner calls PATCH `/api/v1/pharmacy/profile` with a new `phone`, **then** an OTP is sent to the new phone number and the phone is not updated until OTP verification succeeds.",
+        "**Given** `operating_hours` is submitted with Monday `open_time=21:00` and `close_time=09:00` (open after close), **when** the request is processed, **then** HTTP 400 `INVALID_OPERATING_HOURS` is returned.",
+        "**Given** POST `/api/v1/pharmacy/profile/bank-account` is called with valid bank details, **then** a penny drop of Rs 1 is initiated via RazorpayX, the account `verification_status=PENDING`, and the pharmacy owner is notified when verification completes.",
+        "**Given** a verified bank account already exists, **when** POST `/api/v1/pharmacy/profile/bank-account` is called again, **then** HTTP 409 `BANK_ACCOUNT_ALREADY_VERIFIED` is returned.",
+        "**Given** PATCH `/api/v1/pharmacy/profile/tax` is called with a new valid `gstin`, **then** GSTIN re-verification is triggered via auto-KYC, and `re_verification_triggered=true` is returned in the response.",
+        "**Given** a pharmacy has 3 out of 12 profile fields completed, **when** GET `/api/v1/pharmacy/profile/completeness` is called, **then** `completeness_pct` correctly reflects the proportion and `missing_fields` lists the specific incomplete fields with `impact_pct` and actionable `action` strings.",
+        "**Given** an admin updates a pharmacy's profile field, **then** an `AuditLog` entry is written with `actor_id`, `actor_role`, `changed_fields`, `old_values`, and `new_values`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-004/STORY-001",
+      "path": "docs/requirements/EPIC-004-pharmacy-operations-admin/STORY-001-pharmacy-directory.md",
+      "acceptance_criteria": [
+        "**Given** GET `/api/v1/admin/pharmacies?status=ACTIVE&sort=gmv_today&order=desc`, **then** only ACTIVE pharmacies are returned, sorted by `gmv_today` descending, paginated with default `limit=50`.",
+        "**Given** `search=Sharma` is passed, **then** pharmacies where `business_name`, `owner_name`, `phone`, or `code` fuzzy-matches \"Sharma\" are returned; minimum 2-char query is enforced.",
+        "**Given** GET `/api/v1/admin/pharmacies/summary`, **then** all chip values (`total_active`, `pending_kyc`, `gmv_today`, `commission_today`, `payout_due`) are returned with a `data_as_of` timestamp reflecting last cache refresh (? 5 minutes old).",
+        "**Given** GET `/api/v1/admin/pharmacies/:id` for a valid pharmacy, **then** the response includes `performance`, `commission_ledger`, `catalogue_stats`, and at least the 5 most recent orders.",
+        "**Given** `commission_pct` and `net_payout` are requested by an `admin_support` role, **then** those fields are omitted from the response (not returned as null - simply absent from the JSON).",
+        "**Given** GET `/api/v1/admin/pharmacies/export` with `status=SUSPENDED`, **then** a CSV file is streamed with all suspended pharmacies (up to 10,000 rows), including a header comment with the total row count.",
+        "**Given** more than 200 is passed as `limit`, **then** the API clamps it to 200 and processes accordingly.",
+        "**Given** an `admin_compliance` role calls the export endpoint, **then** HTTP 403 `FORBIDDEN` is returned."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-004/STORY-002",
+      "path": "docs/requirements/EPIC-004-pharmacy-operations-admin/STORY-002-pharmacy-performance-metrics.md",
+      "acceptance_criteria": [
+        "**Given** GET `/api/v1/admin/pharmacies/:id/performance?period=30d`, **then** the response includes `fill_rate_pct`, `on_time_prep_pct`, `cancel_rate_pct`, `out_of_stock_rate_pct`, `avg_prep_minutes`, `avg_rating`, and `review_count` computed for the trailing 30 days, with `computed_at` indicating the batch job run time.",
+        "**Given** a pharmacy with `fill_rate_pct=78.5` (below the 85% warning threshold), **then** `alerts.auto_warning_triggered=true` is reflected in the performance response.",
+        "**Given** `fill_rate_pct < 70%` for 3 consecutive calendar days, **then** `alerts.auto_suspension_risk=true` and `alerts.consecutive_low_fill_rate_days=3` are returned.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/performance/alert` with `alert_type=LOW_FILL_RATE` is called, **then** the pharmacy receives a WhatsApp and in-app notification, a `PerformanceAlert` record is stored, and `next_alert_allowed_at` is set to 24 hours from now.",
+        "**Given** the same `alert_type` alert is sent again within 24 hours, **then** HTTP 429 `ALERT_THROTTLED` is returned with `next_alert_allowed_at`.",
+        "**Given** GET `/api/v1/admin/pharmacies/:id/ratings?rating=1`, **then** only 1-star ratings are returned for that pharmacy with customer name, review text, order number, and timestamp.",
+        "**Given** GET `/api/v1/admin/pharmacies/:id/orders?from_date=2026-07-01&to_date=2026-07-24`, **then** only orders within that date range for that pharmacy are returned with `prep_on_time` flag per order.",
+        "**Given** performance data is not yet computed (new pharmacy with no orders), **then** all metric fields return `0` or `null` with `computed_at=null` and no errors."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-004/STORY-003",
+      "path": "docs/requirements/EPIC-004-pharmacy-operations-admin/STORY-003-commission-payout-management.md",
+      "acceptance_criteria": [
+        "**Given** GET `/api/v1/admin/pharmacies/:id/commission`, **then** the response includes `current_commission_pct`, any pending change, TCS applicability, current period GMV/commission/TCS/net_payable, bank account masked and verification status.",
+        "**Given** PATCH `/api/v1/admin/pharmacies/:id/commission` with `commission_pct=25.0`, **then** HTTP 400 `INVALID_COMMISSION_PCT` is returned (exceeds 20% max).",
+        "**Given** PATCH `/api/v1/admin/pharmacies/:id/commission` with `effective_from` = today, **then** HTTP 400 `EFFECTIVE_FROM_MUST_BE_FUTURE` is returned.",
+        "**Given** a valid commission change is submitted, **then** a `CommissionHistory` record is created and an `AuditLog` entry is written with `action=COMMISSION_CHANGED`, `before_value`, `after_value`, and `actor_id`.",
+        "**Given** a pharmacy's annual GMV YTD exceeds Rs 5,00,000, **then** `tcs_applicable=true` and `tcs_deducted = GMV - 1%` in the settlement; below threshold, `tcs_deducted=0`.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/release` on a settlement in `PENDING_RELEASE` status with a verified bank account, **then** RazorpayX payout is initiated, settlement status changes to `RELEASED`, and the pharmacy owner receives a payout confirmation email with UTR.",
+        "**Given** POST `/release` is called on a settlement in `HELD` status, **then** HTTP 409 `SETTLEMENT_HELD` is returned.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold` with a `reason`, **then** settlement status changes to `HELD`, the pharmacy owner is notified via email with the hold reason, and the reason is recorded in the settlement record."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-004/STORY-004",
+      "path": "docs/requirements/EPIC-004-pharmacy-operations-admin/STORY-004-storefront-zone-control.md",
+      "acceptance_criteria": [
+        "**Given** PATCH `/api/v1/admin/pharmacies/:id/storefront` with `is_online=false`, **then** `Pharmacy.is_online=false` is set, `admin_forced_offline=true` is flagged, zone pharmacy list cache is invalidated, and a customer attempting to place an order at that pharmacy gets `PHARMACY_OFFLINE`.",
+        "**Given** `admin_forced_offline=true` on a pharmacy, **when** the pharmacy_owner calls PATCH `/api/v1/pharmacy/storefront` with `is_online=true`, **then** HTTP 403 `ADMIN_OVERRIDE_ACTIVE` is returned.",
+        "**Given** PATCH `/api/v1/admin/pharmacies/:id/zone` with a valid new `zone_id`, **then** `Pharmacy.zone_id` is updated, the old zone and new zone pharmacy list caches are invalidated, and the response confirms cache invalidation with `customer_app_reflects_change_in_minutes=5`.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/catalogue/pause` with `duration_minutes=120` and a reason, **then** all `PharmacyCatalogueMapping` records for the pharmacy have `is_visible=false`, a `CataloguePause` record is created, `auto_resume_at` is set to 2 hours from now, and `items_hidden_count` reflects the count hidden.",
+        "**Given** a catalogue pause expires (current time reaches `auto_resume_at`), **then** all hidden catalogue items are automatically restored to their previous visibility state.",
+        "**Given** GET `/api/v1/admin/zones`, **then** all zones are returned with `pharmacy_count`, `online_pharmacy_count`, and `has_low_pharmacy_warning=true` for zones with `pharmacy_count < 3`.",
+        "**Given** a zone reassignment is made, **then** an `AuditLog` entry is created with `action=ZONE_REASSIGNED`, `old_zone_id`, `new_zone_id`, and `actor_id`.",
+        "**Given** `PATCH /storefront` is called on a pharmacy in `SUSPENDED` status, **then** HTTP 409 `PHARMACY_NOT_ACTIVE` is returned by both admin and pharmacy_owner endpoints."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-004/STORY-005",
+      "path": "docs/requirements/EPIC-004-pharmacy-operations-admin/STORY-005-admin-pharmacy-actions.md",
+      "acceptance_criteria": [
+        "**Given** POST `/api/v1/admin/pharmacies/:id/notice` with `channel=WHATSAPP` and a valid `template_name`, **then** the WhatsApp message is dispatched, a `PharmacyNotice` record is created, an `AuditLog` entry with `action=NOTICE_SENT` is written, and `rate_limit_remaining` is decremented.",
+        "**Given** 3 notices have been sent to a pharmacy in the last hour, **when** a 4th is attempted, **then** HTTP 429 `NOTICE_RATE_LIMIT_EXCEEDED` is returned with `rate_limit_reset_at`.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/notes` with `is_flagged=true`, **then** the note is stored with `is_flagged=true` and is visible to all admin roles via GET `/notes`, but is NOT exposed in any pharmacy dashboard or customer-facing API.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/call-log` with all required fields, **then** a `PharmacyCallLog` record is created as immutable (no edit/delete endpoints exist for call logs).",
+        "**Given** POST `/api/v1/admin/pharmacies/bulk-action` with `action=SUSPEND` called by an `admin_operations` user, **then** HTTP 403 `FORBIDDEN_SUSPEND` is returned.",
+        "**Given** POST `/api/v1/admin/pharmacies/bulk-action` with 101 pharmacy IDs, **then** HTTP 400 `TOO_MANY_PHARMACIES` is returned.",
+        "**Given** POST `/api/v1/admin/pharmacies/bulk-action` with `action=SEND_NOTICE` on 45 pharmacies where 2 have hit rate limits, **then** HTTP 202 is returned with `job_id`, and when the job completes, GET `/bulk-jobs/:job_id` shows `succeeded=43`, `skipped=2` with reasons.",
+        "**Given** a WhatsApp notice is sent with `template_name` not in the approved registry, **then** HTTP 400 `INVALID_TEMPLATE` is returned and no message is dispatched."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-005/STORY-001",
+      "path": "docs/requirements/EPIC-005-master-catalogue/STORY-001-medicine-master-crud.md",
+      "acceptance_criteria": [
+        "**Given** POST `/api/v1/admin/catalogue` with a valid medicine payload, **then** a `MedicineMaster` record is created, `is_rx_only` is forced to `true` if `schedule` is H, H1, or X regardless of the submitted value, and an `AuditLog` entry with `action=MEDICINE_CREATED` is written.",
+        "**Given** a medicine with `schedule=X` is created and a pharmacy tries to add it to their online store, **then** the system returns `SCHEDULE_X_NOT_AVAILABLE_ONLINE`.",
+        "**Given** POST `/api/v1/admin/catalogue` with the same `salt_composition + manufacturer + form + pack_size + pack_unit` as an existing record, **then** HTTP 409 `DUPLICATE_MEDICINE` is returned.",
+        "**Given** POST `/api/v1/admin/catalogue/:id/ban` with a valid reason, **then** `is_banned=true` is set, a background job runs to set `is_visible=false` on all `PharmacyCatalogueMapping` records for this medicine within 30 seconds, and the medicine is excluded from search results immediately.",
+        "**Given** GET `/api/v1/admin/catalogue/:id`, **then** the response includes `stocking_pharmacies`, `substitutes`, `demand_stats`, and `mrp_ceiling` (null if not set).",
+        "**Given** PATCH `/api/v1/admin/catalogue/:id` with `gst_pct=7`, **then** HTTP 400 `INVALID_GST_RATE` is returned.",
+        "**Given** `monthly_demand` is submitted in a POST or PATCH body, **then** it is ignored (read-only computed field); the response always shows the server-computed value.",
+        "**Given** GET `/api/v1/admin/catalogue?is_banned=true`, **then** only banned medicines are returned, each with `ban_reason` populated."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-005/STORY-002",
+      "path": "docs/requirements/EPIC-005-master-catalogue/STORY-002-category-schedule-management.md",
+      "acceptance_criteria": [
+        "**Given** GET `/api/v1/catalogue/categories` (no auth), **then** only categories with `is_visible=true` and `is_deleted=false` are returned, sorted by `display_order` ascending, with `medicine_count` per category.",
+        "**Given** POST `/api/v1/admin/catalogue/categories` with `slug=pain-relief` and another category already has `slug=pain-relief`, **then** HTTP 409 `DUPLICATE_SLUG` is returned.",
+        "**Given** PATCH `/api/v1/admin/catalogue/categories/reorder` with a valid `items` array, **then** all provided categories have their `display_order` updated atomically in a single transaction, and the public category list reflects the new order within 5 minutes (cache TTL).",
+        "**Given** DELETE `/api/v1/admin/catalogue/categories/:id` on a category with 10 active (non-banned) medicines, **then** HTTP 409 `CATEGORY_HAS_ACTIVE_MEDICINES` is returned and no deletion occurs.",
+        "**Given** DELETE `/api/v1/admin/catalogue/categories/:id` on a category with zero active medicines, **then** `is_deleted=true` and `deleted_at` are set; the category disappears from the public list immediately.",
+        "**Given** PATCH `/catalogue/categories/reorder` contains an ID that does not exist, **then** the entire operation is rolled back (no display_order values are changed) and HTTP 400 `INVALID_CATEGORY_ID` is returned.",
+        "**Given** `is_visible` is set to `false` on a category via PATCH, **then** the category no longer appears in the public GET `/catalogue/categories` response, but medicines in that category are still discoverable via name/salt search.",
+        "**Given** GET `/api/v1/admin/catalogue/schedule-rules`, **then** all four schedules (OTC, H, H1, X) are returned with `prescription_required`, `special_register_required`, `online_delivery_allowed`, and `regulatory_reference` for each."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-005/STORY-003",
+      "path": "docs/requirements/EPIC-005-master-catalogue/STORY-003-medicine-search-discovery.md",
+      "acceptance_criteria": [
+        "**Given** GET `/api/v1/catalogue/search?q=augmentin&lat=12.93&lng=77.62`, **then** the response includes matching medicines with `relevance_score`, `best_pharmacy` with price and distance from the provided coordinates, and banned medicines are excluded.",
+        "**Given** `q=paracet` (5 characters, matches \"paracetamol\" via trigram), **then** medicines matching \"paracetamol\" appear in results with an appropriate relevance score.",
+        "**Given** `autocomplete=true&q=aug`, **then** up to 10 autocomplete suggestions are returned, the response is served from Redis cache on subsequent identical queries, and the response time is < 80ms (p95).",
+        "**Given** GET `/api/v1/catalogue/:id` for a banned medicine, **then** HTTP 410 `MEDICINE_BANNED` is returned.",
+        "**Given** GET `/api/v1/catalogue/:id?lat=12.93&lng=77.62` for an active medicine, **then** `stocking_pharmacies_nearby` lists online pharmacies in the customer's zone with price, distance, and estimated delivery time, sorted by price ascending.",
+        "**Given** a medicine in search results has `schedule=X`, **then** `available_online=false` and a note directing in-store visit is returned; the medicine is shown but cannot be added to an online cart.",
+        "**Given** POST `/api/v1/catalogue/check-availability` with `pharmacy_id` and 3 `medicine_ids`, **then** the response returns per-medicine `in_stock`, `stock_quantity`, and `pharmacy_price` in < 100ms (p95).",
+        "**Given** GET `/api/v1/pharmacy/catalogue/search?q=crocin&source=ALL`, **then** the response includes both master-catalogue results (with `source=MASTER`, `is_mapped`, and pharmacy price) and custom POS SKUs (with `source=CUSTOM`) for the authenticated pharmacy."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-005/STORY-004",
+      "path": "docs/requirements/EPIC-005-master-catalogue/STORY-004-price-ceiling-management.md",
+      "acceptance_criteria": [
+        "**Given** POST `/api/v1/admin/catalogue/:id/price-ceiling` with `ceiling_price` greater than the medicine's `mrp`, **then** HTTP 400 `CEILING_ABOVE_MRP` is returned and no ceiling is set.",
+        "**Given** a valid price ceiling is set with `ceiling_price=72` on a medicine with `mrp=85`, **then** `MedicineMaster.mrp_ceiling=72.00` is updated immediately and pharmacies with `pharmacy_price > 72` for this medicine appear in the violations list.",
+        "**Given** a customer tries to place an order for a medicine where the pharmacy's price (80.00) exceeds the ceiling (72.00), **then** the order creation endpoint returns `PRICE_CEILING_VIOLATED` with the medicine name and ceiling price.",
+        "**Given** DELETE `/api/v1/admin/catalogue/:id/price-ceiling` with a valid reason, **then** `MedicineMaster.mrp_ceiling=null`, all `OPEN` `PriceCeilingViolation` records for this medicine are updated to `RESOLVED`, and an `AuditLog` entry is written.",
+        "**Given** GET `/api/v1/admin/catalogue/price-violations?medicine_id=:id`, **then** only violations for that medicine are returned with `overage_amount`, `overage_pct`, pharmacy name, zone, and detection time.",
+        "**Given** POST `/api/v1/admin/catalogue/price-violations/notify` with `medicine_id`, **then** all pharmacies with open violations for that medicine receive a WhatsApp + in-app notification, `last_notified_at` is updated, and `next_batch_allowed_at` is set to 4 hours from now.",
+        "**Given** a second batch notification is attempted for the same medicine within 4 hours, **then** HTTP 429 `NOTIFICATION_RATE_LIMITED` is returned.",
+        "**Given** GET `/api/v1/admin/catalogue/price-ceilings?has_violations=true`, **then** only medicines with at least one `OPEN` violation are returned."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-005/STORY-005",
+      "path": "docs/requirements/EPIC-005-master-catalogue/STORY-005-pharmacy-catalogue-mapping.md",
+      "acceptance_criteria": [
+        "**Given** POST `/api/v1/pharmacy/catalogue-mapping` with `pharmacy_price=220` for a medicine with `mrp=218.50`, **then** HTTP 400 `PRICE_ABOVE_MRP` is returned and no mapping is created.",
+        "**Given** a valid mapping is created with `stock_quantity=48`, **then** the medicine appears in the pharmacy's online storefront and in customer search results for that zone.",
+        "**Given** PATCH `/api/v1/pharmacy/catalogue-mapping/:mapping_id` with `is_visible=false`, **then** the medicine is hidden from the pharmacy's online storefront and excluded from customer search results, but the mapping record and stock quantity remain intact.",
+        "**Given** the same `master_medicine_id` is mapped twice for the same pharmacy, **then** the second POST returns HTTP 409 `MAPPING_ALREADY_EXISTS`.",
+        "**Given** POST `/api/v1/pharmacy/catalogue-mapping` for a medicine with `schedule=X`, **then** HTTP 409 `SCHEDULE_X_NOT_AVAILABLE_ONLINE` is returned.",
+        "**Given** GET `/api/v1/admin/catalogue/:master_id/pharmacy-mappings?above_ceiling=true`, **then** only pharmacies whose `pharmacy_price` exceeds the active `mrp_ceiling` for this medicine are returned.",
+        "**Given** POST `/api/v1/admin/catalogue/bulk-map` with `auto_price_from_mrp=true` for 45 pharmacies, **then** HTTP 202 is returned with a `job_id`, and when the job completes, all 45 pharmacies have a `PharmacyCatalogueMapping` with `pharmacy_price = master mrp` and `initial_stock_quantity`.",
+        "**Given** a master medicine is banned (STORY-005-001), **then** all `PharmacyCatalogueMapping.is_visible` for that medicine are set to `false` within 30 seconds, and the medicine disappears from all pharmacy storefronts and customer search results."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-006/STORY-001",
+      "path": "docs/requirements/EPIC-006-pharmacy-inventory/STORY-001-inventory-management.md",
+      "acceptance_criteria": [
+        "Given a pharmacy_staff JWT, when `GET /api/v1/pharmacy/inventory?tab=LOW_STOCK` is called, then only products where `total_stock_units ? reorder_level` are returned.",
+        "Given a product with `earliest_expiry` within 4 months, when the inventory list is fetched with `tab=EXPIRING`, then that product appears in the result.",
+        "Given a product with no sale or purchase movement in 90+ days, when `tab=ALERTS` is queried, then the product is tagged `dead_stock` in the flags array.",
+        "Given a `pharmacy_staff` role, when `PATCH /api/v1/pharmacy/inventory/:id` is called attempting to set `is_online_visible = true`, then a 403 `FORBIDDEN` response is returned.",
+        "Given a Free-plan pharmacy, when `PATCH /api/v1/pharmacy/inventory/:id` sets `is_online_visible = true`, then a 403 `PLAN_FEATURE_LOCKED` error is returned.",
+        "Given `export=EXCEL` query param, when `GET /api/v1/pharmacy/inventory` is called, then a valid `.xlsx` file download is returned with all current filter results.",
+        "Given a search query `q=para`, when the inventory list API is called, then results matching product name, salt composition, and brand containing \"para\" are returned.",
+        "Given `PATCH /api/v1/pharmacy/inventory/:id/details` with `gst_pct=7`, then a 400 `INVALID_GST_PCT` error is returned (7 is not an allowed GST slab)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-006/STORY-002",
+      "path": "docs/requirements/EPIC-006-pharmacy-inventory/STORY-002-batch-expiry-management.md",
+      "acceptance_criteria": [
+        "Given a product with 2 batches, when the POS adds the product to a cart, then the batch with the earlier `expiry_date` is auto-selected.",
+        "Given `PATCH /batches/:batch_id` with `adjustment = -200` when `quantity_current = 150`, then a 400 `INSUFFICIENT_BATCH_QUANTITY` error is returned and no mutation occurs.",
+        "Given a batch with `expiry_date < today`, when the POS product search is executed, then that batch does not appear in the barcode/search suggestions.",
+        "Given `DELETE /batches/:batch_id` called by a `pharmacy_staff` role, then a 403 `STAFF_CANNOT_WRITE_OFF` error is returned.",
+        "Given `GET /expiry-alerts`, then each product appears in exactly one bucket based on its `earliest_expiry` date, with correct `value_at_risk = quantity_current - purchase_price_per_unit`.",
+        "Given a batch with `free_quantity = 20` and `quantity = 100`, when the batch is created via POST, then `quantity_received = 120` and cost computation uses only the 100 paid units.",
+        "Given `DELETE /batches/:batch_id` (write-off), then `quantity_current` becomes 0, `is_active` becomes false, and a `BatchAdjustmentLog` entry with `reason = EXPIRY_WRITE_OFF` is created.",
+        "Given `GET /expiry-report?export=PDF`, then a downloadable PDF report is returned containing all batches expiring within 4 months."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-006/STORY-003",
+      "path": "docs/requirements/EPIC-006-pharmacy-inventory/STORY-003-rack-location-management.md",
+      "acceptance_criteria": [
+        "Given `POST /rack-locations` with `rack_code = \"Z99-99\"`, then the rack is created and returns 201.",
+        "Given `POST /rack-locations` with `rack_code = \"invalid_code\"`, then a 400 `INVALID_RACK_CODE_FORMAT` error is returned.",
+        "Given `DELETE /rack-locations/A1-01` when 12 products are assigned to A1-01, then a 400 `RACK_NOT_EMPTY` error is returned with a list of blocking products.",
+        "Given `POST /rack-locations/assign` with 3 valid `product_ids` and a valid `rack_code`, then all 3 products have `rack_code` appended to their `rack_locations` array.",
+        "Given a product already assigned to `A1-01`, when `POST /rack-locations/assign` is called again with `A1-01`, then the assignment is idempotent and `rack_locations` remains unchanged.",
+        "Given `POST /rack-locations/print-labels` with `rack_codes: [\"A1-01\", \"B2-03\"]`, then a signed PDF URL is returned referencing a valid 2-label document.",
+        "Given `GET /rack-locations/unlocated`, then only products with an empty `rack_locations` array are returned.",
+        "Given a POS search with `mode=TEXT` and query `\"A1-01\"`, then products at that rack location are returned in the search results (tested via EPIC-007 / STORY-001)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-006/STORY-004",
+      "path": "docs/requirements/EPIC-006-pharmacy-inventory/STORY-004-purchase-grn-management.md",
+      "acceptance_criteria": [
+        "Given `POST /purchases` with a `distributor_id` and `invoice_number`, then a GRN in `DRAFT` status is created and returned.",
+        "Given a second `POST /purchases` with the same `distributor_id` and `invoice_number` for the same pharmacy, then a 400 `DUPLICATE_INVOICE_NUMBER` error is returned.",
+        "Given `POST /purchases/:grn_id/save-and-stock` on a GRN with 10 items, then 10 `ProductBatch` records are created and all parent `PharmacyProduct.total_stock_units` values are updated.",
+        "Given a GRN item with `free_quantity = 20` and `quantity = 100`, when the GRN is finalized, then the created batch has `quantity_received = 120` and `taxable_amount` is calculated on 100 units only.",
+        "Given `POST /purchases/:grn_id/save-and-stock` on an already-STOCKED GRN, then a 400 `GRN_ALREADY_STOCKED` error is returned.",
+        "Given a `pharmacy_staff` JWT calling `POST /purchases/:grn_id/save-and-stock`, then a 403 `STAFF_CANNOT_STOCK` is returned.",
+        "Given a CSV import with 30 rows where 4 have unrecognized product names, then a DRAFT GRN is created with 26 matched items and 4 unmatched items returned for review.",
+        "Given `GET /purchases` with `status=STOCKED`, then only finalized GRNs are returned, each with correct `taxable_amount`, `gst_amount`, and `total` fields."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-006/STORY-005",
+      "path": "docs/requirements/EPIC-006-pharmacy-inventory/STORY-005-distributor-management.md",
+      "acceptance_criteria": [
+        "Given a Free-plan pharmacy JWT, when `GET /api/v1/pharmacy/distributors` is called, then a 403 `PLAN_FEATURE_LOCKED` error is returned.",
+        "Given `POST /distributors` with `gstin = \"INVALIDGSTIN\"`, then a 400 `INVALID_GSTIN_FORMAT` error is returned.",
+        "Given `DELETE /distributors/:id` for a distributor with 50 GRN records, when deactivated, then existing GRN records remain intact and are still accessible.",
+        "Given `PATCH /distributors/:id/supply-list/:product_id/set-preferred` for distributor A, then distributor B's `is_preferred_source` for that product is set to `false`.",
+        "Given `GET /distributors/price-compare?only_multi_source=true`, then only products sourced from 2+ distributors appear in the response.",
+        "Given `GET /distributors/:id/supply-list`, then each item returns `effective_landed_cost` correctly calculated as `purchase_price - (free_goods_value / total_units)`.",
+        "Given a deactivated distributor, when `POST /purchases` is called with that `distributor_id`, then a 400 `DISTRIBUTOR_INACTIVE` error is returned.",
+        "Given `GET /distributors` with `q=\"medico\"`, then all distributors whose `firm_name` or `contact_name` contains \"medico\" (case-insensitive) are returned."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-006/STORY-006",
+      "path": "docs/requirements/EPIC-006-pharmacy-inventory/STORY-006-reorder-suggestions.md",
+      "acceptance_criteria": [
+        "Given a Starter-plan pharmacy JWT, when `GET /api/v1/pharmacy/reorder` is called, then a 403 `PLAN_FEATURE_LOCKED` response is returned.",
+        "Given 24 products below reorder level, when `GET /reorder` is called, then the `kpi.items_below_reorder_level` equals 24 and suggestions are grouped by best distributor.",
+        "Given `POST /reorder/create-po` with 12 items for distributor A, then a PO in `DRAFT` status is created with `po_number` in the format `PO-YYYY-MM-NNNNNN`.",
+        "Given a DRAFT PO, when `PATCH /purchase-orders/:po_id` adds 2 items and removes 1, then `items_count` reflects the net change.",
+        "Given `POST /purchase-orders/:po_id/send`, when the PO is already in `SENT` status, then a 400 `PO_ALREADY_SENT` error is returned.",
+        "Given `POST /purchase-orders/:po_id/record-grn` on a SENT PO, then a new DRAFT GRN is created with all PO items pre-filled and a `grn_id` is returned.",
+        "Given `POST /reorder/refresh` called twice within 5 minutes, then the second call returns 429 rate-limit error.",
+        "Given a product with `avg_daily_units_sold_30d = 0`, when the suggestion list is fetched, then `days_of_cover` is returned as `null` in the suggestion row."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-007/STORY-001",
+      "path": "docs/requirements/EPIC-007-pharmacy-pos-billing/STORY-001-counter-sale-pos.md",
+      "acceptance_criteria": [
+        "Given a cart with one product (no `batch_id` specified), when the item is added, then the batch with the earliest `expiry_date` among active batches is auto-selected.",
+        "Given a cart with one Rx item and `prescribing_doctor` omitted on checkout, then a 400 `RX_PRESCRIBER_REQUIRED` error is returned.",
+        "Given `payment_method = CREDIT` and no customer attached, then a 400 `CREDIT_REQUIRES_NAMED_CUSTOMER` error is returned.",
+        "Given `POST /cart/:id/discount` with `type=PERCENTAGE, value=35` when subtotal is Rs 1000, then a 400 `DISCOUNT_EXCEEDS_LIMIT` is returned (35% > 30% cap).",
+        "Given `POST /cart/:id/checkout` is called successfully, then `ProductBatch.quantity_current` for all cart item batches is decremented by the correct quantities atomically.",
+        "Given a cart with 2-hour inactivity, when `GET /cart/:id` is called, then `status = ABANDONED` and a 410 `CART_EXPIRED` is returned.",
+        "Given `POST /cart/:id/search` with `mode=TEXT` and `query=\"A1-03\"` (a rack code), then products assigned to that rack location are returned.",
+        "Given `payment_method = CASH` and `amount_paid = 500` on a Rs 450 total, then `change_due = 50.00` in the checkout response."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-007/STORY-002",
+      "path": "docs/requirements/EPIC-007-pharmacy-pos-billing/STORY-002-gst-invoice-management.md",
+      "acceptance_criteria": [
+        "Given `GET /invoices/:invoice_id`, then the response includes `gst_breakdown` with correct CGST and SGST split per slab (each = half of total GST for intra-state).",
+        "Given `PATCH /invoice-settings` with `invoice_prefix = \"PHARM1\"`, then the update succeeds and the next generated invoice uses `PHARM1-YYYY-MM-NNNNNN` format.",
+        "Given `PATCH /invoice-settings` with `invoice_prefix = \"TOOLONGPREFIX\"`, then a 400 `INVALID_PREFIX_FORMAT` error is returned.",
+        "Given `GET /invoices/:invoice_id/pdf?template=THERMAL`, then a PDF optimized for 80mm thermal paper is returned.",
+        "Given `POST /invoices/:invoice_id/share` with `channel=WHATSAPP`, then the WhatsApp API is called with an approved template and a PDF download link; `sent_at` is recorded.",
+        "Given a completed checkout, then the generated invoice's `invoice_number` is sequential and does not skip or repeat numbers for the given pharmacy-month.",
+        "Given `GET /invoices` with `export=EXCEL`, then a downloadable `.xlsx` file is returned with all matching invoice rows.",
+        "Given `show_mrp_savings = true` in settings, then the invoice PDF and `GET /invoices/:id` response include the `mrp_savings` line showing the correct total savings."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-007/STORY-003",
+      "path": "docs/requirements/EPIC-007-pharmacy-pos-billing/STORY-003-credit-khata-management.md",
+      "acceptance_criteria": [
+        "Given a Free-plan pharmacy JWT, when `GET /api/v1/pharmacy/khata` is called, then a 403 `PLAN_FEATURE_LOCKED` error is returned.",
+        "Given a POS checkout with `payment_method = CREDIT` for a named customer, then a `KhataEntry` of type `DEBIT` is created with the invoice amount.",
+        "Given `POST /khata/:customer_id/repayment` with `amount = 5000`, then a receipt number in `RCPT-YYYY-MM-NNNNNN` format is returned and `outstanding` decreases by 5000.",
+        "Given a repayment amount greater than the customer's outstanding balance, then a 400 `REPAYMENT_EXCEEDS_OUTSTANDING` error is returned.",
+        "Given `GET /khata` with `overdue_only = true`, then only customers with at least one bill older than 30 days and still unpaid are returned.",
+        "Given `GET /khata/:customer_id`, then the `ledger` array is in reverse-chronological order with a correct `running_balance` column.",
+        "Given `POST /khata/:customer_id/remind` called twice within 24 hours, then the second call returns 429 `REMINDER_RATE_LIMITED`.",
+        "Given a POS checkout for a customer whose `outstanding + new_purchase > credit_limit`, then a 400 `CREDIT_LIMIT_EXCEEDED` error is returned at checkout."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-007/STORY-004",
+      "path": "docs/requirements/EPIC-007-pharmacy-pos-billing/STORY-004-sales-ledger.md",
+      "acceptance_criteria": [
+        "Given `GET /sales?from_date=2026-07-01&to_date=2026-07-24`, then `period_summary.bill_count` equals the exact count of invoices in that date range across both COUNTER and ONLINE channels.",
+        "Given `GET /sales?export=EXCEL&from_date=2025-04-01&to_date=2026-03-31`, then a valid `.xlsx` file is returned with all 12 months of sales data.",
+        "Given `GET /sales?from_date=2024-01-01&to_date=2026-01-01` (>12 months), when `export=EXCEL`, then a 400 `EXPORT_RANGE_TOO_LARGE` error is returned.",
+        "Given `GET /sales?financial_year=2025-26`, then `from_date` is auto-set to `2025-04-01` and `to_date` to `2026-03-31`.",
+        "Given `POST /sales/:sale_id/mark-paid` on a PENDING CREDIT sale, then `payment_status` changes to `PAID`, a `KhataEntry` CREDIT is created, and a receipt number is returned.",
+        "Given `POST /sales/:sale_id/mark-paid` on an already-PAID invoice, then a 400 `SALE_ALREADY_PAID` error is returned.",
+        "Given `GET /sales/summary?from_date=2026-07-01&to_date=2026-07-24`, then `online_vs_counter` percentages sum to 100%.",
+        "Given `GET /sales` with no filters, then the response always includes `period_summary` totals covering the default date range regardless of the current page."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-007/STORY-005",
+      "path": "docs/requirements/EPIC-007-pharmacy-pos-billing/STORY-005-pharmacy-offers-discounts.md",
+      "acceptance_criteria": [
+        "Given a Free-plan pharmacy JWT, when `POST /api/v1/pharmacy/offers` is called, then a 403 `PLAN_FEATURE_LOCKED` error is returned.",
+        "Given `POST /offers` with `discount_type=PERCENTAGE, discount_value=60`, then a 400 `DISCOUNT_EXCEEDS_PLATFORM_LIMIT` error is returned.",
+        "Given `POST /offers` with `coupon_code` omitted, then the created offer has an auto-generated 6-character alphanumeric `coupon_code`.",
+        "Given `POST /offers/validate` with a valid coupon code and matching cart products, then `is_valid = true` and `discount_amount` is correctly calculated.",
+        "Given `POST /offers/validate` with a valid coupon code for CATEGORY=Antibiotics but no antibiotic products in the cart, then `is_valid = false` with code `COUPON_NOT_APPLICABLE`.",
+        "Given `DELETE /offers/:offer_id` on an offer with `total_redemptions = 50`, then the offer is not hard-deleted; instead it is set to `EXPIRED` with `valid_until = today`.",
+        "Given two active counter offers both applicable to a product, when the POS cart is computed, then only the higher-discount offer is applied.",
+        "Given `PATCH /offers/:offer_id/toggle` on an active offer, then `is_active` flips to `false`; calling it again returns `is_active = true`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-008/STORY-001",
+      "path": "docs/requirements/EPIC-008-prescription-management/STORY-001-prescription-upload.md",
+      "acceptance_criteria": [
+        "**Given** a customer uploads a valid JPG file under 10 MB, **when** the upload completes, **then** the prescription is created with `status: UPLOADED`, a private S3 key is stored, and a 1-hour signed URL is returned.",
+        "**Given** a customer uploads a file exceeding 10 MB, **when** the upload is attempted, **then** the API returns HTTP 422 with `FILE_TOO_LARGE`.",
+        "**Given** a customer uploads a `.docx` file, **when** the upload is attempted, **then** the API returns HTTP 422 with `INVALID_FILE_FORMAT`.",
+        "**Given** a customer tries to delete a prescription linked to an order in `PACKING` status, **when** the delete is attempted, **then** the API returns HTTP 409 with `PRESCRIPTION_IN_USE`.",
+        "**Given** a prescription has `type: UPLOADED` and was created 183 days ago, **when** the expiry job runs, **then** the prescription status is updated to `EXPIRED` and cannot be attached to a cart.",
+        "**Given** a customer attaches an `EXPIRED` prescription to their cart, **when** the attachment is attempted, **then** the API returns HTTP 422 with `PRESCRIPTION_EXPIRED`.",
+        "**Given** a prescription is attached to a cart, **when** the cart is viewed by another customer (different `customer_id`), **then** the API returns HTTP 404 (not 403) to prevent enumeration.",
+        "**Given** an uploaded prescription, **when** the OCR job completes, **then** `medicines_extracted`, `doctor_name`, and `prescription_date` are populated in the record without re-running the upload flow.",
+        "**Given** a customer calls `GET /api/v1/prescriptions/:id` for the same prescription twice within 2 hours, **then** two different signed URLs are returned (each freshly generated, both valid for 1 hour).",
+        "**Given** an e-prescription from teleconsult, **when** a customer attempts to delete it, **then** the API returns HTTP 403 with `CANNOT_DELETE_EPRESCRIPTION`."
+      ],
+      "ac_count": 10,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-008/STORY-002",
+      "path": "docs/requirements/EPIC-008-prescription-management/STORY-002-pharmacy-rx-queue.md",
+      "acceptance_criteria": [
+        "**Given** a pharmacy has a prescription in `PENDING_REVIEW` for 2 hours 5 minutes, **when** the Rx queue is loaded, **then** the entry is marked `is_overdue: true` and sorted to the top of the list.",
+        "**Given** a pharmacist approves an Rx with `approved_medicines`, **when** approval succeeds, **then** the order's line items are updated to match the `approved_medicines` list and the previous cart items are replaced.",
+        "**Given** a pharmacist rejects a prescription with reason `ILLEGIBLE`, **when** rejection is saved, **then** the customer receives a WhatsApp notification and in-app push within 30 seconds containing the rejection reason and `custom_message`.",
+        "**Given** an e-prescription (`type: E_PRESCRIPTION`) arrives in the queue, **when** the pharmacist views it, **then** the doctor card shows `verified: true` and the doctor's NMC registration number.",
+        "**Given** a pharmacy on the Free plan attempts to access the Rx queue, **when** the request is made, **then** the API returns HTTP 403 with `PLAN_UPGRADE_REQUIRED`.",
+        "**Given** a pharmacist calls `dispense-to-billing`, **when** the push succeeds, **then** the POS cart is pre-filled with the approved medicines at the approved prices without any manual re-entry.",
+        "**Given** the same patient + same drug is detected within 30 days, **when** the pharmacist views the Rx detail, **then** a `POSSIBLE_DUPLICATE_RX` warning is shown; the pharmacist can still approve.",
+        "**Given** a pharmacist calls `dispense` on an approved prescription, **when** successful, **then** the order status transitions to `READY_FOR_PICKUP` and a POS sale record is created."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-008/STORY-003",
+      "path": "docs/requirements/EPIC-008-prescription-management/STORY-003-rx-compliance-audit.md",
+      "acceptance_criteria": [
+        "**Given** a Schedule H1 medicine is dispensed, **when** 24 hours pass without an admin audit, **then** the audit entry status transitions to `OVERDUE_AUDIT` and a compliance team alert is sent.",
+        "**Given** a patient has the same Schedule H1 drug dispensed twice within 30 days, **when** the second audit detail is loaded, **then** the `possible_duplicate` flag is `true` and the duplicate entry is referenced.",
+        "**Given** `admin_compliance` calls `POST /api/v1/admin/prescriptions/:rx_id/flag` with `severity: HIGH`, **when** successful, **then** an email escalation is sent to the Head of Compliance within 60 seconds.",
+        "**Given** an audit action (verify or flag) is committed, **when** an admin attempts to undo or edit it, **then** the API returns 405 Method Not Allowed (append-only constraint).",
+        "**Given** `admin_operations` calls `GET /api/v1/admin/prescriptions/:rx_id`, **when** the request is made, **then** the prescription `file_url` field is absent from the response (access restricted).",
+        "**Given** the audit queue has 50 entries, **when** an export is requested (`?export=true`), **then** a CSV download URL is returned within 5 seconds containing all 50 entries with Rx ID, patient, drug, schedule, pharmacy, dispense date, and audit outcome.",
+        "**Given** `GET /api/v1/admin/prescriptions/statistics` is called for a 30-day window, **when** the response is received, **then** `compliance_rate_by_schedule` contains separate rates for H, H1, and X.",
+        "**Given** OCR has extracted doctor name and medicines for an uploaded prescription, **when** the audit detail is loaded, **then** verification checklist fields are pre-populated and labeled `\"OCR extracted\"`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-008/STORY-004",
+      "path": "docs/requirements/EPIC-008-prescription-management/STORY-004-schedule-drug-register.md",
+      "acceptance_criteria": [
+        "**Given** a pharmacist dispenses a Schedule H1 medicine via the Rx dispense endpoint, **when** dispense succeeds, **then** a drug register entry is created synchronously with the correct `running_balance = previous_balance - qty_issued`.",
+        "**Given** an admin tries to delete a register entry via any HTTP method, **then** the API returns HTTP 405 Method Not Allowed.",
+        "**Given** `admin_compliance` exports the H1 register for a pharmacy for Q1 2026, **when** the CSV is downloaded, **then** columns appear in regulatory order: S.No, Date, Rx_Reference_No, Patient_Name, Patient_Age, Prescriber_Name, Prescriber_Reg_No, Drug_Name, Batch_No, Quantity_Issued, Running_Balance, Pharmacy_License_No, Dispensed_By.",
+        "**Given** a pharmacy owner calls `GET /api/v1/pharmacy/compliance/drug-register?schedule=H1`, **when** the response is returned, **then** only entries for their own pharmacy are included (no cross-pharmacy data leakage).",
+        "**Given** `admin_compliance` calls `GET /api/v1/admin/compliance/drug-register?schedule=X&pharmacy_id=ph_01`, **when** the response is received, **then** only Schedule X entries for that pharmacy are returned.",
+        "**Given** a Schedule H1 drug register entry was created 3 years and 1 day ago, **when** the archival job runs, **then** the entry's `is_archived` flag is set to `true` and the entry is still queryable via the API.",
+        "**Given** a Schedule X entry is exactly at 5 years of age, **when** queried, **then** it is still accessible with `is_archived: true` and the `retention_expires_at` date matches.",
+        "**Given** `pharmacy_staff` calls the admin export endpoint `POST /api/v1/admin/compliance/drug-register/export`, **then** the API returns HTTP 403 Forbidden."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-008/STORY-005",
+      "path": "docs/requirements/EPIC-008-prescription-management/STORY-005-doctor-registry.md",
+      "acceptance_criteria": [
+        "**Given** an uploaded prescription is processed by OCR with an extractable registration number, **when** the OCR job completes, **then** a doctor record is created (or incremented) with `status: UNVERIFIED` and the `prescription_count` is incremented.",
+        "**Given** the same `registration_no` appears on two different uploaded prescriptions, **when** both are processed, **then** only one doctor record exists and `prescription_count = 2`.",
+        "**Given** a doctor is blacklisted, **when** a new prescription is uploaded with that doctor's `registration_no`, **then** the compliance audit entry is auto-flagged with `BLACKLISTED_DOCTOR` severity `HIGH` before any pharmacist review.",
+        "**Given** a doctor is blacklisted, **when** the blacklist endpoint is called, **then** the response includes `retroactive_flags_queued` count and the async job begins processing existing unflagged Rx entries.",
+        "**Given** `admin_compliance` calls `POST /api/v1/admin/doctors/:id/blacklist` on an already-blacklisted doctor, **then** the API returns HTTP 409 with `DOCTOR_ALREADY_BLACKLISTED`.",
+        "**Given** `GET /api/v1/admin/doctors/unverified` is called, **when** the response is received, **then** doctors are sorted by `prescription_count DESC` so highest-volume unverified doctors are prioritised.",
+        "**Given** an OCR job extracts a qualification not in the allowed ENUM list, **when** the doctor profile is created, **then** the `qualification` field is set to `null` and the associated prescription's compliance entry is auto-flagged with a `UNRECOGNISED_QUALIFICATION` note.",
+        "**Given** `admin_operations` attempts to call `POST /api/v1/admin/doctors/:id/verify`, **then** the API returns HTTP 403 Forbidden."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-008/STORY-006",
+      "path": "docs/requirements/EPIC-008-prescription-management/STORY-006-compliance-reports-filings.md",
+      "acceptance_criteria": [
+        "**Given** the first day of a new calendar month arrives, **when** the monthly job runs, **then** two filing entries (SCHEDULE_H1_REGISTER and SCHEDULE_X_REGISTER) are auto-created for the preceding month with `due_date` set to the 15th.",
+        "**Given** a filing's `due_date` has passed and it is still `PENDING`, **when** the status-check job runs, **then** the filing transitions to `OVERDUE` and an email alert is sent to `admin_compliance`.",
+        "**Given** `admin_compliance` calls `mark-filed` without a `reference_number`, **when** the request is submitted, **then** the API returns HTTP 422 with `REFERENCE_NUMBER_REQUIRED`.",
+        "**Given** two concurrent requests to generate the same filing report are made, **when** the second request arrives while the first is still processing, **then** the second request returns the same `job_id` (deduplicated) rather than starting a second generation job.",
+        "**Given** a drug recall is initiated for batch `PCM2024Q1`, **when** the recall is processed, **then** all inventory items with matching `drug_name + batch_no` across all pharmacies are set to `is_banned = true` and pharmacy owners receive WhatsApp alerts.",
+        "**Given** an admin verifies a prescription, **when** the verification succeeds, **then** a `ComplianceActivityLog` entry with `action: RX_VERIFIED` is written and cannot be deleted or modified.",
+        "**Given** `admin_finance` calls `GET /api/v1/admin/compliance/filings`, **when** the request is made, **then** the filing list is returned (read-only access granted).",
+        "**Given** a filing is older than 5 years, **when** the archival job runs, **then** the filing's `is_archived` is set to `true` and it no longer appears in the default listing (accessible only with `?include_archived=true`)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-009/STORY-001",
+      "path": "docs/requirements/EPIC-009-doctor-teleconsult/STORY-001-doctor-profile-management.md",
+      "acceptance_criteria": [
+        "**Given** `admin_super` creates a doctor profile with all required fields, **when** the request succeeds, **then** the doctor is created with `is_available: false` and `total_consults: 0`.",
+        "**Given** `admin_super` attempts to add a doctor with a `registration_no` already in the system, **when** the request is submitted, **then** the API returns HTTP 409 with `REGISTRATION_NO_DUPLICATE`.",
+        "**Given** `admin_super` tries to set `is_available: true` for a doctor with no `avatar_url`, **when** the request is submitted, **then** the API returns HTTP 422 with `DOCTOR_PROFILE_INCOMPLETE`.",
+        "**Given** `admin_operations` attempts to call `POST /api/v1/admin/teleconsult/doctors`, **when** the request is made, **then** the API returns HTTP 403 Forbidden.",
+        "**Given** two doctors are available and both have been assigned consults, **when** a new consult is assigned, **then** the doctor with the older `last_assigned_at` is selected (least-recently-used load balancing).",
+        "**Given** a consult is rated by a patient with a score of 5, **when** the doctor previously had `avg_rating: 4.6` from 50 consults, **then** the new `avg_rating` is updated to the running average of 51 consults.",
+        "**Given** the `GET /api/v1/admin/teleconsult/doctors/:id/stats` is called with `period: today`, **when** the response is returned, **then** `consults_today` matches the count of completed consults for that doctor since midnight IST.",
+        "**Given** `admin_super` updates a doctor's `languages_spoken`, **when** the update succeeds, **then** the updated list is reflected immediately in the doctor detail and in patient-facing consult assignment responses."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-009/STORY-002",
+      "path": "docs/requirements/EPIC-009-doctor-teleconsult/STORY-002-consult-request-scheduling.md",
+      "acceptance_criteria": [
+        "**Given** a customer requests a consult with `slot: NOW` and a doctor is available, **when** the request is created, **then** the response includes the assigned doctor's card and `estimated_call_in_minutes`.",
+        "**Given** no doctors are available when a NOW consult is requested, **when** the request is created, **then** the response includes `queue_position` and `estimated_wait_minutes`, and `doctor` is null.",
+        "**Given** a customer already has 3 active consults, **when** they attempt a 4th consult request, **then** the API returns HTTP 429 with `MAX_ACTIVE_CONSULTS_REACHED`.",
+        "**Given** a customer attempts to cancel a consult in `IN_CALL` status, **when** the cancel request is made, **then** the API returns HTTP 409 with `CONSULT_CANNOT_CANCEL`.",
+        "**Given** a cart-mode consult is created with `cart_id`, **when** the doctor issues an e-prescription, **then** the e-Rx is automatically linked to the cart and `cart.prescription_id` is updated.",
+        "**Given** a scheduled consult is not started within 30 minutes of its scheduled time, **when** the auto-cancellation job runs, **then** the consult transitions to `CANCELLED` and the customer receives a push notification.",
+        "**Given** a customer requests a consult for `cart_id` that already has an active cart-mode consult, **when** the request is made, **then** the API returns HTTP 409 with `CART_ALREADY_HAS_CONSULT`.",
+        "**Given** a customer views `GET /api/v1/consults/:consult_id` for a consult belonging to a different customer, **then** the API returns HTTP 404."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-009/STORY-003",
+      "path": "docs/requirements/EPIC-009-doctor-teleconsult/STORY-003-consult-session-management.md",
+      "acceptance_criteria": [
+        "**Given** an admin advances a consult from `REQUESTED` directly to `IN_CALL`, **when** the request is submitted, **then** the API returns HTTP 422 with `INVALID_STATUS_TRANSITION`.",
+        "**Given** an admin advances a consult to `COMPLETED` when no e-Rx has been issued and `is_advice_only` is false, **when** the request is submitted, **then** the API returns HTTP 422 with `EPRESCRIPTION_REQUIRED`.",
+        "**Given** a consult transitions to `IN_CALL`, **when** the transition succeeds, **then** `call_started_at` is set by the system to the current UTC timestamp and cannot be modified by the API caller.",
+        "**Given** a customer submits a rating of 5 for a completed consult, **when** the rating is saved, **then** the assigned doctor's `avg_rating` is updated using the running average formula.",
+        "**Given** a customer attempts to rate a consult that is still `IN_CALL`, **when** the rating request is submitted, **then** the API returns HTTP 409 with `CONSULT_NOT_COMPLETED`.",
+        "**Given** a customer rates the same consult twice, **when** the second rating is submitted, **then** the API returns HTTP 409 with `ALREADY_RATED`.",
+        "**Given** the admin queue is loaded, **when** the response is received, **then** `IN_CALL` consults appear before `CALLING`, `CALLING` before `DOCTOR_REVIEWING`, and `DOCTOR_REVIEWING` before `REQUESTED`.",
+        "**Given** a consult transitions to `COMPLETED`, **when** the transition succeeds, **then** the assigned doctor's `total_consults` is incremented and `last_assigned_at` is updated to `call_ended_at`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-009/STORY-004",
+      "path": "docs/requirements/EPIC-009-doctor-teleconsult/STORY-004-eprescription-generation.md",
+      "acceptance_criteria": [
+        "**Given** a doctor issues an e-prescription for a cart-mode consult, **when** the e-Rx is created, **then** the cart's `prescription_id` is automatically updated to the new e-Rx ID without any additional API call.",
+        "**Given** an admin attempts to issue an e-prescription for a consult not assigned to them, **when** the request is submitted, **then** the API returns HTTP 403 with `CONSULT_NOT_ASSIGNED`.",
+        "**Given** an e-prescription is issued with `advice_only: true` and no `advice_text`, **when** the request is submitted, **then** the API returns HTTP 422 with `ADVICE_TEXT_REQUIRED`.",
+        "**Given** an e-prescription is issued, **when** the issuance succeeds, **then** a `Prescription` record is created with `type: E_PRESCRIPTION`, `status: VERIFIED`, `source: TELECONSULT`, and `expires_at = issued_at + 90 days`.",
+        "**Given** an e-prescription is issued with two medicines, **when** the `digital_signature_hash` is computed, **then** it equals `SHA256(doctor_id + \"|\" + patient_name + \"|\" + canonical_medicines_json + \"|\" + issued_at)` and is verifiable on read.",
+        "**Given** a customer calls `GET /api/v1/prescriptions/eprescriptions/:id` for their e-Rx, **when** the response is received, **then** `signature_valid: true` and the `seal: \"VERIFIED\"` badge is present.",
+        "**Given** a second e-prescription issuance is attempted on the same consult, **when** the request is submitted, **then** the API returns HTTP 409 with `CONSULT_ALREADY_HAS_EPRESCRIPTION`.",
+        "**Given** an e-prescription is older than 90 days, **when** a customer attempts to link it to a cart, **then** the API returns HTTP 422 with `PRESCRIPTION_EXPIRED`.",
+        "**Given** a customer calls the download endpoint, **when** the PDF has not yet been generated, **then** the system generates the PDF on demand and redirects to the signed S3 URL.",
+        "**Given** the e-Rx medicines list pre-fills the Rx quote broadcast (EPIC-010), **when** the broadcast is initiated for a cart with a linked e-Rx, **then** the broadcast payload includes all medicines from the e-Rx's `medicines` array."
+      ],
+      "ac_count": 10,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-010/STORY-001",
+      "path": "docs/requirements/EPIC-010-order-management/STORY-001-cart-management.md",
+      "acceptance_criteria": [
+        "**Given** a customer adds the first item to an empty cart, **when** the item is added, **then** the smart-select algorithm runs and the cart is locked to the best-scoring pharmacy.",
+        "**Given** a customer tries to add an item from a different pharmacy without `switch_pharmacy: true`, **when** the add request is made, **then** the API returns HTTP 409 with `PHARMACY_MISMATCH`.",
+        "**Given** a customer applies coupon `FLAT50` to a cart with `item_total = Rs 350`, **when** the coupon is applied, **then** the API returns HTTP 422 with `COUPON_MIN_NOT_MET`.",
+        "**Given** a coupon `NAMMA25` is applied to a cart with `item_total = Rs 255`, **when** the cart is fetched, **then** `coupon_discount = 63.75` and `delivery_fee = 25` (item_total before discount < Rs 199 threshold - delivery fee uses pre-discount total).",
+        "**Given** all items are removed from a cart, **when** the last item is deleted, **then** `pharmacy_id` is set to null, `coupon_code` is cleared, and `prescription_id` is cleared.",
+        "**Given** a cart has an Rx-only item and no prescription attached, **when** the customer proceeds to `POST /api/v1/orders`, **then** checkout is blocked with `PRESCRIPTION_REQUIRED`.",
+        "**Given** a cart has been inactive for 24 hours, **when** the abandonment job runs, **then** the cart status transitions to `ABANDONED` and the customer cannot update it.",
+        "**Given** `FREEDEL` coupon is applied to a cart with `item_total = Rs 150` (below Rs 199), **when** the bill is computed, **then** `delivery_fee = 0` (FREEDEL overrides the threshold rule)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-010/STORY-002",
+      "path": "docs/requirements/EPIC-010-order-management/STORY-002-smart-pharmacy-selection.md",
+      "acceptance_criteria": [
+        "**Given** a customer adds their first item to an empty cart, **when** the smart-select runs, **then** the pharmacy with the highest composite score (distance 60%, fill rate 20%, rating 10%, ETA 10%) is selected and returned.",
+        "**Given** no pharmacy within 5km has the requested medicine in stock, **when** smart-select runs, **then** the response returns `available: false` and no cart is created.",
+        "**Given** a pharmacy has `is_open = false`, **when** smart-select runs, **then** that pharmacy is excluded regardless of how high its score would otherwise be.",
+        "**Given** `GET /api/v1/pharmacies/:id/products` is called, **when** the response is returned, **then** only products with `is_online_visible = true`, `quantity_available > 0`, and `is_banned = false` are included.",
+        "**Given** `POST /api/v1/pharmacies/availability-check` is called with 3 medicine IDs, **when** 2 are in stock and 1 is out, **then** the response correctly categorises them into `available` (2) and `unavailable` (1) arrays.",
+        "**Given** a pharmacy's `avg_prep_time_minutes` is unavailable (new pharmacy), **when** ETA is computed, **then** the default of 10 minutes is used.",
+        "**Given** a customer requests `GET /api/v1/pharmacies/nearby` with `radius_km = 15` (exceeds max), **when** the request is made, **then** the API clamps the radius to 10km.",
+        "**Given** a product batch is recalled (`is_banned = true`), **when** the pharmacy storefront products are fetched, **then** the recalled product does not appear in the response."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-010/STORY-003",
+      "path": "docs/requirements/EPIC-010-order-management/STORY-003-rx-quote-broadcast.md",
+      "acceptance_criteria": [
+        "**Given** a broadcast is initiated with 7 eligible pharmacies within 3km, **when** the broadcast is created, **then** all 7 pharmacies receive a notification and the response includes `pharmacies_notified: 7`.",
+        "**Given** there are 12 eligible pharmacies within 3km, **when** the broadcast is created, **then** only the 10 nearest pharmacies are notified.",
+        "**Given** a pharmacy has not responded within 15 minutes of `received_at`, **when** the expiry job runs, **then** their status updates to `EXPIRED`.",
+        "**Given** 0 quotes have been received and only 3 minutes have elapsed, **when** the broadcast status is polled, **then** `can_view_quotes: false`.",
+        "**Given** 1 quote is received and 6 minutes have elapsed since broadcast, **when** the status is polled, **then** `can_view_quotes: true`.",
+        "**Given** two quotes are received where pharmacy A has lower price but pharmacy B has lower ETA, **when** quotes are listed, **then** A has tag `LOWEST_PRICE` and B has tag `FASTEST`.",
+        "**Given** a customer selects a quote, **when** selection succeeds, **then** a new cart is created pre-filled with the quoted medicines at the quoted prices, locked to the selected pharmacy, with the prescription attached.",
+        "**Given** 30 minutes elapse with no selection, **when** the auto-expiry job runs, **then** broadcast status transitions to `EXPIRED` and the customer receives a push notification."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-010/STORY-004",
+      "path": "docs/requirements/EPIC-010-order-management/STORY-004-order-placement.md",
+      "acceptance_criteria": [
+        "**Given** a cart with an Rx-only item and no prescription attached, **when** `POST /api/v1/orders` is called, **then** the API returns HTTP 422 with `PRESCRIPTION_REQUIRED` and the order is not created.",
+        "**Given** a pharmacy's stock for an item drops to 0 after the customer added it to cart, **when** `POST /api/v1/orders` is called, **then** the live stock check fails and `ITEMS_OUT_OF_STOCK` is returned with the specific item name.",
+        "**Given** a COD order is placed, **when** the order is created, **then** status is `PENDING_ACCEPTANCE` and `payment.status = PENDING_COLLECTION` without requiring any payment confirmation step.",
+        "**Given** a UPI order is placed and `POST /api/v1/orders/:order_id/payment/confirm` is called with an invalid `payment_signature`, **then** the API returns HTTP 422 with `PAYMENT_SIGNATURE_INVALID`.",
+        "**Given** `POST /api/v1/orders/:order_id/payment/confirm` is called twice with the same `payment_id`, **when** the second call is received, **then** the already-confirmed order is returned without error (idempotent).",
+        "**Given** an order is confirmed, **when** the confirmation succeeds, **then** the pharmacy receives a WhatsApp notification within 30 seconds with order number, items, and delivery address.",
+        "**Given** the customer's wallet has Rs 50 and the order total is Rs 221.25, **when** the order is placed, **then** `wallet_applied = 50.00`, `total_payable` via chosen method = Rs 171.25.",
+        "**Given** an order is successfully placed, **when** the cart is accessed, **then** cart `status = CHECKED_OUT` and items cannot be modified."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-010/STORY-005",
+      "path": "docs/requirements/EPIC-010-order-management/STORY-005-order-status-lifecycle.md",
+      "acceptance_criteria": [
+        "**Given** a pharmacy does not accept an order within 10 minutes, **when** the auto-cancel job runs, **then** the order transitions to `CANCELLED` with `reason: PHARMACY_ACCEPTANCE_TIMEOUT` and a full refund is triggered.",
+        "**Given** a pharmacy rejects an order in `PENDING_ACCEPTANCE` status, **when** the rejection is saved, **then** the order is `CANCELLED`, the customer receives a WhatsApp notification with the rejection reason, and a full refund is initiated.",
+        "**Given** an order transitions to `READY_FOR_PICKUP`, **when** the transition succeeds, **then** a 4-digit OTP is generated, stored (hashed), and sent to the customer via SMS/push.",
+        "**Given** an order's `sla_deadline` is 3 minutes away and it is still in `OUT_FOR_DELIVERY`, **when** the admin live feed is polled, **then** the order appears with `SLA_RISK = true`.",
+        "**Given** a pharmacy tries to advance an order from `PACKING` directly to `OUT_FOR_DELIVERY`, **when** the status PATCH is submitted, **then** the API returns HTTP 422 with `INVALID_STATUS_TRANSITION`.",
+        "**Given** `GET /api/v1/orders/:order_id/tracking` is called while the order is `OUT_FOR_DELIVERY`, **when** the response is returned, **then** `steps[4].completed = true` and `steps[5].completed = false`, and `eta_minutes` is populated.",
+        "**Given** an order transitions through all states to `DELIVERED`, **when** `GET /api/v1/orders/:order_id/timeline` is called, **then** all 6 events are listed with non-null timestamps in chronological order.",
+        "**Given** no rider is assigned within 30 minutes of `READY_FOR_PICKUP`, **when** the escalation job runs, **then** an alert is sent to admin_operations."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-010/STORY-006",
+      "path": "docs/requirements/EPIC-010-order-management/STORY-006-order-cancellation-refund.md",
+      "acceptance_criteria": [
+        "**Given** a customer attempts to cancel an order in `PACKING` status, **when** the cancel request is made, **then** the API returns HTTP 409 with `ORDER_CANNOT_CANCEL`.",
+        "**Given** a customer cancels an order paid via UPI, **when** the cancellation succeeds, **then** a `Refund` record is created with `refund_to: SOURCE` and the Razorpay refund API is called within 60 seconds.",
+        "**Given** an admin cancels a COD order before delivery, **when** cancellation is saved, **then** no Razorpay refund is triggered and the response `refund.initiated = false`.",
+        "**Given** an admin issues a partial refund of Rs 50 to wallet on a delivered order, **when** the refund is processed, **then** the customer's Namma Money wallet balance increases by Rs 50 and a `Refund` record is created.",
+        "**Given** a refund of Rs 250 is attempted on an order with `total_payable = Rs 221.25`, **when** the refund request is submitted, **then** the API returns HTTP 422 with `REFUND_EXCEEDS_REMAINING_REFUNDABLE`.",
+        "**Given** the system auto-cancels an order due to pharmacy acceptance timeout, **when** the auto-cancel triggers, **then** a `Refund` and `OrderCancellation` record are created with `cancelled_by_type: SYSTEM`.",
+        "**Given** an admin attempts to cancel a `DELIVERED` order, **when** the cancel request is submitted, **then** the API returns HTTP 409 with `ORDER_DELIVERED`.",
+        "**Given** an order is cancelled for any reason, **when** the cancellation succeeds, **then** the customer receives a push notification and WhatsApp message within 30 seconds with reason and refund status."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-010/STORY-007",
+      "path": "docs/requirements/EPIC-010-order-management/STORY-007-reorder.md",
+      "acceptance_criteria": [
+        "**Given** a customer reorders from a past order and the original pharmacy is open and all items are in stock, **when** the reorder succeeds, **then** a new cart is created with the same items and quantities at the original pharmacy.",
+        "**Given** the original pharmacy is closed, **when** the customer calls reorder with `confirm_pharmacy_change: false`, **then** the API returns HTTP 409 with `PHARMACY_CHANGE_REQUIRED` and the suggested fallback pharmacy details.",
+        "**Given** the customer confirms with `confirm_pharmacy_change: true`, **when** the reorder succeeds with a fallback pharmacy, **then** the cart is created at the fallback pharmacy and the response includes a `pharmacy.note` explaining why the pharmacy changed.",
+        "**Given** a reorder has Rx-only items, **when** the cart is created, **then** `prescription_attached: false` and `prescription_required: true` are in the response, and the original prescription is NOT pre-attached.",
+        "**Given** all items from the original order are unavailable at any nearby pharmacy, **when** reorder is called, **then** the API returns HTTP 422 with `NO_ITEMS_AVAILABLE`.",
+        "**Given** a past order had 3 items and 1 is unavailable at the fallback pharmacy, **when** reorder succeeds, **then** `items_added = 2`, `excluded_items` has 1 entry with the correct reason.",
+        "**Given** `GET /api/v1/orders/history` is called, **when** the response is received, **then** only DELIVERED and CANCELLED orders appear (no active orders in history).",
+        "**Given** a customer has 2 active orders simultaneously, **when** `GET /api/v1/orders/active` is called, **then** both orders appear in the response."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-010/STORY-008",
+      "path": "docs/requirements/EPIC-010-order-management/STORY-008-admin-order-management.md",
+      "acceptance_criteria": [
+        "**Given** `admin_operations` calls `GET /api/v1/admin/orders` with `segment: SLA_RISK`, **when** the response is received, **then** only in-progress orders with `sla_remaining_minutes < 5` are returned.",
+        "**Given** `admin_compliance` calls `GET /api/v1/admin/orders/:order_id`, **when** the detail is returned, **then** the `prescription_card` field shows only the prescription ID and type, with no file URL (content restricted).",
+        "**Given** `admin_support` calls `POST /api/v1/admin/orders/:order_id/dispute`, **when** the dispute is flagged, **then** the order detail for all admin roles shows a `dispute_banner` with the reason and `liable_party`.",
+        "**Given** `admin_finance` calls `POST /api/v1/admin/orders/:order_id/note`, **when** the note is added, **then** the note is visible in the `internal_notes` array and is NOT visible to the customer.",
+        "**Given** a note is added to an order, **when** an admin attempts to delete it, **then** the API returns HTTP 405 Method Not Allowed (notes are append-only).",
+        "**Given** `GET /api/v1/admin/orders/live-feed` is polled at 10-second intervals, **when** an order's `sla_remaining_minutes` drops below 5, **then** the next poll response includes that order with `sla_risk: true` at the top of the list.",
+        "**Given** an export is requested for 15,000 orders, **when** the export is triggered, **then** the API returns a job ID and status `PROCESSING` (async), and the download URL is available within 120 seconds.",
+        "**Given** `admin_super` reassigns a rider on an `OUT_FOR_DELIVERY` order, **when** the reassignment succeeds, **then** an `OrderStatusEvent` is recorded with `actor_type: ADMIN` and the new rider's details."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-011/STORY-001",
+      "path": "docs/requirements/EPIC-011-rider-delivery/STORY-001-rider-onboarding-kyc.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-011/STORY-002",
+      "path": "docs/requirements/EPIC-011-rider-delivery/STORY-002-rider-status-shift.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-011/STORY-003",
+      "path": "docs/requirements/EPIC-011-rider-delivery/STORY-003-order-assignment-engine.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-011/STORY-004",
+      "path": "docs/requirements/EPIC-011-rider-delivery/STORY-004-realtime-rider-tracking.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-011/STORY-005",
+      "path": "docs/requirements/EPIC-011-rider-delivery/STORY-005-delivery-zone-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-011/STORY-006",
+      "path": "docs/requirements/EPIC-011-rider-delivery/STORY-006-delivery-pricing.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-011/STORY-007",
+      "path": "docs/requirements/EPIC-011-rider-delivery/STORY-007-cod-reconciliation.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-011/STORY-008",
+      "path": "docs/requirements/EPIC-011-rider-delivery/STORY-008-rider-incentives-performance.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-001",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-001-payment-processing.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-002",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-002-wallet-operations.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-003",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-003-pharmacy-settlements.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-004",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-004-rider-payouts.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-005",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-005-refund-processing.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-006",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-006-cod-float-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-007",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-007-tax-gst-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-008",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-008-financial-ledger.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-012/STORY-009",
+      "path": "docs/requirements/EPIC-012-payments-finance/STORY-009-financial-overview-dashboard.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-013/STORY-001",
+      "path": "docs/requirements/EPIC-013-marketing-growth/STORY-001-coupon-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-013/STORY-002",
+      "path": "docs/requirements/EPIC-013-marketing-growth/STORY-002-banner-cms-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-013/STORY-003",
+      "path": "docs/requirements/EPIC-013-marketing-growth/STORY-003-campaign-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-013/STORY-004",
+      "path": "docs/requirements/EPIC-013-marketing-growth/STORY-004-customer-segmentation.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-013/STORY-005",
+      "path": "docs/requirements/EPIC-013-marketing-growth/STORY-005-referral-program.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-013/STORY-006",
+      "path": "docs/requirements/EPIC-013-marketing-growth/STORY-006-loyalty-program.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-014/STORY-001",
+      "path": "docs/requirements/EPIC-014-crm-saas/STORY-001-saas-plan-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-014/STORY-002",
+      "path": "docs/requirements/EPIC-014-crm-saas/STORY-002-subscription-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-014/STORY-003",
+      "path": "docs/requirements/EPIC-014-crm-saas/STORY-003-saas-billing-invoicing.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-014/STORY-004",
+      "path": "docs/requirements/EPIC-014-crm-saas/STORY-004-lead-pipeline.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-014/STORY-005",
+      "path": "docs/requirements/EPIC-014-crm-saas/STORY-005-account-health-scoring.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-014/STORY-006",
+      "path": "docs/requirements/EPIC-014-crm-saas/STORY-006-feature-adoption-metering.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-014/STORY-007",
+      "path": "docs/requirements/EPIC-014-crm-saas/STORY-007-renewal-churn-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-014/STORY-008",
+      "path": "docs/requirements/EPIC-014-crm-saas/STORY-008-saas-revenue-analytics.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-015/STORY-001",
+      "path": "docs/requirements/EPIC-015-support-disputes/STORY-001-support-ticket-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-015/STORY-002",
+      "path": "docs/requirements/EPIC-015-support-disputes/STORY-002-dispute-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-015/STORY-003",
+      "path": "docs/requirements/EPIC-015-support-disputes/STORY-003-sla-escalation-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-015/STORY-004",
+      "path": "docs/requirements/EPIC-015-support-disputes/STORY-004-agent-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-015/STORY-005",
+      "path": "docs/requirements/EPIC-015-support-disputes/STORY-005-knowledge-base.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-016/STORY-001",
+      "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-001-platform-overview-analytics.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-016/STORY-002",
+      "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-002-operations-sla-analytics.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-016/STORY-003",
+      "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-003-growth-cohort-analytics.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-016/STORY-004",
+      "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-004-pharmacy-analytics.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-016/STORY-005",
+      "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-005-geography-analytics.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-016/STORY-006",
+      "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-006-report-library.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-017/STORY-001",
+      "path": "docs/requirements/EPIC-017-notifications-comms/STORY-001-push-notification-service.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-017/STORY-002",
+      "path": "docs/requirements/EPIC-017-notifications-comms/STORY-002-sms-service.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-017/STORY-003",
+      "path": "docs/requirements/EPIC-017-notifications-comms/STORY-003-whatsapp-business-api.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-017/STORY-004",
+      "path": "docs/requirements/EPIC-017-notifications-comms/STORY-004-email-service.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-017/STORY-005",
+      "path": "docs/requirements/EPIC-017-notifications-comms/STORY-005-notification-preferences.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-017/STORY-006",
+      "path": "docs/requirements/EPIC-017-notifications-comms/STORY-006-notification-history.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-018/STORY-001",
+      "path": "docs/requirements/EPIC-018-medicine-schedule/STORY-001-medicine-schedule-crud.md",
+      "acceptance_criteria": [
+        "Given `POST /schedule/medicines` with `duration_type = DAYS` and no `duration_days`, then a 400 `MISSING_DURATION_DAYS` error is returned.",
+        "Given `POST /schedule/medicines` with `dose_slots` containing 7 entries, then a 400 `TOO_MANY_DOSE_SLOTS` error is returned.",
+        "Given a customer adds a medicine for a `member_id` belonging to a different customer, then a 403 `MEMBER_ACCESS_DENIED` error is returned.",
+        "Given `POST /schedule/medicines` with valid inputs, then `reminders_scheduled` in the response equals the total number of reminder notifications created for the next 7 days.",
+        "Given `DELETE /schedule/medicines/:id`, then `is_active = false`, `ended_on_date = today`, and all future `ReminderSchedule` entries for that medicine are cancelled.",
+        "Given `GET /schedule/medicines` with no `member_id`, then the response defaults to the customer's self member schedule.",
+        "Given `PATCH /schedule/medicines/:id` updating `dose_slots`, then the existing `ReminderSchedule` for the next 7 days is deleted and recalculated.",
+        "Given `GET /schedule/medicines/:id`, then `approx_days_left` equals `units_in_hand / doses_per_day` (computed correctly for a 2-dose-per-day medicine)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-018/STORY-002",
+      "path": "docs/requirements/EPIC-018-medicine-schedule/STORY-002-care-circle-management.md",
+      "acceptance_criteria": [
+        "Given a customer's first call to `POST /schedule/medicines`, then a `CareCircleMember` with `relationship = SELF` is auto-created if one doesn't already exist.",
+        "Given a care circle with 10 members, when `POST /care-circle` is called, then a 400 `CARE_CIRCLE_LIMIT_REACHED` error is returned.",
+        "Given `DELETE /care-circle/:member_id` on the self member, then a 400 `CANNOT_DELETE_SELF` error is returned.",
+        "Given `DELETE /care-circle/:member_id` on a member with 5 active medicines, then all 5 medicines are soft-deleted (`is_active = false`) and all their future reminders are cancelled.",
+        "Given `GET /care-circle`, then each member row includes `today_adherence_pct` computed from today's dose logs.",
+        "Given `PATCH /care-circle/:member_id` by a customer trying to update another customer's member, then a 403 `MEMBER_ACCESS_DENIED` is returned.",
+        "Given `GET /care-circle/:member_id/summary`, then `refill_alerts` lists only medicines where `units_in_hand ? refill_remind_at_units` for that member.",
+        "Given `POST /care-circle` with `avatar_color = \"not_a_color\"`, then a 400 `INVALID_AVATAR_COLOR` error is returned."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-018/STORY-003",
+      "path": "docs/requirements/EPIC-018-medicine-schedule/STORY-003-dose-reminder-engine.md",
+      "acceptance_criteria": [
+        "Given a new medicine with 2 dose slots (MORNING 08:00, NIGHT 21:00) is added on 2026-07-24, then 14 `DoseLog` records are created (2 per day - 7 days) and 14 `ReminderSchedule` entries are created.",
+        "Given `POST /doses/:date/:slot/mark` with `status = TAKEN`, then the `DoseLog.status` changes to `TAKEN` and `taken_at` is set to the current time.",
+        "Given `POST /doses/:date/:slot/mark` for a dose with `dose_date = 2026-07-22` (> 24 hours ago), then a 400 `DOSE_LOG_LOCKED` error is returned.",
+        "Given a medicine is deleted (`is_active = false`), then all future `ReminderSchedule` records for that medicine with `status = SCHEDULED` are set to `status = CANCELLED`.",
+        "Given a nightly auto-miss job runs at 02:00 IST, then all `DoseLog` records with `status = UPCOMING` and `reminder_time < (now - 2 hours)` for the previous day are updated to `status = MISSED`.",
+        "Given `GET /reminders/today?member_id={id}`, then doses are grouped by `reminder_time` and each group shows all medicines scheduled at that time.",
+        "Given two medicines both scheduled at 08:00 MORNING for the same member, then they appear in the same time group in the `GET /reminders/today` response.",
+        "Given a `ReminderSchedule` sent successfully via FCM, then `status = SENT` and `sent_at` is recorded."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-018/STORY-004",
+      "path": "docs/requirements/EPIC-018-medicine-schedule/STORY-004-adherence-tracking.md",
+      "acceptance_criteria": [
+        "Given a member with 4 doses scheduled on a day and only 3 taken, when `GET /adherence/calendar` is called, then that day shows `status = PARTIAL` and `pct = 75.0`.",
+        "Given a day with no scheduled doses, when `GET /adherence/calendar` is called, then that day shows `status = NO_DOSES` and `pct = null`.",
+        "Given 5 consecutive days with 100% adherence followed by a partial day, when `GET /adherence` is called, then `current_streak_days = 5`.",
+        "Given `GET /medicines/:id/adherence`, then `all_time_pct = total_doses_taken / total_doses_scheduled - 100` is correctly calculated.",
+        "Given `GET /adherence/chart?weeks=4`, then exactly 4 weekly rows are returned, each with a correct date range label and adherence percentage.",
+        "Given a week where `status = HIGH`, then `adherence_pct ? 85%` for that week.",
+        "Given `GET /adherence` with a `member_id` belonging to a different customer, then a 403 `MEMBER_ACCESS_DENIED` error is returned.",
+        "Given `monthly_adherence` in the summary, then the months are sorted in reverse-chronological order (most recent first)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-018/STORY-005",
+      "path": "docs/requirements/EPIC-018-medicine-schedule/STORY-005-refill-alerts.md",
+      "acceptance_criteria": [
+        "Given a medicine with `units_in_hand = 8` and `refill_remind_at_units = 10`, when `GET /refill-alerts` is called, then that medicine appears in the alerts list with correct `approx_days_left`.",
+        "Given `POST /medicines/:id/refill` with `units_added = 60`, then `units_in_hand` increases from 8 to 68 and `refill_alert_cleared = true` is returned.",
+        "Given `POST /medicines/:id/refill` with `units_added = 0`, then a 400 `INVALID_UNITS` error is returned.",
+        "Given `POST /medicines/:id/refill/order-online` for a medicine with `master_medicine_id` set, then a valid deep link URL containing the `master_id` is returned.",
+        "Given `GET /refill-alerts/share`, then a share link with a 30-day expiry is returned and accessible at `GET /schedule/share/:token` without authentication.",
+        "Given `GET /schedule/share/:token` after 30 days, then a 410 `SHARE_LINK_EXPIRED` error is returned.",
+        "Given a medicine with `refill_remind_at_units = 0` (tracking disabled), then it does NOT appear in `GET /refill-alerts` regardless of `units_in_hand` value.",
+        "Given the nightly supply decrement job runs on a medicine with 2 dose slots and `units_in_hand = 5`, then `units_in_hand` decrements to 3 the next morning."
+      ],
+      "ac_count": 8,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-019/STORY-001",
+      "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-001-rules-engine-core.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-019/STORY-002",
+      "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-002-rule-crud-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-019/STORY-003",
+      "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-003-workflow-journey-builder.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-019/STORY-004",
+      "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-004-rule-simulation.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-019/STORY-005",
+      "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-005-activity-log-audit.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-019/STORY-006",
+      "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-006-approvals-queue.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-019/STORY-007",
+      "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-007-automation-health-killswitch.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-019/STORY-008",
+      "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-008-seed-automations.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-020/STORY-001",
+      "path": "docs/requirements/EPIC-020-observability-self-healing/STORY-001-realtime-monitoring-alerting.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-020/STORY-002",
+      "path": "docs/requirements/EPIC-020-observability-self-healing/STORY-002-auto-remediation.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-020/STORY-003",
+      "path": "docs/requirements/EPIC-020-observability-self-healing/STORY-003-slo-incident-management.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-021/STORY-001",
+      "path": "docs/requirements/EPIC-021-settings-admin/STORY-001-admin-staff-management.md",
+      "acceptance_criteria": [
+        "Given an authenticated `admin_super`, when `POST /admin/staff` is called with a valid email, name, and role, then a new AdminStaff record with `status: INVITED` is created and an invitation email is dispatched; the response includes `invite_expires_at` set to 48 hours in the future.",
+        "Given an admin_operations user, when `POST /admin/staff` is called, then `403 FORBIDDEN` is returned - only admin_super can create staff.",
+        "Given there is only 1 active admin_super, when `DELETE /admin/staff/:id` is called for that admin_super, then `422 LAST_SUPER_ADMIN` is returned and the record is not deleted.",
+        "Given an admin_super tries to `DELETE /admin/staff/:id` with their own ID, then `422 CANNOT_MODIFY_SELF` is returned.",
+        "Given an admin staff member is suspended via `PATCH /admin/staff/:id` with `status: SUSPENDED`, then all active sessions for that staff member are immediately revoked and the staff member cannot log in until re-activated.",
+        "Given `GET /admin/staff?role=admin_finance`, then only staff members with `role: admin_finance` are returned in the paginated response.",
+        "Given `POST /admin/staff/:id/reset-password` is called for an existing staff member, then a `200 OK` response is returned and `reset_link_expires_at` is exactly 4 hours in the future; calling it a 6th time within an hour returns `429 RATE_LIMITED`."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-021/STORY-002",
+      "path": "docs/requirements/EPIC-021-settings-admin/STORY-002-feature-flags.md",
+      "acceptance_criteria": [
+        "Given a feature flag with `enabled: true` and `rollout_percentage: 50`, when `PATCH /admin/feature-flags/:name` is called with `{ \"enabled\": false }`, then the flag immediately evaluates as OFF for all users regardless of rollout_percentage, and the change is recorded in the audit log with `before_state` and `after_state`.",
+        "Given a non-admin_super user in production, when `PATCH /admin/feature-flags/:name` is called, then `403 FORBIDDEN` is returned.",
+        "Given `GET /api/v1/feature-flags/check?flags=cod_enabled,new_checkout_flow`, when called without authentication, then `200 OK` is returned with the boolean state of each requested flag and a `Cache-Control: public, max-age=60` header.",
+        "Given a flag with `rollout_percentage: 150` in the request body, when `PATCH /admin/feature-flags/:name` is called, then `400 VALIDATION_ERROR` is returned.",
+        "Given a flag update sets `rollout_percentage` to 100, then the Redis cache key for the flag's environment is immediately invalidated so the next poll returns the updated value.",
+        "Given `GET /admin/feature-flags/summary`, then the response correctly counts `enabled`, `disabled`, and `partial_rollout` (flags where `enabled: true` and `rollout_percentage` is between 1 and 99)."
+      ],
+      "ac_count": 6,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-021/STORY-003",
+      "path": "docs/requirements/EPIC-021-settings-admin/STORY-003-platform-audit-log.md",
+      "acceptance_criteria": [
+        "Given an admin_super suspends a pharmacy, when `GET /admin/audit-log?resource_type=pharmacy&resource_id=:id` is called, then the suspension action is present with `action: \"pharmacy.suspend\"`, `before_state.status: \"ACTIVE\"`, and `after_state.status: \"SUSPENDED\"`.",
+        "Given an automated background job credits a wallet, when the audit log entry is created by the middleware, then `actor_type: SYSTEM` and the `actor_name` identifies the job name.",
+        "Given `GET /admin/audit-log?from=2026-07-01&to=2026-07-24`, then only audit entries with `timestamp` in that date range are returned.",
+        "Given an admin directly attempts `DELETE` on any record in the `audit_logs` table via the database, then the database-level constraint blocks the operation (confirmed via unit test against the DB trigger).",
+        "Given `GET /admin/audit-log?export=true` with a large date range (> 10,000 records), then the response returns a `QUEUED` export job status rather than inline data, and the admin receives an email with a download link within 5 minutes.",
+        "Given a password field exists in `before_state` at middleware capture time, then the field is redacted to `\"[REDACTED]\"` in the stored `before_state` JSONB before the audit log entry is written.",
+        "Given `GET /admin/audit-log/:id` for a valid entry, then the response includes a `diff` array showing the JSON Patch operations between `before_state` and `after_state`."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-021/STORY-004",
+      "path": "docs/requirements/EPIC-021-settings-admin/STORY-004-platform-configuration.md",
+      "acceptance_criteria": [
+        "Given an `admin_super`, when `PATCH /admin/config` is called with `{ \"orders.delivery_fee\": 30 }`, then the config value is updated in the database, the Redis cache key is invalidated, and a `ConfigHistory` record is written with `old_value: \"25\"` and `new_value: \"30\"`.",
+        "Given an `admin_operations` user, when `PATCH /admin/config` is called, then `403 FORBIDDEN` is returned and no values are changed.",
+        "Given `PATCH /admin/config` is called with `{ \"orders.delivery_fee\": \"thirty\" }` (string instead of integer), then `400 VALIDATION_ERROR` is returned with a message indicating that `delivery_fee` expects an integer.",
+        "Given `PATCH /admin/config` is called as a batch with 3 valid keys and 1 immutable key in production, then the entire batch is rejected with `422 CONFIG_KEY_IMMUTABLE` and none of the 3 valid keys are updated.",
+        "Given `GET /admin/config/:key` is called for `orders.delivery_fee`, then the response includes the current `value`, `type`, `unit`, and a `history` array showing previous change records.",
+        "Given the Redis cache for config is empty (cold start), when any service reads config, then it fetches from the database and re-populates the Redis cache with a 60-second TTL.",
+        "Given `GET /admin/config?domain=payments`, then only config keys in the `payments` domain are returned."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-021/STORY-005",
+      "path": "docs/requirements/EPIC-021-settings-admin/STORY-005-rbac-admin-roles.md",
+      "acceptance_criteria": [
+        "Given an authenticated `admin_support` user, when `GET /admin/roles` is called, then all 5 admin roles are returned with their permission lists, and `admin_support`'s permissions include `customers:flag` and `orders:read` but NOT `finance:release-payout`.",
+        "Given `GET /admin/roles/admin_super/permissions`, then the response returns `permissions` containing exactly `[{ \"permission\": \"*:*\", ... }]` and a note explaining the wildcard.",
+        "Given `GET /admin/roles/admin_finance/permissions`, then the response returns exactly 13 permission objects including `finance:release-payout` and `wallet:credit`.",
+        "Given any admin role user, when a `POST /admin/roles/admin_operations/permissions` request is attempted, then `405 METHOD_NOT_ALLOWED` is returned with a message indicating admin roles are not customisable.",
+        "Given `GET /admin/roles/admin_billing` (non-existent role), when the endpoint is called, then `404 ROLE_NOT_FOUND` is returned.",
+        "Given an API request with `admin_support` token that targets an endpoint requiring `finance:release-payout`, when the middleware runs, then `403 FORBIDDEN` is returned with error body containing `{ \"code\": \"INSUFFICIENT_PERMISSIONS\", \"required_permission\": \"finance:release-payout\" }`.",
+        "Given the RBAC middleware performs a permission check, when measured in isolation, the check adds ? 2 ms to request latency (validated via performance test)."
+      ],
+      "ac_count": 7,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-022/STORY-001",
+      "path": "docs/requirements/EPIC-022-external-integrations/STORY-001-razorpay-integration.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-022/STORY-002",
+      "path": "docs/requirements/EPIC-022-external-integrations/STORY-002-maps-geolocation.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-022/STORY-003",
+      "path": "docs/requirements/EPIC-022-external-integrations/STORY-003-government-api-integration.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-022/STORY-004",
+      "path": "docs/requirements/EPIC-022-external-integrations/STORY-004-einvoicing-irn.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-022/STORY-005",
+      "path": "docs/requirements/EPIC-022-external-integrations/STORY-005-accounting-integration.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    },
+    {
+      "id": "EPIC-022/STORY-006",
+      "path": "docs/requirements/EPIC-022-external-integrations/STORY-006-communication-integrations.md",
+      "acceptance_criteria": [],
+      "ac_count": 0,
+      "tracker_status": "unknown",
+      "verified": false
+    }
+  ]
+}

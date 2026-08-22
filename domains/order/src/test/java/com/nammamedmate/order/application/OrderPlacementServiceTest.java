@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -143,6 +144,22 @@ class OrderPlacementServiceTest {
             new ObjectMapper(),
             rateLimiter,
             clock);
+    try {
+      var field = OrderPlacementService.class.getDeclaredField("platformCoupons");
+      field.setAccessible(true);
+      var port =
+          (com.nammamedmate.order.application.port.out.PlatformCouponPort) field.get(service);
+      port.apply("NAMMA25", 10_000);
+      port.apply("FREEDEL", 10_000);
+      port.record("NAMMA25", UUID.randomUUID(), CUST, 100, 10_000);
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError(e);
+    }
+    service.setPlatformCoupons(null);
+    service.setPlatformCoupons(
+        (code, total) ->
+            new com.nammamedmate.order.application.port.out.PlatformCouponPort.Quote(
+                code, com.nammamedmate.order.domain.CartPricing.CouponType.PERCENT, 0, false, ""));
   }
 
   @Test
@@ -180,11 +197,20 @@ class OrderPlacementServiceTest {
 
   @Test
   void ac3_codPlacesPendingAcceptance() {
-    Cart cart = readyCart(false);
+    Cart cart = readyCart(true);
+    cart.setCoupon("NAMMA25", 100);
     carts.insert(cart);
 
     Map<String, Object> data =
         service.placeOrder(customer, cart.id(), "COD", null, "Leave at door", "idem-cod");
+    verify(prescriptions).enqueueForPharmacy(eq(RX), eq(PH1), any());
+
+    Cart blankCoupon = readyCart(false);
+    blankCoupon.setCoupon("   ", 0);
+    carts.insert(blankCoupon);
+    assertThat(
+            service.placeOrder(customer, blankCoupon.id(), "COD", null, null, "idem-blank-coupon"))
+        .containsKey("status");
 
     assertThat(data.get("status")).isEqualTo("PENDING_ACCEPTANCE");
     @SuppressWarnings("unchecked")

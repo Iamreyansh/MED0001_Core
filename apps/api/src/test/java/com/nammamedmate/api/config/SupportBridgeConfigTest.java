@@ -8,7 +8,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nammamedmate.order.application.RefundService;
 import com.nammamedmate.order.application.port.out.ExternalDisputeBannerPort;
+import com.nammamedmate.order.application.port.out.OrderStore;
+import com.nammamedmate.order.application.port.out.RefundInitiatorPort;
+import com.nammamedmate.order.domain.Order;
 import com.nammamedmate.support.application.port.out.CustomerLookupPort;
 import com.nammamedmate.support.application.port.out.OrderContextPort;
 import com.nammamedmate.support.application.port.out.RefundPort;
@@ -76,11 +80,16 @@ class SupportBridgeConfigTest {
     assertThat(ext.findBanner(orderId)).isPresent();
     assertThat(ext.findBanner(orderId).orElseThrow().get("dispute_id")).isEqualTo("DSP-1");
 
-    RefundPort refunds = new SupportBridgeConfig().stubSupportRefundPort();
+    RefundService refunds = mock(RefundService.class);
+    OrderStore orderStore = mock(OrderStore.class);
+    Order order = mock(Order.class);
+    when(orderStore.findById(orderId)).thenReturn(Optional.of(order));
+    when(refunds.initiate(any(), anyString(), any(), any()))
+        .thenReturn(new RefundInitiatorPort.RefundPlan(true, 9600, "SOURCE"));
+    RefundPort port = new SupportBridgeConfig().supportRefundPort(refunds, orderStore);
     assertThat(
-            refunds
-                .processRefund(orderId, customerId, 9600, "SOURCE", UUID.randomUUID())
+            port.processRefund(orderId, customerId, 9600, "SOURCE", UUID.randomUUID())
                 .transactionId())
-        .startsWith("txn_");
+        .startsWith("refund-");
   }
 }
