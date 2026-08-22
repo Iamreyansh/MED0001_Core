@@ -2,11 +2,13 @@ package com.nammamedmate.automation.application;
 
 import com.nammamedmate.automation.application.port.out.ActionExecutorPort;
 import com.nammamedmate.automation.application.port.out.ActivityLogPort;
+import com.nammamedmate.automation.application.port.out.KillSwitchPort;
 import com.nammamedmate.automation.application.port.out.WorkflowExecutionPort;
 import com.nammamedmate.automation.application.port.out.WorkflowStorePort;
 import com.nammamedmate.automation.domain.AutomationWorkflow;
 import com.nammamedmate.automation.domain.ConditionEvaluator;
 import com.nammamedmate.automation.domain.ConditionSpec;
+import com.nammamedmate.automation.domain.KillSwitchStatus;
 import com.nammamedmate.automation.domain.StepType;
 import com.nammamedmate.automation.domain.WorkflowExecution;
 import com.nammamedmate.automation.domain.WorkflowExecutionStatus;
@@ -23,6 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +34,7 @@ public class WorkflowEngineService {
 
   private static final Logger log = LoggerFactory.getLogger(WorkflowEngineService.class);
   public static final String DUPLICATE_EXECUTION_SKIPPED = "DUPLICATE_EXECUTION_SKIPPED";
+  public static final String KILL_SWITCH_PAUSED = "KILL_SWITCH_PAUSED";
 
   private final WorkflowStorePort workflows;
   private final WorkflowExecutionPort executions;
@@ -38,6 +42,7 @@ public class WorkflowEngineService {
   private final ActivityLogPort activityLog;
   private final ConditionEvaluator evaluator;
   private final Clock clock;
+  private final KillSwitchPort killSwitch;
 
   public WorkflowEngineService(
       WorkflowStorePort workflows,
@@ -46,12 +51,25 @@ public class WorkflowEngineService {
       ActivityLogPort activityLog,
       ConditionEvaluator evaluator,
       Clock clock) {
+    this(workflows, executions, actionExecutor, activityLog, evaluator, clock, null);
+  }
+
+  @Autowired
+  public WorkflowEngineService(
+      WorkflowStorePort workflows,
+      WorkflowExecutionPort executions,
+      ActionExecutorPort actionExecutor,
+      ActivityLogPort activityLog,
+      ConditionEvaluator evaluator,
+      Clock clock,
+      KillSwitchPort killSwitch) {
     this.workflows = workflows;
     this.executions = executions;
     this.actionExecutor = actionExecutor;
     this.activityLog = activityLog;
     this.evaluator = evaluator;
     this.clock = clock;
+    this.killSwitch = killSwitch;
   }
 
   /** Start executions for all ACTIVE workflows matching the trigger (dedup per entity). */
@@ -63,6 +81,15 @@ public class WorkflowEngineService {
       String entityName,
       Map<String, Object> context) {
     if (triggerId == null || entityId == null) {
+      return List.of();
+    }
+    if (isPaused()) {
+      log.info("{} trigger_id={} entity_id={}", KILL_SWITCH_PAUSED, triggerId, entityId);
+      activityLog.append(
+          "kill_switch",
+          KILL_SWITCH_PAUSED,
+          "Kill switch paused",
+          Map.of("trigger_id", triggerId, "entity_id", entityId.toString()));
       return List.of();
     }
     List<UUID> started = new ArrayList<>();
@@ -80,6 +107,15 @@ public class WorkflowEngineService {
       String entityName,
       Map<String, Object> context) {
     if (wf == null || entityId == null) {
+      return Optional.empty();
+    }
+    if (isPaused()) {
+      log.info("{} workflow_id={} entity_id={}", KILL_SWITCH_PAUSED, wf.id(), entityId);
+      activityLog.append(
+          "kill_switch",
+          KILL_SWITCH_PAUSED,
+          "Kill switch paused",
+          Map.of("workflow_id", wf.id().toString(), "entity_id", entityId.toString()));
       return Optional.empty();
     }
     if (executions.findRunning(wf.id(), entityId).isPresent()) {
@@ -316,6 +352,10 @@ public class WorkflowEngineService {
             now,
             now,
             current.stepHistory()));
+  }
+
+  private boolean isPaused() {
+    return killSwitch != null && killSwitch.status() == KillSwitchStatus.PAUSED;
   }
 
   private static Map<String, Object> historyRow(

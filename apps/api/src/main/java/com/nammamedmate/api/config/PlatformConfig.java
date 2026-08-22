@@ -3,6 +3,7 @@ package com.nammamedmate.api.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.auth.adapter.out.ratelimit.RedisRateLimiter;
 import com.nammamedmate.auth.adapter.out.revocation.RedisTokenRevocationStore;
+import com.nammamedmate.automation.adapter.in.messaging.AutomationTriggerConsumer;
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredLoyaltyConsumer;
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredReferralConsumer;
 import com.nammamedmate.kernel.ratelimit.InMemoryRateLimiter;
@@ -181,7 +182,8 @@ public class PlatformConfig {
       @Value("${medmate.sqs.queue-url:}") String queueUrl,
       AutoKycOutboxConsumer autoKycOutboxConsumer,
       OrderDeliveredReferralConsumer orderDeliveredReferralConsumer,
-      OrderDeliveredLoyaltyConsumer orderDeliveredLoyaltyConsumer) {
+      OrderDeliveredLoyaltyConsumer orderDeliveredLoyaltyConsumer,
+      AutomationTriggerConsumer automationTriggerConsumer) {
     String url = queueUrl == null ? "" : queueUrl.trim();
     return new SqsEventDispatcher(
         store,
@@ -193,6 +195,7 @@ public class PlatformConfig {
           autoKycOutboxConsumer.accept(message);
           orderDeliveredReferralConsumer.accept(message);
           orderDeliveredLoyaltyConsumer.accept(message);
+          automationTriggerConsumer.accept(message);
         },
         25);
   }

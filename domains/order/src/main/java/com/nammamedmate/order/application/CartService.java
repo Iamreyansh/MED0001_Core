@@ -228,7 +228,13 @@ public class CartService {
       throw new AppException(
           "COUPON_ALREADY_APPLIED", "A different coupon is already applied", 409);
     }
-    PlatformCouponPort.Quote applied = platformCoupons.apply(couponCode, cart.itemTotalPaise());
+    PlatformCouponPort.Quote applied =
+        platformCoupons.apply(
+            couponCode,
+            cart.itemTotalPaise(),
+            principal.subject(),
+            null,
+            cart.prescriptionId() != null);
     cart.setCoupon(applied.code(), applied.discountPaise());
     cart.touch(now());
     carts.update(cart);

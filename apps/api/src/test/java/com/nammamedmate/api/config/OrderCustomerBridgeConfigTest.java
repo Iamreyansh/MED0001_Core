@@ -12,6 +12,7 @@ import com.nammamedmate.catalogue.application.port.out.OrderDemandPort;
 import com.nammamedmate.customer.application.WalletService;
 import com.nammamedmate.order.application.port.out.OrderStore;
 import com.nammamedmate.order.application.port.out.WalletPort;
+import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyOrderMetricsPort;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -28,11 +29,15 @@ class OrderCustomerBridgeConfigTest {
     OrderStore orders = mock(OrderStore.class);
     UUID customerId = UUID.randomUUID();
     UUID orderId = UUID.randomUUID();
-    WalletPort port = config.orderWalletPort(wallets);
+    FinancialLedgerWriterPort ledger = mock(FinancialLedgerWriterPort.class);
+    WalletPort port = config.orderWalletPort(wallets, ledger);
 
+    UUID debitTx = UUID.randomUUID();
     when(wallets.debitForOrder(eq(customerId), eq(orderId), eq(10_000L), any()))
-        .thenReturn(Map.of("amount_debited", new BigDecimal("50.00")));
+        .thenReturn(Map.of("amount_debited", new BigDecimal("50.00"), "transaction_id", debitTx));
     assertThat(port.debitForOrder(customerId, orderId, 10_000L, "x")).isEqualTo(5_000L);
+    org.mockito.Mockito.verify(ledger)
+        .append(eq("WALLET_DEBIT"), eq(debitTx), eq("WALLET"), eq(0L), eq(5_000L), any(), any());
 
     when(wallets.debitForOrder(eq(customerId), isNull(), anyLong(), any()))
         .thenReturn(Map.of("amount_debited", 12.5));
@@ -69,5 +74,11 @@ class OrderCustomerBridgeConfigTest {
     assertThat(demand).isInstanceOf(JdbcOrderDemandBridge.class);
     PharmacyOrderMetricsPort metrics = config.jdbcPharmacyOrderMetricsPort(jdbc);
     assertThat(metrics).isInstanceOf(JdbcPharmacyOrderMetricsBridge.class);
+
+    UUID methodId = UUID.randomUUID();
+    when(jdbc.queryForObject(any(), eq(Boolean.class), eq(methodId))).thenReturn(true);
+    assertThat(
+            config.orderPaymentMethodInActiveOrderPort(jdbc).isPaymentMethodInActiveOrder(methodId))
+        .isTrue();
   }
 }

@@ -304,6 +304,53 @@ class AdminAuthIT extends AbstractApiIT {
   }
 
   @Test
+  void completeInviteActivatesStaffAndRejectsReuse() {
+    UUID invitedId = UUID.fromString("cccccccc-0003-0003-0003-000000000099");
+    String email = "invited-it@test.in";
+    String token = "invite-it-token-001";
+    jdbc.update("DELETE FROM sessions WHERE user_id = ?", invitedId);
+    jdbc.update("DELETE FROM admin_auth_events WHERE admin_id = ?", invitedId);
+    jdbc.update("DELETE FROM admin_staff WHERE id = ? OR email = ?", invitedId, email);
+    jdbc.update(
+        "INSERT INTO admin_staff (id, name, email, password_hash, role, status, mfa_enabled,"
+            + " invite_token_hash, invite_expires_at, failed_login_attempts, created_at, updated_at)"
+            + " VALUES (?, 'Invited Ops', ?, NULL, 'admin_operations', 'INVITED', false, ?,"
+            + " NOW() + INTERVAL '1 day', 0, NOW(), NOW())",
+        invitedId,
+        email,
+        sha256(token));
+
+    ResponseEntity<Map> completed =
+        post(
+            "/api/v1/auth/admin/complete-invite",
+            Map.of("invite_token", token, "password", PASSWORD));
+    assertThat(completed.getStatusCode()).isEqualTo(HttpStatus.OK);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data =
+        (Map<String, Object>) Objects.requireNonNull(completed.getBody()).get("data");
+    assertThat(data.get("status")).isEqualTo("ACTIVE");
+    assertThat(data.get("email")).isEqualTo(email);
+
+    String status =
+        jdbc.queryForObject("SELECT status FROM admin_staff WHERE id = ?", String.class, invitedId);
+    assertThat(status).isEqualTo("ACTIVE");
+
+    ResponseEntity<Map> reused =
+        post(
+            "/api/v1/auth/admin/complete-invite",
+            Map.of("invite_token", token, "password", PASSWORD));
+    assertThat(reused.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> reusedErr =
+        (Map<String, Object>) Objects.requireNonNull(reused.getBody()).get("error");
+    assertThat(reusedErr.get("code")).isEqualTo("INVITE_INVALID");
+
+    ResponseEntity<Map> login =
+        post("/api/v1/auth/admin/login", Map.of("email", email, "password", PASSWORD));
+    assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
+  }
+
+  @Test
   void setupMfaUnauthorizedWithoutToken() {
     ResponseEntity<Map> response = post("/api/v1/auth/admin/setup-mfa", Map.of());
 

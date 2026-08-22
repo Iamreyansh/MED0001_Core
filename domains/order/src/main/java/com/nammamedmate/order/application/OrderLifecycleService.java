@@ -4,10 +4,12 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.order.application.port.out.DeliveryInvoicePort;
 import com.nammamedmate.order.application.port.out.DeliveryOtpCachePort;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import com.nammamedmate.order.application.port.out.OrderStatusEventStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
+import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort;
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort.RefundPlan;
 import com.nammamedmate.order.application.port.out.RiderLookupPort;
@@ -53,6 +55,8 @@ public class OrderLifecycleService {
   private final PasswordEncoder otpEncoder;
   private final SecureRandom random;
   private InventoryAvailabilityPort inventory = new InventoryAvailabilityPort() {};
+  private PrescriptionPort prescriptions = new PrescriptionPort() {};
+  private DeliveryInvoicePort deliveryInvoice = new DeliveryInvoicePort() {};
 
   @Autowired
   public OrderLifecycleService(
@@ -105,6 +109,16 @@ public class OrderLifecycleService {
     this.inventory = inventory == null ? new InventoryAvailabilityPort() {} : inventory;
   }
 
+  @Autowired(required = false)
+  public void setPrescriptions(PrescriptionPort prescriptions) {
+    this.prescriptions = prescriptions == null ? new PrescriptionPort() {} : prescriptions;
+  }
+
+  @Autowired(required = false)
+  public void setDeliveryInvoice(DeliveryInvoicePort deliveryInvoice) {
+    this.deliveryInvoice = deliveryInvoice == null ? new DeliveryInvoicePort() {} : deliveryInvoice;
+  }
+
   @Transactional
   public Map<String, Object> accept(MedmatePrincipal principal, UUID orderId) {
     requirePharmacy(principal);
@@ -117,6 +131,16 @@ public class OrderLifecycleService {
     if (order.isAcceptanceTimedOut(now)) {
       throw new AppException(
           "ORDER_ACCEPTANCE_TIMEOUT", "10-minute acceptance window elapsed", 409);
+    }
+    if (order.prescriptionId() != null) {
+      String rxStatus =
+          prescriptions
+              .pharmacyQueueStatus(order.prescriptionId(), order.pharmacyId())
+              .orElse("PENDING_REVIEW");
+      if (!"APPROVED".equalsIgnoreCase(rxStatus) && !"VERIFIED".equalsIgnoreCase(rxStatus)) {
+        throw new AppException(
+            "RX_NOT_VERIFIED", "Prescription must be approved before fulfilment", 422);
+      }
     }
     OrderStatus from = order.status();
     order.accept(now);
@@ -358,6 +382,7 @@ public class OrderLifecycleService {
     orders.update(order);
     appendEvent(order.id(), from, to, actorType, actorId, notes, now);
     if (to == OrderStatus.DELIVERED) {
+      deliveryInvoice.onDelivered(order);
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("order_id", order.id().toString());
       payload.put("customer_id", order.customerId().toString());

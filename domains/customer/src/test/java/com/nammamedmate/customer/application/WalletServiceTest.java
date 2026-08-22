@@ -1298,6 +1298,42 @@ class WalletServiceTest {
   }
 
   @Test
+  void debitStrict_duplicateKeyMissingRow_rethrows() {
+    WalletRecord wallet = wallets.findByCustomerId(customerId).orElseThrow();
+    FakeWalletStore racing =
+        new FakeWalletStore() {
+          @Override
+          public WalletTxRecord insertTransaction(WalletTxRecord tx) {
+            if (tx.type() == WalletTxType.DEBIT) {
+              throw new org.springframework.dao.DuplicateKeyException("race");
+            }
+            return super.insertTransaction(tx);
+          }
+        };
+    racing.insertWallet(wallet);
+    racing.insertTransaction(
+        new WalletTxRecord(
+            Ids.newId(),
+            wallet.id(),
+            WalletTxType.CREDIT,
+            5_000L,
+            5_000L,
+            "REFUND",
+            "open",
+            null,
+            null,
+            null,
+            NOW.plus(10, ChronoUnit.DAYS),
+            5_000L,
+            NOW));
+    racing.updateWallet(
+        new WalletRecord(wallet.id(), customerId, 5_000L, 5_000L, 0, 1, NOW, NOW), 0);
+    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    assertThatThrownBy(() -> racingService.debitStrict(customerId, Ids.newId(), 100L, "miss", "x"))
+        .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+  }
+
+  @Test
   void listTransactions_includesExpiredBalanceBefore() {
     WalletRecord wallet = wallets.findByCustomerId(customerId).orElseThrow();
     wallets.updateWallet(new WalletRecord(wallet.id(), customerId, 100L, 100L, 0, 1, NOW, NOW), 0);

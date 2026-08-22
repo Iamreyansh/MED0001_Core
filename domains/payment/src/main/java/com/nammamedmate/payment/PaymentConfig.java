@@ -576,6 +576,9 @@ public class PaymentConfig {
           UUID settlementId, UUID heldBy, String reason, String notes, Instant heldAt) {}
 
       @Override
+      public void markUnheld(UUID settlementId, UUID unheldBy, String notes, Instant unheldAt) {}
+
+      @Override
       public void markBelowThreshold(UUID settlementId, String notes, Instant now) {}
 
       @Override

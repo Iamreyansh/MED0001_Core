@@ -4,6 +4,7 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.medicine_schedule.application.port.out.CareCircleMemberStore;
 import com.nammamedmate.medicine_schedule.application.port.out.CareCircleMemberStore.MemberRecord;
+import com.nammamedmate.medicine_schedule.application.port.out.DoseLogStore;
 import com.nammamedmate.medicine_schedule.application.port.out.NotificationDispatchPort;
 import com.nammamedmate.medicine_schedule.application.port.out.RefillAlertQueryPort;
 import com.nammamedmate.medicine_schedule.application.port.out.RefillLogStore;
@@ -50,6 +51,7 @@ public class RefillAlertService {
   private final RefillLogStore refillLogs;
   private final ScheduleShareTokenStore shareTokens;
   private final NotificationDispatchPort notifications;
+  private final DoseLogStore doseLogs;
   private final Clock clock;
 
   public RefillAlertService(
@@ -60,6 +62,7 @@ public class RefillAlertService {
       RefillLogStore refillLogs,
       ScheduleShareTokenStore shareTokens,
       NotificationDispatchPort notifications,
+      DoseLogStore doseLogs,
       Clock clock) {
     this.medicines = medicines;
     this.members = members;
@@ -68,6 +71,7 @@ public class RefillAlertService {
     this.refillLogs = refillLogs;
     this.shareTokens = shareTokens;
     this.notifications = notifications;
+    this.doseLogs = doseLogs;
     this.clock = clock;
   }
 
@@ -244,14 +248,19 @@ public class RefillAlertService {
       if (refillLogs.existsNegativeOnDate(m.id(), today)) {
         continue;
       }
+      int taken = doseLogs.countsForMedicineOn(m.id(), today).taken();
+      int unrecorded = Math.max(0, doses - taken);
+      if (unrecorded <= 0) {
+        continue;
+      }
       int before = m.unitsInHand();
-      Integer after = medicines.decrementUnitsBy(m.id(), doses, now).orElse(null);
+      Integer after = medicines.decrementUnitsBy(m.id(), unrecorded, now).orElse(null);
       if (after == null) {
         continue;
       }
       refillLogs.insert(
           new RefillLogRecord(
-              Ids.newId(), m.id(), m.customerId(), -doses, before, after, today, now));
+              Ids.newId(), m.id(), m.customerId(), -unrecorded, before, after, today, now));
       changed++;
     }
     return changed;

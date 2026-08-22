@@ -282,6 +282,7 @@ public class ConsultSessionService {
     m.put("consult_id", item.consultId());
     m.put("status", item.status());
     m.put("patient_name", item.patientName());
+    m.put("patient_phone", item.patientPhone());
     m.put("doctor_name", item.doctorName());
     m.put("medicines_requested", item.medicinesRequested());
     m.put("call_started_at", item.callStartedAt());

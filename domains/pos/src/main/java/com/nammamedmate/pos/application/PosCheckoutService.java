@@ -129,7 +129,7 @@ public class PosCheckoutService {
     }
 
     long subtotal = items.stream().mapToLong(PosCartItem::lineTotalPaise).sum();
-    long gstTotal = items.stream().mapToLong(PosCartItem::gstAmountPaise).sum();
+    long gstTotal;
     long discount;
     if (cart.appliedOfferId() != null) {
       discount = Math.min(cart.discountAmountPaise(), subtotal);
@@ -148,7 +148,11 @@ public class PosCheckoutService {
               MoneyMath.maxDiscountPaise(subtotal));
     }
     long grand = Math.max(0L, subtotal - discount);
-    gstTotal = MoneyMath.gstAfterDiscount(gstTotal, subtotal, discount);
+    List<long[]> discountedLines = proRateDiscountedLines(items, subtotal, discount);
+    gstTotal = 0L;
+    for (long[] line : discountedLines) {
+      gstTotal += line[1];
+    }
 
     if (method == PaymentMethod.CREDIT) {
       long outstanding = khata.outstandingPaise(principal.pharmacyId(), cart.customerId());
@@ -226,15 +230,37 @@ public class PosCheckoutService {
             upiReference,
             paidPaise,
             changeDue,
-            0L,
+            Math.max(0L, subtotal - grand),
             InvoiceStatus.ACTIVE,
             pdfUrl,
             now);
     invoiceStore.insert(invoice);
 
     List<InvoiceItem> invoiceItems = new ArrayList<>();
-    for (PosCartItem item : items) {
-      invoiceItems.add(InvoiceItem.fromCartItem(Ids.newId(), invoiceId, item, now));
+    for (int i = 0; i < items.size(); i++) {
+      PosCartItem item = items.get(i);
+      long discountedLine = discountedLines.get(i)[0];
+      long lineGst = discountedLines.get(i)[1];
+      invoiceItems.add(
+          new InvoiceItem(
+              Ids.newId(),
+              invoiceId,
+              item.productId(),
+              item.productName(),
+              item.hsnCode(),
+              item.batchId(),
+              item.batchNumber(),
+              item.expiryDate(),
+              item.packSize(),
+              item.quantity(),
+              item.isLoose(),
+              item.unitPricePaise(),
+              item.gstPct(),
+              discountedLine,
+              lineGst,
+              discountedLine,
+              item.isRxOnly(),
+              now));
     }
     invoiceStore.insertItems(invoiceItems);
     cartStore.markCompleted(cartId, invoiceId, now);
@@ -267,7 +293,7 @@ public class PosCheckoutService {
     data.put("amount_paid", MoneyMath.paiseToRupees(paidPaise));
     data.put("change_due", MoneyMath.paiseToRupees(changeDue));
     data.put("grand_total", MoneyMath.paiseToRupees(grand));
-    data.put("gst_breakdown", gstBreakdown(items));
+    data.put("gst_breakdown", gstBreakdown(items, discountedLines));
     data.put("invoice_pdf_url", pdfUrl);
     data.put("items_count", items.size());
     data.put("customer_name", cart.customerName());
@@ -275,12 +301,42 @@ public class PosCheckoutService {
     return data;
   }
 
-  private static List<Map<String, Object>> gstBreakdown(List<PosCartItem> items) {
+  /** Per line: [discountedInclusive, gst, taxable]. */
+  private static List<long[]> proRateDiscountedLines(
+      List<PosCartItem> items, long subtotal, long discount) {
+    List<long[]> out = new ArrayList<>();
+    long allocated = 0L;
+    for (int i = 0; i < items.size(); i++) {
+      PosCartItem item = items.get(i);
+      long lineDiscount;
+      if (i == items.size() - 1) {
+        lineDiscount = Math.max(0L, discount - allocated);
+      } else if (discount <= 0) {
+        lineDiscount = 0L;
+      } else {
+        lineDiscount =
+            java.math.BigDecimal.valueOf(discount)
+                .multiply(java.math.BigDecimal.valueOf(item.lineTotalPaise()))
+                .divide(java.math.BigDecimal.valueOf(subtotal), 0, java.math.RoundingMode.HALF_UP)
+                .longValueExact();
+        allocated += lineDiscount;
+      }
+      long discounted = Math.max(0L, item.lineTotalPaise() - lineDiscount);
+      long gst = MoneyMath.gstFromInclusive(discounted, item.gstPct());
+      out.add(new long[] {discounted, gst, discounted - gst});
+    }
+    return out;
+  }
+
+  private static List<Map<String, Object>> gstBreakdown(
+      List<PosCartItem> items, List<long[]> discountedLines) {
     Map<Integer, long[]> bySlab = new TreeMap<>();
-    for (PosCartItem item : items) {
+    for (int i = 0; i < items.size(); i++) {
+      PosCartItem item = items.get(i);
+      long[] priced = discountedLines.get(i);
       long[] agg = bySlab.computeIfAbsent(item.gstPct(), k -> new long[2]);
-      agg[0] += MoneyMath.taxableFromInclusive(item.lineTotalPaise(), item.gstPct());
-      agg[1] += item.gstAmountPaise();
+      agg[0] += priced[2];
+      agg[1] += priced[1];
     }
     List<Map<String, Object>> rows = new ArrayList<>();
     for (Map.Entry<Integer, long[]> e : bySlab.entrySet()) {

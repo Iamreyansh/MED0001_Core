@@ -201,6 +201,8 @@ medmate:
     jobs:
       enabled: true
     due-dispatch-delay-ms: 60000
+  crm:
+    enforce-module-matrix: true
   automation:
     seed:
       # AC-007: ApplicationRunner initializes seed rules on api boot (idempotent).

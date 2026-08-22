@@ -67,6 +67,35 @@ class PaymentOrderBridgeConfigTest {
   }
 
   @Test
+  void bridgesPaymentDomainRazorpayAsPrimaryOrderClient() {
+    PaymentOrderBridgeConfig config = new PaymentOrderBridgeConfig();
+    com.nammamedmate.payment.application.port.out.RazorpayGatewayPort gateway =
+        mock(com.nammamedmate.payment.application.port.out.RazorpayGatewayPort.class);
+    com.nammamedmate.payment.application.PaymentService payments =
+        mock(com.nammamedmate.payment.application.PaymentService.class);
+    UUID orderId = UUID.randomUUID();
+    when(gateway.createOrder(eq(orderId), eq(500L)))
+        .thenReturn(
+            new com.nammamedmate.payment.application.port.out.RazorpayGatewayPort.CreateOrderResult(
+                "order_live", 500L, "rzp_k"));
+    when(gateway.verifyPaymentSignature("o", "p", "s")).thenReturn(true);
+    when(gateway.signPayment("o", "p")).thenReturn("sig");
+    when(gateway.verifyWebhookSignature("h", new byte[] {1})).thenReturn(true);
+    when(gateway.refund("pay", 100L))
+        .thenReturn(
+            new com.nammamedmate.payment.application.port.out.RazorpayGatewayPort.RefundResult(
+                "rfnd", 100L));
+    when(payments.handleWebhook(eq("h"), any())).thenReturn(Map.of("processed", true));
+    var port = config.orderRazorpayFromPaymentDomain(gateway, payments);
+    assertThat(port.createOrder(orderId, 500L).razorpayOrderId()).isEqualTo("order_live");
+    assertThat(port.verifyPaymentSignature("o", "p", "s")).isTrue();
+    assertThat(port.signPayment("o", "p")).isEqualTo("sig");
+    assertThat(port.verifyWebhookSignature("h", new byte[] {1})).isTrue();
+    assertThat(port.refund("pay", 100L).razorpayRefundId()).isEqualTo("rfnd");
+    assertThat(port.handleWebhook("h", new byte[] {1})).containsEntry("processed", true);
+  }
+
+  @Test
   void bridgesCustomerWalletPort() {
     PaymentOrderBridgeConfig config = new PaymentOrderBridgeConfig();
     WalletService wallets = mock(WalletService.class);

@@ -64,6 +64,8 @@ jobs:
       - uses: ./.github/actions/setup-java
         with:
           restore-s3-cache: "true"
+      - name: Bruno collection + acceptance matrix
+        run: make bruno-check
       - name: Quality gates
         run: make check
       - name: Boot jars

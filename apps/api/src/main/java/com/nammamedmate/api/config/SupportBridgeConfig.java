@@ -6,8 +6,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.order.application.RefundService;
 import com.nammamedmate.order.application.port.out.ExternalDisputeBannerPort;
 import com.nammamedmate.order.application.port.out.OrderStore;
-import com.nammamedmate.order.domain.ActorType;
 import com.nammamedmate.order.domain.Order;
+import com.nammamedmate.order.domain.Refund;
+import com.nammamedmate.order.domain.RefundTo;
 import com.nammamedmate.support.application.port.out.CustomerLookupPort;
 import com.nammamedmate.support.application.port.out.OrderContextPort;
 import com.nammamedmate.support.application.port.out.RefundPort;
@@ -121,9 +122,15 @@ public class SupportBridgeConfig {
           orders
               .findById(orderId)
               .orElseThrow(() -> new IllegalStateException("Order not found for support refund"));
-      var plan = refunds.initiate(order, "SUPPORT_DISPUTE", ActorType.ADMIN, null);
-      String txn = plan.initiated() ? "refund-" + orderId : "none-" + orderId;
-      return new RefundPort.RefundResult(txn, plan.initiated());
+      RefundTo dest =
+          refundTo != null && refundTo.toUpperCase().contains("WALLET")
+              ? RefundTo.WALLET
+              : RefundTo.SOURCE;
+      String idem = disputeId == null ? orderId.toString() : disputeId.toString();
+      Refund refund =
+          refunds.issueManual(
+              order, amountPaise, dest, "SUPPORT_DISPUTE", "Support dispute " + idem, null, idem);
+      return new RefundPort.RefundResult(refund.id().toString(), true);
     };
   }
 

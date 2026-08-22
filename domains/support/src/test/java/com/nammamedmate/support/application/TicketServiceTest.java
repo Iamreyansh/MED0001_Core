@@ -224,6 +224,51 @@ class TicketServiceTest {
     UUID id = (UUID) created.get("id");
     Map<String, Object> resolved = service.resolve(admin, id, "Done");
     assertThat(resolved.get("csat_survey_scheduled_at")).isEqualTo(NOW.plusSeconds(24 * 3600));
+    Map<String, Object> csat = service.submitCsat(customer, id, 5, "Great");
+    assertThat(csat.get("csat_score")).isEqualTo(5);
+    assertThatThrownBy(() -> service.submitCsat(customer, id, 4, "again"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("CSAT_ALREADY_SUBMITTED");
+  }
+
+  @Test
+  void submitCsatRejectsInvalidAndForeignCustomers() {
+    Map<String, Object> created =
+        service.create(
+            customer,
+            new TicketService.CreateCommand("OTHER", "Q", "d", "APP", null, null, null, null));
+    UUID id = (UUID) created.get("id");
+    assertThatThrownBy(() -> service.submitCsat(customer, id, 5, "too soon"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    service.resolve(admin, id, "Done");
+    assertThatThrownBy(() -> service.submitCsat(customer, id, 0, "bad"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.submitCsat(customer, id, null, "bad"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.submitCsat(customer, id, 6, "bad"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    MedmatePrincipal other =
+        new MedmatePrincipal(UUID.randomUUID(), AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
+    assertThatThrownBy(() -> service.submitCsat(other, id, 5, "nope"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("FORBIDDEN");
+    assertThat(service.submitCsat(admin, id, 3, null).get("csat_score")).isEqualTo(3);
+  }
+
+  @Test
+  void submitCsatAllowsClosedTickets() {
+    Map<String, Object> created =
+        service.create(
+            customer,
+            new TicketService.CreateCommand("OTHER", "Q", "d", "APP", null, null, null, null));
+    UUID id = (UUID) created.get("id");
+    service.resolve(admin, id, "Done");
+    store.update(store.findById(id).orElseThrow().withStatus(TicketStatus.CLOSED, NOW));
+    assertThat(service.submitCsat(customer, id, 4, "closed ok").get("csat_score")).isEqualTo(4);
   }
 
   @Test

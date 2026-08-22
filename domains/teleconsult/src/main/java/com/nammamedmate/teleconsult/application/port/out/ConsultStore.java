@@ -35,6 +35,11 @@ public interface ConsultStore {
 
   List<Consult> findDueForAutoCancel(Instant deadlineBefore);
 
+  /** Unassigned scheduled consults whose slot time has arrived. */
+  default List<Consult> findDueForScheduledAssign(Instant now) {
+    return List.of();
+  }
+
   /** Active queue rows sorted IN_CALL → CALLING → DOCTOR_REVIEWING → REQUESTED, then created_at. */
   List<QueueItem> listActiveQueue();
 
@@ -70,6 +75,7 @@ public interface ConsultStore {
       UUID consultId,
       String status,
       String patientName,
+      String patientPhone,
       String doctorName,
       List<String> medicinesRequested,
       Instant callStartedAt,

@@ -79,5 +79,11 @@ class OrderConfigTest {
           }
         };
     rx.enqueueForPharmacy(id, id, id);
+    com.nammamedmate.order.application.port.out.PrescriptionPort defaults =
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {};
+    defaults.findVerified(id, id);
+    defaults.findForBroadcast(id, id);
+    defaults.pharmacyQueueStatus(id, id);
+    defaults.enqueueForPharmacy(id, id, id);
   }
 }

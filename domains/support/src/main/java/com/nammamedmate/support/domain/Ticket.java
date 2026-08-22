@@ -226,6 +226,38 @@ public record Ticket(
         updatedAt);
   }
 
+  public Ticket withCsat(int score, String feedback, Instant updatedAt) {
+    return new Ticket(
+        id,
+        ticketId,
+        customerId,
+        pharmacyId,
+        orderId,
+        category,
+        subject,
+        status,
+        priority,
+        slaLevel,
+        slaDueAt,
+        firstResponseDueAt,
+        resolutionDueAt,
+        assignedAgentId,
+        channel,
+        firstResponseAt,
+        resolvedAt,
+        resolutionSummary,
+        score,
+        feedback,
+        csatSurveyScheduledAt,
+        csatSurveySentAt,
+        createdByAdminId,
+        slaPausedAt,
+        slaL4NotifiedAt,
+        deletedAt,
+        createdAt,
+        updatedAt);
+  }
+
   public Ticket withCsatSent(Instant sentAt) {
     return copy(
         status,

@@ -244,6 +244,20 @@ public class JdbcProductBatchStore implements ProductBatchStore {
         Timestamp.from(now),
         pharmacyId,
         productId);
+    jdbc.update(
+        """
+        UPDATE pharmacy_catalogue_mapping pcm
+           SET stock_quantity = pp.total_stock_units, updated_at = ?
+          FROM pharmacy_product pp
+         WHERE pp.id = ?
+           AND pp.pharmacy_id = ?
+           AND pp.pharmacy_id = pcm.pharmacy_id
+           AND pp.master_medicine_id IS NOT NULL
+           AND pp.master_medicine_id = pcm.master_medicine_id
+        """,
+        Timestamp.from(now),
+        productId,
+        pharmacyId);
   }
 
   @Override

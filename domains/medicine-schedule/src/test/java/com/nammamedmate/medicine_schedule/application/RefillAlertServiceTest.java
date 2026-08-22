@@ -2,6 +2,8 @@ package com.nammamedmate.medicine_schedule.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,6 +12,7 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.medicine_schedule.application.port.out.CareCircleMemberStore;
 import com.nammamedmate.medicine_schedule.application.port.out.CareCircleMemberStore.MemberRecord;
+import com.nammamedmate.medicine_schedule.application.port.out.DoseLogStore;
 import com.nammamedmate.medicine_schedule.application.port.out.NotificationDispatchPort;
 import com.nammamedmate.medicine_schedule.application.port.out.RefillAlertQueryPort;
 import com.nammamedmate.medicine_schedule.application.port.out.RefillLogStore;
@@ -48,6 +51,7 @@ class RefillAlertServiceTest {
   private FakeRefillLogs refillLogs;
   private FakeShareTokens shareTokens;
   private RecordingNotifications notifications;
+  private DoseLogStore doseLogs;
   private RefillAlertService service;
   private UUID customerId;
   private MedmatePrincipal customer;
@@ -61,6 +65,10 @@ class RefillAlertServiceTest {
     refillLogs = new FakeRefillLogs();
     shareTokens = new FakeShareTokens();
     notifications = new RecordingNotifications();
+    doseLogs = mock(DoseLogStore.class);
+    when(doseLogs.countsForMedicineOn(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .thenReturn(new DoseLogStore.TodayCounts(0, 0, 0, 0, 0));
     careCircle = mock(CareCircleService.class);
     customerId = Ids.newId();
     customer = new MedmatePrincipal(customerId, AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
@@ -89,6 +97,7 @@ class RefillAlertServiceTest {
             refillLogs,
             shareTokens,
             notifications,
+            doseLogs,
             CLOCK);
   }
 
@@ -206,6 +215,25 @@ class RefillAlertServiceTest {
     assertThat(medicines.findById(med.id()).orElseThrow().unitsInHand()).isEqualTo(3);
     assertThat(refillLogs.logs.getFirst().unitsAdded()).isEqualTo(-2);
     assertThat(service.runNightlySupplyDecrement()).isZero();
+  }
+
+  @Test
+  void nightlyDecrementSkipsAlreadyTakenDoses() {
+    ScheduleMedicineRecord med = insertMedicine(5, 10, null, twoSlots());
+    when(doseLogs.countsForMedicineOn(eq(med.id()), any()))
+        .thenReturn(new DoseLogStore.TodayCounts(2, 1, 0, 0, 1));
+    assertThat(service.runNightlySupplyDecrement()).isEqualTo(1);
+    assertThat(medicines.findById(med.id()).orElseThrow().unitsInHand()).isEqualTo(4);
+    assertThat(refillLogs.logs.getFirst().unitsAdded()).isEqualTo(-1);
+  }
+
+  @Test
+  void nightlyDecrementSkipsWhenAllSlotsAlreadyTaken() {
+    ScheduleMedicineRecord med = insertMedicine(5, 10, null, twoSlots());
+    when(doseLogs.countsForMedicineOn(eq(med.id()), any()))
+        .thenReturn(new DoseLogStore.TodayCounts(2, 2, 0, 0, 0));
+    assertThat(service.runNightlySupplyDecrement()).isZero();
+    assertThat(medicines.findById(med.id()).orElseThrow().unitsInHand()).isEqualTo(5);
   }
 
   @Test

@@ -100,6 +100,7 @@ class PaymentConfigTest {
     settlementStub.markReleaseFailed(UUID.randomUUID(), "k", java.time.Instant.now());
     settlementStub.markHeld(
         UUID.randomUUID(), UUID.randomUUID(), "r", null, java.time.Instant.now());
+    settlementStub.markUnheld(UUID.randomUUID(), UUID.randomUUID(), "n", java.time.Instant.now());
     settlementStub.markBelowThreshold(UUID.randomUUID(), "n", java.time.Instant.now());
     assertThat(settlementStub.listPendingForBulk(1, 10)).isEmpty();
 

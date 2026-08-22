@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nammamedmate.automation.adapter.in.messaging.AutomationTriggerConsumer;
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredLoyaltyConsumer;
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredReferralConsumer;
 import com.nammamedmate.messaging.OutboxMessage;
@@ -45,19 +46,21 @@ class PlatformConfigGuardsTest {
     AutoKycOutboxConsumer kyc = mock(AutoKycOutboxConsumer.class);
     OrderDeliveredReferralConsumer referral = mock(OrderDeliveredReferralConsumer.class);
     OrderDeliveredLoyaltyConsumer loyalty = mock(OrderDeliveredLoyaltyConsumer.class);
+    AutomationTriggerConsumer automation = mock(AutomationTriggerConsumer.class);
     OutboxMessage msg =
         new OutboxMessage(
             java.util.UUID.randomUUID(), "order.delivered", "{}", java.time.Instant.now(), false);
     when(store.claimUnpublished(anyInt(), any(), any())).thenReturn(java.util.List.of(msg));
-    var dispatcher = cfg.sqsEventDispatcher(store, sqs, "", kyc, referral, loyalty);
+    var dispatcher = cfg.sqsEventDispatcher(store, sqs, "", kyc, referral, loyalty, automation);
     dispatcher.dispatchOnce();
     verify(kyc).accept(msg);
     verify(referral).accept(msg);
     verify(loyalty).accept(msg);
+    verify(automation).accept(msg);
 
     SqsClient client = mock(SqsClient.class);
     when(sqs.getObject()).thenReturn(client);
-    cfg.sqsEventDispatcher(store, sqs, "https://sqs.example/q", kyc, referral, loyalty)
+    cfg.sqsEventDispatcher(store, sqs, "https://sqs.example/q", kyc, referral, loyalty, automation)
         .dispatchOnce();
     verify(client)
         .sendMessage(any(software.amazon.awssdk.services.sqs.model.SendMessageRequest.class));

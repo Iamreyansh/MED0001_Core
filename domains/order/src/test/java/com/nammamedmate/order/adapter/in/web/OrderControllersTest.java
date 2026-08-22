@@ -50,6 +50,7 @@ class OrderControllersTest {
   @Mock private OrderCancellationService orderCancellation;
   @Mock private ReorderService reorderService;
   @Mock private AdminOrderService adminOrderService;
+  @Mock private com.nammamedmate.order.application.port.out.RazorpayPaymentPort razorpay;
 
   private CartSmartSelectController cartSmartSelectController;
   private CartController cartController;
@@ -83,7 +84,7 @@ class OrderControllersTest {
     orderController =
         new OrderController(orderPlacement, orderLifecycle, orderCancellation, reorderService);
     orderPaymentController = new OrderPaymentController(orderPlacement);
-    webhookController = new RazorpayOrderPaymentWebhookController(orderPlacement);
+    webhookController = new RazorpayOrderPaymentWebhookController(razorpay);
     pharmacyOrderLifecycleController = new PharmacyOrderLifecycleController(orderLifecycle);
     adminOrderLifecycleController = new AdminOrderLifecycleController(orderLifecycle);
     adminCancelRefundController = new AdminOrderCancelRefundController(orderCancellation);
@@ -310,12 +311,11 @@ class OrderControllersTest {
     orderPaymentController.codCollect(rider, orderId, null);
     verify(orderPlacement).collectCod(rider, orderId, null);
 
-    when(orderPlacement.handleRazorpayWebhook(any(), any(), eq("idem-w")))
-        .thenReturn(Map.of("ignored", true));
+    when(razorpay.handleWebhook(eq("sig"), any())).thenReturn(Map.of("processed", true));
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setAttribute(
         com.nammamedmate.kernel.webhook.WebhookRawBodyFilter.CACHED_BODY_ATTR, "{}".getBytes());
-    assertThat(webhookController.orderPayment("sig", "idem-w", request).success()).isTrue();
+    assertThat(webhookController.orderPayment("sig", request).success()).isTrue();
 
     when(orderLifecycle.tracking(customer, orderId))
         .thenReturn(Map.of("status", "OUT_FOR_DELIVERY"));

@@ -44,6 +44,7 @@ class FinanceSettlementControllerTest {
     when(settlements.getAdminDetail(any(), any())).thenReturn(Map.of("status", "PENDING"));
     when(settlements.release(any(), any(), any(), any())).thenReturn(Map.of("status", "RELEASED"));
     when(settlements.hold(any(), any(), any(), any())).thenReturn(Map.of("status", "HELD"));
+    when(settlements.unhold(any(), any(), any())).thenReturn(Map.of("status", "PENDING"));
     when(settlements.releaseAll(any(), any(), any(), any())).thenReturn(Map.of("released", 1));
 
     UUID id = UUID.randomUUID();
@@ -61,6 +62,11 @@ class FinanceSettlementControllerTest {
                 .hold(finance, id, new AdminFinanceSettlementController.HoldRequest("r", "n"))
                 .data())
         .containsEntry("status", "HELD");
+    assertThat(
+            admin
+                .unhold(finance, id, new AdminFinanceSettlementController.HoldRequest(null, "ok"))
+                .data())
+        .containsEntry("status", "PENDING");
     assertThat(
             admin
                 .releaseAll(
@@ -91,10 +97,12 @@ class FinanceSettlementControllerTest {
   void nullBodiesDefault() {
     when(settlements.release(any(), any(), isNull(), any())).thenReturn(Map.of("ok", true));
     when(settlements.hold(any(), any(), isNull(), isNull())).thenReturn(Map.of("ok", true));
+    when(settlements.unhold(any(), any(), isNull())).thenReturn(Map.of("ok", true));
     when(settlements.releaseAll(any(), isNull(), isNull(), any())).thenReturn(Map.of("ok", true));
     UUID id = UUID.randomUUID();
     assertThat(admin.release(finance, id, "k", null).data()).containsKey("ok");
     assertThat(admin.hold(finance, id, null).data()).containsKey("ok");
+    assertThat(admin.unhold(finance, id, null).data()).containsKey("ok");
     assertThat(admin.releaseAll(finance, "k", null).data()).containsKey("ok");
   }
 }

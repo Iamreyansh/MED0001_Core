@@ -287,6 +287,24 @@ public class SettlementFacadeService {
     return data;
   }
 
+  @Transactional
+  public Map<String, Object> unhold(MedmatePrincipal principal, UUID settlementId, String notes) {
+    requireFinanceRole(principal);
+    SettlementRecord settlement = requireSettlement(settlementId);
+    String apiStatus = SettlementStatuses.toApiStatus(settlement.status());
+    if (!SettlementStatuses.API_HELD.equals(apiStatus)) {
+      throw new AppException("SETTLEMENT_NOT_HELD", "Settlement is not on HOLD", 422);
+    }
+    Instant now = clock.instant();
+    settlements.markUnheld(settlementId, principal.subject(), notes, now);
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("settlement_id", settlementId.toString());
+    data.put("status", SettlementStatuses.API_PENDING);
+    data.put("unheld_by", principal.subject().toString());
+    data.put("unheld_at", now.toString());
+    return data;
+  }
+
   /** Not @Transactional — each nested release commits claim/finalize independently. */
   public Map<String, Object> releaseAll(
       MedmatePrincipal principal, Object threshold, String notes, String idempotencyKey) {

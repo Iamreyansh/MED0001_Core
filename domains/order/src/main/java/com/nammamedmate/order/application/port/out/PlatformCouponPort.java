@@ -10,6 +10,15 @@ public interface PlatformCouponPort {
 
   Quote apply(String couponCode, long itemTotalPaise);
 
+  default Quote apply(
+      String couponCode,
+      long itemTotalPaise,
+      java.util.UUID customerId,
+      Boolean firstOrder,
+      Boolean hasRxItems) {
+    return apply(couponCode, itemTotalPaise);
+  }
+
   default void record(
       String couponCode,
       java.util.UUID orderId,

@@ -171,7 +171,18 @@ public class MarketingBridgeConfig {
     return new PlatformCouponPort() {
       @Override
       public Quote apply(String couponCode, long itemTotalPaise) {
-        CouponService.CartQuote q = coupons.applyForCart(couponCode, itemTotalPaise);
+        return apply(couponCode, itemTotalPaise, null, null, null);
+      }
+
+      @Override
+      public Quote apply(
+          String couponCode,
+          long itemTotalPaise,
+          java.util.UUID customerId,
+          Boolean firstOrder,
+          Boolean hasRxItems) {
+        CouponService.CartQuote q =
+            coupons.applyForCart(couponCode, itemTotalPaise, customerId, firstOrder, hasRxItems);
         CouponType type =
             switch (q.discountType()) {
               case "PERCENT" -> CouponType.PERCENT;

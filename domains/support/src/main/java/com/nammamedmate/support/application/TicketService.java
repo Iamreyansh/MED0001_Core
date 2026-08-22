@@ -432,6 +432,35 @@ public class TicketService {
   }
 
   @Transactional
+  public Map<String, Object> submitCsat(
+      MedmatePrincipal principal, UUID id, Integer score, String feedback) {
+    requirePrincipal(principal);
+    Ticket ticket = requireTicket(id);
+    if (!isAdmin(principal) && !ticket.customerId().equals(principal.subject())) {
+      throw new AppException("FORBIDDEN", "Cannot submit CSAT for this ticket", 403);
+    }
+    if (ticket.status() != TicketStatus.RESOLVED && ticket.status() != TicketStatus.CLOSED) {
+      throw new AppException(
+          "VALIDATION_ERROR", "CSAT can only be submitted after resolution", 400);
+    }
+    if (ticket.csatScore() != null) {
+      throw new AppException(
+          "CSAT_ALREADY_SUBMITTED", "CSAT already submitted for this ticket", 409);
+    }
+    if (score == null || score < 1 || score > 5) {
+      throw new AppException("VALIDATION_ERROR", "score must be between 1 and 5", 400);
+    }
+    Instant now = clock.instant();
+    Ticket updated = ticket.withCsat(score, feedback == null ? null : feedback.trim(), now);
+    tickets.update(updated);
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("ticket_id", ticket.ticketId());
+    data.put("csat_score", score);
+    data.put("csat_feedback", updated.csatFeedback());
+    return data;
+  }
+
+  @Transactional
   public Map<String, Object> reopen(MedmatePrincipal principal, UUID id, String reason) {
     requirePrincipal(principal);
     Ticket ticket = requireTicket(id);

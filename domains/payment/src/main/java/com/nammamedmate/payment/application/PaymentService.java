@@ -85,17 +85,18 @@ public class PaymentService {
       String method,
       String idempotencyKey) {
     requireCustomer(principal);
-    String idem = idempotencyKey == null || idempotencyKey.isBlank() ? null : idempotencyKey.trim();
-    if (idem != null) {
-      var replay = payments.findByIdempotencyKey(idem);
-      if (replay.isPresent()) {
-        Payment existingKey = replay.get();
-        if (orderId != null && !existingKey.orderId().equals(orderId)) {
-          throw new AppException(
-              "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key already used for another payment", 409);
-        }
-        return initiateView(existingKey, razorpay.keyId());
+    String idem =
+        idempotencyKey == null || idempotencyKey.isBlank()
+            ? Ids.newId().toString()
+            : idempotencyKey.trim();
+    var replay = payments.findByIdempotencyKey(idem);
+    if (replay.isPresent()) {
+      Payment existingKey = replay.get();
+      if (orderId != null && !existingKey.orderId().equals(orderId)) {
+        throw new AppException(
+            "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key already used for another payment", 409);
       }
+      return initiateView(existingKey, razorpay.keyId());
     }
     if (orderId == null) {
       throw new AppException("VALIDATION_ERROR", "order_id is required", 400);

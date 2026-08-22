@@ -76,6 +76,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
           aws_secretsmanager_secret.razorpay.arn,
           aws_secretsmanager_secret.razorpayx.arn,
           aws_secretsmanager_secret.kyc.arn,
+          aws_secretsmanager_secret.comms.arn,
           data.aws_secretsmanager_secret.maps_geocode.arn
         ]
       },
@@ -134,6 +135,7 @@ resource "aws_iam_role_policy" "ecs_task" {
           aws_secretsmanager_secret.razorpay.arn,
           aws_secretsmanager_secret.razorpayx.arn,
           aws_secretsmanager_secret.kyc.arn,
+          aws_secretsmanager_secret.comms.arn,
           data.aws_secretsmanager_secret.maps_geocode.arn
         ]
       },
@@ -300,6 +302,7 @@ locals {
     { name = "MEDMATE_SECRETS_RAZORPAY_ARN", value = aws_secretsmanager_secret.razorpay.arn },
     { name = "MEDMATE_SECRETS_RAZORPAYX_ARN", value = aws_secretsmanager_secret.razorpayx.arn },
     { name = "MEDMATE_SECRETS_KYC_ARN", value = aws_secretsmanager_secret.kyc.arn },
+    { name = "MEDMATE_SECRETS_COMMS_ARN", value = aws_secretsmanager_secret.comms.arn },
     { name = "AWS_REGION", value = data.aws_region.current.region },
     { name = "JAVA_TOOL_OPTIONS", value = "-XX:MaxRAMPercentage=75.0" }
   ]
@@ -317,7 +320,14 @@ locals {
     { name = "MEDMATE_RAZORPAY_KEY_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_secret::" },
     { name = "MEDMATE_RAZORPAY_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:webhook_secret::" },
     { name = "MEDMATE_RAZORPAYX_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:webhook_secret::" },
-    { name = "MEDMATE_KYC_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.kyc.arn}:webhook_secret::" }
+    { name = "MEDMATE_KYC_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.kyc.arn}:webhook_secret::" },
+    { name = "MEDMATE_MSG91_AUTH_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:msg91_auth_key::" },
+    { name = "MEDMATE_FCM_SERVER_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_server_key::" },
+    { name = "MEDMATE_SENDGRID_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sendgrid_api_key::" },
+    { name = "MEDMATE_WHATSAPP_ACCESS_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_token::" },
+    { name = "MEDMATE_WHATSAPP_APP_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_app_secret::" },
+    { name = "MEDMATE_SMS_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sms_webhook_secret::" },
+    { name = "MEDMATE_EMAIL_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:email_webhook_secret::" }
   ]
   worker_env = [
     { name = "SPRING_PROFILES_ACTIVE", value = local.environment },
@@ -330,7 +340,12 @@ locals {
   ]
   worker_secrets = [
     { name = "SPRING_DATASOURCE_USERNAME", valueFrom = "${aws_secretsmanager_secret.db.arn}:username::" },
-    { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" }
+    { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" },
+    { name = "MEDMATE_MSG91_AUTH_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:msg91_auth_key::" },
+    { name = "MEDMATE_FCM_SERVER_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_server_key::" },
+    { name = "MEDMATE_SENDGRID_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sendgrid_api_key::" },
+    { name = "MEDMATE_WHATSAPP_ACCESS_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_token::" },
+    { name = "MEDMATE_WHATSAPP_APP_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_app_secret::" }
   ]
 }
 

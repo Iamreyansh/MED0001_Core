@@ -1,8 +1,10 @@
 {
-  "version": 1,
-  "generated_from": "docs/requirements/**/STORY-*.md",
+  "version": 2,
+  "generated_from": "docs/requirements/**/STORY-*.md + AGENT-REQUIREMENT-IMPLEMENTATION.md",
   "story_count": 129,
-  "ac_count": 500,
+  "ac_count": 1067,
+  "stories_missing_acs": [],
+  "stories_unknown_tracker": [],
   "stories": [
     {
       "id": "EPIC-001/STORY-001",
@@ -17,7 +19,7 @@
         "Given a successfully verified OTP session, when `verify-otp` is called again with the same `session_id`, then `409 OTP_ALREADY_USED` is returned."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -33,7 +35,7 @@
         "Given a `switch-pharmacy` request for a `pharmacy_id` the staff member is not assigned to, when the endpoint is called, then `403 FORBIDDEN` is returned."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -49,7 +51,7 @@
         "Given an expired `mfa_challenge_token` (older than 5 minutes), when `POST /auth/admin/verify-mfa` is called, then `401 CHALLENGE_TOKEN_EXPIRED` is returned."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -65,7 +67,7 @@
         "Given a customer refresh token with a 30-day TTL, when it is used at day 31, then `401 REFRESH_TOKEN_EXPIRED` is returned."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -81,7 +83,7 @@
         "Given `GET /admin/permissions`, when called with `resource=orders` query param, then only permissions for the `orders` resource are returned."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -97,7 +99,7 @@
         "Given a customer's `total_orders` reaches 12 via the nightly segment recomputation job, then their `segment` is updated from `REGULAR` to `LOYAL`."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -113,7 +115,7 @@
         "Given an address belonging to customer A, when customer B calls `DELETE /customers/me/addresses/:id` with that address ID, then `404 ADDRESS_NOT_FOUND` is returned (no cross-customer leakage)."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -129,7 +131,7 @@
         "Given `GET /customers/me/wallet/transactions?type=CREDIT`, then only transactions with `type: CREDIT` are returned in the paginated response."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -145,7 +147,7 @@
         "Given a card payment method with type=CARD, the `razorpay_token_id` field must never appear in any customer-facing API response (it is internal only)."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -161,7 +163,7 @@
         "Given a customer at GOLD tier with 80 `points_earned_lifetime`, when a points reversal brings `points_balance` below the GOLD threshold but `points_earned_lifetime` remains 80, then the tier remains `GOLD` (tier is one-way ratchet based on lifetime points)."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -178,7 +180,7 @@
         "**Given** a phone number not in +91[6-9]XXXXXXXXX format, **when** registration is submitted, **then** HTTP 400 `INVALID_PHONE` is returned."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -195,7 +197,7 @@
         "**Given** an admin accesses a signed document URL, **when** the URL is fetched, **then** access is logged in the audit trail with admin_id, document_id, and timestamp."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -212,7 +214,7 @@
         "**Given** `kyc_auto_verification_enabled=false`, **when** an admin calls POST `/api/v1/admin/pharmacies/:id/kyc/auto-verify`, **then** HTTP 503 `FEATURE_FLAG_DISABLED` is returned."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "pending",
       "verified": false
     },
     {
@@ -229,7 +231,7 @@
         "**Given** POST `/api/v1/admin/pharmacies/:id/request-documents` with valid `document_types` and `message`, **then** the pharmacy owner receives an in-app + email + WhatsApp notification, and the KYC SLA timer resets."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -246,7 +248,7 @@
         "**Given** an admin updates a pharmacy's profile field, **then** an `AuditLog` entry is written with `actor_id`, `actor_role`, `changed_fields`, `old_values`, and `new_values`."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -263,7 +265,7 @@
         "**Given** an `admin_compliance` role calls the export endpoint, **then** HTTP 403 `FORBIDDEN` is returned."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -280,7 +282,7 @@
         "**Given** performance data is not yet computed (new pharmacy with no orders), **then** all metric fields return `0` or `null` with `computed_at=null` and no errors."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -297,7 +299,7 @@
         "**Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold` with a `reason`, **then** settlement status changes to `HELD`, the pharmacy owner is notified via email with the hold reason, and the reason is recorded in the settlement record."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -314,7 +316,7 @@
         "**Given** `PATCH /storefront` is called on a pharmacy in `SUSPENDED` status, **then** HTTP 409 `PHARMACY_NOT_ACTIVE` is returned by both admin and pharmacy_owner endpoints."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -331,7 +333,7 @@
         "**Given** a WhatsApp notice is sent with `template_name` not in the approved registry, **then** HTTP 400 `INVALID_TEMPLATE` is returned and no message is dispatched."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -348,7 +350,7 @@
         "**Given** GET `/api/v1/admin/catalogue?is_banned=true`, **then** only banned medicines are returned, each with `ban_reason` populated."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -365,7 +367,7 @@
         "**Given** GET `/api/v1/admin/catalogue/schedule-rules`, **then** all four schedules (OTC, H, H1, X) are returned with `prescription_required`, `special_register_required`, `online_delivery_allowed`, and `regulatory_reference` for each."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -382,7 +384,7 @@
         "**Given** GET `/api/v1/pharmacy/catalogue/search?q=crocin&source=ALL`, **then** the response includes both master-catalogue results (with `source=MASTER`, `is_mapped`, and pharmacy price) and custom POS SKUs (with `source=CUSTOM`) for the authenticated pharmacy."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -399,7 +401,7 @@
         "**Given** GET `/api/v1/admin/catalogue/price-ceilings?has_violations=true`, **then** only medicines with at least one `OPEN` violation are returned."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -416,7 +418,7 @@
         "**Given** a master medicine is banned (STORY-005-001), **then** all `PharmacyCatalogueMapping.is_visible` for that medicine are set to `false` within 30 seconds, and the medicine disappears from all pharmacy storefronts and customer search results."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -433,7 +435,7 @@
         "Given `PATCH /api/v1/pharmacy/inventory/:id/details` with `gst_pct=7`, then a 400 `INVALID_GST_PCT` error is returned (7 is not an allowed GST slab)."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -450,7 +452,7 @@
         "Given `GET /expiry-report?export=PDF`, then a downloadable PDF report is returned containing all batches expiring within 4 months."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -467,7 +469,7 @@
         "Given a POS search with `mode=TEXT` and query `\"A1-01\"`, then products at that rack location are returned in the search results (tested via EPIC-007 / STORY-001)."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -484,7 +486,7 @@
         "Given `GET /purchases` with `status=STOCKED`, then only finalized GRNs are returned, each with correct `taxable_amount`, `gst_amount`, and `total` fields."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -501,7 +503,7 @@
         "Given `GET /distributors` with `q=\"medico\"`, then all distributors whose `firm_name` or `contact_name` contains \"medico\" (case-insensitive) are returned."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -518,7 +520,7 @@
         "Given a product with `avg_daily_units_sold_30d = 0`, when the suggestion list is fetched, then `days_of_cover` is returned as `null` in the suggestion row."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -535,7 +537,7 @@
         "Given `payment_method = CASH` and `amount_paid = 500` on a Rs 450 total, then `change_due = 50.00` in the checkout response."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -552,7 +554,7 @@
         "Given `show_mrp_savings = true` in settings, then the invoice PDF and `GET /invoices/:id` response include the `mrp_savings` line showing the correct total savings."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -569,7 +571,7 @@
         "Given a POS checkout for a customer whose `outstanding + new_purchase > credit_limit`, then a 400 `CREDIT_LIMIT_EXCEEDED` error is returned at checkout."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -586,7 +588,7 @@
         "Given `GET /sales` with no filters, then the response always includes `period_summary` totals covering the default date range regardless of the current page."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -603,7 +605,7 @@
         "Given `PATCH /offers/:offer_id/toggle` on an active offer, then `is_active` flips to `false`; calling it again returns `is_active = true`."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -622,7 +624,7 @@
         "**Given** an e-prescription from teleconsult, **when** a customer attempts to delete it, **then** the API returns HTTP 403 with `CANNOT_DELETE_EPRESCRIPTION`."
       ],
       "ac_count": 10,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -639,7 +641,7 @@
         "**Given** a pharmacist calls `dispense` on an approved prescription, **when** successful, **then** the order status transitions to `READY_FOR_PICKUP` and a POS sale record is created."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -656,7 +658,7 @@
         "**Given** OCR has extracted doctor name and medicines for an uploaded prescription, **when** the audit detail is loaded, **then** verification checklist fields are pre-populated and labeled `\"OCR extracted\"`."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -673,7 +675,7 @@
         "**Given** `pharmacy_staff` calls the admin export endpoint `POST /api/v1/admin/compliance/drug-register/export`, **then** the API returns HTTP 403 Forbidden."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -690,7 +692,7 @@
         "**Given** `admin_operations` attempts to call `POST /api/v1/admin/doctors/:id/verify`, **then** the API returns HTTP 403 Forbidden."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -707,7 +709,7 @@
         "**Given** a filing is older than 5 years, **when** the archival job runs, **then** the filing's `is_archived` is set to `true` and it no longer appears in the default listing (accessible only with `?include_archived=true`)."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -724,7 +726,7 @@
         "**Given** `admin_super` updates a doctor's `languages_spoken`, **when** the update succeeds, **then** the updated list is reflected immediately in the doctor detail and in patient-facing consult assignment responses."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -741,7 +743,7 @@
         "**Given** a customer views `GET /api/v1/consults/:consult_id` for a consult belonging to a different customer, **then** the API returns HTTP 404."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -758,7 +760,7 @@
         "**Given** a consult transitions to `COMPLETED`, **when** the transition succeeds, **then** the assigned doctor's `total_consults` is incremented and `last_assigned_at` is updated to `call_ended_at`."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -777,7 +779,7 @@
         "**Given** the e-Rx medicines list pre-fills the Rx quote broadcast (EPIC-010), **when** the broadcast is initiated for a cart with a linked e-Rx, **then** the broadcast payload includes all medicines from the e-Rx's `medicines` array."
       ],
       "ac_count": 10,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -794,7 +796,7 @@
         "**Given** `FREEDEL` coupon is applied to a cart with `item_total = Rs 150` (below Rs 199), **when** the bill is computed, **then** `delivery_fee = 0` (FREEDEL overrides the threshold rule)."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -811,7 +813,7 @@
         "**Given** a product batch is recalled (`is_banned = true`), **when** the pharmacy storefront products are fetched, **then** the recalled product does not appear in the response."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -828,7 +830,7 @@
         "**Given** 30 minutes elapse with no selection, **when** the auto-expiry job runs, **then** broadcast status transitions to `EXPIRED` and the customer receives a push notification."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -845,7 +847,7 @@
         "**Given** an order is successfully placed, **when** the cart is accessed, **then** cart `status = CHECKED_OUT` and items cannot be modified."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -862,7 +864,7 @@
         "**Given** no rider is assigned within 30 minutes of `READY_FOR_PICKUP`, **when** the escalation job runs, **then** an alert is sent to admin_operations."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -879,7 +881,7 @@
         "**Given** an order is cancelled for any reason, **when** the cancellation succeeds, **then** the customer receives a push notification and WhatsApp message within 30 seconds with reason and refund status."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -896,7 +898,7 @@
         "**Given** a customer has 2 active orders simultaneously, **when** `GET /api/v1/orders/active` is called, **then** both orders appear in the response."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -913,391 +915,864 @@
         "**Given** `admin_super` reassigns a rider on an `OUT_FOR_DELIVERY` order, **when** the reassignment succeeds, **then** an `OrderStatusEvent` is recorded with `actor_type: ADMIN` and the new rider's details."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-011/STORY-001",
       "path": "docs/requirements/EPIC-011-rider-delivery/STORY-001-rider-onboarding-kyc.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: A rider can successfully register with valid inputs; account is created with `status = PENDING_KYC` and `kyc_status = NOT_SUBMITTED`.",
+        "AC-002: Registration with a duplicate phone number returns HTTP 409 with error code `PHONE_ALREADY_REGISTERED`.",
+        "AC-003: Registration with an invalid vehicle plate (e.g., `KA-123`) returns HTTP 422 with error code `INVALID_VEHICLE_PLATE`.",
+        "AC-004: Attempting KYC submission without uploading a driving licence returns HTTP 422 with `DRIVING_LICENCE_MISSING`.",
+        "AC-005: Uploading a document with an expired insurance date returns HTTP 422 with `DOCUMENT_EXPIRED`.",
+        "AC-006: Admin approving a KYC in `SUBMITTED` state sets `status = ACTIVE` and `kyc_status = APPROVED`; rider receives push notification.",
+        "AC-007: Admin rejecting a KYC sets `kyc_status = REJECTED` with the provided reason; rider can view the reason and re-submit after correcting documents.",
+        "AC-008: Blocking an ACTIVE rider sets `status = BLOCKED`; blocked rider receives HTTP 401 on Rider App login attempts.",
+        "AC-009: Unblocking a BLOCKED rider restores `status = ACTIVE`.",
+        "AC-010: A scheduled job sends an expiry alert notification 30 days before insurance or PUC expiry date; `expiry_alert_sent` is set to `true` after dispatch to prevent duplicate alerts."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-011/STORY-002",
       "path": "docs/requirements/EPIC-011-rider-delivery/STORY-002-rider-status-shift.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: A rider with `status = ACTIVE` can go ONLINE; a `RiderShift` record is created and GPS broadcasting begins.",
+        "AC-002: A rider with `kyc_status != APPROVED` or `status = BLOCKED` receives HTTP 403 `RIDER_NOT_ELIGIBLE` when attempting to go ONLINE.",
+        "AC-003: When a rider goes OFFLINE, the open `RiderShift` record is closed with `shift_end` timestamp and `duration_minutes` computed.",
+        "AC-004: Going OFFLINE while an order is ON_TRIP returns the `OFFLINE_DURING_DELIVERY` response (status is set but order is flagged; admin receives an alert).",
+        "AC-005: Fleet dashboard accurately reflects `online`, `on_trip`, and `offline` counts derived from live RiderProfile.status data.",
+        "AC-006: Zone coverage_status is correctly computed: a zone with 5 live orders and 2 online riders returns `STRETCHED` (ratio = 2.5 > 0.7).",
+        "AC-007: Admin force-changing a rider status creates an entry in `RiderStatusAuditLog` with the reason and admin ID.",
+        "AC-008: A rider offline for > 2 minutes without a GPS update is marked `is_stale_gps = true` in the fleet list without changing their status."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-011/STORY-003",
       "path": "docs/requirements/EPIC-011-rider-delivery/STORY-003-order-assignment-engine.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: Auto-assign selects the rider with the highest composite score (distance 40%, rating 30%, load 20%, on_time 10%) from eligible ONLINE riders with < 2 active orders.",
+        "AC-002: A rider who does not accept within 5 minutes has the assignment status set to `TIMED_OUT` and the order is returned to the dispatch queue.",
+        "AC-003: `POST /rider/orders/:id/accept` with an expired assignment (past 5-minute window) returns HTTP 410 `ASSIGNMENT_EXPIRED`.",
+        "AC-004: `POST /rider/orders/:id/pickup-confirm` with a correct pickup OTP advances the order to `OUT_FOR_DELIVERY`; incorrect OTP returns `INVALID_PICKUP_OTP`.",
+        "AC-005: `POST /rider/orders/:id/deliver` with a correct delivery OTP advances the order to `DELIVERED` and computes `on_time` flag; earnings entry is created.",
+        "AC-006: A rider with 2 active assignments cannot be assigned a 3rd order via either manual or auto-assign; returns `RIDER_AT_MAX_LOAD`.",
+        "AC-007: When `auto_assign_enabled = false`, `POST /admin/dispatch/auto-assign-all` returns HTTP 403 `AUTO_ASSIGN_DISABLED`.",
+        "AC-008: Reassignment logs the previous rider, new rider, and reason in `OrderAssignment`; previous assignment record is closed with `REASSIGNED` status."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-011/STORY-004",
       "path": "docs/requirements/EPIC-011-rider-delivery/STORY-004-realtime-rider-tracking.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: A batch of GPS points from an ONLINE rider is ingested; the latest position is updated in Redis and all points are persisted to PostgreSQL.",
+        "AC-002: A location update with `accuracy > 50 m` is stored with `low_accuracy = true` and is excluded from the ETA calculation.",
+        "AC-003: `GET /orders/:id/rider-location` for an order in `OUT_FOR_DELIVERY` returns the rider's current lat/lng and ETA.",
+        "AC-004: `GET /orders/:id/rider-location` for an order not in `OUT_FOR_DELIVERY` returns HTTP 422 `LOCATION_NOT_AVAILABLE`.",
+        "AC-005: ETA is recalculated after each valid location ingestion and pushed to the WebSocket channel for the corresponding order.",
+        "AC-006: A geofence breach triggers a `GeofenceBreachEvent` record and sends an alert to admin_operations; duplicate breach alerts within a 5-minute window are suppressed.",
+        "AC-007: Location history older than 30 days is purged by the scheduled job; `GET /admin/riders/:id/location-history` for purged data returns HTTP 410 `HISTORY_EXPIRED`.",
+        "AC-008: Admin `GET /admin/riders/:id/location` returns `is_stale = true` when last GPS update is > 2 minutes ago."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-011/STORY-005",
       "path": "docs/requirements/EPIC-011-rider-delivery/STORY-005-delivery-zone-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: Creating a zone with a valid GeoJSON polygon stores it in PostGIS and returns zone_id; the zone is immediately available for address matching.",
+        "AC-002: A customer checkout with a delivery address outside all zone polygons returns `ADDRESS_NOT_SERVICEABLE`.",
+        "AC-003: Setting `is_serviceable = false` blocks new checkouts from that zone; existing IN_PROGRESS orders are unaffected.",
+        "AC-004: Surge toggle `is_surge_active = true` with multiplier 1.5 causes the fee-estimate endpoint to return `delivery_fee = (base + distance) - 1.5`.",
+        "AC-005: Zone list summary chips (`serviceable_zones`, `zones_under_strain`, `avg_delivery_minutes`) reflect live data.",
+        "AC-006: A zone with `live_orders > online_riders - 2` shows `coverage_status = UNDER_STRAIN` in the zone list.",
+        "AC-007: Applying a rebalancing suggestion sends a push notification to each recommended rider and updates suggestion status to `APPLIED`.",
+        "AC-008: Creating a zone with a duplicate name in the same city returns HTTP 409 `ZONE_NAME_DUPLICATE`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-011/STORY-006",
       "path": "docs/requirements/EPIC-011-rider-delivery/STORY-006-delivery-pricing.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: `GET /delivery/fee-estimate` for an address 3 km from a pharmacy in Koramangala (base_fee=Rs 25, per_km=Rs 5, no surge) returns `delivery_fee = Rs 40` and `handling_fee = Rs 5`.",
+        "AC-002: `GET /delivery/fee-estimate` for an order value of Rs 250 with `free_delivery_threshold = Rs 199` returns `is_free_delivery = true` and `delivery_fee = 0`.",
+        "AC-003: When `is_surge_active = true` with `surge_multiplier = 1.5`, the fee-estimate returns `delivery_fee = (base + distance) - 1.5`.",
+        "AC-004: The fee simulator returns a full breakdown including `rider_delivery_payout = max(delivery_fee - 0.70, 15.00)`.",
+        "AC-005: `PATCH /admin/zones/:id/pricing` updates zone config; subsequent fee estimates for that zone use the new values.",
+        "AC-006: The fee is locked into `DeliveryFeeSnapshot` at order placement; a subsequent surge toggle does not alter the stored fee for the order.",
+        "AC-007: `GET /delivery/fee-estimate` for an address outside all zone polygons returns HTTP 422 `ADDRESS_NOT_SERVICEABLE`.",
+        "AC-008: The endpoint returns HTTP 429 when the 30 req/min/IP rate limit is exceeded."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-011/STORY-007",
       "path": "docs/requirements/EPIC-011-rider-delivery/STORY-007-cod-reconciliation.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: When a rider's `cod_in_hand` exceeds Rs 2,000, the rider is automatically flagged as `FLOAT_RISK`; they receive a push notification and SMS immediately.",
+        "AC-002: A `FLOAT_RISK` rider attempting to accept a new COD order receives an error `COD_LIMIT_EXCEEDED`; they can still accept non-COD orders.",
+        "AC-003: Admin marking a deposit confirms the amount, reduces rider's `cod_in_hand` accordingly, and clears `FLOAT_RISK` status if `cod_in_hand` is now below the limit.",
+        "AC-004: Rider's `GET /rider/cod` accurately shows `in_hand`, `limit_remaining`, and `can_accept_cod_orders = false` when at or above the limit.",
+        "AC-005: A deposit request submitted with a reference number already in the system returns HTTP 409 `DUPLICATE_REFERENCE`.",
+        "AC-006: The admin COD board filters `risk_only=true` to show only FLOAT_RISK riders, sorted by `cod_in_hand` descending.",
+        "AC-007: The daily COD reconciliation report is generated at 11 PM and is available in the finance module (EPIC-012/STORY-006); admin_finance receives an email notification."
+      ],
+      "ac_count": 7,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-011/STORY-008",
       "path": "docs/requirements/EPIC-011-rider-delivery/STORY-008-rider-incentives-performance.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: Base pay for a 2 km delivery is Rs 15; base pay for a 5+ km delivery is Rs 25; a 3.5 km delivery gets the interpolated value of Rs 20.",
+        "AC-002: After completing deliveries for 7 consecutive calendar days, a rider's next weekly payout includes a Rs 100 streak bonus; `daily_streak_days` resets to 0 if a full day passes without a delivery.",
+        "AC-003: Weekly payout computation runs automatically on Monday morning for the previous Mon-Sun cycle.",
+        "AC-004: A rider with unresolved `cod_in_hand > Rs 2,000` at payout computation time has their payout status set to `HELD`; admin_finance must release it manually.",
+        "AC-005: A rider whose net_payout is < Rs 100 has the amount carried forward; no payout is disbursed and `payout_status` is set to `BELOW_THRESHOLD_CARRIED_FORWARD`.",
+        "AC-006: `POST /admin/riders/:id/payout/release` triggers a RazorpayX payout; the rider receives an SMS confirmation on success.",
+        "AC-007: A failed Razorpay payout is auto-retried once after 24 hours; if the retry fails, status is set to `FAILED` and an alert is sent to admin_finance.",
+        "AC-008: `GET /rider/performance` shows `acceptance_rate_pct` computed as `(accepted / assigned) - 100` over the lifetime of the rider's account."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-001",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-001-payment-processing.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: `POST /payments/initiate` creates a Razorpay order and returns `razorpay_order_id` and `razorpay_key_id`; the MedMate payment record is created in `PENDING` state.",
+        "AC-002: `POST /payments/verify` with a valid HMAC-SHA256 signature sets payment status to `CAPTURED` and advances the order to the next workflow state.",
+        "AC-003: `POST /payments/verify` with an invalid signature returns HTTP 422 `PAYMENT_SIGNATURE_INVALID`; order remains in `PAYMENT_PENDING`.",
+        "AC-004: Receiving a `payment.captured` webhook for an already-CAPTURED payment is a no-op (idempotent); returns HTTP 200 without re-processing.",
+        "AC-005: Receiving a webhook with an invalid `X-Razorpay-Signature` header returns HTTP 400 `WEBHOOK_SIGNATURE_INVALID`.",
+        "AC-006: A COD order creation sets `payment_status = PENDING_COD` without calling the Razorpay API; attempting `POST /payments/initiate` for a COD order returns `COD_ORDER_NO_PAYMENT`.",
+        "AC-007: When a customer has Rs 50 wallet balance and places a Rs 495 order, `POST /payments/initiate` shows `wallet_deducted = 50.00` and `gateway_amount_paise = 44500`.",
+        "AC-008: `GET /payments/:id` for a payment belonging to a different customer returns HTTP 403 `FORBIDDEN`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-002",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-002-wallet-operations.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: `POST /wallet/debit` with a valid idempotency_key debits the wallet atomically; re-sending the same idempotency_key returns the original result with `already_processed = true` and does not double-debit.",
+        "AC-002: A debit request for Rs 200 on a wallet with Rs 150 balance is rejected with `INSUFFICIENT_BALANCE` (checkout service caps the debit to available balance before calling this endpoint).",
+        "AC-003: Wallet balance never goes below 0.00; any scenario that would result in negative balance fails atomically.",
+        "AC-004: Credits expire 365 days after issuance; the `GET /wallet/balance` response includes `expiring_soon.amount` for credits expiring within 30 days.",
+        "AC-005: FIFO debit order: when a customer has Rs 50 credit expiring in 10 days and Rs 100 credit expiring in 300 days, a debit of Rs 75 consumes the Rs 50 expiring credit first plus Rs 25 from the newer credit.",
+        "AC-006: Admin credit via `POST /admin/customers/:id/wallet/credit` > Rs 1,000 returns HTTP 422 `ADMIN_CREDIT_EXCEEDS_LIMIT`.",
+        "AC-007: `GET /customers/me/wallet/transactions` returns paginated history with correct `balance_before` and `balance_after` on each entry.",
+        "AC-008: A COD refund creates a CREDIT transaction with `reason = REFUND` and the customer's balance is updated immediately."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-003",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-003-pharmacy-settlements.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: Settlement auto-generation cron creates a `PharmacySettlement` record for each ACTIVE pharmacy with verified bank account every Monday at 06:00 IST for the previous Mon-Sun cycle.",
+        "AC-002: `net_payable` is correctly computed: GMV Rs 52,000, commission 8%, TCS 1% ? commission Rs 4,160, TCS Rs 520, net Rs 47,320.",
+        "AC-003: Releasing a settlement with `net_payable < Rs 100` returns HTTP 422 `AMOUNT_BELOW_THRESHOLD` and carries the amount to the next cycle.",
+        "AC-004: Releasing a HELD settlement returns HTTP 422 `SETTLEMENT_HELD`; admin must call the unhold endpoint first.",
+        "AC-005: Releasing a settlement triggers a RazorpayX payout; the pharmacy owner receives an email and WhatsApp notification with the settlement breakdown.",
+        "AC-006: Bulk release skips settlements > Rs 50,000 and those with HELD status; it returns a summary with released count and failed reasons.",
+        "AC-007: `GET /pharmacy/finance/settlements/:id` returns only settlements belonging to the authenticated pharmacy_owner; requesting another pharmacy's settlement returns HTTP 403.",
+        "AC-008: Each settlement release creates a `FinancialLedger` entry with type `PAYOUT_PHARMACY`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-004",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-004-rider-payouts.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: Monday morning cron creates a `RiderPayout` record for each rider who had at least one delivery in the cycle.",
+        "AC-002: A rider with `cod_in_hand > Rs 2,000` at computation time has payout auto-set to `HELD`; releasing it via the API without COD resolution returns HTTP 422 `COD_UNRESOLVED`.",
+        "AC-003: A payout with `net_payout < Rs 100` is not released; it gets status `BELOW_THRESHOLD_CARRIED` and the amount is added to the next cycle.",
+        "AC-004: Successful `POST /admin/finance/rider-payouts/:id/release` triggers a RazorpayX payout and the rider receives an SMS with the payout amount.",
+        "AC-005: A failed Razorpay payout is automatically retried once after 24 hours; if the retry fails, status is `FAILED` and admin_finance receives an alert.",
+        "AC-006: Bulk release skips riders with `HELD` status, `net_payout > Rs 10,000`, and `net_payout < Rs 100`; returns a summary with release count and failure reasons.",
+        "AC-007: `GET /rider/payouts/history` returns only the authenticated rider's own payout records.",
+        "AC-008: Each payout release creates a `FinancialLedger` entry with type `PAYOUT_RIDER`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-005",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-005-refund-processing.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: A pharmacy-cancelled order with UPI payment ? Rs 500 is auto-refunded to the source account within 10 minutes; `auto_processed = true`.",
+        "AC-002: A refund > Rs 500 remains in `PENDING` state until admin_finance explicitly processes it.",
+        "AC-003: A COD cancellation of any amount creates a wallet credit immediately; `refund_to = WALLET`, `status = COMPLETED`.",
+        "AC-004: When the Razorpay `refund.processed` webhook arrives, the refund status is updated to `COMPLETED`; the customer receives a push notification.",
+        "AC-005: A partial refund (e.g., Rs 450 on a Rs 495 order) creates a `Refund` record with `is_partial = true`; the notes field is mandatory for partial refunds.",
+        "AC-006: `GET /admin/finance/refunds?status=PENDING` shows `is_overdue = true` for refunds older than 24 hours without action.",
+        "AC-007: Attempting to process an already-COMPLETED refund returns HTTP 409 `REFUND_ALREADY_PROCESSED`.",
+        "AC-008: For a hybrid payment (Rs 50 wallet + Rs 445 UPI), the refund for full amount credits Rs 50 to wallet immediately and initiates a Rs 445 Razorpay refund."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-006",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-006-cod-float-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: `GET /admin/finance/cod-float` displays accurate real-time `total_cod_in_transit` as the sum of all riders' `cod_in_hand`.",
+        "AC-002: Riders with `in_hand > Rs 2,000` appear with `risk_status = FLOAT_RISK`; `risk_only=true` filter shows only those riders.",
+        "AC-003: The daily reconciliation job runs at 11 PM IST; the next morning `GET /admin/finance/cod-float/reconciliation-report?date=yesterday` returns the report.",
+        "AC-004: A variance > Rs 100 in the report triggers an alert to admin_finance; the report shows `variance_reason` field for admin to record their explanation.",
+        "AC-005: `POST /auto-reconcile` for a date in the future returns HTTP 422 `INVALID_DATE`.",
+        "AC-006: `POST /auto-reconcile` while a job is already running for the same date returns HTTP 409 `JOB_ALREADY_RUNNING`.",
+        "AC-007: Reconciliation report is exportable as CSV (via the standard `/export` pattern or download link); the CSV includes rider-level breakdown."
+      ],
+      "ac_count": 7,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-007",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-007-tax-gst-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: `GET /admin/finance/taxes?month=2026-07` correctly shows `tcs_collected.tcs_amount = total_gmv - 0.01`.",
+        "AC-002: `TCSRegister` is updated automatically when a pharmacy settlement is released; GSTIN and PAN are sourced from the pharmacy profile.",
+        "AC-003: `POST /taxes/filings/:id/generate` returns a downloadable JSON or CSV file with all TCS records for the period; the file structure matches GSTR-8 GSTN upload format.",
+        "AC-004: `POST /taxes/filings/:id/mark-filed` requires a `reference_number`; omitting it returns HTTP 422 `REFERENCE_REQUIRED`.",
+        "AC-005: A filing past its `due_date` with `status = PENDING` automatically shows `status = OVERDUE` in the filings list.",
+        "AC-006: `GET /taxes/tcs-register?month=2026-07` returns one entry per pharmacy with their GSTIN, GMV, and CGST/SGST TCS breakdown.",
+        "AC-007: Attempting to regenerate a file for a FILED filing returns HTTP 409 `FILING_ALREADY_FILED`.",
+        "AC-008: All tax data endpoints are accessible only to `admin_finance`, `admin_compliance`, and `admin_super`; other roles receive HTTP 403."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-008",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-008-financial-ledger.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: Every payment capture creates three `FinancialLedger` entries atomically: `ORDER_GMV` (credit), `COMMISSION` (credit), and `GATEWAY_FEE` (debit).",
+        "AC-002: No UPDATE or DELETE SQL operations succeed on the `FinancialLedger` table; the table has DB-level constraints enforcing append-only behaviour.",
+        "AC-003: `GET /admin/finance/ledger?type=PAYOUT_PHARMACY` returns only payout entries; `running_balance` is computed correctly as a window sum.",
+        "AC-004: `GET /admin/finance/ledger/export?from=2026-07-01&to=2026-07-31` returns a download URL for a CSV with all 12,450 entries for July.",
+        "AC-005: Export request for a range > 90 days returns HTTP 422 `DATE_RANGE_TOO_LARGE`.",
+        "AC-006: `kpi_chips` in the ledger response (`gmv_today`, `commission_today`, `net_revenue_today`) are computed from ledger entries for the current calendar day.",
+        "AC-007: Any role other than `admin_finance` or `admin_super` calling any ledger endpoint receives HTTP 403.",
+        "AC-008: The CSV export contains columns: `ledger_id`, `type`, `reference_id`, `reference_type`, `credit`, `debit`, `running_balance`, `description`, `created_at` - compatible with Tally/Zoho import format."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-012/STORY-009",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-009-financial-overview-dashboard.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "AC-001: `GET /admin/finance/kpi` returns current-day `gmv_today` matching the sum of `Payment.amount` where `status = CAPTURED` and `created_at` is today.",
+        "AC-002: `GET /admin/finance/pnl?period=7D` correctly computes `net_revenue = commission_earned ? refunds_issued ? gateway_fees` for the past 7 days.",
+        "AC-003: `gmv_chart` in the P&L response returns daily data points for `7D`, `30D`, `90D` periods, and hourly data for `TODAY`.",
+        "AC-004: `GET /admin/finance/cash-position` shows `platform_net = received_from_customers ? paid_to_pharmacies ? paid_to_riders ? refunded_to_customers`.",
+        "AC-005: `get /admin/finance/ratios` computes `take_rate_pct = (commission / GMV) - 100` correctly for the selected period.",
+        "AC-006: `period=CUSTOM` without `from` and `to` returns HTTP 422 `CUSTOM_DATES_REQUIRED`.",
+        "AC-007: Any role other than `admin_finance` or `admin_super` receives HTTP 403 on all finance overview endpoints.",
+        "AC-008: KPI chips cached for no more than 60 seconds; subsequent requests within 60 seconds return cached data with `as_of` timestamp indicating cache age."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-013/STORY-001",
       "path": "docs/requirements/EPIC-013-marketing-growth/STORY-001-coupon-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Admin can create a coupon with all valid fields; it appears in the list immediately with status ACTIVE.",
+        "Creating a coupon with a duplicate code returns HTTP 409 with `COUPON_CODE_EXISTS`.",
+        "Customer validate endpoint returns `valid: true` and correct `discount_amount` for a valid NAMMA25 (25% off Rs 580 cart = Rs 100 after cap).",
+        "Customer validate endpoint returns `valid: false` with `COUPON_MIN_ORDER_NOT_MET` when cart total < `min_order_value`.",
+        "When `budget_used` reaches `budget_total`, coupon status auto-transitions to PAUSED and an admin notification is sent.",
+        "Attempting to PATCH `code` or `type` returns HTTP 400 with `IMMUTABLE_FIELD`.",
+        "DELETE on a coupon with 0 redemptions removes it; DELETE on a coupon with redemptions changes status to EXPIRED and returns the appropriate message.",
+        "Customer available coupons list returns only ACTIVE, non-expired coupons applicable to the customer's segment.",
+        "Admin can toggle a coupon ACTIVE ? PAUSED ? ACTIVE; status reflects change in list view.",
+        "ROAS in coupon detail = revenue_attributed / discount_spend and matches arithmetic."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-013/STORY-002",
       "path": "docs/requirements/EPIC-013-marketing-growth/STORY-002-banner-cms-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Admin creates a banner; it appears in the admin list and the customer-facing `GET /api/v1/banners?placement=HOME_TOP` within 5 seconds.",
+        "A banner with `valid_until` in the past is not returned by the customer-facing endpoint, even if `is_live = true`.",
+        "Reorder endpoint updates priorities atomically; subsequent list returns banners in new priority order.",
+        "Impression log is throttled: calling `POST /api/v1/banners/:id/impression` twice within 30 minutes from the same session increments `impressions` only once.",
+        "CTR = `clicks / impressions - 100` and matches the counts visible in the admin detail view.",
+        "Toggle endpoint flips `is_live`; toggling a live banner takes it offline immediately (next customer API call does not return it).",
+        "Creating a banner with an image URL that returns HTTP 404 returns `INVALID_IMAGE_URL`.",
+        "Bulk reorder of 3 banners within the same placement succeeds; reorder across different placements returns `MIXED_PLACEMENTS`.",
+        "Expired banners (past `valid_until`) are auto-deactivated by the scheduled job and do not appear in customer lists.",
+        "Audit log contains a record for every create, update, toggle, reorder, and delete action."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-013/STORY-003",
       "path": "docs/requirements/EPIC-013-marketing-growth/STORY-003-campaign-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Admin creates a WHATSAPP campaign with a valid template; it is created in DRAFT status.",
+        "Cost estimate for segment `DORMANT` (12,400 members) on WHATSAPP channel returns `estimated_recipients = 12400` and `estimated_cost_paise > 0`.",
+        "Launch endpoint transitions status from SCHEDULED ? RUNNING and records `launched_at` timestamp.",
+        "Campaign with `budget_cap` transitions to PAUSED when `actual_spend_rs ? budget_cap_rs`, and admin receives notification.",
+        "Conversion attribution: an order placed 24 hours after a campaign click is counted as `converted`; an order placed 49 hours after is not.",
+        "Attempting to edit a RUNNING campaign returns HTTP 409 `CAMPAIGN_ALREADY_RUNNING`.",
+        "SMS campaign created without `message_template_id` returns HTTP 422 `CHANNEL_TEMPLATE_REQUIRED`.",
+        "`roi_pct` in campaign detail = `((revenue_attributed ? actual_spend) / actual_spend) - 100` and matches arithmetic.",
+        "Funnel in campaign detail has `sent ? delivered ? opened ? clicked ? converted`.",
+        "Paused campaign can be resumed; RUNNING status is restored."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-013/STORY-004",
       "path": "docs/requirements/EPIC-013-marketing-growth/STORY-004-customer-segmentation.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "All 8 system segments exist on a fresh environment and cannot be deleted or edited.",
+        "System segments are recomputed at 02:00 IST nightly; `last_computed_at` is updated after each run.",
+        "Creating a custom segment with valid criteria returns HTTP 201 and the segment appears in the list.",
+        "Custom segment with `has_rx_orders = true` and `loyalty_tier in [GOLD, PLATINUM]` correctly includes only customers matching both criteria.",
+        "Trigger compute endpoint returns HTTP 202 immediately with `job_id`; after job completes `customer_count` and `last_computed_at` are updated.",
+        "Deleting a system segment returns HTTP 403 `CANNOT_DELETE_SYSTEM_SEGMENT`.",
+        "Deleting a custom segment that is referenced by an active campaign returns HTTP 409 `SEGMENT_IN_USE`.",
+        "Segment detail returns `recommended_actions` as a non-empty string array.",
+        "`GET /api/v1/admin/segments/:id/customers` returns paginated customers sorted by requested field.",
+        "VIP segment count increases when a new customer reaches 30 orders or LTV exceeds Rs 10,000 after nightly recompute."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-013/STORY-005",
       "path": "docs/requirements/EPIC-013-marketing-growth/STORY-005-referral-program.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Customer receives a unique 8-character referral code upon account creation.",
+        "Applying a valid referral code at signup returns HTTP 200 and creates a `PENDING` referral record.",
+        "Applying one's own referral code returns HTTP 400 `REFERRAL_SELF_REFERRAL`.",
+        "Attempting to apply a second referral code to an account that already has one returns HTTP 409 `REFERRAL_ALREADY_APPLIED`.",
+        "When referee's first order reaches DELIVERED, both referrer and referee receive Rs 100 wallet credit and referral status becomes CONVERTED.",
+        "When `is_active = false`, applying a referral code returns HTTP 403 `REFERRAL_PROGRAM_PAUSED`.",
+        "Admin overview KPI `referral_cac_rs = total_rewards_paid_rs / total_converted_referrals` matches arithmetic.",
+        "Top-referrers leaderboard lists customers sorted by `converted` count descending.",
+        "Referral wallet credits expire 365 days from credit date; expired balance shown separately.",
+        "Admin `admin_super` can update `reward_for_referrer_rs` and it applies to all future reward disbursements."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-013/STORY-006",
       "path": "docs/requirements/EPIC-013-marketing-growth/STORY-006-loyalty-program.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Customer earns 5 points on an item total of Rs 580 (floors `580/100 = 5`) after order DELIVERED.",
+        "Points are NOT credited at order placement; they appear in the account only after DELIVERED event.",
+        "Cancelled order correctly reverses previously credited points via an `ADJUSTED` transaction.",
+        "Redemption of 20 points on a Rs 200 cart (20% cap = 40 points, 20 ? 40) succeeds and applies Rs 20 wallet credit.",
+        "Redemption of 50 points on a Rs 200 cart returns `EXCEEDS_REDEMPTION_CAP` (20% cap = 40 points).",
+        "Redemption of 5 points returns `BELOW_MINIMUM_REDEMPTION` (minimum is 10).",
+        "Customer tier upgrades from SILVER to GOLD when `points_earned_lifetime` crosses 50; tier is updated immediately on point credit.",
+        "Tier does not downgrade even if customer redeems all points (balance drops to 0).",
+        "Admin manual adjustment credits 50 points correctly; transaction appears in customer history as `ADJUSTED`.",
+        "Points expired by nightly job appear as `EXPIRED` transactions; `points_balance` decreases accordingly."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-014/STORY-001",
       "path": "docs/requirements/EPIC-014-crm-saas/STORY-001-saas-plan-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Admin lists all plans and sees correct `subscriber_count` and `mrr_rs` per plan.",
+        "Annual price = monthly price - 10 for every plan; `annual_savings_pct ? 16.7%`.",
+        "Admin updates STARTER plan price to Rs 799; change is audit-logged with old value Rs 699 and new value Rs 799.",
+        "Attempting to change FREE plan price returns `CANNOT_MODIFY_FREE_PLAN_PRICE`.",
+        "Attaching an add-on to an account that already has it returns HTTP 409 `ADDON_ALREADY_ATTACHED`.",
+        "Detaching an add-on mid-cycle returns a prorated credit amount > 0.",
+        "Module matrix correctly shows which plans include each module.",
+        "Pharmacy-facing plan list shows `is_current: true` for the pharmacy's active plan and `upgrade_cta` on higher tiers.",
+        "`attach_rate_pct` for E_INVOICE matches `(accounts_with_einvoice / total_active_accounts) - 100`.",
+        "Plan change by admin is recorded in the account's activity timeline."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-014/STORY-002",
       "path": "docs/requirements/EPIC-014-crm-saas/STORY-002-subscription-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "New pharmacy registration creates a FREE plan subscription automatically with status ACTIVE.",
+        "Subscribing to STARTER (MONTHLY) creates an invoice for Rs 699 and transitions subscription to ACTIVE.",
+        "Upgrading from STARTER to RETAIL_PRO mid-cycle produces a prorated charge; invoice shows the proration credit and net charge.",
+        "Downgrade request schedules the plan change at `renewal_date`; pharmacy retains RETAIL_PRO access until then.",
+        "Cancellation sets `cancels_at = renewal_date`; subscription remains ACTIVE until that date.",
+        "Auto-renew payment failure transitions subscription to PAST_DUE; modules remain accessible.",
+        "After 7 days in PAST_DUE without payment, subscription moves to EXPIRED and premium modules are locked.",
+        "Admin override grants RETAIL_PRO access for 90 days; override is recorded in account activity timeline.",
+        "Toggle auto-renew to `false` does not immediately cancel subscription; it sets `auto_renew = false`.",
+        "Dunning sequence (STORY-003) is triggered upon PAST_DUE transition."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-014/STORY-003",
       "path": "docs/requirements/EPIC-014-crm-saas/STORY-003-saas-billing-invoicing.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Invoice generated on subscription start contains: plan line item, SAC code 9983, 18% GST, and correct total.",
+        "Admin billing dashboard chips (collected, due, overdue) match the actual invoice status counts.",
+        "Sending a reminder on a PAID invoice returns HTTP 400 `INVOICE_ALREADY_PAID`.",
+        "Admin marking an invoice paid with `payment_mode = NEFT` transitions status to PAID and subscription to ACTIVE.",
+        "DSO is computed correctly as average `(paid_at ? due_date)` days across all PAID invoices in the period.",
+        "Pharmacy owner can download a signed PDF invoice via the `download_url`.",
+        "Dunning step increments on the correct days (Day 3, 7, 10, 14) via automation engine.",
+        "Account EXPIRED transition (Day 14 dunning) locks premium modules immediately.",
+        "Collection rate = PAID / (PAID + OVERDUE) - 100 matches arithmetic on the dashboard.",
+        "Waived invoice does not appear in overdue count or collection rate denominator."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-014/STORY-004",
       "path": "docs/requirements/EPIC-014-crm-saas/STORY-004-lead-pipeline.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "New marketplace pharmacy registration auto-creates a lead with `stage = CONTACTED` and `source = MARKETPLACE`.",
+        "Admin creates a lead manually; it appears in the pipeline at stage NEW with win probability 0%.",
+        "Advance endpoint moves lead from CONTACTED ? DEMO, auto-sets win probability to 30%.",
+        "Mark-won endpoint creates a subscription record and returns `subscription_id`.",
+        "`weighted_forecast_mrr_rs` = SUM(estimated_mrr - win_probability) and updates after each lead change.",
+        "Mark-lost lead with `lost_reason = PRICE` records the reason and transitions to LOST.",
+        "Reopening a LOST lead resets it to CONTACTED with win probability 10%.",
+        "`avg_sales_cycle_days` is computed from all WON leads in the period.",
+        "Activity timeline on lead detail shows all stage changes with actor name and timestamp.",
+        "Advancing a WON or LOST lead returns the appropriate error code."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-014/STORY-005",
       "path": "docs/requirements/EPIC-014-crm-saas/STORY-005-account-health-scoring.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Health score for an account with all invoices PAID, high module usage, no open tickets, and growing GMV scores ? 75 (HEALTHY).",
+        "Account with OVERDUE invoice has `billing_health_score = 0`, dragging overall score below 50 into AT_RISK band.",
+        "At-risk list returns only accounts with `overall_score < 50`, sorted by `mrr_rs` descending.",
+        "Save play logged by CSM appears in account's save play history and updates `last_save_play_at`.",
+        "Score < 40 auto-triggers a save play task notification to the assigned CSM (via notification engine).",
+        "Platform health KPIs show correct `at_risk_count` matching the at-risk list total.",
+        "Usage chart returns per-module event counts for the last 30 days.",
+        "Health scores are recomputed nightly; `computed_at` is within 24 hours.",
+        "`health_band` correctly maps: 75-100 = HEALTHY, 50-74 = MODERATE, 25-49 = AT_RISK, 0-24 = CHURNING.",
+        "`mrr_at_risk_rs` = sum of MRR from AT_RISK + CHURNING accounts and matches manual arithmetic."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-014/STORY-006",
       "path": "docs/requirements/EPIC-014-crm-saas/STORY-006-feature-adoption-metering.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Adoption overview lists all 18 modules with correct `adoption_pct` = `accounts_using / accounts_eligible - 100`.",
+        "Modules with `adoption_pct < 20%` are flagged in the overview (e.g. via a `low_adoption: true` flag).",
+        "Admin toggles Advanced Analytics ON for an account not on RETAIL_PRO; module is accessible in that account's ERP.",
+        "After module toggle, `AccountModuleOverride` record exists with `override = true` and the reason.",
+        "Nudge endpoint sends emails to all accounts on RETAIL_PRO with 0 Advanced Analytics events in last 30 days.",
+        "`adoption_score` for an account using 5 of 8 eligible modules = `FLOOR(5/8 - 100) = 62`.",
+        "Event counts reset to 0 on the first day of each month; previous month is archived.",
+        "`seat_usage.used` correctly counts only active (non-deactivated) staff users.",
+        "`invoice_usage.used` correctly counts invoices generated in the current calendar month via ERP billing.",
+        "Module detail shows `eligible_not_using` accounts sorted by account name."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-014/STORY-007",
       "path": "docs/requirements/EPIC-014-crm-saas/STORY-007-renewal-churn-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Renewal pipeline shows all accounts renewing in the next 30 days with correct `days_until_renewal`.",
+        "Accounts with `health_score < 50` are classified as `risk_level = HIGH` in the renewal list.",
+        "`logo_churn_pct` = churned logos / start-of-month logos - 100 and matches arithmetic.",
+        "Admin-trigger manual renewal generates an invoice and advances the renewal date by one billing cycle.",
+        "Churn survey logs with mandatory reason; survey appears in churn analysis counts.",
+        "Churn reasons chart sums to 100% for the selected period.",
+        "`at_risk_indicators` in churn analysis shows correlation between churn and leading indicators.",
+        "Win-back sequence is triggered 7 days after an account reaches EXPIRED status (verifiable via automation engine logs).",
+        "Save play banner shows count of active save plays in the past 7 days.",
+        "Monthly churn reports refresh on the first day of each month with prior month's data."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-014/STORY-008",
       "path": "docs/requirements/EPIC-014-crm-saas/STORY-008-saas-revenue-analytics.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "MRR on the dashboard = sum of monthly recurring revenue from all ACTIVE subscriptions and matches independent verification.",
+        "ARR = MRR - 12 (not sum of annual invoices).",
+        "NRR > 100% when expansion MRR > churn MRR; formula verified: `(MRR_end + expansion ? churn) / MRR_start - 100`.",
+        "GRR ? NRR always; GRR formula: `(MRR_end ? churn) / MRR_start - 100`.",
+        "Quick ratio > 1 when `(new + expansion) > (contraction + churn)`.",
+        "MRR bridge: `start_mrr + new + expansion ? contraction ? churn = end_mrr` (arithmetic integrity).",
+        "Cohort grid shows 100% at month 0 for all cohorts; retention values decrease or stay flat over time.",
+        "LTV/CAC ratio = `avg_ltv / avg_cac` and matches arithmetic.",
+        "Report download returns a signed URL expiring in 1 hour.",
+        "All endpoints return HTTP 403 for `admin_operations` role (restricted to `admin_finance` and `admin_super`)."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-015/STORY-001",
       "path": "docs/requirements/EPIC-015-support-disputes/STORY-001-support-ticket-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Customer creates a ticket; ticket appears in admin queue with correct `ticket_id` format `TKT-YYYYMMDD-XXXXXX`.",
+        "HIGH priority ticket has `sla_level = L3` and `sla_due_at` = creation time + 8 hours.",
+        "SLA breach after 8 hours for L3 triggers auto-escalation to L4 via automation engine.",
+        "Agent replies with `is_internal_note = true`; internal note is not visible to customer in ticket thread.",
+        "Customer replies to a RESOLVED ticket; status auto-changes to IN_PROGRESS.",
+        "Round-robin assignment respects the 20-ticket cap: agent at 20 open tickets is not assigned new tickets.",
+        "CSAT survey is scheduled 24 hours after `resolved_at` timestamp.",
+        "Admin creates ticket on behalf of customer; `customer_id` is the customer's (not the admin's).",
+        "Priority change to URGENT updates `sla_level` to L4 immediately.",
+        "CSV export of ticket queue returns all visible columns for the filtered set."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-015/STORY-002",
       "path": "docs/requirements/EPIC-015-support-disputes/STORY-002-dispute-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Customer raises a WRONG_ITEMS dispute; system recommends liable party PHARMACY in the admin detail view.",
+        "Creating a second dispute on the same order returns HTTP 409 `DISPUTE_ALREADY_EXISTS`.",
+        "Approving a refund of Rs 96 (? Rs 200) auto-processes the refund and returns `auto_processed: true`.",
+        "Attempting to approve a refund of Rs 250 (> Rs 200) without `admin_support` role returns HTTP 403 `APPROVAL_REQUIRED`.",
+        "Admin rejects a dispute; customer's dispute history shows status RESOLVED with `refund_amount_rs = 0`.",
+        "Dispute detail shows the full history timeline with actor names and timestamps.",
+        "`resolution_sla_at` = `created_at + 48 hours`; breach triggers escalation.",
+        "Order detail view shows a dispute banner when an open or resolved dispute exists for the order.",
+        "Auto-raise for NOT_DELIVERED is triggered when customer reports non-delivery despite `order.status = DELIVERED`.",
+        "Admin export of disputes as CSV includes all key fields: dispute_id, order_id, customer_name, type, status, liable_party, refund_amount."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-015/STORY-003",
       "path": "docs/requirements/EPIC-015-support-disputes/STORY-003-sla-escalation-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "SLA policy for ORDER/HIGH has `first_response_sla_minutes = 30` and `sla_level = L1` in the default configuration.",
+        "Admin updates `first_response_sla_minutes` for ORDER/HIGH to 45; change is audit-logged; subsequent tickets use the new value.",
+        "Breach list shows tickets where first response is overdue; `minutes_breached` increases in real time (verified on two sequential API calls 60 seconds apart).",
+        "L1 breach auto-triggers escalation to L2 after `auto_escalate_after_minutes = 30` via automation engine.",
+        "Escalation matrix shows all 4 levels with correct `notification_channel` arrays.",
+        "Updating escalation matrix L2 `notification_channel` to include EMAIL is persisted and returned in the next GET.",
+        "SLA timer pauses when ticket enters `AWAITING_CUSTOMER` status; `minutes_breached` does not increase during pause.",
+        "`sla_adherence_pct` (shown in support analytics) correctly = `(tickets_within_sla / total_resolved) - 100`.",
+        "Non-`admin_super` role attempting to update SLA policies returns HTTP 403 `FORBIDDEN`.",
+        "L4 breach triggers notification to Senior Ops Manager via all configured channels (IN_APP + WHATSAPP + CALL)."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-015/STORY-004",
       "path": "docs/requirements/EPIC-015-support-disputes/STORY-004-agent-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Agent roster shows all `admin_support` role users with correct `open_load`, `is_online`, and `csat_score`.",
+        "An agent with `open_load = 20` is not suggested by the assignment algorithm and is skipped in auto-assignment.",
+        "Agent going online (`is_online = true`) immediately becomes eligible for auto-assignment.",
+        "`admin_support` user can toggle only their own online status; attempting to toggle another agent's status returns HTTP 403.",
+        "Suggest-assignment returns an agent with `specialty_match = true` when a matching online agent is available.",
+        "When all agents are at capacity, suggest-assignment returns `overflow: true` and no `suggested_agent`.",
+        "Agent detail shows correct `sla_breach_count_this_week` matching the breach list for that agent.",
+        "Workload breakdown correctly sums to `open_load` across all categories and priorities.",
+        "`avg_handle_minutes` = mean of `(resolved_at ? first_response_at)` in minutes across resolved tickets in the period.",
+        "Weekly performance report is generated and emailed every Monday at 08:00 IST (verifiable via scheduled job log)."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-015/STORY-005",
       "path": "docs/requirements/EPIC-015-support-disputes/STORY-005-knowledge-base.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "Admin creates a canned response; it is searchable by shortcut key `/refund-processing` and appears in the canned response list.",
+        "Creating a canned response with a duplicate shortcut key returns HTTP 409 `SHORTCUT_KEY_EXISTS`.",
+        "Canned response body contains `{customer_name}` and `{order_id}`; server interpolates variables correctly when used in a ticket reply.",
+        "Public help endpoint returns only `is_published = true` articles; unpublished articles are excluded.",
+        "`view_count` increments by 1 each time a customer reads an article via the public endpoint.",
+        "`deflection_count` increments by 1 when a customer submits `issue_resolved = true` for an article.",
+        "Admin article list sorts by `deflection_count` descending to surface top-performing articles.",
+        "Keyword search `q = \"track\"` returns \"How to track my order\" from the help center.",
+        "`admin_support` role can read canned responses but cannot create or delete them; attempt returns HTTP 403.",
+        "Canned responses with `category = ORDER` are returned first when agent opens `/` search in an ORDER category ticket."
+      ],
+      "ac_count": 10,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-016/STORY-001",
       "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-001-platform-overview-analytics.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /overview with period=7D returns 8 KPI cards (gmv, orders_count, aov, net_revenue, net_margin_pct, take_rate_pct, active_customers, repeat_customer_pct) each with a `wow_delta_pct`.",
+        "GET /overview with period=TODAY returns `data_source: \"LIVE\"` and computes metrics from current-day orders.",
+        "GET /overview with period=90D returns in under 2 seconds (uses pre-aggregated tables).",
+        "GET /charts returns a `gmv_trend` array with one data point per day in the period.",
+        "GET /leaderboards with `?export=csv` returns a non-null `export_url` (S3 pre-signed link valid for 1 hour).",
+        "Requests from role `admin_support` to any overview endpoint return `403 FORBIDDEN`.",
+        "CUSTOM period without `date_from` or `date_to` returns `400 MISSING_DATE_RANGE`.",
+        "`take_rate_pct` value matches formula `(commission / GMV) - 100` within 0.01% tolerance."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-016/STORY-002",
       "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-002-operations-sla-analytics.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /operations with period=TODAY returns `live_orders_now` reflecting current count of non-terminal orders.",
+        "GET /fulfilment-funnel returns exactly 5 stages in fixed order; drop_off_pct for `orders_placed` stage is null.",
+        "GET /delivery-breakdown returns P50 and P90 for pharmacy_prep, rider_pickup, delivery, and total for each zone.",
+        "GET /cancellations groups reasons under `customer`, `pharmacy`, and `system` actors; percentages sum to 100%.",
+        "`sla_adherence_pct` accurately reflects only delivered orders against SLA threshold; non-delivered orders are excluded.",
+        "Zone filter on any ops endpoint returns data scoped to that zone only; invalid zone_id returns 404.",
+        "`fill_rate_pct` excludes orders cancelled before pharmacy acceptance from the denominator.",
+        "Admin Command Center widget using GET /operations?period=TODAY auto-refreshes every 30 seconds."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-016/STORY-003",
       "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-003-growth-cohort-analytics.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /growth returns `month1_retention_pct` with its source `cohort_week` so the admin can verify which cohort was used.",
+        "GET /cohort returns a matrix where row 0 (Week 0) is always 100% for all cohorts.",
+        "GET /cohort returns null for elapsed weeks that are in the future (cohort has not yet reached that week).",
+        "GET /acquisition returns percentages that sum to 100% across all sources.",
+        "GET /acquisition returns `cac_rs: 0` for ORGANIC source (no ad spend attributable).",
+        "GET /order-trend with granularity=WEEKLY returns one data point per ISO week in the period.",
+        "`new_customer_orders` + `returning_customer_orders` equals `total_orders` for every data point in the trend.",
+        "Cohort table is pre-computed; the endpoint returns stale `last_computed_at` timestamp rather than computing live, and live computation is never triggered by this endpoint."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-016/STORY-004",
       "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-004-pharmacy-analytics.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /overview returns 403 with `error.code = PLAN_UPGRADE_REQUIRED` for a pharmacy on the Free plan.",
+        "GET /accounts-gst returns GST slab breakdown with 5%, 12%, and 18% slabs; `output_gst` across all slabs matches `gst_liability.output_gst_paise` total.",
+        "GET /products with `?dead_stock_only=true` returns only products with `dead_stock_flag: true`.",
+        "GET /products sorts by revenue descending by default; changing `sort=margin_pct` re-orders results accordingly.",
+        "GET /reports/:report_id with `?export=excel` for a report with > 500 rows returns `export_url` (async S3 link), not inline data.",
+        "GET /reports-catalogue returns `is_favorite: true` for reports previously favorited by the pharmacy owner.",
+        "GET /accounts-gst day book rows are chronological; `balance_paise` is a running cumulative balance throughout the period.",
+        "A `pharmacy_staff` user can read analytics but cannot toggle report favorites (returns 403 on the PATCH favorites endpoint if added in future).",
+        "GET /overview with period=FY computes from April 1 of the current financial year to today's date."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-016/STORY-005",
       "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-005-geography-analytics.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /geography returns zones sorted by GMV descending by default; `is_dark: true` for zones with `riders_online = 0`.",
+        "GET /supply-gap classifies zones correctly: gap > 50% = CRITICAL, 30-50% = HIGH, 10-30% = MODERATE, < 10% = LOW.",
+        "GET /supply-gap suggests `ADD_RIDERS` when gap is CRITICAL and pharmacy coverage > 80%; `ADD_PHARMACIES` when pharmacy coverage < 60%.",
+        "GET /demand-heatmap returns 24 hour entries (0-23) per zone.",
+        "GET /geography with period > 30D returns `400 INVALID_PERIOD`.",
+        "Dark zones (riders_online=0) in GET /supply-gap appear with `gap_severity: CRITICAL` regardless of demand_score.",
+        "GET /geography `dark_zones_count` matches the count of zones with `is_dark: true` in the zones array.",
+        "Demand heatmap data is pre-computed over last 28 days; calling the endpoint never triggers a live scan of raw order data."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-016/STORY-006",
       "path": "docs/requirements/EPIC-016-analytics-reporting/STORY-006-report-library.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /generate with `async: true` for a report with > 10,000 rows returns HTTP 202 with a `job_id`.",
+        "GET /jobs/:job_id for a COMPLETED job returns a non-null `download_url` and `expires_at` 7 days in the future.",
+        "PATCH /schedule with `enabled: true` and empty `email_recipients` returns `422 MISSING_RECIPIENTS`.",
+        "A `admin_finance` user attempting to generate a `COMPLIANCE` report receives `403 FORBIDDEN`.",
+        "GET /history shows `generated_by: \"SCHEDULER\"` for scheduled report runs.",
+        "`COMPLIANCE` category reports appear in GET /history even after 2 years (5-year retention).",
+        "`TAX_GSTR8_PREP` report row totals reconcile with commission ledger totals for the same period (zero tolerance).",
+        "Async job that runs beyond 24 hours is marked `FAILED` with `error_message: JOB_TIMEOUT`.",
+        "All report generation events (manual and scheduled) appear in the audit log with actor, timestamp, and row count."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-017/STORY-001",
       "path": "docs/requirements/EPIC-017-notifications-comms/STORY-001-push-notification-service.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /device-token with a new token for an existing device_id replaces the old token; the old token is deactivated.",
+        "DELETE /device-token marks the device token as inactive; subsequent pushes to the same user do not target this token.",
+        "POST /push/send with payload > 4 KB returns `400 PAYLOAD_TOO_LARGE` before calling FCM.",
+        "When FCM returns `NOT_REGISTERED` for a token, the token's `is_active` is set to `false` and the log entry status is `FAILED`.",
+        "POST /broadcast with `schedule_at: null` immediately enqueues the broadcast and returns `status: QUEUED`.",
+        "GET /push/logs returns `opened_at` timestamp when the customer has clicked the notification's action_url deep link.",
+        "POST /push/send targeting a user with 3 device tokens creates 3 separate log entries (one per token).",
+        "Broadcast to ALL_CUSTOMERS resolves recipient list at execution time, not at schedule time."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-017/STORY-002",
       "path": "docs/requirements/EPIC-017-notifications-comms/STORY-002-sms-service.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /sms/send with a PROMOTIONAL template between 21:00-09:00 IST returns `422 PROMOTIONAL_TIME_RESTRICTED`.",
+        "POST /sms/send with phone number in non-E.164 format (e.g., `9876543210`) returns `400 INVALID_PHONE_FORMAT`.",
+        "POST /sms/send when MSG91 times out automatically retries via Twilio; log entry has `fallback_used: true` and `provider: TWILIO`.",
+        "POST /sms/send for PROMOTIONAL type for a DND-registered number logs `status: SKIPPED_DND` without calling MSG91.",
+        "GET /templates returns only `is_active: true` templates when `?is_active=true` filter is applied.",
+        "POST /templates with a `template_id` that already exists returns `409 TEMPLATE_ALREADY_EXISTS`.",
+        "GET /logs with `?template_id=OTP_VERIFICATION` returns only OTP verification SMS logs.",
+        "Monthly cost report (from `sms_delivery_logs`) aggregates to match MSG91 billing portal within Rs 5 tolerance."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-017/STORY-003",
       "path": "docs/requirements/EPIC-017-notifications-comms/STORY-003-whatsapp-business-api.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /whatsapp/send for a phone number in `whatsapp_optouts` returns `422 RECIPIENT_OPTED_OUT` without calling Meta API.",
+        "POST /whatsapp/webhook with incorrect `X-Hub-Signature-256` returns `403 INVALID_SIGNATURE`.",
+        "A delivery receipt webhook updates the log entry's `delivered_at`; a read receipt updates `read_at`.",
+        "POST /whatsapp/send with a PENDING or REJECTED template returns `422 TEMPLATE_NOT_APPROVED`.",
+        "GET /templates returns `rejection_reason` for REJECTED templates and null for APPROVED ones.",
+        "POST /templates/REORDER_REMINDER successfully submits to Meta and returns `status: PENDING`.",
+        "An inbound WA \"STOP\" reply from a customer triggers the opt-out webhook flow and adds the phone to `whatsapp_optouts`.",
+        "GET /logs shows cost_rs values: Rs 0.85 for UTILITY templates, Rs 2.00 for MARKETING templates."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-017/STORY-004",
       "path": "docs/requirements/EPIC-017-notifications-comms/STORY-004-email-service.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /email/send to a hard-bounced email returns `422 RECIPIENT_HARD_BOUNCED` without calling SendGrid.",
+        "POST /email/send for a TRANSACTIONAL template to an unsubscribed email is sent successfully (transactional bypass).",
+        "POST /email/send when SendGrid returns 503 automatically retries via AWS SES; log entry has `fallback_used: true`.",
+        "Clicking the unsubscribe link in a MARKETING email calls POST /notifications/unsubscribe and adds the address to `email_unsubscribes`.",
+        "GET /templates returns `open_rate_pct` and `click_rate_pct` computed from delivery log events.",
+        "A spam report from SendGrid webhook immediately marks the email address as unsubscribed.",
+        "POST /email/send with attachment URL that returns 404 sends the email without the attachment and logs a warning.",
+        "Template with `{{undefined_variable}}` sends email with the variable rendered as an empty string (not as literal `{{undefined_variable}}`)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-017/STORY-005",
       "path": "docs/requirements/EPIC-017-notifications-comms/STORY-005-notification-preferences.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "PATCH /customers/me/notification-preferences with `categories: { order_updates: false }` returns `422 CANNOT_DISABLE_MANDATORY_CATEGORY`.",
+        "GET /customers/me/notification-preferences returns `can_disable: false` for `order_updates` and `account_critical` categories.",
+        "POST /notifications/unsubscribe with a valid token disables the customer's `email.promotions` preference and adds to `email_unsubscribes`.",
+        "POST /notifications/unsubscribe with an expired token (> 7 days) returns `410 TOKEN_EXPIRED`.",
+        "PATCH /pharmacy/notification-preferences by a `pharmacy_staff` user returns `403 FORBIDDEN`.",
+        "When a customer disables `whatsapp: false` in PATCH, subsequent notification sends check this preference and skip WhatsApp (while still sending push/SMS/email if enabled).",
+        "After a WA \"STOP\" opt-out, the customer's `whatsapp_optout_active` field returns `true` in GET /preferences even if their `channels.whatsapp` is still `true` in preferences.",
+        "Every preference change creates an audit log entry in `notification_preference_audit`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-017/STORY-006",
       "path": "docs/requirements/EPIC-017-notifications-comms/STORY-006-notification-history.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /notifications?unread_only=true returns only notifications with `is_read: false` for the authenticated customer.",
+        "GET /notifications/count returns `unread_count: 0` (not null) when no unread notifications exist; bell-dot should be hidden.",
+        "DELETE /notifications/:id for an ORDER_UPDATE type notification returns `422 CANNOT_DELETE_ORDER_UPDATE`.",
+        "POST /notifications/:id/read sets `is_read: true` and `read_at` to current timestamp.",
+        "PUT /notifications with `{ mark_all_read: true }` marks all unread notifications as read and returns the count of notifications updated.",
+        "GET /notifications after 30 days does not return PROMO notifications older than 30 days (TTL enforcement).",
+        "GET /admin/notifications/history with `?channel=SMS&status=FAILED` returns only failed SMS entries.",
+        "GET /admin/notifications/history with `?export=csv` returns a pre-signed S3 download URL.",
+        "In-app notifications are auto-created on order status change events; no manual creation endpoint needed or exposed."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1314,7 +1789,7 @@
         "Given `GET /schedule/medicines/:id`, then `approx_days_left` equals `units_in_hand / doses_per_day` (computed correctly for a 2-dose-per-day medicine)."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1331,7 +1806,7 @@
         "Given `POST /care-circle` with `avatar_color = \"not_a_color\"`, then a 400 `INVALID_AVATAR_COLOR` error is returned."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1348,7 +1823,7 @@
         "Given a `ReminderSchedule` sent successfully via FCM, then `status = SENT` and `sent_at` is recorded."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1365,7 +1840,7 @@
         "Given `monthly_adherence` in the summary, then the months are sorted in reverse-chronological order (most recent first)."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1382,95 +1857,200 @@
         "Given the nightly supply decrement job runs on a medicine with 2 dose slots and `units_in_hand = 5`, then `units_in_hand` decrements to 3 the next morning."
       ],
       "ac_count": 8,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-019/STORY-001",
       "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-001-rules-engine-core.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /triggers returns all 28+ triggers grouped by category; each entry includes `available_context_vars` and `available_conditions`.",
+        "GET /actions returns all 14 action types; `always_require_approval: true` for suspend_entity and mass_payout actions.",
+        "POST /rules/evaluate with a rule where conditions fail returns `conditions_met: false` and no actions dispatched.",
+        "POST /rules/evaluate for the same rule_id + entity_id within the dedup_window returns `duplicate_skipped: true`.",
+        "Rule evaluation completes (trigger receipt to action dispatch) within 500ms P99.",
+        "When `automation_kill_switch` is PAUSED, POST /rules/evaluate logs `KILL_SWITCH_PAUSED` and returns without executing actions.",
+        "Action failure (e.g., payout API error) is logged in activity log but the next action in the sequence still executes.",
+        "The `trigger_events` table records every event the engine receives, including those where no rules matched."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-019/STORY-002",
       "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-002-rule-crud-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /rules creates a rule with `status: INACTIVE` regardless of what the caller sends for status.",
+        "PATCH /rules/:id on an ACTIVE rule resets status to INACTIVE and returns `status_reset_reason: RULE_EDITED`.",
+        "PATCH /rules/:id/status with `status: ACTIVE` by an `admin_operations` user returns `403 FORBIDDEN`.",
+        "PATCH /rules/:id/status with ACTIVE when 200 rules are already active returns `422 ACTIVE_RULE_LIMIT_REACHED`.",
+        "DELETE /rules/:id for a rule with fire_count > 0 without `?force=true` returns `422 RULE_HAS_FIRE_HISTORY`.",
+        "DELETE /rules/:id for a seed rule (`is_seed_rule: true`) returns `403 FORBIDDEN` even with force=true.",
+        "POST /rules/:id/duplicate creates a new rule with `status: INACTIVE`, `fire_count: 0`, and name suffixed with \"(Copy)\".",
+        "GET /rules with `?status=ACTIVE&trigger_category=DISPATCH` returns only ACTIVE rules in the DISPATCH category.",
+        "Rule name uniqueness is enforced; POST /rules with an existing name returns `409 RULE_NAME_CONFLICT`."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-019/STORY-003",
       "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-003-workflow-journey-builder.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /workflows with more than 20 steps returns `422 STEP_LIMIT_EXCEEDED`.",
+        "A WAIT step persists execution state; a scheduler job resumes the execution after `wait_duration_hours`.",
+        "A BRANCH step at execution time evaluates the live condition; true routes to `next_step_id_on_true`, false to `next_step_id_on_false`.",
+        "PATCH /workflows/:id for a workflow with 4 active executions sets those executions to PAUSED and returns `active_executions_paused: 4`.",
+        "A second trigger fire for an entity already running a workflow execution logs `DUPLICATE_EXECUTION_SKIPPED` and creates no new execution.",
+        "GET /workflows/:id/executions returns `wait_until` timestamp for executions currently in a WAIT step.",
+        "POST /toggle by an `admin_operations` user returns `403 FORBIDDEN`.",
+        "Cancelling an execution stops it at the current step; previously executed steps' actions are not rolled back."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-019/STORY-004",
       "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-004-rule-simulation.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /simulate returns HTTP 202 with a `simulation_id`; results are available via the GET endpoint after completion.",
+        "POST /simulate for a rule with `status: ACTIVE` returns `422 RULE_IS_ACTIVE` (cannot batch-simulate active rules).",
+        "GET /simulation-results returns `false_positive_risk: HIGH` when actions include `suspend_entity` or `release_payout` affecting > 10% of matched entities.",
+        "GET /simulation-results returns `status: RUNNING` (not 404) while the simulation is still processing.",
+        "POST /simulation-preview for a matching entity returns `would_fire: true` with `conditions_evaluated` showing each condition's `resolved_value` and `result`.",
+        "POST /simulation-preview for an entity that fails a condition returns `would_fire: false` with the failing condition identified.",
+        "In SIMULATING status, a rule receives live events and creates activity log entries with `status: SIMULATED` but dispatches zero real actions.",
+        "A rule that has been in SIMULATING status for 24 hours auto-reverts to INACTIVE and the admin receives a push/email notification.",
+        "`estimated_impact_summary` string is present and human-readable in simulation results."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-019/STORY-005",
       "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-005-activity-log-audit.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /activity returns entries filterable by status; `status: SIMULATED` entries are present and tagged with rule name + [SIMULATED] marker.",
+        "GET /activity/:action_id returns full `before_state` and `after_state` snapshots for EXECUTED actions.",
+        "POST /rollback for a `suspend_entity` action reactivates the entity and creates a new `ROLLBACK` activity log entry referencing the original.",
+        "POST /rollback for a `release_payout` action returns `422 NOT_ROLLBACKABLE`.",
+        "POST /rollback for an already-rolled-back action returns `422 ALREADY_ROLLED_BACK`.",
+        "GET /activity/stats returns `pending_approvals_count` matching the actual count in the approvals queue.",
+        "`manual_actions_saved_estimate` in stats equals the count of EXECUTED actions with `actor: AUTOMATION` in the last 30 days.",
+        "Activity log entries for RATE_LIMITED fires have `status: RATE_LIMITED` and are visible in the feed (they do not silently disappear).",
+        "Activity log query with date range filter returns within 500ms (verified by P99 monitoring)."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-019/STORY-006",
       "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-006-approvals-queue.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /approvals returns `chips.pending_count` matching the exact count of PENDING approvals.",
+        "POST /approve immediately executes the action and creates an activity log entry with `actor: HUMAN, override_by: approver_id`.",
+        "POST /approve for an EXPIRED approval returns `410 APPROVAL_EXPIRED`.",
+        "POST /reject requires a non-empty `reason`; empty reason returns `400 REASON_REQUIRED`.",
+        "An `admin_finance` user successfully approves a FINANCE category payout approval.",
+        "An `admin_finance` user attempting to approve an ADMIN category (suspension) approval returns `403 FORBIDDEN`.",
+        "Approval expiry (after 4 hours) automatically sets `status: EXPIRED` and fires the alternative action if configured.",
+        "All eligible approvers receive a HIGH-priority push notification when a new approval enters the queue.",
+        "GET /approvals/stats returns `avg_response_time_minutes` computed from the last 7 days of resolved approvals."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-019/STORY-007",
       "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-007-automation-health-killswitch.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /kill-switch with `action: PAUSE` immediately changes `kill_switch_status` to PAUSED; subsequent rule evaluations are halted within 60 seconds.",
+        "POST /kill-switch by an `admin_operations` user returns `403 FORBIDDEN`.",
+        "POST /kill-switch with empty reason returns `400 REASON_REQUIRED`.",
+        "GET /health returns `kill_switch_status: PAUSED` while paused and `ACTIVE` after resume.",
+        "GET /health/circuit-breakers shows `circuit_status: OPEN` for `apply_wallet_credit` when fires exceed threshold; `reset_at` is 30 minutes after `opened_at`.",
+        "When a circuit is OPEN for an action type, all rules attempting that action log `EXCEPTION` with message `CIRCUIT_OPEN` in the activity log.",
+        "GET /health/per-rule returns `success_rate_pct` computed as `EXECUTED / (EXECUTED + EXCEPTION) - 100` for each rule.",
+        "Kill switch PAUSE and RESUME events are immutably logged in `automation_kill_switch_log` with actor and reason.",
+        "Pending approvals are unaffected by kill switch PAUSE; they can still be approved/rejected and the approved action executes upon RESUME."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-019/STORY-008",
       "path": "docs/requirements/EPIC-019-automation-rules-engine/STORY-008-seed-automations.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /seed-rules/initialize on a fresh platform creates 6 seed rules and 3 seed workflows, all with `status: INACTIVE`.",
+        "POST /seed-rules/initialize called a second time returns `result: ALREADY_EXISTS` for all rules without modifying them.",
+        "GET /seed-rules returns `simulation_risk` for each seed rule that has been simulated; `null` for those not yet simulated.",
+        "Attempting to DELETE a seed rule returns `403 FORBIDDEN`.",
+        "AUTO_FLAG_SCHEDULE_X seed rule has `conditions: []` (empty - always fires) and cannot have conditions added that would prevent it from firing on any Schedule X sale.",
+        "AUTO_RELEASE_DUE_PAYOUTS seed rule has `guardrails.value_cap = 5000000` (Rs 50,000) and `require_approval_above = 5000000` out of the box.",
+        "Platform bootstrap script successfully calls POST /initialize and logs the initialization result.",
+        "`recommended_next_step` returns `RUN_SIMULATION` for rules with `simulation_run: false` and `null` for rules that are already ACTIVE."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-020/STORY-001",
       "path": "docs/requirements/EPIC-020-observability-self-healing/STORY-001-realtime-monitoring-alerting.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /realtime returns `data_age_seconds` < 120 (data is never staler than 2 minutes).",
+        "A GMV_DROP alert fires when actual GMV < 50% of same-hour previous week average; severity is CRITICAL.",
+        "CRITICAL alert fires a HIGH-priority push notification AND SMS to all active admin_super and admin_operations users.",
+        "Alerts auto-resolve when the triggering metric recovers above threshold for 2 consecutive collection intervals; `resolved_at` is set and `status` becomes RESOLVED.",
+        "GET /metrics returns null data points for minutes with no data (not 0), to avoid false anomaly detection.",
+        "GET /slo shows `error_budget_remaining_pct: 0` or negative when SLO target is not met; this triggers a CRITICAL alert.",
+        "POST /alerts/:id/acknowledge for an already-acknowledged alert returns `409 ALREADY_ACKNOWLEDGED`.",
+        "GET /metrics for `sla_pct` with `period_minutes=1440` returns 1,440 data points (one per minute for 24 hours)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-020/STORY-002",
       "path": "docs/requirements/EPIC-020-observability-self-healing/STORY-002-auto-remediation.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "ZONE_DARK alert firing (zone dark > 30 min) automatically triggers REQUEST_RIDERS remediation when the playbook is enabled; `trigger_type: AUTO` in the log.",
+        "THROTTLE_PHARMACY reduces pharmacy's `max_concurrent_orders` by 30% of the previous value (rounded down) and logs `previous_order_cap` and `new_order_cap`.",
+        "Payment job retry fires after 5 minutes; after 3 failed retries a new CRITICAL alert is created and no further auto-retries occur.",
+        "PATCH /playbooks/:id with `is_enabled: false` stops the playbook from firing on new alerts; existing in-flight remediations complete.",
+        "POST /remediation-actions (manual) for REQUEST_RIDERS on a zone sends push notifications to all offline riders in the zone.",
+        "POST /remediation-actions (manual) with the same action_type + target_entity_id triggered within 5 minutes returns `429 RATE_LIMITED`.",
+        "GET /remediation-actions shows both AUTO and MANUAL triggered actions with their `trigger_type` field.",
+        "Playbook threshold changes are audit-logged with `updated_by` and a diff of changed threshold values."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-020/STORY-003",
       "path": "docs/requirements/EPIC-020-observability-self-healing/STORY-003-slo-incident-management.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "A CRITICAL monitoring alert not acknowledged within 15 minutes auto-creates a P1 incident with `created_by: SYSTEM`.",
+        "POST /incidents returns `incident_number` in `INC-YYYYMMDD-NNN` format.",
+        "PATCH /incidents/:id attempting to set `status: DETECTING` on a MITIGATING incident returns `422 INVALID_STATUS_TRANSITION`.",
+        "POST /resolve for a P1 incident sets `postmortem_required: true` and `postmortem_deadline` to 48 hours after resolution.",
+        "POST /resolve with empty `root_cause` returns `400 MISSING_REQUIRED_FIELDS`.",
+        "P1 incident declaration triggers HIGH-priority push notifications to all admin_super and admin_operations users.",
+        "GET /slo/history returns `error_budget_consumed_pct` that correctly reflects breach of SLO; negative value indicates SLO compliance with headroom.",
+        "`status_history` JSONB array in incident detail contains all status transitions with actor, message, and timestamp.",
+        "24 hours after a P1/P2 incident resolution, if postmortem is not filed, a reminder push notification is sent to admin_super users."
+      ],
+      "ac_count": 9,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1486,7 +2066,7 @@
         "Given `POST /admin/staff/:id/reset-password` is called for an existing staff member, then a `200 OK` response is returned and `reset_link_expires_at` is exactly 4 hours in the future; calling it a 6th time within an hour returns `429 RATE_LIMITED`."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1501,7 +2081,7 @@
         "Given `GET /admin/feature-flags/summary`, then the response correctly counts `enabled`, `disabled`, and `partial_rollout` (flags where `enabled: true` and `rollout_percentage` is between 1 and 99)."
       ],
       "ac_count": 6,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1517,7 +2097,7 @@
         "Given `GET /admin/audit-log/:id` for a valid entry, then the response includes a `diff` array showing the JSON Patch operations between `before_state` and `after_state`."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1533,7 +2113,7 @@
         "Given `GET /admin/config?domain=payments`, then only config keys in the `payments` domain are returned."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
@@ -1549,55 +2129,109 @@
         "Given the RBAC middleware performs a permission check, when measured in isolation, the check adds ? 2 ms to request latency (validated via performance test)."
       ],
       "ac_count": 7,
-      "tracker_status": "unknown",
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-022/STORY-001",
       "path": "docs/requirements/EPIC-022-external-integrations/STORY-001-razorpay-integration.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /webhook with invalid `X-Razorpay-Signature` returns `400 INVALID_SIGNATURE` without processing.",
+        "Duplicate `payment.captured` webhook (same `razorpay_payment_id`) is silently ignored (returns 200 but no duplicate ledger entry).",
+        "POST /razorpayx/payout with `amount_paise ? 20000000` uses mode `IMPS`; amount > 20000000 uses mode `NEFT` (auto-selection).",
+        "POST /verify-upi for a valid UPI VPA returns `valid: true` and the registered account holder name.",
+        "POST /fund-account for a pharmacy creates a RazorpayX contact + fund account and stores `fund_account_id` for future payouts.",
+        "A failed payout automatically retries once after 1 hour; after 2 failures, a manual-review alert is created.",
+        "`payment.authorized` webhook triggers explicit capture API call to Razorpay (not auto-capture); order status updates to PAYMENT_CAPTURED on success.",
+        "Razorpay test mode (`razorpay_mode: TEST`) routes all API calls to `api.razorpay.com/v1` with test API keys; no live transactions."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-022/STORY-002",
       "path": "docs/requirements/EPIC-022-external-integrations/STORY-002-maps-geolocation.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /geocode for a previously geocoded address returns `cache_hit: true` and does not call Google Maps API.",
+        "POST /zone-check uses server-side ray-casting; no Google API call is made; response returns within 10ms.",
+        "POST /distance-matrix with > 25 origins returns `422 TOO_MANY_ORIGINS` (Google API limit).",
+        "Daily maps API cost alert fires when daily spend exceeds Rs 500 (based on aggregated `maps_api_call_log`).",
+        "POST /geocode returns `422 GEOCODE_NO_RESULTS` when Google returns `ZERO_RESULTS` status.",
+        "POST /directions returns `duration_in_traffic_seconds` (includes real-time traffic) in addition to `duration_seconds` (historical average).",
+        "All maps API calls (including cache hits) are logged in `maps_api_call_log` with `was_cache_hit` field.",
+        "Geocoding API key, Distance Matrix key, and Directions key are separate keys loaded from AWS Secrets Manager (not shared keys)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-022/STORY-003",
       "path": "docs/requirements/EPIC-022-external-integrations/STORY-003-government-api-integration.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /gstn/verify with an invalid GSTIN checksum returns `422 INVALID_GSTIN_FORMAT` without calling the GSTN API.",
+        "POST /gstn/verify for a previously verified GSTIN within 7 days returns `cache_hit: true` and uses cached data.",
+        "POST /drug-registry/verify-licence returns `is_expired: true` and `status: EXPIRED` for licences past their expiry date.",
+        "POST /digilocker/initiate returns a valid `auth_url` that redirects the user to DigiLocker's authorization page.",
+        "POST /digilocker/callback with an invalid `state` parameter returns `400 INVALID_STATE`.",
+        "A pharmacy with a drug licence expiring within 30 days triggers the `register_due` automation trigger (EPIC-019).",
+        "POST /fssai/verify returns `422 FSSAI_LICENCE_NOT_FOUND` for a licence number that does not exist in the FSSAI database.",
+        "All government API calls are logged in `government_api_call_log`; no API credentials or Aadhaar numbers appear in logs."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-022/STORY-004",
       "path": "docs/requirements/EPIC-022-external-integrations/STORY-004-einvoicing-irn.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /generate-irn with invalid invoice schema returns `422 INVALID_INVOICE_SCHEMA` with the failing field in the error message.",
+        "POST /generate-irn for a duplicate invoice (same seller+buyer+invoice_number+FY) returns the existing IRN with `already_existed: true`.",
+        "POST /cancel-irn more than 24 hours after generation returns `422 IRN_CANCELLATION_WINDOW_EXPIRED`.",
+        "GET /status/:irn for a cancelled IRN returns `status: CANCELLED` with `cancelled_at` timestamp.",
+        "When `e_invoicing_enabled: false` for a pharmacy, IRN generation is skipped and `irn: null` appears on the invoice (no error raised).",
+        "The `signed_invoice_json` stored in `einvoice_irn_records` contains a valid digital signature from NIC (verifiable independently).",
+        "A cancelled IRN cannot be regenerated with the same `invoice_number`; a new invoice number is required for a replacement invoice.",
+        "All e-invoice API calls to the NIC portal are logged (request summary, response status, latency) in the audit log."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-022/STORY-005",
       "path": "docs/requirements/EPIC-022-external-integrations/STORY-005-accounting-integration.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "POST /sync for a Free plan pharmacy returns `403 PLAN_UPGRADE_REQUIRED`.",
+        "POST /sync when another sync is in progress returns `429 SYNC_IN_PROGRESS`.",
+        "GET /sync-status returns `records_failed: 2` and populates the `errors` array with the specific failed invoice IDs and reasons.",
+        "GET /export-tally-xml generates valid Tally XML that Tally can import without errors for SALES sync type.",
+        "PATCH /config with `auto_sync_enabled: true, sync_frequency: DAILY` sets `next_sync_at` to the next 02:00 IST.",
+        "Zoho Books OAuth2 token refresh happens automatically before expiry; sync jobs do not fail due to expired tokens.",
+        "Syncing the same invoice twice to Zoho Books creates only one voucher (external reference deduplication).",
+        "GET /config for a pharmacy that has not connected any accounting system returns `connected_system: null` and `api_key_status: DISCONNECTED`."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     },
     {
       "id": "EPIC-022/STORY-006",
       "path": "docs/requirements/EPIC-022-external-integrations/STORY-006-communication-integrations.md",
-      "acceptance_criteria": [],
-      "ac_count": 0,
-      "tracker_status": "unknown",
+      "acceptance_criteria": [
+        "GET /status returns `status: DOWN` for a channel whose last health check ping failed; `overall_status: DEGRADED` if any channel is not HEALTHY.",
+        "PATCH /config with new API credentials that fail the connectivity test returns `422 CONNECTIVITY_TEST_FAILED` and retains old credentials.",
+        "PATCH /config never returns full API credentials in the response; `api_key_preview` shows only first 4 characters + `****`.",
+        "GET /usage returns `cost_today_rs` computed from actual message count - per-message rate for each channel.",
+        "POST /test sends a real message labelled `is_test: true` in the log; test messages count towards daily_sent_count.",
+        "When MSG91 `status: DOWN`, the platform automatically routes SMS through Twilio (`fallback_sent_today` increments in usage stats).",
+        "When a channel's `daily_limit_pct_used` reaches 80%, an admin alert fires (EPIC-020 alert type: CHANNEL_LIMIT_WARNING).",
+        "Every configuration change creates an audit log entry in `communication_config_audit` with changed fields (credentials masked)."
+      ],
+      "ac_count": 8,
+      "tracker_status": "staging-deployed",
       "verified": false
     }
   ]

@@ -13,10 +13,10 @@
 
 ## Progress
 
-> 2026-08-22: staging SHA `319b4cf0…` is live (`api:45` / `worker:43`). Implemented
-> stories are `staging-deployed`. `production-ready` waits for a prod apply (D2).
-> EPIC-003 STORY-003 (Auto KYC) stays `pending` — never implemented.
-> Evidence: [PRODUCTION-READINESS-AUDIT.md](./PRODUCTION-READINESS-AUDIT.md).
+> 2026-08-22: production-integration remediations are `in_progress` (see
+> [PRODUCTION-READINESS-AUDIT.md](./PRODUCTION-READINESS-AUDIT.md) D1–D20).
+> Staging SHA `319b4cf0…` remains live until a new SHA is applied. Do not mark
+> `staging-deployed` again until that deploy; `production-ready` waits for D2.
 
 | Phase | Total | Staging-deployed | Production-ready |
 |-------|-------|------------------|------------------|
@@ -57,7 +57,7 @@
 |------|-------|-------|--------|-----------|-------|
 | EPIC-003 | [STORY-001](./EPIC-003-pharmacy-onboarding-kyc/STORY-001-pharmacy-registration.md) | Pharmacy Registration | staging-deployed | 2026-07-26 | `domains/pharmacy`; V012 widen `pharmacies` + OTP/pincode/audit; owner via `pharmacy_staff` + system `owner` role; magic OTP `*@nammamedmate.test`→`123456`; email uniqueness excludes `customers` (no email col); phone excludes `admin_staff`; password on `pharmacy_staff` (+ optional `pharmacies.password_hash`); partial pincode seed (ponytail) |
 | EPIC-003 | [STORY-002](./EPIC-003-pharmacy-onboarding-kyc/STORY-002-kyc-document-upload.md) | KYC Document Upload | staging-deployed | 2026-07-27 | `domains/pharmacy`; V013; multipart (story waiver) + local/S3 store; GuardDuty Malware Protection for S3 (`kyc/`) + EventBridge→SQS→worker soft-delete; deferred request-path scanner; rate limits; `admin_compliance`+`pharmacies:update`; servlet ≤10MB; magic-byte MIME; flag `medmate.kyc.auto-verification-enabled`; admin audit at URL issuance; auto_kyc_result null until STORY-003 |
-| EPIC-003 | [STORY-003](./EPIC-003-pharmacy-onboarding-kyc/STORY-003-auto-kyc-verification.md) | Auto KYC Verification | pending | — | — |
+| EPIC-003 | [STORY-003](./EPIC-003-pharmacy-onboarding-kyc/STORY-003-auto-kyc-verification.md) | Auto KYC Verification | in_progress | — | D8: verify only, never auto-activate |
 | EPIC-003 | [STORY-004](./EPIC-003-pharmacy-onboarding-kyc/STORY-004-kyc-status-management.md) | KYC Status Management (Admin) | staging-deployed | 2026-07-28 | `domains/pharmacy`; V015 audit_log + stub zones + pharmacy code/SLA/suspend metadata; AdminPharmacyController list/detail/approve/reject/suspend/reactivate/request-documents; replaced auth suspend stub; outbox notify stubs; RBAC ops+suspend, support/finance+read; REJECTED status (legacy KYC_REJECTED still gated); commission default 8.00; list meta INDEX `has_next`; BR6 reactivate restores `can_reapply` only for `admin_super` |
 | EPIC-003 | [STORY-005](./EPIC-003-pharmacy-onboarding-kyc/STORY-005-pharmacy-profile-update.md) | Pharmacy Profile Update | staging-deployed | 2026-07-28 | `domains/pharmacy`; V016 hours/bank/change-requests/OTPs + profile tax flags; PharmacyProfileController + AdminPharmacyProfileController; stub penny-drop + magic OTP; bankAccountCipher; completeness N=13 (BR6); logo/IFSC format-only; no Redis hours cache; verify-contact endpoint; OTP outbox ids-only + ProfileContactNotifier; bank GET owner-only / admin finance+super via admin path; soft-delete bank re-entry |
 

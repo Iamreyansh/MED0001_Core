@@ -2,11 +2,13 @@ package com.nammamedmate.worker;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nammamedmate.automation.adapter.in.messaging.AutomationTriggerConsumer;
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredLoyaltyConsumer;
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredReferralConsumer;
 import com.nammamedmate.marketing.adapter.in.messaging.OrderDeliveredCampaignConsumer;
 import com.nammamedmate.messaging.OutboxMessage;
 import com.nammamedmate.notification.adapter.in.messaging.CustomerNotificationRequestedHandler;
+import com.nammamedmate.notification.adapter.in.messaging.NotificationDispatchConsumer;
 import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
 import java.time.Instant;
 import java.util.Map;
@@ -25,24 +27,30 @@ public class DomainEventRouter {
 
   private final ObjectMapper objectMapper;
   private final ObjectProvider<CustomerNotificationRequestedHandler> notifications;
+  private final ObjectProvider<NotificationDispatchConsumer> dispatch;
   private final ObjectProvider<AutoKycOutboxConsumer> autoKyc;
   private final ObjectProvider<OrderDeliveredLoyaltyConsumer> loyalty;
   private final ObjectProvider<OrderDeliveredReferralConsumer> referral;
   private final ObjectProvider<OrderDeliveredCampaignConsumer> campaigns;
+  private final ObjectProvider<AutomationTriggerConsumer> automation;
 
   public DomainEventRouter(
       ObjectMapper objectMapper,
       ObjectProvider<CustomerNotificationRequestedHandler> notifications,
+      ObjectProvider<NotificationDispatchConsumer> dispatch,
       ObjectProvider<AutoKycOutboxConsumer> autoKyc,
       ObjectProvider<OrderDeliveredLoyaltyConsumer> loyalty,
       ObjectProvider<OrderDeliveredReferralConsumer> referral,
-      ObjectProvider<OrderDeliveredCampaignConsumer> campaigns) {
+      ObjectProvider<OrderDeliveredCampaignConsumer> campaigns,
+      ObjectProvider<AutomationTriggerConsumer> automation) {
     this.objectMapper = objectMapper;
     this.notifications = notifications;
+    this.dispatch = dispatch;
     this.autoKyc = autoKyc;
     this.loyalty = loyalty;
     this.referral = referral;
     this.campaigns = campaigns;
+    this.automation = automation;
   }
 
   public void handle(String messageBody) {
@@ -59,9 +67,16 @@ public class DomainEventRouter {
     String type = root.get("type") == null ? "" : String.valueOf(root.get("type"));
     OutboxMessage envelope =
         new OutboxMessage(eventId(root), type, messageBody, Instant.now(), false);
+    if (isKnownNotificationType(type)) {
+      routeNotification(type, messageBody);
+    } else {
+      routeDomain(type, envelope, messageBody);
+    }
+    Optional.ofNullable(automation.getIfAvailable()).ifPresent(c -> c.accept(envelope));
+  }
+
+  private void routeDomain(String type, OutboxMessage envelope, String messageBody) {
     switch (type) {
-      case "customer.notification.requested" ->
-          require(notifications.getIfAvailable(), type).handleMessage(messageBody);
       case "pharmacy.kyc.auto_verify_requested", "pharmacy.kyc.async_check_requested" ->
           require(autoKyc.getIfAvailable(), type).accept(envelope);
       case "order.delivered" -> {
@@ -74,9 +89,63 @@ public class DomainEventRouter {
           throw new IllegalStateException("No consumer for " + type);
         }
       }
-      default ->
-          log.info("No dedicated consumer for type={} length={}", type, messageBody.length());
+      case "order.cancelled" -> {
+        Optional.ofNullable(loyalty.getIfAvailable()).ifPresent(c -> c.accept(envelope));
+        Optional.ofNullable(referral.getIfAvailable()).ifPresent(c -> c.accept(envelope));
+      }
+      default -> tryUnknown(type, messageBody);
     }
+  }
+
+  private void routeNotification(String type, String messageBody) {
+    CustomerNotificationRequestedHandler handler = notifications.getIfAvailable();
+    if (handler != null) {
+      handler.handleMessage(messageBody);
+      return;
+    }
+    NotificationDispatchConsumer consumer = dispatch.getIfAvailable();
+    if (consumer != null) {
+      consumer.handleMessage(messageBody);
+      return;
+    }
+    throw new IllegalStateException("No consumer for " + type);
+  }
+
+  private void tryUnknown(String type, String messageBody) {
+    NotificationDispatchConsumer consumer = dispatch.getIfAvailable();
+    if (consumer != null && consumer.tryHandle(messageBody)) {
+      return;
+    }
+    log.info("No dedicated consumer for type={} length={}", type, messageBody.length());
+  }
+
+  static boolean isKnownNotificationType(String type) {
+    if (type == null || type.isBlank()) {
+      return false;
+    }
+    return switch (type) {
+      case "customer.notification.requested",
+          "medicine_schedule.notification.dose_reminder",
+          "medicine_schedule.notification.refill_alert",
+          "marketing.campaign.dispatch.requested",
+          "crm.invoice.dunning_step",
+          "crm.invoice.payment_reminder",
+          "crm.subscription.dunning_started",
+          "crm.subscription.churn_survey",
+          "crm.subscription.expired",
+          "crm.subscription.winback",
+          "crm.module.nudge",
+          "observability.alert.critical_page",
+          "observability.incident.declared",
+          "observability.incident.postmortem_reminder",
+          "inventory.po.sent" ->
+          true;
+      default ->
+          type.startsWith("support.notification.")
+              || type.startsWith("pharmacy.notification.")
+              || type.startsWith("marketing.notification.")
+              || type.startsWith("crm.account.");
+    };
   }
 
   private static <T> T require(T bean, String type) {

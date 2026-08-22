@@ -205,6 +205,14 @@ class OrderPlacementServiceTest {
         service.placeOrder(customer, cart.id(), "COD", null, "Leave at door", "idem-cod");
     verify(prescriptions).enqueueForPharmacy(eq(RX), eq(PH1), any());
 
+    Cart returningCoupon = readyCart(false);
+    returningCoupon.setCoupon("NAMMA25", 100);
+    carts.insert(returningCoupon);
+    assertThat(
+            service.placeOrder(
+                customer, returningCoupon.id(), "COD", null, null, "idem-coupon-return"))
+        .containsKey("status");
+
     Cart blankCoupon = readyCart(false);
     blankCoupon.setCoupon("   ", 0);
     carts.insert(blankCoupon);

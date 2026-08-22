@@ -269,8 +269,19 @@ class InAppNotificationAcTest {
     handler.handlePayload(null);
     handler.handlePayload(Map.of());
     handler.handlePayload(Map.of("title", "t", "body", "b"));
-    handler.handlePayload(
-        Map.of("customer_id", CUST.toString(), "channel", "SMS", "title", "t", "body", "b"));
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                handler.handlePayload(
+                    Map.of(
+                        "customer_id",
+                        CUST.toString(),
+                        "channel",
+                        "SMS",
+                        "title",
+                        "t",
+                        "body",
+                        "b")))
+        .isInstanceOf(IllegalStateException.class);
     handler.handlePayload(
         Map.of("customer_id", "bad", "channel", "PUSH", "title", "t", "body", "b"));
     handler.handleMessage(

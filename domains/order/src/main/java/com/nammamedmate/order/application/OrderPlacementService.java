@@ -363,6 +363,7 @@ public class OrderPlacementService {
           "Payment for order #" + orderNumber);
     }
 
+    boolean firstOrder = !orders.hasPlacedAnyOrder(cart.customerId());
     orders.insert(order);
     inventory.reserveForOrder(
         cart.pharmacyId(),
@@ -371,6 +372,12 @@ public class OrderPlacementService {
             .map(i -> new InventoryAvailabilityPort.ReserveLine(i.productId(), i.quantity()))
             .toList());
     if (cart.couponCode() != null && !cart.couponCode().isBlank()) {
+      platformCoupons.apply(
+          cart.couponCode(),
+          cart.itemTotalPaise(),
+          cart.customerId(),
+          firstOrder,
+          cart.prescriptionId() != null);
       platformCoupons.record(
           cart.couponCode(),
           orderId,

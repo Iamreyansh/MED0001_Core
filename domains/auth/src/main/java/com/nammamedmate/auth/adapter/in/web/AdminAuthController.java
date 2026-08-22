@@ -29,14 +29,29 @@ public class AdminAuthController {
   private final AdminLoginService loginService;
   private final AdminVerifyMfaService verifyMfaService;
   private final AdminSetupMfaService setupMfaService;
+  private final com.nammamedmate.auth.application.AdminInviteCompleteService inviteCompleteService;
 
   public AdminAuthController(
       AdminLoginService loginService,
       AdminVerifyMfaService verifyMfaService,
-      AdminSetupMfaService setupMfaService) {
+      AdminSetupMfaService setupMfaService,
+      com.nammamedmate.auth.application.AdminInviteCompleteService inviteCompleteService) {
     this.loginService = loginService;
     this.verifyMfaService = verifyMfaService;
     this.setupMfaService = setupMfaService;
+    this.inviteCompleteService = inviteCompleteService;
+  }
+
+  @PostMapping("/complete-invite")
+  public ApiResponse<Map<String, Object>> completeInvite(
+      @RequestBody(required = false) Map<String, Object> body) {
+    Map<String, Object> req = body == null ? Map.of() : body;
+    Object token = req.get("invite_token");
+    Object password = req.get("password");
+    return ApiResponse.ok(
+        inviteCompleteService.complete(
+            token == null ? null : String.valueOf(token),
+            password == null ? null : String.valueOf(password)));
   }
 
   @PostMapping("/login")

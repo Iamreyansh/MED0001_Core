@@ -52,6 +52,7 @@ public class SecurityConfig {
                         "/api/v1/auth/pharmacy/login",
                         "/api/v1/auth/pharmacy/pos-pin",
                         "/api/v1/auth/admin/login",
+                        "/api/v1/auth/admin/complete-invite",
                         "/api/v1/auth/refresh",
                         "/api/v1/pharmacy/register",
                         "/api/v1/pharmacy/register/verify-email",

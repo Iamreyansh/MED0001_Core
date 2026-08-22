@@ -33,6 +33,7 @@ class OrderPlacementIT extends AbstractApiIT {
   private static final String OWNER_EMAIL = "order-owner@test.in";
   private static final String PASSWORD = "OrderTest1!";
   private static final String CUSTOMER_PHONE = "+919999900053";
+  private static final String CUSTOMER_PHONE_B = "+919999900054";
 
   @Autowired private TestRestTemplate rest;
   @Autowired private JdbcTemplate jdbc;
@@ -43,19 +44,19 @@ class OrderPlacementIT extends AbstractApiIT {
 
   @BeforeEach
   void seed() {
+    purgeOrdersForPhones(CUSTOMER_PHONE, CUSTOMER_PHONE_B);
     jdbc.update(
-        "DELETE FROM order_status_event WHERE order_id IN (SELECT id FROM orders WHERE customer_id"
-            + " IN (SELECT id FROM customers WHERE phone = ?))",
-        CUSTOMER_PHONE);
+        "DELETE FROM carts WHERE customer_id IN (SELECT id FROM customers WHERE phone IN (?, ?))",
+        CUSTOMER_PHONE,
+        CUSTOMER_PHONE_B);
     jdbc.update(
-        "DELETE FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE phone = ?)",
-        CUSTOMER_PHONE);
+        "UPDATE customers SET default_address_id = NULL WHERE phone IN (?, ?)",
+        CUSTOMER_PHONE,
+        CUSTOMER_PHONE_B);
     jdbc.update(
-        "DELETE FROM carts WHERE customer_id IN (SELECT id FROM customers WHERE phone = ?)",
-        CUSTOMER_PHONE);
-    jdbc.update(
-        "DELETE FROM customer_addresses WHERE customer_id IN (SELECT id FROM customers WHERE phone = ?)",
-        CUSTOMER_PHONE);
+        "DELETE FROM customer_addresses WHERE customer_id IN (SELECT id FROM customers WHERE phone IN (?, ?))",
+        CUSTOMER_PHONE,
+        CUSTOMER_PHONE_B);
     jdbc.update("DELETE FROM pharmacy_catalogue_mapping WHERE pharmacy_id = ?", PH1);
     jdbc.update("DELETE FROM pharmacy_directory_metrics WHERE pharmacy_id = ?", PH1);
     jdbc.update("DELETE FROM pharmacy_staff_assignment WHERE staff_id = ?", STAFF1);
@@ -314,6 +315,108 @@ class OrderPlacementIT extends AbstractApiIT {
             Map.class);
     assertThat(confirm2.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(data(confirm2).get("status")).isEqualTo("PENDING_ACCEPTANCE");
+  }
+
+  @Test
+  void lastSellableUnitBlocksSecondCustomer() {
+    String opsToken = adminLogin(OPS_EMAIL);
+    String pharmacyToken = pharmacyLogin();
+    String tokenA = customerLogin(CUSTOMER_PHONE);
+    String tokenB = customerLogin(CUSTOMER_PHONE_B);
+    UUID customerB =
+        jdbc.queryForObject(
+            "SELECT id FROM customers WHERE phone = ?", UUID.class, CUSTOMER_PHONE_B);
+    UUID addressB = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO customer_addresses (
+          id, customer_id, label, flat_building, area_locality, city, state, pincode,
+          latitude, longitude, is_default, created_at, updated_at
+        ) VALUES (?, ?, 'Home', '12', 'Koramangala', 'Bengaluru', 'KA', '560034',
+          12.9345, 77.6125, true, NOW(), NOW())
+        """,
+        addressB,
+        customerB);
+    jdbc.update("UPDATE customers SET default_address_id = ? WHERE id = ?", addressB, customerB);
+
+    String med = createMedicine(opsToken, "OrderIT LastUnit", "OTC", 85.00);
+    mapMedicine(pharmacyToken, med, 85.00, 1);
+
+    ResponseEntity<Map> addA =
+        rest.exchange(
+            baseUrl() + "/api/v1/cart/items",
+            HttpMethod.POST,
+            bearer(
+                tokenA, Map.of("medicine_id", med, "quantity", 1, "lat", 12.9345, "lng", 77.6125)),
+            Map.class);
+    assertThat(addA.getStatusCode()).isEqualTo(HttpStatus.OK);
+    String cartA = String.valueOf(data(addA).get("cart_id"));
+    rest.exchange(
+        baseUrl() + "/api/v1/cart/address",
+        HttpMethod.POST,
+        bearer(tokenA, Map.of("address_id", addressId.toString())),
+        Map.class);
+    ResponseEntity<Map> addB =
+        rest.exchange(
+            baseUrl() + "/api/v1/cart/items",
+            HttpMethod.POST,
+            bearer(
+                tokenB, Map.of("medicine_id", med, "quantity", 1, "lat", 12.9345, "lng", 77.6125)),
+            Map.class);
+    assertThat(addB.getStatusCode()).isEqualTo(HttpStatus.OK);
+    String cartB = String.valueOf(data(addB).get("cart_id"));
+    rest.exchange(
+        baseUrl() + "/api/v1/cart/address",
+        HttpMethod.POST,
+        bearer(tokenB, Map.of("address_id", addressB.toString())),
+        Map.class);
+
+    ResponseEntity<Map> placedA =
+        rest.exchange(
+            baseUrl() + "/api/v1/orders",
+            HttpMethod.POST,
+            bearerIdem(
+                tokenA,
+                Map.of("cart_id", cartA, "payment_method", "COD"),
+                UUID.randomUUID().toString()),
+            Map.class);
+    assertThat(placedA.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+    ResponseEntity<Map> placedB =
+        rest.exchange(
+            baseUrl() + "/api/v1/orders",
+            HttpMethod.POST,
+            bearerIdem(
+                tokenB,
+                Map.of("cart_id", cartB, "payment_method", "COD"),
+                UUID.randomUUID().toString()),
+            Map.class);
+    assertThat(placedB.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(errorCode(placedB)).isEqualTo("ITEMS_OUT_OF_STOCK");
+  }
+
+  private void purgeOrdersForPhones(String... phones) {
+    for (String phone : phones) {
+      jdbc.update(
+          "DELETE FROM payment WHERE order_id IN (SELECT id FROM orders WHERE customer_id IN"
+              + " (SELECT id FROM customers WHERE phone = ?))",
+          phone);
+      jdbc.update(
+          "DELETE FROM inventory_reservation WHERE order_id IN (SELECT id FROM orders WHERE"
+              + " customer_id IN (SELECT id FROM customers WHERE phone = ?))",
+          phone);
+      jdbc.update(
+          "DELETE FROM delivery_fee_snapshots WHERE order_id IN (SELECT id FROM orders WHERE"
+              + " customer_id IN (SELECT id FROM customers WHERE phone = ?))",
+          phone);
+      jdbc.update(
+          "DELETE FROM order_status_event WHERE order_id IN (SELECT id FROM orders WHERE"
+              + " customer_id IN (SELECT id FROM customers WHERE phone = ?))",
+          phone);
+      jdbc.update(
+          "DELETE FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE phone = ?)",
+          phone);
+    }
   }
 
   private void insertPharmacy(UUID id, String name, String code, double lat, double lng) {

@@ -291,11 +291,28 @@ public class JdbcConsultStore implements ConsultStore {
   }
 
   @Override
+  public List<Consult> findDueForScheduledAssign(Instant now) {
+    return jdbc.query(
+        """
+        SELECT * FROM consults
+        WHERE deleted_at IS NULL
+          AND slot_type = 'SCHEDULED'
+          AND status = 'REQUESTED'
+          AND doctor_id IS NULL
+          AND scheduled_at IS NOT NULL
+          AND scheduled_at <= ?
+        ORDER BY scheduled_at ASC
+        """,
+        this::mapRow,
+        Timestamp.from(now));
+  }
+
+  @Override
   public List<QueueItem> listActiveQueue() {
     return jdbc.query(
         """
-        SELECT c.id, c.status, c.patient_name, c.medicines_needing_rx, c.call_started_at,
-               c.created_at, c.is_cart_mode, d.name AS doctor_name
+        SELECT c.id, c.status, c.patient_name, c.patient_phone, c.medicines_needing_rx,
+               c.call_started_at, c.created_at, c.is_cart_mode, d.name AS doctor_name
         FROM consults c
         LEFT JOIN teleconsult_doctors d ON d.id = c.doctor_id
         WHERE c.deleted_at IS NULL
@@ -315,6 +332,7 @@ public class JdbcConsultStore implements ConsultStore {
                 (UUID) rs.getObject("id"),
                 rs.getString("status"),
                 rs.getString("patient_name"),
+                rs.getString("patient_phone"),
                 rs.getString("doctor_name"),
                 medicineNames(rs.getString("medicines_needing_rx")),
                 instant(rs.getTimestamp("call_started_at")),

@@ -248,6 +248,8 @@ class CartServiceTest {
     when(prescriptions.findVerified(rx, CUST))
         .thenReturn(Optional.of(new PrescriptionPort.PrescriptionRef(rx, "VERIFIED")));
     assertThat(service.attachPrescription(customer, rx).get("prescription_id")).isEqualTo(rx);
+    service.removeCoupon(customer);
+    assertThat(service.applyCoupon(customer, "FLAT50").get("coupon_code")).isEqualTo("FLAT50");
     assertThat(service.removePrescription(customer).get("prescription_id")).isNull();
 
     Map<String, Object> sw = service.switchPharmacy(customer, PH2, true);

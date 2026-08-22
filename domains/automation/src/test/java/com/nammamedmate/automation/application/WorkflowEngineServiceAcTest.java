@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -12,11 +13,13 @@ import static org.mockito.Mockito.when;
 
 import com.nammamedmate.automation.application.port.out.ActionExecutorPort;
 import com.nammamedmate.automation.application.port.out.ActivityLogPort;
+import com.nammamedmate.automation.application.port.out.KillSwitchPort;
 import com.nammamedmate.automation.application.port.out.WorkflowExecutionPort;
 import com.nammamedmate.automation.application.port.out.WorkflowStorePort;
 import com.nammamedmate.automation.domain.AutomationWorkflow;
 import com.nammamedmate.automation.domain.ConditionEvaluator;
 import com.nammamedmate.automation.domain.ConditionSpec;
+import com.nammamedmate.automation.domain.KillSwitchStatus;
 import com.nammamedmate.automation.domain.StepType;
 import com.nammamedmate.automation.domain.WorkflowExecution;
 import com.nammamedmate.automation.domain.WorkflowExecutionStatus;
@@ -230,6 +233,54 @@ class WorkflowEngineServiceAcTest {
 
     when(workflows.listActiveByTrigger("invoice_overdue")).thenReturn(List.of(wf));
     assertThat(engine.onTrigger("invoice_overdue", "PHARMACY", ENTITY, "x", Map.of())).isEmpty();
+  }
+
+  @Test
+  void killSwitchPausedSkipsOnTriggerAndStart() {
+    KillSwitchPort kill = mock(KillSwitchPort.class);
+    when(kill.status()).thenReturn(KillSwitchStatus.PAUSED);
+    WorkflowEngineService paused =
+        new WorkflowEngineService(
+            workflows,
+            executions,
+            actionExecutor,
+            activityLog,
+            new ConditionEvaluator(clock()),
+            clock(),
+            kill);
+    AutomationWorkflow wf =
+        workflow(
+            List.of(new WorkflowStep("s1", StepType.WAIT, null, Map.of(), 1, null, null, null)));
+    when(workflows.listActiveByTrigger("invoice_overdue")).thenReturn(List.of(wf));
+    assertThat(paused.onTrigger("invoice_overdue", "PHARMACY", ENTITY, "x", Map.of())).isEmpty();
+    assertThat(paused.start(wf, "PHARMACY", ENTITY, "x", Map.of())).isEmpty();
+    verify(executions, never()).insert(any());
+    verify(activityLog, times(2))
+        .append(
+            eq("kill_switch"), eq(WorkflowEngineService.KILL_SWITCH_PAUSED), anyString(), anyMap());
+
+    when(kill.status()).thenReturn(KillSwitchStatus.ACTIVE);
+    when(workflows.listActiveByTrigger("invoice_overdue")).thenReturn(List.of());
+    assertThat(paused.onTrigger("invoice_overdue", "PHARMACY", ENTITY, "x", Map.of())).isEmpty();
+  }
+
+  private Clock clock() {
+    return new Clock() {
+      @Override
+      public ZoneOffset getZone() {
+        return ZoneOffset.UTC;
+      }
+
+      @Override
+      public Clock withZone(java.time.ZoneId zone) {
+        return this;
+      }
+
+      @Override
+      public Instant instant() {
+        return now.get();
+      }
+    };
   }
 
   private AutomationWorkflow workflow(List<WorkflowStep> steps) {

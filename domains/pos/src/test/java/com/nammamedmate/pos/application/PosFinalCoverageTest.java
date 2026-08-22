@@ -547,6 +547,133 @@ class PosFinalCoverageTest {
         .isEqualTo("RATE_LIMIT_EXCEEDED");
   }
 
+  @Test
+  void discountedGstUsesProRatedTaxableAndMrpSavings() {
+    UUID cartId = UUID.randomUUID();
+    when(invoiceStore.getOrCreateSettings(pharmacy))
+        .thenReturn(new InvoiceStore.InvoiceSettingsRow("INV"));
+    when(invoiceStore.nextSequence(any(), anyInt(), anyInt())).thenReturn(9);
+    when(invoiceStore.insert(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cartStore.findById(pharmacy, cartId))
+        .thenReturn(
+            Optional.of(
+                new PosCart(
+                    cartId,
+                    pharmacy,
+                    staff,
+                    null,
+                    null,
+                    null,
+                    null,
+                    DiscountType.PERCENTAGE,
+                    BigDecimal.TEN,
+                    0,
+                    20_000,
+                    0,
+                    20_000,
+                    PosCartStatus.ACTIVE,
+                    NOW.plusSeconds(100),
+                    null,
+                    null,
+                    NOW,
+                    NOW)));
+    when(cartStore.listItems(cartId))
+        .thenReturn(List.of(lineItem(cartId, 10_000L, 12), lineItem(cartId, 10_000L, 5)));
+    Map<String, Object> discounted =
+        checkout.checkout(principal, cartId, "CASH", BigDecimal.valueOf(200), null, null);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> slabs = (List<Map<String, Object>>) discounted.get("gst_breakdown");
+    assertThat(slabs).hasSize(2);
+    assertThat((BigDecimal) discounted.get("grand_total"))
+        .isEqualByComparingTo(new BigDecimal("180.00"));
+
+    when(cartStore.findById(pharmacy, cartId))
+        .thenReturn(
+            Optional.of(
+                new PosCart(
+                    cartId,
+                    pharmacy,
+                    staff,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    0,
+                    0,
+                    0,
+                    PosCartStatus.ACTIVE,
+                    NOW.plusSeconds(100),
+                    null,
+                    null,
+                    NOW,
+                    NOW)));
+    when(cartStore.listItems(cartId))
+        .thenReturn(List.of(lineItem(cartId, 1_000L, 12), lineItem(cartId, 1_000L, 12)));
+    Map<String, Object> noDiscount =
+        checkout.checkout(principal, cartId, "CASH", BigDecimal.TEN, null, null);
+    assertThat((BigDecimal) noDiscount.get("grand_total"))
+        .isEqualByComparingTo(new BigDecimal("20.00"));
+
+    // four equal lines + 2 paise discount over-allocates HALF_UP remainder to 0
+    when(cartStore.findById(pharmacy, cartId))
+        .thenReturn(
+            Optional.of(
+                new PosCart(
+                    cartId,
+                    pharmacy,
+                    staff,
+                    null,
+                    null,
+                    null,
+                    null,
+                    DiscountType.FLAT_RS,
+                    new BigDecimal("0.02"),
+                    0,
+                    4_000,
+                    0,
+                    4_000,
+                    PosCartStatus.ACTIVE,
+                    NOW.plusSeconds(100),
+                    null,
+                    null,
+                    NOW,
+                    NOW)));
+    when(cartStore.listItems(cartId))
+        .thenReturn(
+            List.of(
+                lineItem(cartId, 1_000L, 12),
+                lineItem(cartId, 1_000L, 12),
+                lineItem(cartId, 1_000L, 12),
+                lineItem(cartId, 1_000L, 12)));
+    Map<String, Object> remainder =
+        checkout.checkout(principal, cartId, "CASH", BigDecimal.TEN, null, null);
+    assertThat((BigDecimal) remainder.get("grand_total"))
+        .isEqualByComparingTo(new BigDecimal("39.98"));
+  }
+
+  private static PosCartItem lineItem(UUID cartId, long unitPaise, int gstPct) {
+    return PosCartItem.compute(
+        UUID.randomUUID(),
+        cartId,
+        UUID.randomUUID(),
+        "X",
+        UUID.randomUUID(),
+        "BN",
+        LocalDate.of(2027, 1, 1),
+        1,
+        false,
+        unitPaise,
+        gstPct,
+        false,
+        1,
+        "3004",
+        NOW);
+  }
+
   private PosCart cart(UUID id, PosCartStatus status, Instant expires, UUID customerId) {
     return new PosCart(
         id,

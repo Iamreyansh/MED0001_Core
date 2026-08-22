@@ -80,6 +80,8 @@ class JdbcPlatformOverviewStoreTest {
             any(),
             any(),
             any(),
+            any(),
+            any(),
             any()))
         .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(rs, 0)));
     lenient().when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
@@ -148,6 +150,8 @@ class JdbcPlatformOverviewStoreTest {
     when(jdbc.query(
             anyString(),
             any(RowMapper.class),
+            any(),
+            any(),
             any(),
             any(),
             any(),

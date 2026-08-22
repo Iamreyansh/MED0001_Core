@@ -107,24 +107,24 @@ class AutoKycServiceTest {
     assertThat(outboxStore.all()).isNotEmpty();
   }
 
-  // ─── 2. All checks pass → auto-activate ──────────────────────────────────────
+  // ─── 2. All checks pass → queue for admin_compliance (D8, no auto-activate) ──
 
   @Test
-  void allChecksPassAutoActivatesPharmacy() {
+  void allChecksPassQueuesForAdminCompliance() {
     service.adminTriggerAutoVerify(adminPrincipal(), PHARMACY_ID, null);
 
     PharmacyRecord updated = pharmacyStore.findById(PHARMACY_ID).orElseThrow();
-    assertThat(updated.status()).isEqualTo("ACTIVE");
-    assertThat(updated.zoneId()).isEqualTo(ZONE_ID);
-    assertThat(updated.online()).isTrue();
+    assertThat(updated.status()).isEqualTo("KYC_SUBMITTED");
+    assertThat(updated.online()).isFalse();
 
     AutoKycJobRecord job = jobStore.findLatestByPharmacy(PHARMACY_ID).orElseThrow();
     assertThat(job.overallStatus()).isEqualTo("PASS");
-    assertThat(job.autoActivated()).isTrue();
+    assertThat(job.autoActivated()).isFalse();
     assertThat(job.completedAt()).isEqualTo(NOW);
 
     assertThat(outboxStore.all().stream().map(m -> m.type()))
-        .contains("pharmacy.kyc.auto_activated", "pharmacy.notification.welcome");
+        .contains("pharmacy.kyc.manual_review_required")
+        .doesNotContain("pharmacy.kyc.auto_activated", "pharmacy.notification.welcome");
   }
 
   // ─── 3. FSSAI fail → manual queue ────────────────────────────────────────────
@@ -702,7 +702,10 @@ class AutoKycServiceTest {
             NOW);
     pharmacyStore.save(noPin);
     service.adminTriggerAutoVerify(adminPrincipal(), PHARMACY_ID, null);
-    assertThat(pharmacyStore.findById(PHARMACY_ID).orElseThrow().status()).isEqualTo("ACTIVE");
+    assertThat(pharmacyStore.findById(PHARMACY_ID).orElseThrow().status())
+        .isEqualTo("KYC_SUBMITTED");
+    assertThat(outboxStore.all().stream().map(m -> m.type()))
+        .contains("pharmacy.kyc.manual_review_required");
   }
 
   @Test

@@ -118,4 +118,58 @@ class OrderDeliveredReferralConsumerTest {
         new OutboxMessage(UUID.randomUUID(), "order.delivered", "{}", Instant.now(), false));
     verify(referrals, times(3)).onRefereeOrderDelivered(any(), any());
   }
+
+  @Test
+  void cancelsPendingReferralOnOrderCancelled() throws Exception {
+    UUID customerId = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+    when(mapper.readValue(any(String.class), eq(DomainEvent.class)))
+        .thenReturn(
+            DomainEvent.of(
+                "order.cancelled",
+                "order",
+                orderId,
+                Map.of("customer_id", customerId.toString(), "order_id", orderId.toString())));
+    when(referrals.onRefereeFirstOrderCancelled(customerId, orderId)).thenReturn(Optional.empty());
+    consumer.accept(
+        new OutboxMessage(UUID.randomUUID(), "order.cancelled", "{}", Instant.now(), false));
+    verify(referrals).onRefereeFirstOrderCancelled(customerId, orderId);
+
+    when(mapper.readValue(any(String.class), eq(DomainEvent.class)))
+        .thenThrow(new RuntimeException("bad-cancel"));
+    consumer.accept(
+        new OutboxMessage(UUID.randomUUID(), "order.cancelled", "{}", Instant.now(), false));
+
+    when(mapper.readValue(any(String.class), eq(DomainEvent.class)))
+        .thenReturn(DomainEvent.of("order.cancelled", "order", orderId, Map.of()));
+    consumer.accept(
+        new OutboxMessage(UUID.randomUUID(), "order.cancelled", "{}", Instant.now(), false));
+
+    when(mapper.readValue(any(String.class), eq(DomainEvent.class)))
+        .thenReturn(
+            DomainEvent.of(
+                "order.cancelled", "order", orderId, Map.of("customer_id", customerId.toString())));
+    consumer.accept(
+        new OutboxMessage(UUID.randomUUID(), "order.cancelled", "{}", Instant.now(), false));
+    verify(referrals, times(2)).onRefereeFirstOrderCancelled(customerId, orderId);
+
+    when(mapper.readValue(any(String.class), eq(DomainEvent.class)))
+        .thenReturn(
+            DomainEvent.of(
+                "order.cancelled", "order", orderId, Map.of("order_id", orderId.toString())));
+    consumer.accept(
+        new OutboxMessage(UUID.randomUUID(), "order.cancelled", "{}", Instant.now(), false));
+
+    when(mapper.readValue(any(String.class), eq(DomainEvent.class)))
+        .thenReturn(
+            new DomainEvent(
+                UUID.randomUUID(),
+                "order.cancelled",
+                "order",
+                null,
+                Instant.now(),
+                Map.of("customer_id", customerId.toString())));
+    consumer.accept(
+        new OutboxMessage(UUID.randomUUID(), "order.cancelled", "{}", Instant.now(), false));
+  }
 }

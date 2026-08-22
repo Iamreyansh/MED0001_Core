@@ -94,6 +94,13 @@ class CustomerReferralIT extends AbstractApiIT {
     assertThat(notFound.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     assertThat(errorCode(notFound)).isEqualTo("REFERRAL_CODE_NOT_FOUND");
 
+    jdbc.update(
+        "UPDATE customers SET created_at = created_at - interval '2 hours' WHERE phone = ?",
+        UNKNOWN_PHONE);
+    ResponseEntity<Map> stale = apply(unknownToken, referrerCode);
+    assertThat(stale.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(errorCode(stale)).isEqualTo("REFERRAL_SIGNUP_ONLY");
+
     ResponseEntity<Map> unauthorized =
         rest.exchange(
             baseUrl() + "/api/v1/customers/me/referral",

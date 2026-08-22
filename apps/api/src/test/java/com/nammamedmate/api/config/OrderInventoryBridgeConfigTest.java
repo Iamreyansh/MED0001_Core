@@ -10,7 +10,10 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.nammamedmate.inventory.application.port.out.FefoBatchSelectionPort;
 import com.nammamedmate.inventory.application.port.out.InventoryAvailabilityQuery;
+import com.nammamedmate.inventory.application.port.out.ProductBatchStore;
+import com.nammamedmate.inventory.domain.ProductBatch;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import java.sql.ResultSet;
 import java.util.List;
@@ -28,8 +31,10 @@ class OrderInventoryBridgeConfigTest {
   void bridgesQueryToOrderPortWithCatalogueFallback() throws Exception {
     InventoryAvailabilityQuery query = mock(InventoryAvailabilityQuery.class);
     JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    FefoBatchSelectionPort fefo = mock(FefoBatchSelectionPort.class);
+    ProductBatchStore batches = mock(ProductBatchStore.class);
     InventoryAvailabilityPort port =
-        new OrderInventoryBridgeConfig().orderInventoryAvailabilityPort(query, jdbc);
+        new OrderInventoryBridgeConfig().orderInventoryAvailabilityPort(query, jdbc, fefo, batches);
 
     UUID pharmacy = UUID.randomUUID();
     UUID med = UUID.randomUUID();
@@ -109,6 +114,59 @@ class OrderInventoryBridgeConfigTest {
                     List.of(new InventoryAvailabilityPort.ReserveLine(med, 2))))
         .isInstanceOf(com.nammamedmate.kernel.error.AppException.class);
     port.reserveForOrder(pharmacy, UUID.randomUUID(), null);
+    UUID orderId = UUID.randomUUID();
+    UUID productId = UUID.randomUUID();
+    when(jdbc.query(anyString(), any(RowMapper.class), eq(pharmacy), eq(med)))
+        .thenReturn(List.of(productId));
+    when(fefo.listPosEligibleBatches(eq(pharmacy), eq(productId)))
+        .thenReturn(
+            List.of(
+                new ProductBatch(
+                    UUID.randomUUID(),
+                    productId,
+                    pharmacy,
+                    "B1",
+                    java.time.LocalDate.of(2027, 1, 1),
+                    null,
+                    10,
+                    10,
+                    100,
+                    120,
+                    true,
+                    null,
+                    null,
+                    null,
+                    java.time.Instant.parse("2026-01-01T00:00:00Z"),
+                    java.time.Instant.parse("2026-01-01T00:00:00Z"))));
+    doAnswer(
+            inv -> {
+              RowCallbackHandler h = inv.getArgument(1);
+              ResultSet rs = mock(ResultSet.class);
+              when(rs.getObject("pharmacy_id")).thenReturn(pharmacy);
+              when(rs.getObject("medicine_id")).thenReturn(med);
+              when(rs.getInt("quantity")).thenReturn(2);
+              when(rs.getString("status")).thenReturn("RESERVED");
+              h.processRow(rs);
+              return null;
+            })
+        .when(jdbc)
+        .query(anyString(), any(RowCallbackHandler.class), eq(orderId));
+    port.deductForOrder(orderId);
+    doAnswer(
+            inv -> {
+              RowCallbackHandler h = inv.getArgument(1);
+              ResultSet rs = mock(ResultSet.class);
+              when(rs.getObject("pharmacy_id")).thenReturn(pharmacy);
+              when(rs.getObject("medicine_id")).thenReturn(med);
+              when(rs.getInt("quantity")).thenReturn(2);
+              when(rs.getString("status")).thenReturn("RESERVED");
+              h.processRow(rs);
+              return null;
+            })
+        .when(jdbc)
+        .query(anyString(), any(RowCallbackHandler.class), any());
+    when(jdbc.update(anyString(), any(), any(), any())).thenReturn(1);
+    port.releaseForOrder(UUID.randomUUID());
     port.deductForOrder(UUID.randomUUID());
     port.releaseForOrder(UUID.randomUUID());
   }

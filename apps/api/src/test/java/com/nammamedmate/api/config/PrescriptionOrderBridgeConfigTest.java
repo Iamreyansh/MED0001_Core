@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
+import com.nammamedmate.prescription.application.PharmacyRxQueueService;
 import com.nammamedmate.prescription.application.port.out.OrderLinkPort;
 import com.nammamedmate.prescription.application.port.out.PrescriptionInUsePort;
 import java.time.Clock;
@@ -34,7 +35,8 @@ class PrescriptionOrderBridgeConfigTest {
   @SuppressWarnings("unchecked")
   void prescriptionPort_findVerifiedAndBroadcast() throws Exception {
     JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    PrescriptionPort port = config.jdbcPrescriptionPort(jdbc, om, clock);
+    PharmacyRxQueueService rxQueue = mock(PharmacyRxQueueService.class);
+    PrescriptionPort port = config.jdbcPrescriptionPort(jdbc, om, clock, rxQueue);
     UUID rx = UUID.randomUUID();
     UUID cust = UUID.randomUUID();
 
@@ -92,7 +94,15 @@ class PrescriptionOrderBridgeConfigTest {
     assertThat(port.findForBroadcast(null, cust)).isEmpty();
 
     port.enqueueForPharmacy(null, UUID.randomUUID(), null);
-    port.enqueueForPharmacy(rx, UUID.randomUUID(), UUID.randomUUID());
+    UUID pharmacy = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+    port.enqueueForPharmacy(rx, pharmacy, orderId);
+    org.mockito.Mockito.verify(rxQueue).enqueue(rx, pharmacy, orderId);
+
+    when(jdbc.query(anyString(), any(RowMapper.class), eq(rx), eq(pharmacy)))
+        .thenReturn(List.of("PENDING_REVIEW"));
+    assertThat(port.pharmacyQueueStatus(rx, pharmacy)).contains("PENDING_REVIEW");
+    assertThat(port.pharmacyQueueStatus(null, pharmacy)).isEmpty();
   }
 
   @Test

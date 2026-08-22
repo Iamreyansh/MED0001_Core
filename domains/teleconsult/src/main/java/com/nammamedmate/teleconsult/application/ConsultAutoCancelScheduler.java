@@ -24,6 +24,10 @@ public class ConsultAutoCancelScheduler {
 
   @Scheduled(fixedDelayString = "${medmate.teleconsult.auto-cancel.delay-ms:60000}")
   public void autoCancelOverdue() {
+    int assigned = service.assignDueScheduled();
+    if (assigned > 0) {
+      log.info("Assigned {} scheduled consults at slot time", assigned);
+    }
     int n = service.autoCancelOverdue();
     if (n > 0) {
       log.info("Auto-cancelled {} overdue scheduled consults", n);

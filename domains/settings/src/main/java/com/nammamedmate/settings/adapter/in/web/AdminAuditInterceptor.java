@@ -2,6 +2,7 @@ package com.nammamedmate.settings.adapter.in.web;
 
 import com.nammamedmate.security.MedmatePrincipal;
 import com.nammamedmate.settings.application.AuditLogService;
+import com.nammamedmate.settings.application.port.out.AdminStaffStore;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.LinkedHashMap;
@@ -30,11 +31,15 @@ public class AdminAuditInterceptor implements HandlerInterceptor {
           ".*/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?:/.*)?$");
 
   private final AuditLogService auditLogService;
+  private final AdminStaffStore staff;
   private final Executor auditExecutor;
 
   public AdminAuditInterceptor(
-      AuditLogService auditLogService, @Qualifier("auditExecutor") Executor auditExecutor) {
+      AuditLogService auditLogService,
+      AdminStaffStore staff,
+      @Qualifier("auditExecutor") Executor auditExecutor) {
     this.auditLogService = auditLogService;
+    this.staff = staff;
     this.auditExecutor = auditExecutor;
   }
 
@@ -83,7 +88,14 @@ public class AdminAuditInterceptor implements HandlerInterceptor {
     String ua = request.getHeader("User-Agent");
     UUID actorId = principal == null ? null : principal.subject();
     String role = principal == null ? "unknown" : principal.role().value();
-    String actorName = principal == null ? "unknown" : principal.role().value();
+    final String actorName =
+        principal == null
+            ? "unknown"
+            : staff
+                .findById(principal.subject())
+                .map(AdminStaffStore.AdminStaffRow::name)
+                .filter(n -> !n.isBlank())
+                .orElse(principal.role().value());
 
     auditExecutor.execute(
         () ->

@@ -38,6 +38,8 @@ jobs:
           docker pull postgis/postgis:16-3.4 &
           docker pull redis:7-alpine &
           wait
+      - name: Bruno collection + acceptance matrix
+        run: make bruno-check
       - name: Spotless, unit + integration tests, JaCoCo 100%, SpotBugs, ArchUnit
         run: make check
       - name: Save Gradle cache to S3

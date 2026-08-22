@@ -96,6 +96,114 @@ class OrderLifecycleServiceTest {
     service.setInventory(null);
     service.setInventory(
         new com.nammamedmate.order.application.port.out.InventoryAvailabilityPort() {});
+    service.setPrescriptions(null);
+    service.setDeliveryInvoice(null);
+    service.setDeliveryInvoice(
+        new com.nammamedmate.order.application.port.out.DeliveryInvoicePort() {});
+  }
+
+  @Test
+  void acceptBlocksUnverifiedRx() {
+    UUID rxId = UUID.randomUUID();
+    Order order = pendingOrder(PaymentMethod.COD, rxId);
+    orders.insert(order);
+    service.setPrescriptions(
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<String> pharmacyQueueStatus(
+              UUID prescriptionId, UUID pharmacyId) {
+            return java.util.Optional.of("PENDING_REVIEW");
+          }
+        });
+    assertThatThrownBy(() -> service.accept(pharmacy, order.id()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("RX_NOT_VERIFIED");
+
+    service.setPrescriptions(
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<String> pharmacyQueueStatus(
+              UUID prescriptionId, UUID pharmacyId) {
+            return java.util.Optional.of("APPROVED");
+          }
+        });
+    assertThat(service.accept(pharmacy, order.id()).get("status")).isEqualTo("ACCEPTED");
+
+    Order verified = pendingOrder(PaymentMethod.COD, rxId);
+    orders.insert(verified);
+    service.setPrescriptions(
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<String> pharmacyQueueStatus(
+              UUID prescriptionId, UUID pharmacyId) {
+            return java.util.Optional.of("VERIFIED");
+          }
+        });
+    assertThat(service.accept(pharmacy, verified.id()).get("status")).isEqualTo("ACCEPTED");
+
+    Order missingQueue = pendingOrder(PaymentMethod.COD, rxId);
+    orders.insert(missingQueue);
+    service.setPrescriptions(
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+        });
+    assertThatThrownBy(() -> service.accept(pharmacy, missingQueue.id()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("RX_NOT_VERIFIED");
   }
 
   private static PasswordEncoder hashEncoder() {
@@ -316,6 +424,10 @@ class OrderLifecycleServiceTest {
   }
 
   private Order pendingOrder(PaymentMethod method) {
+    return pendingOrder(method, null);
+  }
+
+  private Order pendingOrder(PaymentMethod method, UUID prescriptionId) {
     Order order =
         new Order(
             UUID.randomUUID(),
@@ -335,7 +447,7 @@ class OrderLifecycleServiceTest {
             method == PaymentMethod.COD ? PaymentStatus.PENDING_COLLECTION : PaymentStatus.PAID,
             null,
             null,
-            null,
+            prescriptionId,
             UUID.randomUUID(),
             null,
             OrderStatus.PAYMENT_PENDING,

@@ -5,8 +5,10 @@ import com.nammamedmate.customer.application.WalletService;
 import com.nammamedmate.customer.application.port.out.ActiveOrdersPort;
 import com.nammamedmate.customer.application.port.out.AddressInActiveOrderPort;
 import com.nammamedmate.customer.application.port.out.CustomerOrderHistoryPort;
+import com.nammamedmate.customer.application.port.out.PaymentMethodInActiveOrderPort;
 import com.nammamedmate.order.application.port.out.OrderStore;
 import com.nammamedmate.order.application.port.out.WalletPort;
+import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyOrderMetricsPort;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -26,21 +28,46 @@ public class OrderCustomerBridgeConfig {
 
   @Bean
   @Primary
-  WalletPort orderWalletPort(WalletService walletService) {
+  WalletPort orderWalletPort(WalletService walletService, FinancialLedgerWriterPort ledger) {
     return new WalletPort() {
       @Override
       public long debitForOrder(
           UUID customerId, UUID orderId, long orderTotalPaise, String description) {
         Map<String, Object> result =
             walletService.debitForOrder(customerId, orderId, orderTotalPaise, description);
+        long debitPaise = 0L;
         Object debited = result.get("amount_debited");
         if (debited instanceof BigDecimal bd) {
-          return bd.movePointRight(2).longValueExact();
+          debitPaise = bd.movePointRight(2).longValueExact();
+        } else if (debited instanceof Number n) {
+          debitPaise = BigDecimal.valueOf(n.doubleValue()).movePointRight(2).longValue();
         }
-        if (debited instanceof Number n) {
-          return BigDecimal.valueOf(n.doubleValue()).movePointRight(2).longValue();
+        if (debitPaise > 0
+            && ledger != null
+            && !Boolean.TRUE.equals(result.get("already_processed"))) {
+          Object tx = result.get("transaction_id");
+          UUID txId =
+              tx instanceof UUID u
+                  ? u
+                  : tx != null ? UUID.fromString(tx.toString()) : UUID.randomUUID();
+          String note =
+              description == null || description.isBlank()
+                  ? "Auto-applied at checkout"
+                  : description;
+          ledger.append(
+              "WALLET_DEBIT",
+              txId,
+              "WALLET",
+              0L,
+              debitPaise,
+              note,
+              Map.of(
+                  "customer_id",
+                  customerId == null ? "" : customerId.toString(),
+                  "order_id",
+                  orderId == null ? "" : orderId.toString()));
         }
-        return 0L;
+        return debitPaise;
       }
 
       @Override
@@ -86,6 +113,25 @@ public class OrderCustomerBridgeConfig {
   @Primary
   CustomerOrderHistoryPort jdbcCustomerOrderHistoryPort(OrderStore orders) {
     return orders::hasPlacedAnyOrder;
+  }
+
+  @Bean
+  @Primary
+  PaymentMethodInActiveOrderPort orderPaymentMethodInActiveOrderPort(JdbcTemplate jdbc) {
+    return methodId ->
+        Boolean.TRUE.equals(
+            jdbc.queryForObject(
+                """
+                SELECT EXISTS (
+                  SELECT 1 FROM orders o
+                  JOIN saved_payment_methods m ON m.customer_id = o.customer_id
+                  WHERE m.id = ? AND m.deleted_at IS NULL
+                    AND o.deleted_at IS NULL
+                    AND o.status NOT IN ('DELIVERED','CANCELLED')
+                )
+                """,
+                Boolean.class,
+                methodId));
   }
 
   @Bean
