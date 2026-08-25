@@ -55,7 +55,7 @@ class ReferralServiceTest {
     wallets = new FakeWalletStore();
     hasOrdered = new AtomicBoolean(false);
     WalletService walletService =
-        new WalletService(wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, 100_000L);
+        new WalletService(wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, () -> 100_000L);
     service =
         new ReferralService(
             referrals,
@@ -358,7 +358,8 @@ class ReferralServiceTest {
             referrals,
             profiles,
             id -> false,
-            new WalletService(wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, 100_000L),
+            new WalletService(
+                wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, () -> 100_000L),
             new InMemoryRateLimiter(CLOCK),
             CLOCK,
             "https://nammamedmate.com/join/");

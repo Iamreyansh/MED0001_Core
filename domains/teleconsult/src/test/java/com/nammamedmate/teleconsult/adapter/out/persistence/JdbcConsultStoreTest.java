@@ -146,6 +146,7 @@ class JdbcConsultStoreTest {
               return List.of(mapper.mapRow(rs, 0));
             });
     assertThat(store.listActiveQueue()).hasSize(1);
+    assertThat(store.findQueuedNowUnassigned()).hasSize(1);
 
     when(jdbc.query(anyString(), any(ResultSetExtractor.class)))
         .thenAnswer(

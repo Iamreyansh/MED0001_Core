@@ -1382,6 +1382,37 @@ class TokenManagementServicesTest {
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("UNAUTHORIZED");
 
+    CurrentUserService missingRider =
+        new CurrentUserService(
+            customers,
+            pharmacyStaff,
+            assignments,
+            pharmacies,
+            admins,
+            new com.nammamedmate.auth.application.port.out.RiderAccountPort() {
+              @Override
+              public Optional<
+                      com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+                  findByPhone(String phone) {
+                return Optional.empty();
+              }
+
+              @Override
+              public Optional<
+                      com.nammamedmate.auth.application.port.out.RiderAccountPort.RiderAccount>
+                  findById(UUID id) {
+                return Optional.empty();
+              }
+            },
+            rbacPermissionServiceForTest(),
+            limiter);
+    assertThatThrownBy(
+            () ->
+                missingRider.me(
+                    new MedmatePrincipal(Ids.newId(), AuthRole.RIDER, null, TokenScope.FULL, "j")))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("UNAUTHORIZED");
+
     String blockedTok = "rider-blocked-refresh-tokxxxx";
     UUID blockedRiderId = Ids.newId();
     sessions.save(

@@ -16,6 +16,7 @@ dependencies {
     implementation(project(":domains:observability-ops"))
     implementation(project(":domains:medicine-schedule"))
     implementation(project(":domains:inventory"))
+    implementation(project(":domains:rider"))
     implementation(project(":domains:automation"))
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-json")

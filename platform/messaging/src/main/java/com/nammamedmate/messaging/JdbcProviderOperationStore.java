@@ -88,7 +88,11 @@ public final class JdbcProviderOperationStore implements ProviderOperationStore 
   }
 
   private void update(
-      String operationType, String idempotencyKey, String status, String providerRef, String error) {
+      String operationType,
+      String idempotencyKey,
+      String status,
+      String providerRef,
+      String error) {
     jdbc.update(
         """
         UPDATE provider_operation

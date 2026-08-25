@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,10 +16,13 @@ import com.nammamedmate.automation.adapter.in.messaging.AutomationTriggerConsume
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredLoyaltyConsumer;
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredReferralConsumer;
 import com.nammamedmate.marketing.adapter.in.messaging.OrderDeliveredCampaignConsumer;
+import com.nammamedmate.messaging.ConsumerInbox;
 import com.nammamedmate.messaging.OutboxMessage;
 import com.nammamedmate.notification.adapter.in.messaging.CustomerNotificationRequestedHandler;
 import com.nammamedmate.notification.adapter.in.messaging.NotificationDispatchConsumer;
 import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
+import com.nammamedmate.rider.adapter.in.messaging.AutomationRiderAssignConsumer;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -32,7 +36,8 @@ class DomainEventRouterTest {
     OrderDeliveredLoyaltyConsumer loyalty = mock(OrderDeliveredLoyaltyConsumer.class);
     OrderDeliveredReferralConsumer referral = mock(OrderDeliveredReferralConsumer.class);
     OrderDeliveredCampaignConsumer campaigns = mock(OrderDeliveredCampaignConsumer.class);
-    DomainEventRouter router = router(notes, dispatch, kyc, loyalty, referral, campaigns, null);
+    DomainEventRouter router =
+        router(notes, dispatch, kyc, loyalty, referral, campaigns, null, null);
 
     assertThatThrownBy(() -> router.handle(null)).isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(() -> router.handle("  ")).isInstanceOf(IllegalStateException.class);
@@ -64,7 +69,7 @@ class DomainEventRouterTest {
   @Test
   void routesNotificationTypesToHandler() {
     CustomerNotificationRequestedHandler notes = mock(CustomerNotificationRequestedHandler.class);
-    DomainEventRouter router = router(notes, null, null, null, null, null, null);
+    DomainEventRouter router = router(notes, null, null, null, null, null, null, null);
     router.handle("{\"type\":\"medicine_schedule.notification.dose_reminder\"}");
     router.handle("{\"type\":\"medicine_schedule.notification.refill_alert\"}");
     router.handle("{\"type\":\"marketing.campaign.dispatch.requested\"}");
@@ -89,7 +94,7 @@ class DomainEventRouterTest {
   @Test
   void knownNotificationFallsBackToDispatchConsumer() {
     NotificationDispatchConsumer dispatch = mock(NotificationDispatchConsumer.class);
-    router(null, dispatch, null, null, null, null, null)
+    router(null, dispatch, null, null, null, null, null, null)
         .handle("{\"type\":\"crm.invoice.payment_reminder\"}");
     verify(dispatch).handleMessage("{\"type\":\"crm.invoice.payment_reminder\"}");
   }
@@ -98,7 +103,7 @@ class DomainEventRouterTest {
   void unknownDispatchableUsesCatchAll() {
     NotificationDispatchConsumer dispatch = mock(NotificationDispatchConsumer.class);
     when(dispatch.tryHandle(anyString())).thenReturn(true);
-    router(null, dispatch, null, null, null, null, null)
+    router(null, dispatch, null, null, null, null, null, null)
         .handle("{\"type\":\"misc.ping\",\"channel\":\"PUSH\",\"title\":\"t\",\"body\":\"b\"}");
     verify(dispatch).tryHandle(anyString());
   }
@@ -109,7 +114,7 @@ class DomainEventRouterTest {
     when(dispatch.tryHandle(anyString())).thenReturn(false);
     assertThatThrownBy(
             () ->
-                router(null, dispatch, null, null, null, null, null)
+                router(null, dispatch, null, null, null, null, null, null)
                     .handle("{\"type\":\"automation.action.executed\"}"))
         .isInstanceOf(IllegalStateException.class);
     verify(dispatch).tryHandle(anyString());
@@ -119,7 +124,7 @@ class DomainEventRouterTest {
   @Test
   void routesAutomationActionWhenConsumerPresent() {
     AutomationTriggerConsumer automation = mock(AutomationTriggerConsumer.class);
-    DomainEventRouter routed = router(null, null, null, null, null, null, automation);
+    DomainEventRouter routed = router(null, null, null, null, null, null, automation, null);
     routed.handle("{\"type\":\"automation.action.executed\"}");
     routed.handle("{\"type\":\"order.placed\"}");
     routed.handle("{\"type\":\"order.cancelled\"}");
@@ -132,20 +137,22 @@ class DomainEventRouterTest {
     OrderDeliveredReferralConsumer referral = mock(OrderDeliveredReferralConsumer.class);
     OrderDeliveredCampaignConsumer campaigns = mock(OrderDeliveredCampaignConsumer.class);
 
-    router(null, null, null, loyalty, null, null, null).handle("{\"type\":\"order.delivered\"}");
+    router(null, null, null, loyalty, null, null, null, null)
+        .handle("{\"type\":\"order.delivered\"}");
     verify(loyalty).accept(any(OutboxMessage.class));
 
-    router(null, null, null, null, referral, null, null).handle("{\"type\":\"order.delivered\"}");
+    router(null, null, null, null, referral, null, null, null)
+        .handle("{\"type\":\"order.delivered\"}");
     verify(referral).accept(any(OutboxMessage.class));
 
-    router(null, null, null, null, null, campaigns, null)
+    router(null, null, null, null, null, campaigns, null, null)
         .handle(
             "{\"type\":\"order.delivered\",\"event_id\":\"22222222-2222-4222-8222-222222222222\"}");
     verify(campaigns).accept(any(OutboxMessage.class));
 
     OrderDeliveredLoyaltyConsumer cancelLoyalty = mock(OrderDeliveredLoyaltyConsumer.class);
     OrderDeliveredReferralConsumer cancelReferral = mock(OrderDeliveredReferralConsumer.class);
-    router(null, null, null, cancelLoyalty, cancelReferral, null, null)
+    router(null, null, null, cancelLoyalty, cancelReferral, null, null, null)
         .handle("{\"type\":\"order.cancelled\"}");
     verify(cancelLoyalty).accept(any(OutboxMessage.class));
     verify(cancelReferral).accept(any(OutboxMessage.class));
@@ -153,7 +160,7 @@ class DomainEventRouterTest {
 
   @Test
   void failsClosedWhenConsumerMissingOrJsonInvalid() {
-    DomainEventRouter empty = router(null, null, null, null, null, null, null);
+    DomainEventRouter empty = router(null, null, null, null, null, null, null, null);
     assertThatThrownBy(() -> empty.handle("{\"type\":\"customer.notification.requested\"}"))
         .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(() -> empty.handle("{\"type\":\"pharmacy.kyc.async_check_requested\"}"))
@@ -172,8 +179,62 @@ class DomainEventRouterTest {
     assertThat(DomainEventRouter.isKnownNotificationType("crm.invoice.dunning_step")).isTrue();
     assertThat(DomainEventRouter.isKnownNotificationType("support.notification.csat_survey"))
         .isTrue();
+    assertThat(DomainEventRouter.isKnownNotificationType("rider.notification.assigned")).isTrue();
     assertThat(DomainEventRouter.isKnownNotificationType("pharmacy.kyc.auto_verify_requested"))
         .isFalse();
+  }
+
+  @Test
+  void skipsDuplicateWhenInboxAlreadyProcessed() {
+    ConsumerInbox inbox = mock(ConsumerInbox.class);
+    when(inbox.alreadyProcessed(anyString(), any())).thenReturn(true);
+    CustomerNotificationRequestedHandler notes = mock(CustomerNotificationRequestedHandler.class);
+    DomainEventRouter routed = router(notes, null, null, null, null, null, null, null, inbox);
+    routed.handle(
+        "{\"type\":\"customer.notification.requested\",\"eventId\":\"11111111-1111-4111-8111-111111111111\"}");
+    verify(notes, never()).handleMessage(anyString());
+    verify(inbox, never()).claim(anyString(), any());
+  }
+
+  @Test
+  void claimsInboxAfterSuccessfulRoute() {
+    ConsumerInbox inbox = mock(ConsumerInbox.class);
+    when(inbox.alreadyProcessed(anyString(), any())).thenReturn(false);
+    CustomerNotificationRequestedHandler notes = mock(CustomerNotificationRequestedHandler.class);
+    DomainEventRouter routed = router(notes, null, null, null, null, null, null, null, inbox);
+    UUID eventId = UUID.fromString("11111111-1111-4111-8111-111111111111");
+    routed.handle(
+        "{\"type\":\"customer.notification.requested\",\"eventId\":\"11111111-1111-4111-8111-111111111111\"}");
+    verify(notes).handleMessage(anyString());
+    verify(inbox).claim(eq("domain-event-router"), eq(eventId));
+  }
+
+  @Test
+  void routesRiderAssignRequested() {
+    AutomationRiderAssignConsumer riderAssign = mock(AutomationRiderAssignConsumer.class);
+    router(null, null, null, null, null, null, null, riderAssign)
+        .handle("{\"type\":\"automation.rider.assign_requested\"}");
+    verify(riderAssign).accept(any(OutboxMessage.class));
+  }
+
+  @Test
+  void failsClosedWhenRiderAssignConsumerMissing() {
+    DomainEventRouter empty = router(null, null, null, null, null, null, null, null);
+    assertThatThrownBy(() -> empty.handle("{\"type\":\"automation.rider.assign_requested\"}"))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  private static DomainEventRouter router(
+      CustomerNotificationRequestedHandler notes,
+      NotificationDispatchConsumer dispatch,
+      AutoKycOutboxConsumer kyc,
+      OrderDeliveredLoyaltyConsumer loyalty,
+      OrderDeliveredReferralConsumer referral,
+      OrderDeliveredCampaignConsumer campaigns,
+      AutomationTriggerConsumer automation,
+      AutomationRiderAssignConsumer riderAssign) {
+    return router(
+        notes, dispatch, kyc, loyalty, referral, campaigns, automation, riderAssign, null);
   }
 
   @SuppressWarnings("unchecked")
@@ -184,7 +245,9 @@ class DomainEventRouterTest {
       OrderDeliveredLoyaltyConsumer loyalty,
       OrderDeliveredReferralConsumer referral,
       OrderDeliveredCampaignConsumer campaigns,
-      AutomationTriggerConsumer automation) {
+      AutomationTriggerConsumer automation,
+      AutomationRiderAssignConsumer riderAssign,
+      ConsumerInbox inbox) {
     ObjectProvider<CustomerNotificationRequestedHandler> n = mock(ObjectProvider.class);
     ObjectProvider<NotificationDispatchConsumer> d = mock(ObjectProvider.class);
     ObjectProvider<AutoKycOutboxConsumer> k = mock(ObjectProvider.class);
@@ -192,6 +255,7 @@ class DomainEventRouterTest {
     ObjectProvider<OrderDeliveredReferralConsumer> r = mock(ObjectProvider.class);
     ObjectProvider<OrderDeliveredCampaignConsumer> c = mock(ObjectProvider.class);
     ObjectProvider<AutomationTriggerConsumer> a = mock(ObjectProvider.class);
+    ObjectProvider<AutomationRiderAssignConsumer> ra = mock(ObjectProvider.class);
     when(n.getIfAvailable()).thenReturn(notes);
     when(d.getIfAvailable()).thenReturn(dispatch);
     when(k.getIfAvailable()).thenReturn(kyc);
@@ -199,6 +263,7 @@ class DomainEventRouterTest {
     when(r.getIfAvailable()).thenReturn(referral);
     when(c.getIfAvailable()).thenReturn(campaigns);
     when(a.getIfAvailable()).thenReturn(automation);
-    return new DomainEventRouter(new ObjectMapper(), n, d, k, l, r, c, a);
+    when(ra.getIfAvailable()).thenReturn(riderAssign);
+    return new DomainEventRouter(new ObjectMapper(), n, d, k, l, r, c, a, ra, inbox);
   }
 }

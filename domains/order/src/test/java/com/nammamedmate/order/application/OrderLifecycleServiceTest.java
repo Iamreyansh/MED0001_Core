@@ -369,6 +369,60 @@ class OrderLifecycleServiceTest {
   }
 
   @Test
+  void confirmRiderDelivery_publishesOrderDelivered() {
+    Order order = pendingOrder(PaymentMethod.COD);
+    order.accept(T0);
+    order.advanceTo(OrderStatus.READY_FOR_PICKUP, T0);
+    order.advanceTo(OrderStatus.OUT_FOR_DELIVERY, T0);
+    order.assignRider(RIDER, T0);
+    orders.insert(order);
+    service.confirmRiderDelivery(order.id(), RIDER, T0.plusSeconds(60));
+    Order updated = orders.findById(order.id()).orElseThrow();
+    assertThat(updated.status()).isEqualTo(OrderStatus.DELIVERED);
+    assertThat(outboxStore.all().stream().anyMatch(m -> "order.delivered".equals(m.type())))
+        .isTrue();
+  }
+
+  @Test
+  void confirmRiderDelivery_rejectsInvalidState() {
+    assertThatThrownBy(() -> service.confirmRiderDelivery(null, RIDER, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+    assertThatThrownBy(() -> service.confirmRiderDelivery(UUID.randomUUID(), null, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.confirmRiderDelivery(UUID.randomUUID(), RIDER, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+
+    Order pending = pendingOrder(PaymentMethod.COD);
+    orders.insert(pending);
+    assertThatThrownBy(() -> service.confirmRiderDelivery(pending.id(), RIDER, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_OUT_FOR_DELIVERY");
+
+    Order out = pendingOrder(PaymentMethod.COD);
+    out.accept(T0);
+    out.advanceTo(OrderStatus.READY_FOR_PICKUP, T0);
+    out.advanceTo(OrderStatus.OUT_FOR_DELIVERY, T0);
+    out.assignRider(RIDER, T0);
+    orders.insert(out);
+    UUID other = UUID.fromString("dddddddd-0002-4000-8000-000000000002");
+    assertThatThrownBy(() -> service.confirmRiderDelivery(out.id(), other, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("RIDER_MISMATCH");
+
+    Order unassigned = pendingOrder(PaymentMethod.COD);
+    unassigned.accept(T0);
+    unassigned.advanceTo(OrderStatus.READY_FOR_PICKUP, T0);
+    unassigned.advanceTo(OrderStatus.OUT_FOR_DELIVERY, T0);
+    orders.insert(unassigned);
+    service.confirmRiderDelivery(unassigned.id(), RIDER, T0);
+    assertThat(orders.findById(unassigned.id()).orElseThrow().status())
+        .isEqualTo(OrderStatus.DELIVERED);
+  }
+
+  @Test
   void ac8_noRiderWithin30Min_cancelsAndRefunds() {
     Order order = pendingOrder(PaymentMethod.COD);
     order.accept(T0);

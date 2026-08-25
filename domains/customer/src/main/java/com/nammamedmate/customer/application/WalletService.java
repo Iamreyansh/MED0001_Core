@@ -1,6 +1,7 @@
 package com.nammamedmate.customer.application;
 
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore;
+import com.nammamedmate.customer.application.port.out.WalletCreditLimitPort;
 import com.nammamedmate.customer.application.port.out.WalletStore;
 import com.nammamedmate.customer.application.port.out.WalletStore.WalletRecord;
 import com.nammamedmate.customer.application.port.out.WalletStore.WalletTxRecord;
@@ -24,7 +25,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,19 +45,23 @@ public class WalletService {
   private final CustomerProfileStore profiles;
   private final RateLimiter rateLimiter;
   private final Clock clock;
-  private final long maxCreditPaise;
+  private final WalletCreditLimitPort creditLimit;
 
   public WalletService(
       WalletStore wallets,
       CustomerProfileStore profiles,
       RateLimiter rateLimiter,
       Clock clock,
-      @Value("${medmate.wallet.max-credit-paise:100000}") long maxCreditPaise) {
+      WalletCreditLimitPort creditLimit) {
     this.wallets = wallets;
     this.profiles = profiles;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
-    this.maxCreditPaise = maxCreditPaise;
+    this.creditLimit = creditLimit;
+  }
+
+  private long maxCreditPaise() {
+    return creditLimit.maxCreditPaise();
   }
 
   @Transactional(readOnly = true)
@@ -166,7 +170,7 @@ public class WalletService {
     }
 
     long amountPaise = parsePositiveAmountPaise(cmd.amount());
-    if (amountPaise > maxCreditPaise) {
+    if (amountPaise > maxCreditPaise()) {
       throw new AppException(
           "ADMIN_CREDIT_EXCEEDS_LIMIT", "Amount exceeds max_wallet_credit_per_transaction", 422);
     }
@@ -263,7 +267,7 @@ public class WalletService {
     if (amountPaise <= 0) {
       throw new AppException("INVALID_AMOUNT", "amount must be positive", 422);
     }
-    if (amountPaise > maxCreditPaise) {
+    if (amountPaise > maxCreditPaise()) {
       throw new AppException(
           "ADMIN_CREDIT_EXCEEDS_LIMIT", "Amount exceeds max_wallet_credit_per_transaction", 422);
     }

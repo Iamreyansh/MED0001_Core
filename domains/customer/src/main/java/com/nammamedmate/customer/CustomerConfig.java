@@ -15,6 +15,7 @@ import com.nammamedmate.customer.application.port.out.GeocodePort;
 import com.nammamedmate.customer.application.port.out.LoyaltyCartPort;
 import com.nammamedmate.customer.application.port.out.PaymentMethodInActiveOrderPort;
 import com.nammamedmate.customer.application.port.out.RazorpayVpaPort;
+import com.nammamedmate.customer.application.port.out.WalletCreditLimitPort;
 import com.nammamedmate.kernel.error.AppException;
 import java.io.IOException;
 import java.net.URI;
@@ -33,6 +34,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Configuration
 public class CustomerConfig {
+
+  @Bean
+  @ConditionalOnMissingBean(WalletCreditLimitPort.class)
+  WalletCreditLimitPort defaultWalletCreditLimit(
+      @Value("${medmate.wallet.max-credit-paise:100000}") long maxCreditPaise) {
+    return () -> maxCreditPaise;
+  }
 
   @Bean
   @ConditionalOnMissingBean(LoyaltyCartPort.class)

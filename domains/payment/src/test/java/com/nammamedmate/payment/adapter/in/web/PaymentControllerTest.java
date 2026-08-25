@@ -12,8 +12,8 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.api.ApiResponse;
-import com.nammamedmate.messaging.WebhookInbox;
 import com.nammamedmate.kernel.webhook.WebhookRawBodyFilter;
+import com.nammamedmate.messaging.WebhookInbox;
 import com.nammamedmate.payment.application.PaymentService;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -105,5 +105,15 @@ class PaymentControllerTest {
     assertThat(gated.razorpay("sig", request).data().get("processed")).isEqualTo(true);
     verify(box).claim(eq("razorpay"), eq("evt_1"), anyString());
     gated.razorpay("sig", new MockHttpServletRequest());
+
+    PaymentWebhookController nullMapper = new PaymentWebhookController(payments, provider, null);
+    MockHttpServletRequest invalid = new MockHttpServletRequest();
+    invalid.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "not-json".getBytes());
+    when(payments.handleWebhook(anyString(), any())).thenReturn(Map.of("processed", true));
+    assertThat(nullMapper.razorpay("sig", invalid).data().get("processed")).isEqualTo(true);
+
+    MockHttpServletRequest nullId = new MockHttpServletRequest();
+    nullId.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "{\"id\":null}".getBytes());
+    assertThat(nullMapper.razorpay("sig", nullId).data().get("processed")).isEqualTo(true);
   }
 }

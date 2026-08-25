@@ -4,7 +4,6 @@ import com.nammamedmate.prescription.application.port.out.CatalogueSchedulePort;
 import com.nammamedmate.prescription.application.port.out.InventoryStockPort;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;

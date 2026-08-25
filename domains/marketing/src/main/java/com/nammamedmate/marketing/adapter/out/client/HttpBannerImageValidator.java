@@ -30,9 +30,9 @@ public class HttpBannerImageValidator implements BannerImageValidatorPort {
     if (!httpish) {
       throw new AppException("INVALID_IMAGE_URL", "image_url must be http(s)", 422);
     }
-    rejectUnsafeHost(trimmed);
     HttpURLConnection conn = null;
     try {
+      rejectUnsafeHost(trimmed);
       conn = (HttpURLConnection) URI.create(trimmed).toURL().openConnection();
       conn.setInstanceFollowRedirects(false);
       conn.setConnectTimeout(3_000);
@@ -79,7 +79,7 @@ public class HttpBannerImageValidator implements BannerImageValidatorPort {
       throw new AppException("INVALID_IMAGE_URL", "image_url must be http(s)", 422);
     }
     String host = uri.getHost();
-    if (host == null || host.isBlank()) {
+    if (host == null) {
       throw new AppException("INVALID_IMAGE_URL", "image_url must be http(s)", 422);
     }
     String h = host.toLowerCase(Locale.ROOT);

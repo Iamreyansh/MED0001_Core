@@ -8,10 +8,10 @@ import com.nammamedmate.order.application.OrderPlacementService;
 import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
 import com.nammamedmate.payment.application.PaymentService;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
+import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
 import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
-import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.WalletPort;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -113,7 +113,8 @@ public class PaymentOrderBridgeConfig {
 
   @Bean
   @Primary
-  CustomerWalletPort customerWalletPort(WalletService walletService) {
+  CustomerWalletPort customerWalletPort(
+      WalletService walletService, FinancialLedgerWriterPort ledger) {
     return new CustomerWalletPort() {
       @Override
       public Map<String, Object> debit(
@@ -129,8 +130,11 @@ public class PaymentOrderBridgeConfig {
           String referenceId,
           String note,
           String idempotencyKey) {
-        return walletService.systemCredit(
-            customerId, amountPaise, note, referenceId, idempotencyKey, reason);
+        Map<String, Object> result =
+            walletService.systemCredit(
+                customerId, amountPaise, note, referenceId, idempotencyKey, reason);
+        appendWalletCreditLedger(ledger, customerId, amountPaise, reason, referenceId, result);
+        return result;
       }
 
       @Override
@@ -165,6 +169,35 @@ public class PaymentOrderBridgeConfig {
         return new TransactionsPage(txPage.data(), meta.total(), meta.page(), meta.limit());
       }
     };
+  }
+
+  private static void appendWalletCreditLedger(
+      FinancialLedgerWriterPort ledger,
+      UUID customerId,
+      long amountPaise,
+      String reason,
+      String referenceId,
+      Map<String, Object> result) {
+    if (ledger == null
+        || amountPaise <= 0
+        || Boolean.TRUE.equals(result.get("already_processed"))) {
+      return;
+    }
+    Object tx = result.get("transaction_id");
+    UUID txId =
+        tx instanceof UUID u ? u : tx != null ? UUID.fromString(tx.toString()) : UUID.randomUUID();
+    ledger.append(
+        "WALLET_CREDIT",
+        txId,
+        "WALLET",
+        amountPaise,
+        0L,
+        reason == null || reason.isBlank() ? "Wallet credit" : reason,
+        Map.of(
+            "customer_id",
+            customerId == null ? "" : customerId.toString(),
+            "reference_id",
+            referenceId == null ? "" : referenceId));
   }
 
   @Bean

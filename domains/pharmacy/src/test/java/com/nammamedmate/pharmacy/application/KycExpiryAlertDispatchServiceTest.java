@@ -53,5 +53,18 @@ class KycExpiryAlertDispatchServiceTest {
     assertThat(svc.dispatchDue()).isEqualTo(1);
     assertThat(store.all()).isNotEmpty();
     verify(jdbc).update(anyString(), any(), eq(alertId));
+
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Timestamp.class)))
+        .thenAnswer(
+            inv -> {
+              RowMapper<?> mapper = inv.getArgument(1);
+              ResultSet rs = mock(ResultSet.class);
+              when(rs.getObject("id")).thenReturn(alertId);
+              when(rs.getObject("document_id")).thenReturn(docId);
+              when(rs.getObject("pharmacy_id")).thenReturn(pharmacyId);
+              when(rs.getString("template")).thenReturn(null);
+              return List.of(mapper.mapRow(rs, 0));
+            });
+    assertThat(svc.dispatchDue()).isEqualTo(1);
   }
 }

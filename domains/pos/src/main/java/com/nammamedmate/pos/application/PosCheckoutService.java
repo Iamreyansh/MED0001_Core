@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -96,6 +97,34 @@ public class PosCheckoutService {
             .orElseThrow(() -> new AppException("CART_NOT_FOUND", "Cart not found", 404));
 
     Instant now = clock.instant();
+    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+      Optional<UUID> prior =
+          cartStore.findInvoiceByCheckoutIdempotency(principal.pharmacyId(), idempotencyKey);
+      if (prior.isPresent()) {
+        PosCart replay =
+            new PosCart(
+                cart.id(),
+                cart.pharmacyId(),
+                cart.staffId(),
+                cart.customerId(),
+                cart.customerName(),
+                cart.customerPhone(),
+                cart.prescribingDoctor(),
+                cart.discountType(),
+                cart.discountValue(),
+                cart.discountAmountPaise(),
+                cart.subtotalPaise(),
+                cart.gstTotalPaise(),
+                cart.grandTotalPaise(),
+                PosCartStatus.COMPLETED,
+                cart.expiresAt(),
+                prior.get(),
+                cart.appliedOfferId(),
+                cart.createdAt(),
+                now);
+        return replayCompleted(principal.pharmacyId(), replay, now);
+      }
+    }
     if (cart.status() == PosCartStatus.COMPLETED) {
       if (idempotencyKey != null && !idempotencyKey.isBlank() && cart.invoiceId() != null) {
         return replayCompleted(principal.pharmacyId(), cart, now);
@@ -280,6 +309,10 @@ public class PosCheckoutService {
     }
     invoiceStore.insertItems(invoiceItems);
     cartStore.markCompleted(cartId, invoiceId, now);
+    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+      cartStore.saveCheckoutIdempotency(
+          principal.pharmacyId(), idempotencyKey, cartId, invoiceId, now);
+    }
 
     if (cart.appliedOfferId() != null) {
       if (discount > 0) {

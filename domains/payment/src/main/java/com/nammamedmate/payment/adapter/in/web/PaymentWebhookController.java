@@ -63,7 +63,7 @@ public class PaymentWebhookController {
 
   private String eventId(byte[] rawBody) {
     try {
-      JsonNode root = objectMapper.readTree(rawBody == null ? new byte[0] : rawBody);
+      JsonNode root = objectMapper.readTree(rawBody);
       JsonNode id = root.get("id");
       return id == null || id.isNull() ? null : id.asText();
     } catch (Exception e) {

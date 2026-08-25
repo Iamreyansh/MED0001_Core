@@ -139,6 +139,31 @@ class JdbcPosStoresTest {
   }
 
   @Test
+  void checkoutIdempotencyLookupAndSave() throws Exception {
+    assertThat(cartStore.findInvoiceByCheckoutIdempotency(null, "k")).isEmpty();
+    assertThat(cartStore.findInvoiceByCheckoutIdempotency(pharmacy, null)).isEmpty();
+    assertThat(cartStore.findInvoiceByCheckoutIdempotency(pharmacy, "  ")).isEmpty();
+
+    UUID invoiceId = UUID.randomUUID();
+    when(jdbc.query(anyString(), any(RowMapper.class), eq(pharmacy), eq("key-1")))
+        .thenAnswer(
+            inv -> {
+              RowMapper<?> mapper = inv.getArgument(1);
+              ResultSet rs = mock(ResultSet.class);
+              when(rs.getObject("invoice_id")).thenReturn(invoiceId);
+              return List.of(mapper.mapRow(rs, 0));
+            });
+    assertThat(cartStore.findInvoiceByCheckoutIdempotency(pharmacy, "key-1")).contains(invoiceId);
+
+    cartStore.saveCheckoutIdempotency(null, "k", cartId, invoiceId, now);
+    cartStore.saveCheckoutIdempotency(pharmacy, null, cartId, invoiceId, now);
+    cartStore.saveCheckoutIdempotency(pharmacy, "  ", cartId, invoiceId, now);
+    cartStore.saveCheckoutIdempotency(pharmacy, "key-1", null, invoiceId, now);
+    cartStore.saveCheckoutIdempotency(pharmacy, "key-1", cartId, null, now);
+    cartStore.saveCheckoutIdempotency(pharmacy, "key-1", cartId, invoiceId, now);
+  }
+
+  @Test
   void invoiceStoreCrud() throws Exception {
     when(jdbc.query(anyString(), any(RowMapper.class), any()))
         .thenAnswer(

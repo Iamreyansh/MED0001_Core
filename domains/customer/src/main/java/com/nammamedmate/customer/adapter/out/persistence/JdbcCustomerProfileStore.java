@@ -323,6 +323,30 @@ public class JdbcCustomerProfileStore implements CustomerProfileStore {
         """,
         Timestamp.from(deletedAt),
         id);
+    jdbc.update(
+        """
+        UPDATE customers SET
+          preferred_language = 'en',
+          segment = NULL,
+          wallet_balance_paise = 0,
+          loyalty_points = 0,
+          total_orders = 0,
+          total_ltv_paise = 0,
+          cancel_rate = 0,
+          dispute_count = 0,
+          last_order_at = NULL
+        WHERE id = ?
+        """,
+        id);
+    jdbc.update(
+        """
+        UPDATE wallet_transaction SET
+          description = 'REDACTED',
+          reference_id = NULL
+        WHERE customer_id = ?
+        """,
+        id);
+    jdbc.update("DELETE FROM referral_events WHERE referee_id = ? OR referrer_id = ?", id, id);
   }
 
   static String escapeIlike(String raw) {

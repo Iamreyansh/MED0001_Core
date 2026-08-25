@@ -12,4 +12,6 @@ public interface RecipientIdentityPort {
   Optional<UUID> findCustomerIdByPhone(String phone);
 
   Optional<String> findPhoneByCustomerId(UUID customerId);
+
+  Optional<String> findPhoneByRiderId(UUID riderId);
 }

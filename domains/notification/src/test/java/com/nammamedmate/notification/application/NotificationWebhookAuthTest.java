@@ -89,7 +89,27 @@ class NotificationWebhookAuthTest {
     assertThatThrownBy(
             () -> NotificationWebhookAuth.validateVendorKeysForDeployedProfile("", "b", "c", "d"))
         .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "a", "replace_me", "c", "d"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "a", "b", "replace_me", "d"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "a", "b", "c", "replace_me"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateSecretsForDeployedProfile("live-sms", "replace_me"))
+        .isInstanceOf(IllegalStateException.class);
     assertThat(NotificationWebhookAuth.isPlaceholder("changeme")).isTrue();
     assertThat(NotificationWebhookAuth.isPlaceholder("ok")).isFalse();
+    assertThat(NotificationWebhookAuth.isPlaceholder(null)).isTrue();
   }
 }

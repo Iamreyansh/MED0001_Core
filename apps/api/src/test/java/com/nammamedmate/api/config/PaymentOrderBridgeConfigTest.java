@@ -113,7 +113,7 @@ class PaymentOrderBridgeConfigTest {
     when(wallets.listTransactionsForCustomer(customerId, 1, 20, null))
         .thenReturn(new TxPage(List.of(), PaginationMeta.of(1, 20, 0)));
 
-    CustomerWalletPort port = config.customerWalletPort(wallets);
+    CustomerWalletPort port = config.customerWalletPort(wallets, null);
     assertThat(port.debit(customerId, orderId, 100L, "k", "n"))
         .containsEntry("already_processed", false);
     assertThat(port.systemCredit(customerId, 200L, "REFUND", "ref", "note", "idem"))

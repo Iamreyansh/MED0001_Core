@@ -11,6 +11,7 @@ import com.nammamedmate.rider.application.port.out.DispatchOrderPort.OrderDetail
 import com.nammamedmate.rider.application.port.out.DistanceMatrixPort;
 import com.nammamedmate.rider.application.port.out.OrderAssignmentStore;
 import com.nammamedmate.rider.application.port.out.OrderAssignmentStore.AssignmentRecord;
+import com.nammamedmate.rider.application.port.out.OrderDeliveryConfirmPort;
 import com.nammamedmate.rider.application.port.out.PlatformPricingConfigStore;
 import com.nammamedmate.rider.application.port.out.RiderStore;
 import com.nammamedmate.rider.application.port.out.RiderTripEarningsStore;
@@ -53,6 +54,7 @@ public class RiderOrderService {
   private final PlatformPricingConfigStore pricingConfig;
   private final OutboxPublisher outbox;
   private final Clock clock;
+  private OrderDeliveryConfirmPort deliveryConfirm;
 
   public RiderOrderService(
       OrderAssignmentStore assignments,
@@ -101,6 +103,11 @@ public class RiderOrderService {
     this.pricingConfig = pricingConfig;
     this.outbox = outbox;
     this.clock = clock;
+  }
+
+  @Autowired(required = false)
+  public void setDeliveryConfirm(OrderDeliveryConfirmPort deliveryConfirm) {
+    this.deliveryConfirm = deliveryConfirm;
   }
 
   @Transactional(readOnly = true)
@@ -258,8 +265,8 @@ public class RiderOrderService {
     // payload).
     Map<String, Object> sms = new LinkedHashMap<>();
     sms.put("order_id", orderId.toString());
-    sms.put("customer_id", "unknown");
     sms.put("channel", "SMS");
+    sms.put("phone", order.customerPhone());
     sms.put("template", "delivery_otp");
     outbox.publish(DomainEvent.of("customer.notification.requested", "order", orderId, sms));
     Map<String, Object> data = new LinkedHashMap<>();
@@ -321,8 +328,12 @@ public class RiderOrderService {
             a.createdAt(),
             now);
     assignments.update(updated);
-    orders.advanceStatus(
-        orderId, "OUT_FOR_DELIVERY", "DELIVERED", "RIDER", riderId, "delivery_otp", now);
+    if (deliveryConfirm != null) {
+      deliveryConfirm.confirmDelivered(orderId, riderId, now);
+    } else {
+      orders.advanceStatus(
+          orderId, "OUT_FOR_DELIVERY", "DELIVERED", "RIDER", riderId, "delivery_otp", now);
+    }
     otpCache.decrConcurrent(riderId);
     otpCache.evict(orderId);
     int deliveryMinutes =

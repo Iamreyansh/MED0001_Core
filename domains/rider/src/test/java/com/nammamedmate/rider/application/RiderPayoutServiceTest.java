@@ -2,12 +2,19 @@ package com.nammamedmate.rider.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.messaging.ProviderOperationStore;
 import com.nammamedmate.rider.adapter.out.client.StubRazorpayRouteAdapter;
 import com.nammamedmate.rider.application.port.out.PlatformPricingConfigStore;
 import com.nammamedmate.rider.application.port.out.RiderPayoutStore;
@@ -398,6 +405,71 @@ class RiderPayoutServiceTest {
     assertThatThrownBy(() -> service.release(finance(), riderId, heldId, "no", "idem-cod"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("COD_UNRESOLVED");
+  }
+
+  @Test
+  void attemptDisburseUsesProviderOpsLedger() {
+    ProviderOperationStore ops = mock(ProviderOperationStore.class);
+    when(ops.find(eq("PAYOUT"), anyString())).thenReturn(Optional.empty());
+    RiderPayoutService withOps =
+        new RiderPayoutService(
+            riders,
+            earnings,
+            payouts,
+            razorpay,
+            cfg(),
+            new OutboxPublisher(outbox, new ObjectMapper()),
+            Clock.fixed(MONDAY_MORNING, ZoneOffset.UTC),
+            ops);
+    PayoutCycle.Window prev = PayoutCycle.previous(MONDAY_MORNING);
+    seedTrip(prev.from(), 15_000L, 0L, 0L);
+    withOps.computeWeeklyPayouts();
+    PayoutRecord released = payouts.byRider.values().iterator().next();
+    assertThat(released.status()).isEqualTo("RELEASED");
+    verify(ops).ensurePending(eq("PAYOUT"), anyString(), eq("razorpay"));
+    verify(ops).markSent(eq("PAYOUT"), anyString(), anyString());
+
+    payouts = new FakePayouts();
+    earnings = new FakeEarnings();
+    seedTrip(prev.from(), 18_000L, 0L, 0L);
+    when(ops.find(eq("PAYOUT"), anyString()))
+        .thenReturn(
+            Optional.of(
+                new ProviderOperationStore.Operation("PAYOUT", "k", "pout_replay", "SENT")));
+    razorpay.failNext(true);
+    RiderPayoutService replaySvc =
+        new RiderPayoutService(
+            riders,
+            earnings,
+            payouts,
+            razorpay,
+            cfg(),
+            new OutboxPublisher(outbox, new ObjectMapper()),
+            Clock.fixed(MONDAY_MORNING, ZoneOffset.UTC),
+            ops);
+    replaySvc.computeWeeklyPayouts();
+    PayoutRecord replayed = payouts.byRider.values().iterator().next();
+    assertThat(replayed.status()).isEqualTo("RELEASED");
+    assertThat(replayed.razorpayPayoutId()).isEqualTo("pout_replay");
+
+    payouts = new FakePayouts();
+    earnings = new FakeEarnings();
+    seedTrip(prev.from(), 20_000L, 0L, 0L);
+    when(ops.find(eq("PAYOUT"), anyString())).thenReturn(Optional.empty());
+    razorpay.failNext(true);
+    RiderPayoutService failSvc =
+        new RiderPayoutService(
+            riders,
+            earnings,
+            payouts,
+            razorpay,
+            cfg(),
+            new OutboxPublisher(outbox, new ObjectMapper()),
+            Clock.fixed(MONDAY_MORNING, ZoneOffset.UTC),
+            ops);
+    failSvc.computeWeeklyPayouts();
+    assertThat(payouts.byRider.values().iterator().next().status()).isEqualTo("PENDING");
+    verify(ops, never()).markSent(eq("PAYOUT"), eq("unused"), anyString());
   }
 
   private void seedTrip(LocalDate date, long base, long tip, long incentive) {

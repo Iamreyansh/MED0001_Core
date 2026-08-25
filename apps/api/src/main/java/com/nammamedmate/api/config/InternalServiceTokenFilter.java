@@ -37,7 +37,8 @@ final class InternalServiceTokenFilter extends OncePerRequestFilter {
         || !MessageDigest.isEqual(
             expectedToken.getBytes(StandardCharsets.UTF_8),
             token.getBytes(StandardCharsets.UTF_8))) {
-      response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or missing X-Internal-Token");
+      response.sendError(
+          HttpServletResponse.SC_UNAUTHORIZED, "Invalid or missing X-Internal-Token");
       return;
     }
     filterChain.doFilter(request, response);

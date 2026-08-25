@@ -31,6 +31,11 @@ class WalletServiceTest {
   private static final Instant NOW = Instant.parse("2026-07-26T02:00:00Z");
   private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
+  private static com.nammamedmate.customer.application.port.out.WalletCreditLimitPort creditLimit(
+      long paise) {
+    return () -> paise;
+  }
+
   private FakeWalletStore wallets;
   private FakeCustomerProfileStore profiles;
   private InMemoryRateLimiter rateLimiter;
@@ -44,7 +49,7 @@ class WalletServiceTest {
     wallets = new FakeWalletStore();
     profiles = new FakeCustomerProfileStore();
     rateLimiter = new InMemoryRateLimiter(CLOCK);
-    service = new WalletService(wallets, profiles, rateLimiter, CLOCK, 100_000L);
+    service = new WalletService(wallets, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     customerId = Ids.newId();
     profiles.saveProfile(CustomerTestFixtures.customer(customerId));
     customer = new MedmatePrincipal(customerId, AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
@@ -281,7 +286,8 @@ class WalletServiceTest {
   @Test
   void rateLimited_getWallet() {
     InMemoryRateLimiter tight = new InMemoryRateLimiter(CLOCK);
-    WalletService limited = new WalletService(wallets, profiles, tight, CLOCK, 100_000L);
+    WalletService limited =
+        new WalletService(wallets, profiles, tight, CLOCK, creditLimit(100_000L));
     for (int i = 0; i < 30; i++) {
       limited.getMyWallet(customer);
     }
@@ -437,7 +443,8 @@ class WalletServiceTest {
             throw new IllegalStateException("duplicate");
           }
         };
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     MedmatePrincipal otherPrincipal =
         new MedmatePrincipal(other, AuthRole.CUSTOMER, null, TokenScope.FULL, "j2");
     assertThat(racingService.getMyWallet(otherPrincipal).get("wallet_id")).isEqualTo(existingId);
@@ -458,7 +465,8 @@ class WalletServiceTest {
             throw new IllegalStateException("duplicate");
           }
         };
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     MedmatePrincipal otherPrincipal =
         new MedmatePrincipal(other, AuthRole.CUSTOMER, null, TokenScope.FULL, "j2");
     assertThatThrownBy(() -> racingService.getMyWallet(otherPrincipal))
@@ -571,7 +579,8 @@ class WalletServiceTest {
           }
         };
     racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     Map<String, Object> result =
         racingService.adminCredit(
             financeAdmin,
@@ -617,7 +626,8 @@ class WalletServiceTest {
           }
         };
     racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     Map<String, Object> result =
         racingService.adminCredit(
             financeAdmin,
@@ -637,7 +647,8 @@ class WalletServiceTest {
           }
         };
     racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     assertThatThrownBy(
             () ->
                 racingService.adminCredit(
@@ -682,7 +693,8 @@ class WalletServiceTest {
           }
         };
     flaky.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
-    WalletService flakyService = new WalletService(flaky, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService flakyService =
+        new WalletService(flaky, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     assertThat(flakyService.expireCredits()).isZero();
   }
 
@@ -723,7 +735,8 @@ class WalletServiceTest {
             NOW,
             NOW),
         0);
-    WalletService flakyService = new WalletService(flaky, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService flakyService =
+        new WalletService(flaky, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     assertThatThrownBy(() -> flakyService.debitForOrder(customerId, Ids.newId(), 500L, "x"))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("INSUFFICIENT_WALLET_BALANCE");
@@ -968,7 +981,8 @@ class WalletServiceTest {
           }
         };
     racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     assertThat(racingService.systemCredit(customerId, 100L, null, null, idem).get("reason"))
         .isEqualTo("REFERRAL");
   }
@@ -1017,7 +1031,8 @@ class WalletServiceTest {
           }
         };
     racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     assertThat(racingService.systemCredit(customerId, 500L, "x", null, idem).get("transaction_id"))
         .isEqualTo(existing.id());
   }
@@ -1032,7 +1047,8 @@ class WalletServiceTest {
           }
         };
     racing.insertWallet(wallets.findByCustomerId(customerId).orElseThrow());
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     assertThatThrownBy(() -> racingService.systemCredit(customerId, 100L, "x", null, "sys-miss"))
         .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
   }
@@ -1222,7 +1238,7 @@ class WalletServiceTest {
           }
         };
     WalletService createService =
-        new WalletService(emptyLock, profiles, rateLimiter, CLOCK, 100_000L);
+        new WalletService(emptyLock, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     assertThatThrownBy(() -> createService.debitStrict(fresh, Ids.newId(), 100, "cw", "n"))
         .extracting(ex -> ((AppException) ex).code())
         .isIn("INSUFFICIENT_BALANCE", "INSUFFICIENT_WALLET_BALANCE");
@@ -1258,7 +1274,8 @@ class WalletServiceTest {
           }
         };
     racing.insertWallet(wallet);
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     Map<String, Object> replay =
         racingService.debitStrict(customerId, Ids.newId(), 100L, idem, "x");
     assertThat(replay.get("already_processed")).isEqualTo(true);
@@ -1292,7 +1309,8 @@ class WalletServiceTest {
             NOW));
     flaky.updateWallet(
         new WalletRecord(wallet.id(), customerId, 5_000L, 5_000L, 0, 1, NOW, NOW), 0);
-    WalletService flakyService = new WalletService(flaky, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService flakyService =
+        new WalletService(flaky, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     Map<String, Object> dup = flakyService.debitStrict(customerId, Ids.newId(), 100L, idem, "  ");
     assertThat(dup.get("already_processed")).isEqualTo(true);
   }
@@ -1328,7 +1346,8 @@ class WalletServiceTest {
             NOW));
     racing.updateWallet(
         new WalletRecord(wallet.id(), customerId, 5_000L, 5_000L, 0, 1, NOW, NOW), 0);
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     assertThatThrownBy(() -> racingService.debitStrict(customerId, Ids.newId(), 100L, "miss", "x"))
         .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
   }
@@ -1394,7 +1413,8 @@ class WalletServiceTest {
           }
         };
     racing.insertWallet(wallet);
-    WalletService racingService = new WalletService(racing, profiles, rateLimiter, CLOCK, 100_000L);
+    WalletService racingService =
+        new WalletService(racing, profiles, rateLimiter, CLOCK, creditLimit(100_000L));
     Map<String, Object> result =
         racingService.systemCredit(customerId, 200L, "n", null, idem, "REFUND");
     assertThat(result.get("transaction_id")).isEqualTo(existing.id());

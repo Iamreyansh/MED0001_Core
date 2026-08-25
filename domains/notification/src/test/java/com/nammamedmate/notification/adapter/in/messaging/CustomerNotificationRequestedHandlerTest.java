@@ -334,4 +334,42 @@ class CustomerNotificationRequestedHandlerTest {
     verify(whatsapp, org.mockito.Mockito.atLeastOnce())
         .send(any(WhatsAppSendService.SendCommand.class));
   }
+
+  @Test
+  void riderNotificationResolvesPhoneAndRecipientIds() {
+    UUID rider = UUID.fromString("d0000001-0000-4000-8000-00000000000d");
+    when(identities.findPhoneByRiderId(rider)).thenReturn(Optional.of("+919800011122"));
+    handler.handlePayload(
+        "rider.notification.assignment",
+        Map.of(
+            "rider_id",
+            rider.toString(),
+            "message",
+            "New drop",
+            "channel",
+            "SMS",
+            "template",
+            "rider_assign"));
+    verify(sms).send(any(SmsSendService.SendCommand.class));
+
+    when(identities.findPhoneByRiderId(rider)).thenReturn(Optional.empty());
+    handler.handlePayload(
+        Map.of("channel", "SMS", "rider_id", rider.toString(), "template", "rider_assign"));
+
+    handler.handlePayload(
+        Map.of("channel", "PUSH", "rider_id", rider.toString(), "title", "Go", "body", "Now"));
+    handler.handlePayload(
+        Map.of(
+            "channel",
+            "PUSH",
+            "rider_id",
+            rider.toString(),
+            "recipient_ids",
+            List.of(rider.toString()),
+            "title",
+            "Dup rider",
+            "body",
+            "Ids"));
+    verify(push, org.mockito.Mockito.atLeastOnce()).send(any(PushSendService.SendCommand.class));
+  }
 }

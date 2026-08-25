@@ -60,13 +60,16 @@ public class HealthController {
       data.put("outbox", "DEGRADED");
       degraded = true;
     }
-    if (redis != null && redis.getIfAvailable() != null) {
-      try (var connection = redis.getIfAvailable().getConnection()) {
-        connection.ping();
-        data.put("redis", "UP");
-      } catch (RuntimeException ex) {
-        data.put("redis", "DEGRADED");
-        degraded = true;
+    if (redis != null) {
+      RedisConnectionFactory factory = redis.getIfAvailable();
+      if (factory != null) {
+        try (var connection = factory.getConnection()) {
+          connection.ping();
+          data.put("redis", "UP");
+        } catch (RuntimeException ex) {
+          data.put("redis", "DEGRADED");
+          degraded = true;
+        }
       }
     }
     data.put("status", degraded ? "DEGRADED" : "UP");

@@ -344,6 +344,137 @@ class CouponServiceTest {
 
     when(store.highBurnCouponsForDay(any())).thenReturn(List.of());
     service.sendDailyBudgetBurnDigest();
+
+    Coupon capped =
+        new Coupon(
+            flat50().id(),
+            "FLAT50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            39900,
+            5000L,
+            2500000000L,
+            0,
+            1,
+            1,
+            100,
+            List.of(),
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "flat",
+            "terms",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("FLAT50")).thenReturn(Optional.of(capped));
+    when(store.countRedemptions(capped.id())).thenReturn(1L);
+    assertThat(
+            service
+                .validate(
+                    customer,
+                    new CouponService.ValidateCommand("FLAT50", 500, CUST, true, true, null))
+                .get("error_code"))
+        .isEqualTo("COUPON_MAX_REDEMPTIONS");
+    assertThatThrownBy(() -> service.applyForCart("FLAT50", 40_000, CUST, true, false))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_MAX_REDEMPTIONS");
+    assertThatThrownBy(
+            () -> service.recordRedemption("FLAT50", UUID.randomUUID(), CUST, 5_000, 40_000))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_MAX_REDEMPTIONS");
+
+    Coupon underCap =
+        new Coupon(
+            flat50().id(),
+            "FLAT50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            39900,
+            5000L,
+            2500000000L,
+            0,
+            0,
+            5,
+            100,
+            List.of(),
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "flat",
+            "terms",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("FLAT50")).thenReturn(Optional.of(underCap));
+    when(store.countRedemptions(underCap.id())).thenReturn(1L);
+    assertThat(
+            service
+                .validate(
+                    customer,
+                    new CouponService.ValidateCommand("FLAT50", 500, CUST, true, true, null))
+                .get("valid"))
+        .isEqualTo(true);
+    assertThat(service.applyForCart("FLAT50", 40_000, CUST, true, false).code())
+        .isEqualTo("FLAT50");
+    service.recordRedemption("FLAT50", UUID.randomUUID(), CUST, 5_000, 40_000);
+
+    when(store.findByCode("GONE")).thenReturn(Optional.empty());
+    assertThatThrownBy(
+            () -> service.recordRedemption("GONE", UUID.randomUUID(), CUST, 5_000, 40_000))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_NOT_FOUND");
+
+    Coupon zeroCap =
+        new Coupon(
+            flat50().id(),
+            "FLAT50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            39900,
+            5000L,
+            2500000000L,
+            0,
+            0,
+            0,
+            100,
+            List.of(),
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "flat",
+            "terms",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("FLAT50")).thenReturn(Optional.of(zeroCap));
+    assertThat(
+            service
+                .validate(
+                    customer,
+                    new CouponService.ValidateCommand("FLAT50", 500, CUST, true, true, null))
+                .get("valid"))
+        .isEqualTo(true);
+    assertThat(service.applyForCart("FLAT50", 40_000, CUST, true, false).code())
+        .isEqualTo("FLAT50");
+    service.recordRedemption("FLAT50", UUID.randomUUID(), CUST, 5_000, 40_000);
+  }
+
+  @Test
+  void findByCodeForUpdateDefaultDelegates() {
+    CouponStore defaults =
+        org.mockito.Mockito.mock(CouponStore.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+    when(defaults.findByCode("X")).thenReturn(Optional.empty());
+    assertThat(defaults.findByCodeForUpdate("X")).isEmpty();
   }
 
   @Test

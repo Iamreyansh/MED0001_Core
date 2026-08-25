@@ -34,6 +34,12 @@ class AdminPasswordResetCompleteServiceTest {
     assertThatThrownBy(() -> service.complete(null, "Passw0rd!"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.complete("  ", "Passw0rd!"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.complete("tok", null))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
     assertThatThrownBy(() -> service.complete("tok", "short"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
@@ -70,6 +76,10 @@ class AdminPasswordResetCompleteServiceTest {
                     Timestamp.from(NOW.plusSeconds(3600)))));
     when(jdbc.update(anyString(), any(), any(), eq(id), any())).thenReturn(1);
     assertThat(service.complete("tok", "Passw0rd!").get("status")).isEqualTo("ACTIVE");
+
+    when(jdbc.queryForList(anyString(), any(Object.class)))
+        .thenReturn(List.of(Map.of("id", id, "email", "ops@test.in")));
+    assertThat(service.complete("tok", "Passw0rd!").get("email")).isEqualTo("ops@test.in");
 
     when(jdbc.update(anyString(), any(), any(), eq(id), any())).thenReturn(0);
     assertThatThrownBy(() -> service.complete("tok", "Passw0rd!"))

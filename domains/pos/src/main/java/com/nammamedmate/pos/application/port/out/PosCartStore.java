@@ -44,6 +44,11 @@ public interface PosCartStore {
 
   void markCompleted(UUID cartId, UUID invoiceId, Instant updatedAt);
 
+  Optional<UUID> findInvoiceByCheckoutIdempotency(UUID pharmacyId, String idempotencyKey);
+
+  void saveCheckoutIdempotency(
+      UUID pharmacyId, String idempotencyKey, UUID cartId, UUID invoiceId, Instant createdAt);
+
   int abandonExpired(Instant now);
 
   void attachCustomer(

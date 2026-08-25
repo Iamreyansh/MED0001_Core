@@ -12,7 +12,7 @@ before-I/O, internal token injection, SSRF, PII wipe, FEFO fail-closed, OCR/
 CRM fail-closed, and launch-scope gates are in this tree. Tracker
 `production-ready` stays 0 until production evidence is retained.
 
-**Audit date:** 2026-08-22 (integration re-audit)
+**Audit date:** 2026-08-26 (integration remediation pass)
 **Scope:** All 154 requirement files, 22 epics / 129 stories, composition roots,
 schema, infra (static), security, reliability, and local release gates.
 **Baseline:** Working tree at start of production-integration remediations.
@@ -47,6 +47,7 @@ RTO ≤60 min.
 | D18 | Teleconsult ops endpoints expose decrypted patient phone with audit logging | Product (2026-08-22) |
 | D19 | Coupon eligibility is identical at validate, cart apply, and placement | Product (2026-08-22) |
 | D20 | Dispute refunds use `RefundService.issueManual` for the approved amount | Finance (2026-08-22) |
+| D21 | Core flows must work at launch; only optional external integrations (DigiLocker, live gov APIs, IRN/GSP, Zoho/Tally, advanced Maps directions, OCR automation) may remain fail-closed | Product (2026-08-26) |
 
 ---
 
@@ -79,7 +80,7 @@ Status values: `open` · `in_progress` · `resolved` · `accepted ceiling` · `d
 | X10 | EPIC-012 | high | Payment idempotency | Unique key exists; initiate generates key if missing | **resolved** | D3 | Persist provider identity before I/O | Replay initiate returns same payment |
 | X11 | EPIC-019 | high | Event-driven rules | Trigger consumer + JDBC dedup exist; most actions are outbox no-ops | **accepted ceiling** | intentional | Keep seeds INACTIVE until typed consumers | Outbox trigger evaluates stored rules; seeds stay off |
 | X12 | EPIC-020 | blocker | Real SLO metrics | Fake P99 returns 0; auto-remediate false on deploy profiles | **resolved** | defect | Real latency source; disable fake self-heal | Metrics sourced from orders/payments/ALB |
-| X13 | Infra | high | Health reflects deps | `HealthController` SELECT 1 only | **open** | defect | Health includes Redis/SQS/outbox age | Health DOWN without DB; degraded without queue |
+| X13 | Infra | high | Health reflects deps | `HealthController` Redis + outbox age | **resolved** | defect | Health includes Redis/outbox age | Health DEGRADED when outbox stale |
 | X14 | EPIC-015 / 012 | high | Support refunds | `RefundService.issueManual` wired | **resolved** | D20 | — | Approve ₹100 dispute refunds ₹100 |
 | X15 | EPIC-008 | high | Order → Rx queue | Placement enqueues queue | **resolved** | D5 | Sync `prescription.status` on queue actions | Place Rx order creates queue row |
 | X16 | EPIC-005 / 010 | high | Price ceiling | `JdbcPriceCeilingAdapter` at place | **resolved** | Enforce | — | Placement returns `PRICE_CEILING_VIOLATED` |
@@ -89,8 +90,8 @@ Status values: `open` · `in_progress` · `resolved` · `accepted ceiling` · `d
 | X20 | EPIC-021 | high | Admin invite complete | `POST /auth/admin/complete-invite` exists | **resolved** | Wire email + auth | Password-reset consume still open (R21) | Invite token sets password and activates |
 | X21 | EPIC-011 | high | Maps + SSE | Maps fallback + in-memory SSE | **accepted ceiling** | intentional | Redis pub/sub later | Documented single-instance SSE |
 | X22 | Schema | high | FKs + append-only | V128–V130 constraints | **resolved** | Add constraints | — | Illegal UPDATE fails |
-| X23 | Security | high | Named audit actors | Middleware names staff; pharmacy/catalogue writers use `unknown` | **open** | defect | Resolve actor from `admin_staff` | Audit `actor_name` is staff name |
-| X24 | Security | high | Deletion wipes PII | Addresses + payment methods redacted; Rx/consult/schedule/support remain | **open** | defect | Transactional pseudonymize remaining PII | Addresses/Rx/consult PII wiped or unlinked |
+| X23 | Security | high | Named audit actors | Middleware names staff; pharmacy/catalogue writers use `unknown` | **resolved** | defect | Resolve actor from `admin_staff`/`pharmacy_staff` | Audit `actor_name` is staff name |
+| X24 | Security | high | Deletion wipes PII | Addresses + payment methods redacted; Rx/consult/schedule/support remain | **resolved** | defect | Transactional pseudonymize remaining PII | Addresses/Rx/consult PII wiped or unlinked |
 | X25 | Tests | blocker | AC + Bruno gates | `acceptance-ac-gate.py` + `bruno-run` + Trivy; verified still false until staging | **resolved** | defect | Execute Bruno + AC evidence mapping | Bruno + matrix fail CI when unverified launch ACs exist |
 | X26 | EPIC-001 | high | OTP SMS | `Msg91OtpSmsSender` HTTP on deployed profiles | **accepted ceiling** | deploy-stage | Live handset proof | Deployed profile requires MSG91 key |
 | X27 | EPIC-003 | high | D8 never activate | `activateAfterAutoKyc` is no-op (D8) | **resolved** | D8 | Delete dead activation helpers | All-PASS verify leaves pharmacy PENDING_KYC |
@@ -106,13 +107,13 @@ Status values: `open` · `in_progress` · `resolved` · `accepted ceiling` · `d
 | R7 | EPIC-007 / 006 | high | Stock races | `tryDeductQuantity` WHERE qty >= ? | **resolved** | defect | `UPDATE … WHERE qty >= ?` | Concurrent last unit fails second writer |
 | R8 | EPIC-010 | high | D10 no-rider | Code auto-cancels (matches D10); STORY-005 AC said alert-only | **resolved** | D10 | Matrix AC updated to D10 | 30m no-rider → cancel + refund |
 | R9 | EPIC-002 | high | Payment-method guard | orders.saved_payment_method_id + guard | **resolved** | defect | `orders.saved_payment_method_id` | Delete blocked only for in-use method |
-| R10 | EPIC-012 | high | Ledger holes | Checkout `debitForOrder` and order refunds skip ledger; legacy payout paths skip ledger | **open** | defect | Write ledger at source; retire legacy | Wallet debit/refund appear in ledger |
-| R11 | EPIC-017 | blocker | Live delivery | `HttpVendorClients` skeletal; producers omit templates; rider/admin paging drop | **open** | defect | Real payloads + templates + recipient types | Staging handset/inbox proof |
-| R12 | EPIC-011 | high | Rider notify + assign | `rider.notification.*` no-op; `auto_assign_rider` has no consumer | **open** | defect | Route rider notify; worker assign consumer | Assign + payout SMS delivered |
+| R10 | EPIC-012 | high | Ledger holes | Checkout `debitForOrder` and order refunds skip ledger; legacy payout paths skip ledger | **resolved** | defect | Write ledger at source; retire legacy | Wallet debit/refund appear in ledger |
+| R11 | EPIC-017 | blocker | Live delivery | `HttpVendorClients` skeletal; producers omit templates; rider/admin paging drop | **in_progress** | defect | Real payloads + templates + recipient types | Staging handset/inbox proof |
+| R12 | EPIC-010/011 | blocker | Rider deliver → order.delivered | Rider JDBC bypass skipped invoice/loyalty/campaign | **resolved** | defect | `OrderDeliveryConfirmPort` → `OrderLifecycleService` | Rider deliver publishes `order.delivered` once |
 | R13 | EPIC-008 | high | Stub OCR / schedule / POS | FailClosed OCR; catalogue+stock bridges; exports still local | **accepted ceiling** | defect / deferred | Wire catalogue + stock; fail-closed OCR in prod; S3 export | No invented doctors; H1/X from master |
 | R14 | EPIC-009 | high | NOW queue + D18 | FIFO NOW drain in assignDueScheduled; D18 audit log on queue | **resolved** | defect | FIFO NOW drain + encrypt + audit | Doctor available → queued NOW assigned |
-| R15 | EPIC-016 / 021 | high | Config / finance RBAC | Platform config unused at runtime; finance denied analytics HTTP | **open** | defect | Config port + D16 security | PATCH config affects wallet cap; finance reads overview |
-| R16 | EPIC-004 | high | Directory metrics | `pharmacy_directory_metrics` never written; orders `status=ALL` SQL | **open** | defect | Nightly UPSERT + treat ALL as no filter | Directory GMV/orders non-zero |
+| R15 | EPIC-016 / 021 | high | Config / finance RBAC | Platform config unused at runtime; finance denied analytics HTTP | **resolved** | defect | Config port + D16 security | PATCH config affects wallet cap; finance reads overview |
+| R16 | EPIC-004 | high | Directory metrics | `pharmacy_directory_metrics` never written; orders `status=ALL` SQL | **resolved** | defect | Nightly UPSERT + treat ALL as no filter | Directory GMV/orders non-zero |
 | R17 | Marketing | high | Banner SSRF | Resolve-and-reject non-public; no redirect follow | **resolved** | defect | Resolve-and-reject non-public | Private IP URL rejected |
 | R18 | EPIC-014 | deferred | CRM charging | Stub `SubscriptionPaymentPort`; seat usage hardcoded 0 | **deferred** | launch-scope | Disable paid subscribe until live | FREE bootstrap still works |
 | R19 | EPIC-019 / 020 | deferred | Self-heal / seeds | Remediation stubs; most automation actions no-op | **deferred** | launch-scope | Seeds INACTIVE; playbooks operator-only | No fake self-heal in prod |

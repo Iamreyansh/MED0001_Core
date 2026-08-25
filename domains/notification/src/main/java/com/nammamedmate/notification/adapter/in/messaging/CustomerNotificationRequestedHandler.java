@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -234,6 +235,13 @@ public class CustomerNotificationRequestedHandler {
     if (phone != null) {
       return phone;
     }
+    UUID riderId = parseUuid(payload.get("rider_id"));
+    if (identities != null && riderId != null) {
+      Optional<String> riderPhone = identities.findPhoneByRiderId(riderId);
+      if (riderPhone.isPresent()) {
+        return riderPhone.get();
+      }
+    }
     UUID customerId = parseUuid(payload.get("customer_id"));
     if (identities == null || customerId == null) {
       return null;
@@ -268,6 +276,10 @@ public class CustomerNotificationRequestedHandler {
       payload.putIfAbsent("title", "Incident");
       String incidentBody = first(payload, "severity", "message");
       payload.putIfAbsent("body", incidentBody == null ? "Incident update" : incidentBody);
+    } else if (type.startsWith("rider.notification.")) {
+      payload.putIfAbsent("recipient_type", "RIDER");
+      payload.putIfAbsent("title", "Rider update");
+      payload.putIfAbsent("body", first(payload, "message", "alert", "template"));
     }
   }
 
@@ -317,6 +329,10 @@ public class CustomerNotificationRequestedHandler {
     UUID pharmacyId = parseUuid(payload.get("pharmacy_id"));
     if (pharmacyId != null && !ids.contains(pharmacyId)) {
       ids.add(pharmacyId);
+    }
+    UUID riderId = parseUuid(payload.get("rider_id"));
+    if (riderId != null && !ids.contains(riderId)) {
+      ids.add(riderId);
     }
     return ids;
   }

@@ -49,4 +49,21 @@ public class JdbcRecipientIdentityPort implements RecipientIdentityPort {
             customerId);
     return rows.stream().findFirst();
   }
+
+  @Override
+  public Optional<String> findPhoneByRiderId(UUID riderId) {
+    if (riderId == null) {
+      return Optional.empty();
+    }
+    List<String> rows =
+        jdbc.query(
+            """
+            SELECT phone FROM riders
+            WHERE id = ? AND deleted_at IS NULL
+            LIMIT 1
+            """,
+            (rs, i) -> rs.getString("phone"),
+            riderId);
+    return rows.stream().findFirst();
+  }
 }

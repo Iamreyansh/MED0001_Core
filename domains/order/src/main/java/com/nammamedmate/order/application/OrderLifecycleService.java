@@ -242,6 +242,31 @@ public class OrderLifecycleService {
     return data;
   }
 
+  /** Canonical rider delivery — invoice (D12), order.delivered outbox, side effects once. */
+  @Transactional
+  public void confirmRiderDelivery(UUID orderId, UUID riderId, Instant now) {
+    if (orderId == null) {
+      throw new AppException("ORDER_NOT_FOUND", "Order not found", 404);
+    }
+    if (riderId == null) {
+      throw new AppException("VALIDATION_ERROR", "rider_id is required", 400);
+    }
+    Order order =
+        orders
+            .findById(orderId)
+            .orElseThrow(() -> new AppException("ORDER_NOT_FOUND", "Order not found", 404));
+    if (order.status() != OrderStatus.OUT_FOR_DELIVERY) {
+      throw new AppException(
+          "ORDER_NOT_OUT_FOR_DELIVERY", "Order not in OUT_FOR_DELIVERY state", 409);
+    }
+    if (order.riderId() != null && !order.riderId().equals(riderId)) {
+      throw new AppException("RIDER_MISMATCH", "Order assigned to another rider", 409);
+    }
+    OrderStatus from = order.status();
+    applyTransition(
+        order, from, OrderStatus.DELIVERED, ActorType.RIDER, riderId, "delivery_otp", now);
+  }
+
   @Transactional
   public Map<String, Object> adminForceStatus(
       MedmatePrincipal principal, UUID orderId, String statusRaw, String reason, String notes) {

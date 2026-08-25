@@ -29,6 +29,13 @@ class InternalServiceTokenFilterTest {
     assertThat(InternalServiceTokenFilter.requiresToken("/api/v1/wallet/credit")).isTrue();
     assertThat(InternalServiceTokenFilter.requiresToken("/api/v1/internal/kyc/x")).isTrue();
     assertThat(InternalServiceTokenFilter.requiresToken(null)).isFalse();
+    assertThat(InternalServiceTokenFilter.requiresToken("")).isFalse();
+    assertThat(InternalServiceTokenFilter.requiresToken("  ")).isFalse();
+
+    InternalServiceTokenFilter nullToken = new InternalServiceTokenFilter(null);
+    when(req.getRequestURI()).thenReturn(null);
+    nullToken.doFilter(req, res, chain);
+    verify(chain, org.mockito.Mockito.times(3)).doFilter(req, res);
   }
 
   @Test
@@ -45,8 +52,7 @@ class InternalServiceTokenFilterTest {
 
     when(req.getHeader("X-Internal-Token")).thenReturn("nope");
     filter.doFilter(req, res, chain);
-    verify(res, org.mockito.Mockito.times(2))
-        .sendError(401, "Invalid or missing X-Internal-Token");
+    verify(res, org.mockito.Mockito.times(2)).sendError(401, "Invalid or missing X-Internal-Token");
   }
 
   @Test

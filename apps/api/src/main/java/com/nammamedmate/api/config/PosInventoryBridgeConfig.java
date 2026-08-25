@@ -62,8 +62,7 @@ public class PosInventoryBridgeConfig {
       ProductBatch after =
           batches
               .tryDeductQuantity(batchId, quantity, now)
-              .orElseThrow(
-                  () -> new AppException("INSUFFICIENT_STOCK", "Stock depleted", 400));
+              .orElseThrow(() -> new AppException("INSUFFICIENT_STOCK", "Stock depleted", 400));
       batches.insertStockMovement(
           UUID.randomUUID(),
           pharmacyId,

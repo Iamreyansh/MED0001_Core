@@ -176,6 +176,44 @@ class RiderOrderServiceTest {
         .isEqualTo("INVALID_DELIVERY_OTP");
   }
 
+  @Test
+  void deliverUsesCanonicalConfirmPort() {
+    java.util.concurrent.atomic.AtomicBoolean confirmed =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    service.setDeliveryConfirm((oid, rid, at) -> confirmed.set(true));
+    service.accept(rider(), orderId);
+    service.pickupConfirm(rider(), orderId, pickupOtp);
+    Map<String, Object> result = service.deliver(rider(), orderId, deliveryOtp);
+    assertThat(result.get("order_status")).isEqualTo("DELIVERED");
+    assertThat(confirmed).isTrue();
+  }
+
+  @Test
+  void currentAcceptDeliverWhenAssignmentOrOrderMissing() {
+    assertThatThrownBy(
+            () ->
+                service.current(
+                    new MedmatePrincipal(Ids.newId(), AuthRole.RIDER, null, TokenScope.FULL, "j")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+
+    orders.byId.clear();
+    assertThatThrownBy(() -> service.current(rider()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+    assertThatThrownBy(() -> service.accept(rider(), orderId))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+
+    orders.put(order(orderId, "READY_FOR_PICKUP", riderId));
+    service.accept(rider(), orderId);
+    service.pickupConfirm(rider(), orderId, pickupOtp);
+    orders.byId.clear();
+    assertThatThrownBy(() -> service.deliver(rider(), orderId, deliveryOtp))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+  }
+
   private MedmatePrincipal rider() {
     return new MedmatePrincipal(riderId, AuthRole.RIDER, null, TokenScope.FULL, "j");
   }

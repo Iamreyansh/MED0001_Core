@@ -117,6 +117,16 @@ class OutboxTest {
     verify(jdbc).update(anyString(), eq("boom"), eq(message.id()));
     store.markPoisoned(message, null);
     verify(jdbc).update(anyString(), eq("poisoned"), eq(message.id()));
+    store.markPoisoned(message, "dead");
+    verify(jdbc).update(anyString(), eq("dead"), eq(message.id()));
+    when(jdbc.update(anyString(), any(), any(), anyInt())).thenReturn(1);
+    store.markFailed(message, "maxed");
+    InMemoryOutboxStore mem = new InMemoryOutboxStore();
+    OutboxMessage pending = OutboxMessage.pending("t", "{}");
+    mem.append(pending);
+    mem.markPoisoned(pending, "default");
+    assertThat(new ProviderOperationStore.Operation("X", "k", null, "PENDING").hasProviderRef())
+        .isFalse();
   }
 
   @Test
@@ -133,41 +143,71 @@ class OutboxTest {
 
   @Test
   void consumerInboxAndProviderOpsCoverBranches() {
-    JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    JdbcConsumerInbox inbox = new JdbcConsumerInbox(jdbc);
-    when(jdbc.queryForObject(anyString(), eq(Integer.class), any(), any())).thenReturn(1, 0);
+    JdbcTemplate inboxJdbc = mock(JdbcTemplate.class);
+    JdbcConsumerInbox inbox = new JdbcConsumerInbox(inboxJdbc);
+    when(inboxJdbc.queryForObject(anyString(), eq(Integer.class), any(), any())).thenReturn(1, 0);
     assertThat(inbox.alreadyProcessed("c", UUID.randomUUID())).isTrue();
     assertThat(inbox.alreadyProcessed("c", UUID.randomUUID())).isFalse();
     assertThat(inbox.alreadyProcessed(" ", UUID.randomUUID())).isFalse();
     assertThat(inbox.alreadyProcessed(null, UUID.randomUUID())).isFalse();
     assertThat(inbox.alreadyProcessed("c", null)).isFalse();
+    when(inboxJdbc.queryForObject(anyString(), eq(Integer.class), any(), any())).thenReturn(null);
+    assertThat(inbox.alreadyProcessed("c", UUID.randomUUID())).isFalse();
+    when(inboxJdbc.update(anyString(), any(Object[].class)))
+        .thenReturn(1)
+        .thenThrow(new org.springframework.dao.DuplicateKeyException("dup"));
+    assertThat(inbox.claim("c", UUID.randomUUID())).isTrue();
+    assertThat(inbox.claim("c", UUID.randomUUID())).isFalse();
     assertThat(inbox.claim(" ", UUID.randomUUID())).isFalse();
     assertThat(inbox.claim(null, UUID.randomUUID())).isFalse();
     assertThat(inbox.claim("c", null)).isFalse();
 
-    JdbcWebhookInbox hooks = new JdbcWebhookInbox(jdbc);
-    when(jdbc.queryForObject(anyString(), eq(Integer.class), any(), any())).thenReturn(1, 0);
+    JdbcTemplate hookJdbc = mock(JdbcTemplate.class);
+    JdbcWebhookInbox hooks = new JdbcWebhookInbox(hookJdbc);
+    when(hookJdbc.queryForObject(anyString(), eq(Integer.class), any(), any())).thenReturn(1, 0);
     assertThat(hooks.alreadyReceived("razorpay", "evt_1")).isTrue();
     assertThat(hooks.alreadyReceived("razorpay", "evt_2")).isFalse();
     assertThat(hooks.alreadyReceived(" ", "evt")).isFalse();
     assertThat(hooks.alreadyReceived(null, "evt")).isFalse();
     assertThat(hooks.alreadyReceived("razorpay", null)).isFalse();
     assertThat(hooks.alreadyReceived("razorpay", " ")).isFalse();
+    when(hookJdbc.queryForObject(anyString(), eq(Integer.class), any(), any())).thenReturn(null);
+    assertThat(hooks.alreadyReceived("razorpay", "evt_3")).isFalse();
+    when(hookJdbc.update(anyString(), any(Object[].class)))
+        .thenReturn(1)
+        .thenThrow(new org.springframework.dao.DuplicateKeyException("dup"));
+    assertThat(hooks.claim("razorpay", "evt_ok", null)).isTrue();
+    assertThat(hooks.claim("razorpay", "evt_dup", "{}")).isFalse();
     assertThat(hooks.claim(" ", "evt", "{}")).isFalse();
     assertThat(hooks.claim(null, "evt", "{}")).isFalse();
     assertThat(hooks.claim("razorpay", " ", "{}")).isFalse();
     assertThat(hooks.claim("razorpay", null, "{}")).isFalse();
 
+    JdbcTemplate jdbc = mock(JdbcTemplate.class);
+
     JdbcProviderOperationStore ops = new JdbcProviderOperationStore(jdbc);
     when(jdbc.query(anyString(), any(RowMapper.class), any(), any()))
-        .thenReturn(List.of(new ProviderOperationStore.Operation("PAYOUT", "k", "pout_1", "SENT")));
+        .thenAnswer(
+            invocation -> {
+              RowMapper<?> mapper = invocation.getArgument(1);
+              ResultSet rs = mock(ResultSet.class);
+              when(rs.getString("operation_type")).thenReturn("PAYOUT");
+              when(rs.getString("idempotency_key")).thenReturn("k");
+              when(rs.getString("provider_ref")).thenReturn("pout_1");
+              when(rs.getString("status")).thenReturn("SENT");
+              return List.of(mapper.mapRow(rs, 0));
+            });
     assertThat(ops.find("PAYOUT", "k")).isPresent();
     assertThat(ops.ensurePending("PAYOUT", "k", "razorpayx").hasProviderRef()).isTrue();
     assertThat(ops.ensurePending("PAYOUT", "k", "razorpayx").terminalSuccess()).isTrue();
     assertThat(new ProviderOperationStore.Operation("X", "k", " ", "FAILED").hasProviderRef())
         .isFalse();
+    assertThat(new ProviderOperationStore.Operation("X", "k", null, "PENDING").hasProviderRef())
+        .isFalse();
     assertThat(new ProviderOperationStore.Operation("X", "k", "ref", "FAILED").terminalSuccess())
         .isFalse();
+    assertThat(new ProviderOperationStore.Operation("X", "k", "ref", "SUCCEEDED").terminalSuccess())
+        .isTrue();
     ops.markSent("PAYOUT", "k", "pout_1");
     ops.markSucceeded("PAYOUT", "k", "pout_1");
     ops.markFailed("PAYOUT", "k", "boom");

@@ -11,6 +11,7 @@ import com.nammamedmate.messaging.OutboxMessage;
 import com.nammamedmate.notification.adapter.in.messaging.CustomerNotificationRequestedHandler;
 import com.nammamedmate.notification.adapter.in.messaging.NotificationDispatchConsumer;
 import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
+import com.nammamedmate.rider.adapter.in.messaging.AutomationRiderAssignConsumer;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -18,7 +19,6 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /** Routes SQS domain-event payloads to idempotent consumers. Failures propagate for retry/DLQ. */
@@ -35,6 +35,7 @@ public class DomainEventRouter {
   private final ObjectProvider<OrderDeliveredReferralConsumer> referral;
   private final ObjectProvider<OrderDeliveredCampaignConsumer> campaigns;
   private final ObjectProvider<AutomationTriggerConsumer> automation;
+  private final ObjectProvider<AutomationRiderAssignConsumer> riderAssign;
   private final ConsumerInbox inbox;
 
   public DomainEventRouter(
@@ -45,29 +46,8 @@ public class DomainEventRouter {
       ObjectProvider<OrderDeliveredLoyaltyConsumer> loyalty,
       ObjectProvider<OrderDeliveredReferralConsumer> referral,
       ObjectProvider<OrderDeliveredCampaignConsumer> campaigns,
-      ObjectProvider<AutomationTriggerConsumer> automation) {
-    this(
-        objectMapper,
-        notifications,
-        dispatch,
-        autoKyc,
-        loyalty,
-        referral,
-        campaigns,
-        automation,
-        null);
-  }
-
-  @Autowired
-  public DomainEventRouter(
-      ObjectMapper objectMapper,
-      ObjectProvider<CustomerNotificationRequestedHandler> notifications,
-      ObjectProvider<NotificationDispatchConsumer> dispatch,
-      ObjectProvider<AutoKycOutboxConsumer> autoKyc,
-      ObjectProvider<OrderDeliveredLoyaltyConsumer> loyalty,
-      ObjectProvider<OrderDeliveredReferralConsumer> referral,
-      ObjectProvider<OrderDeliveredCampaignConsumer> campaigns,
       ObjectProvider<AutomationTriggerConsumer> automation,
+      ObjectProvider<AutomationRiderAssignConsumer> riderAssign,
       ConsumerInbox inbox) {
     this.objectMapper = objectMapper;
     this.notifications = notifications;
@@ -77,6 +57,7 @@ public class DomainEventRouter {
     this.referral = referral;
     this.campaigns = campaigns;
     this.automation = automation;
+    this.riderAssign = riderAssign;
     this.inbox = inbox;
   }
 
@@ -129,6 +110,8 @@ public class DomainEventRouter {
         Optional.ofNullable(loyalty.getIfAvailable()).ifPresent(c -> c.accept(envelope));
         Optional.ofNullable(referral.getIfAvailable()).ifPresent(c -> c.accept(envelope));
       }
+      case "automation.rider.assign_requested" ->
+          require(riderAssign.getIfAvailable(), type).accept(envelope);
       default -> tryUnknown(type, messageBody);
     }
   }

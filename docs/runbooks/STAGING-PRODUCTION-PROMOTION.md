@@ -16,15 +16,20 @@ Audit canvas: open beside chat —
 
 ## Staging proof
 
+Retain evidence artifacts (logs/screenshots/CLI output) under `docs/runbooks/evidence/<date>-staging/`:
+
 ```bash
 make tf-plan ENV=staging
 # apply only after review
 scripts/deploy-ecs.sh staging
 make smoke-remote HEALTH_URL=https://core.api.staging.nammamedmate.com/api/v1/health
 BRUNO_REQUIRED=1 HEALTH_URL=https://core.api.staging.nammamedmate.com/api/v1/health make bruno-run
+python3 scripts/acceptance-ac-gate.py
 ```
 
-Vendor sandbox proofs (retain logs): Razorpay capture + refund, RazorpayX payout, MSG91 OTP, FCM, WhatsApp, email, Maps geocode, OCR/GSP if enabled.
+Vendor sandbox proofs (retain logs): Razorpay capture + refund, RazorpayX payout, MSG91 OTP, FCM, WhatsApp, email, Maps geocode. Optional fail-closed: OCR/GSP, DigiLocker, IRN (D21).
+
+Core journey proofs (retain): rider deliver → `order.delivered` → loyalty/referral/campaign side effects; pharmacy directory metrics non-zero after nightly job; POS checkout idempotency replay; automation `automation.rider.assign_requested`.
 
 Drills (record timestamps for RPO/RTO):
 

@@ -579,4 +579,45 @@ class RefundServiceTest {
     when(entity.get("id")).thenReturn(child);
     assertThat(RefundService.text(entity, "id")).isNull();
   }
+
+  @Test
+  void executeRefund_withProviderOps_replaysAndMarksSent() {
+    com.nammamedmate.messaging.ProviderOperationStore ops =
+        mock(com.nammamedmate.messaging.ProviderOperationStore.class);
+    RefundService withOps =
+        new RefundService(
+            refundStore,
+            cancellationStore,
+            orderStore,
+            razorpay,
+            wallet,
+            Clock.fixed(T0, ZoneOffset.UTC),
+            null,
+            ops);
+    Order upi = order(PaymentMethod.UPI, PaymentStatus.PAID, 45000, 0, "pay_ops");
+    when(orderStore.findById(upi.id())).thenReturn(Optional.of(upi));
+    when(ops.find(eq("REFUND"), anyString())).thenReturn(Optional.empty());
+    when(razorpay.refund(anyString(), anyLong()))
+        .thenReturn(new RazorpayPaymentPort.RefundResult("rfnd_ops", 45000L));
+    assertThat(
+            withOps
+                .initiate(upi, "PHARMACY_CANCELLED", ActorType.PHARMACY, UUID.randomUUID())
+                .initiated())
+        .isTrue();
+    verify(ops).ensurePending(eq("REFUND"), anyString(), eq("razorpay"));
+    verify(ops).markSent(eq("REFUND"), anyString(), eq("rfnd_ops"));
+
+    Order replay = order(PaymentMethod.UPI, PaymentStatus.PAID, 45000, 0, "pay_replay");
+    when(orderStore.findById(replay.id())).thenReturn(Optional.of(replay));
+    when(ops.find(eq("REFUND"), anyString()))
+        .thenReturn(
+            Optional.of(
+                new com.nammamedmate.messaging.ProviderOperationStore.Operation(
+                    "REFUND", "order-refund:x", "rfnd_replay", "SENT")));
+    assertThat(
+            withOps
+                .initiate(replay, "PHARMACY_CANCELLED", ActorType.PHARMACY, UUID.randomUUID())
+                .initiated())
+        .isTrue();
+  }
 }

@@ -423,7 +423,7 @@ public class SecurityConfig {
                     .hasAnyRole(
                         "ADMIN_SUPER", "ADMIN_FINANCE", "ADMIN_OPERATIONS", "ADMIN_COMPLIANCE")
                     .requestMatchers("/api/v1/admin/analytics", "/api/v1/admin/analytics/**")
-                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS")
+                    .hasAnyRole("ADMIN_SUPER", "ADMIN_OPERATIONS", "ADMIN_FINANCE")
                     // EPIC-020 monitoring: support alerts list; finance metrics subset
                     // (service-enforced)
                     .requestMatchers(HttpMethod.GET, "/api/v1/admin/monitoring/alerts")
