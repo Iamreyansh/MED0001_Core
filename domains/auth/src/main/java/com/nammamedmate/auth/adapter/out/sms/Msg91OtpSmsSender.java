@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ public final class Msg91OtpSmsSender implements SmsSender {
   private final String authKey;
   private final Sender sender;
 
+  @Autowired
   public Msg91OtpSmsSender(@Value("${medmate.msg91.auth-key:}") String authKey) {
     this(authKey, defaultSender(OTP_URL));
   }
