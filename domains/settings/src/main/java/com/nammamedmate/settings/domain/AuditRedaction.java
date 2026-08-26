@@ -19,7 +19,7 @@ public final class AuditRedaction {
           "otp_hash",
           "totp_secret",
           "backup_codes",
-          "razorpay_token_id",
+          "gateway_token_id",
           "upi_id",
           "password");
 

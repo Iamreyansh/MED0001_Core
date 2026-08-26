@@ -22,7 +22,7 @@ class OutboxIntegrationEventAdapterTest {
     when(provider.getIfAvailable()).thenReturn(outbox);
     OutboxIntegrationEventAdapter adapter = new OutboxIntegrationEventAdapter(provider);
     UUID id = UUID.randomUUID();
-    adapter.publish("PAYMENT_CAPTURED", "razorpay_payment", id, Map.of("k", "v"));
+    adapter.publish("PAYMENT_CAPTURED", "cashfree_payment", id, Map.of("k", "v"));
     verify(outbox).publish(any(DomainEvent.class));
   }
 

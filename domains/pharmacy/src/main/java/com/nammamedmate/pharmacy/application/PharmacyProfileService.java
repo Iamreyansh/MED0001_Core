@@ -74,7 +74,6 @@ public class PharmacyProfileService {
   private final AesGcmCipher cipher;
   private final OutboxPublisher outbox;
   private final RateLimiter rateLimiter;
-  private final AutoKycService autoKyc;
   private final PasswordEncoder otpEncoder;
   private final Supplier<String> otpGenerator;
   private final SecureRandom secureRandom;
@@ -92,7 +91,6 @@ public class PharmacyProfileService {
       @Qualifier("bankAccountCipher") AesGcmCipher cipher,
       OutboxPublisher outbox,
       RateLimiter rateLimiter,
-      AutoKycService autoKyc,
       @Qualifier("passwordEncoder") PasswordEncoder otpEncoder,
       Clock clock,
       ProfileContactNotifier contactNotifier) {
@@ -106,7 +104,6 @@ public class PharmacyProfileService {
         cipher,
         outbox,
         rateLimiter,
-        autoKyc,
         otpEncoder,
         null,
         new SecureRandom(),
@@ -125,7 +122,6 @@ public class PharmacyProfileService {
       @Qualifier("bankAccountCipher") AesGcmCipher cipher,
       OutboxPublisher outbox,
       RateLimiter rateLimiter,
-      AutoKycService autoKyc,
       @Qualifier("passwordEncoder") PasswordEncoder otpEncoder,
       Clock clock) {
     this(
@@ -138,7 +134,6 @@ public class PharmacyProfileService {
         cipher,
         outbox,
         rateLimiter,
-        autoKyc,
         otpEncoder,
         null,
         new SecureRandom(),
@@ -156,7 +151,6 @@ public class PharmacyProfileService {
       @Qualifier("bankAccountCipher") AesGcmCipher cipher,
       OutboxPublisher outbox,
       RateLimiter rateLimiter,
-      AutoKycService autoKyc,
       @Qualifier("passwordEncoder") PasswordEncoder otpEncoder,
       Supplier<String> otpGenerator,
       SecureRandom secureRandom,
@@ -171,7 +165,6 @@ public class PharmacyProfileService {
         cipher,
         outbox,
         rateLimiter,
-        autoKyc,
         otpEncoder,
         otpGenerator,
         secureRandom,
@@ -189,7 +182,6 @@ public class PharmacyProfileService {
       AesGcmCipher cipher,
       OutboxPublisher outbox,
       RateLimiter rateLimiter,
-      AutoKycService autoKyc,
       PasswordEncoder otpEncoder,
       Supplier<String> otpGenerator,
       SecureRandom secureRandom,
@@ -204,7 +196,6 @@ public class PharmacyProfileService {
     this.cipher = cipher;
     this.outbox = outbox;
     this.rateLimiter = rateLimiter;
-    this.autoKyc = autoKyc;
     this.otpEncoder = otpEncoder;
     this.otpGenerator = otpGenerator;
     this.secureRandom = secureRandom;
@@ -427,10 +418,6 @@ public class PharmacyProfileService {
         pharmacist,
         reVerify || current.gstinReverificationPending(),
         now);
-
-    if (reVerify) {
-      autoKyc.triggerGstinReverification(pharmacyId);
-    }
 
     ProfileRecord refreshed = profiles.findById(pharmacyId).orElse(current);
     Result completeness = completeness(refreshed);

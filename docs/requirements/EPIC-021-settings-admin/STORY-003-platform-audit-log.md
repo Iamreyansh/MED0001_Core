@@ -247,5 +247,5 @@ GET /api/v1/admin/audit-log/:id
 
 - The audit middleware should be implemented as a post-response hook (using a response interceptor or async queue) to avoid blocking the HTTP response. The audit write should be best-effort - a failure to write an audit entry should not fail the originating request, but should be monitored and alerted.
 - The `diff` field in the single-entry detail response is computed on-the-fly using a JSON Patch diff library; it is not stored. This keeps storage minimal while offering rich diff views in the UI.
-- For the sensitive-fields redaction list, maintain it as a configuration array: `["password_hash", "otp_hash", "totp_secret", "backup_codes", "razorpay_token_id", "upi_id"]`.
+- For the sensitive-fields redaction list, maintain it as a configuration array: `["password_hash", "otp_hash", "totp_secret", "backup_codes", "gateway_token_id", "upi_id"]`.
 - Long-term consider migrating to an append-only time-series store (ClickHouse, TimescaleDB) as audit log volume grows with platform scale.

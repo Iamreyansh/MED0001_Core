@@ -9,13 +9,13 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreeGatewayClient;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort.OrderSnapshot;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
 import com.nammamedmate.payment.application.port.out.PaymentStore;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
 import com.nammamedmate.payment.application.port.out.WalletPort;
 import com.nammamedmate.payment.domain.Payment;
 import com.nammamedmate.payment.domain.PaymentMethod;
@@ -52,9 +52,9 @@ class PaymentServiceFinalCoverageTest {
   @Mock private OrderLookupPort orders;
   @Mock private OrderPaymentStatusPort orderStatus;
   @Mock private FinancialLedgerWriterPort ledger;
-  @Mock private RazorpayGatewayPort razorpayMock;
+  @Mock private CashfreeGatewayPort cashfreeMock;
 
-  private StubRazorpayGatewayClient razorpay;
+  private StubCashfreeGatewayClient cashfree;
   private PaymentService service;
   private final UUID customerId = UUID.randomUUID();
   private final UUID orderId = UUID.randomUUID();
@@ -64,11 +64,11 @@ class PaymentServiceFinalCoverageTest {
 
   @BeforeEach
   void setUp() {
-    razorpay = new StubRazorpayGatewayClient();
+    cashfree = new StubCashfreeGatewayClient();
     service =
         new PaymentService(
             store,
-            razorpay,
+            cashfree,
             wallet,
             orders,
             orderStatus,
@@ -96,16 +96,16 @@ class PaymentServiceFinalCoverageTest {
                 saved.get() != null && saved.get().id().equals(inv.getArgument(0))
                     ? Optional.of(saved.get())
                     : Optional.empty());
-    when(store.findByRazorpayOrderId(anyString()))
+    when(store.findByGatewayOrderId(anyString()))
         .thenAnswer(
             inv ->
-                saved.get() != null && inv.getArgument(0).equals(saved.get().razorpayOrderId())
+                saved.get() != null && inv.getArgument(0).equals(saved.get().gatewayOrderId())
                     ? Optional.of(saved.get())
                     : Optional.empty());
-    when(store.findByRazorpayPaymentId(anyString()))
+    when(store.findByGatewayPaymentId(anyString()))
         .thenAnswer(
             inv ->
-                saved.get() != null && inv.getArgument(0).equals(saved.get().razorpayPaymentId())
+                saved.get() != null && inv.getArgument(0).equals(saved.get().gatewayPaymentId())
                     ? Optional.of(saved.get())
                     : Optional.empty());
   }
@@ -121,18 +121,18 @@ class PaymentServiceFinalCoverageTest {
   }
 
   @Test
-  void razorpayAppExceptionOtherCodesRethrown() {
+  void cashfreeAppExceptionOtherCodesRethrown() {
     when(orders.findById(orderId))
         .thenReturn(
             Optional.of(new OrderSnapshot(orderId, customerId, "UPI", 100, 0, "PAYMENT_PENDING")));
     when(wallet.debitForOrder(any(), any(), anyLong(), anyString())).thenReturn(0L);
-    when(razorpayMock.keyId()).thenReturn("k");
-    when(razorpayMock.createOrder(any(), anyLong()))
+    when(cashfreeMock.keyId()).thenReturn("k");
+    when(cashfreeMock.createOrder(any(), anyLong()))
         .thenThrow(new AppException("VALIDATION_ERROR", "bad", 400));
     PaymentService svc =
         new PaymentService(
             store,
-            razorpayMock,
+            cashfreeMock,
             wallet,
             orders,
             orderStatus,
@@ -147,18 +147,18 @@ class PaymentServiceFinalCoverageTest {
   }
 
   @Test
-  void razorpayNullKeyIdKeepsConfigured() {
+  void cashfreeNullKeyIdKeepsConfigured() {
     when(orders.findById(orderId))
         .thenReturn(
             Optional.of(new OrderSnapshot(orderId, customerId, "UPI", 100, 0, "PAYMENT_PENDING")));
     when(wallet.debitForOrder(any(), any(), anyLong(), anyString())).thenReturn(0L);
-    when(razorpayMock.keyId()).thenReturn("fallback");
-    when(razorpayMock.createOrder(any(), anyLong()))
-        .thenReturn(new RazorpayGatewayPort.CreateOrderResult("order_x", 100, null));
+    when(cashfreeMock.keyId()).thenReturn("fallback");
+    when(cashfreeMock.createOrder(any(), anyLong()))
+        .thenReturn(new CashfreeGatewayPort.CreateOrderResult("order_x", 100, null));
     PaymentService svc =
         new PaymentService(
             store,
-            razorpayMock,
+            cashfreeMock,
             wallet,
             orders,
             orderStatus,
@@ -168,7 +168,7 @@ class PaymentServiceFinalCoverageTest {
             Clock.fixed(NOW, ZoneOffset.UTC),
             new BigDecimal("8.00"));
     Map<String, Object> data = svc.initiate(customer, orderId, 100L, " ", "UPI");
-    assertThat(data.get("razorpay_key_id")).isEqualTo("fallback");
+    assertThat(data.get("cashfree_app_id")).isEqualTo("fallback");
   }
 
   @Test
@@ -223,7 +223,7 @@ class PaymentServiceFinalCoverageTest {
         """
         {"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_est","order_id":"%s"}}}}
         """
-            .formatted(saved.get().razorpayOrderId());
+            .formatted(saved.get().gatewayOrderId());
     Map<String, Object> ack =
         service.handleWebhook(sign(body), body.getBytes(StandardCharsets.UTF_8));
     assertThat(ack.get("processed")).isEqualTo(true);
@@ -245,14 +245,14 @@ class PaymentServiceFinalCoverageTest {
         """
         {"event":"payment.failed","payload":{"payment":{"entity":{"id":"pay_fail_1","order_id":"%s"}}}}
         """
-            .formatted(pending.razorpayOrderId());
+            .formatted(pending.gatewayOrderId());
     assertThat(
             service
                 .handleWebhook(sign(idem), idem.getBytes(StandardCharsets.UTF_8))
                 .get("processed"))
         .isEqualTo(false);
 
-    // reset to pending without razorpay order match path via payment id only
+    // reset to pending without cashfree order match path via payment id only
     saved.set(
         new Payment(
             UUID.randomUUID(),
@@ -321,14 +321,14 @@ class PaymentServiceFinalCoverageTest {
     assertThat(init.get("method")).isEqualTo("CARD");
 
     // PAYMENT_INITIATION_FAILED remapped, then blank keyId keeps fallback
-    when(razorpayMock.keyId()).thenReturn("k");
-    when(razorpayMock.createOrder(any(), anyLong()))
+    when(cashfreeMock.keyId()).thenReturn("k");
+    when(cashfreeMock.createOrder(any(), anyLong()))
         .thenThrow(new AppException("PAYMENT_INITIATION_FAILED", "fail", 502))
-        .thenReturn(new RazorpayGatewayPort.CreateOrderResult("order_b", 1000, "  "));
+        .thenReturn(new CashfreeGatewayPort.CreateOrderResult("order_b", 1000, "  "));
     PaymentService remap =
         new PaymentService(
             store,
-            razorpayMock,
+            cashfreeMock,
             wallet,
             orders,
             orderStatus,
@@ -340,18 +340,18 @@ class PaymentServiceFinalCoverageTest {
     saved.set(null);
     assertThatThrownBy(() -> remap.initiate(customer, orderId, 1000L, "INR", "UPI"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_ERROR");
+        .isEqualTo("CASHFREE_ERROR");
 
     saved.set(null);
     Map<String, Object> keyed = remap.initiate(customer, orderId, 1000L, "INR", "UPI");
-    assertThat(keyed.get("razorpay_key_id")).isEqualTo("k");
+    assertThat(keyed.get("cashfree_app_id")).isEqualTo("k");
 
     // zero commission ledger + null principal + detail null fee
     saved.set(null);
     PaymentService zeroComm =
         new PaymentService(
             store,
-            razorpay,
+            cashfree,
             wallet,
             orders,
             orderStatus,
@@ -382,7 +382,7 @@ class PaymentServiceFinalCoverageTest {
         """
         {"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_new","order_id":"%s","fee":null}}}}
         """
-            .formatted(saved.get().razorpayOrderId());
+            .formatted(saved.get().gatewayOrderId());
     // status CAPTURED → no-op
     assertThat(
             service
@@ -397,7 +397,7 @@ class PaymentServiceFinalCoverageTest {
         """
         {"event":"payment.failed","payload":{"payment":{"entity":{"order_id":"%s"}}}}
         """
-            .formatted(saved.get().razorpayOrderId());
+            .formatted(saved.get().gatewayOrderId());
     assertThat(
             service
                 .handleWebhook(sign(failNoId), failNoId.getBytes(StandardCharsets.UTF_8))
@@ -415,8 +415,8 @@ class PaymentServiceFinalCoverageTest {
     when(wallet.debitForOrder(any(), any(), anyLong(), anyString())).thenReturn(0L);
     service.initiate(customer, orderId, 1000L, "INR", "UPI");
     String payId = "pay_fee_get";
-    String sig = razorpay.signPayment(saved.get().razorpayOrderId(), payId);
-    service.verify(customer, payId, saved.get().razorpayOrderId(), sig);
+    String sig = cashfree.signPayment(saved.get().gatewayOrderId(), payId);
+    service.verify(customer, payId, saved.get().gatewayOrderId(), sig);
     assertThat(service.getPayment(customer, saved.get().id()).get("gateway_fee")).isNotNull();
 
     // captured webhook with payment id but no order id → no-op
@@ -437,7 +437,7 @@ class PaymentServiceFinalCoverageTest {
         """
         {"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_fn","order_id":"%s","fee":null}}}}
         """
-            .formatted(saved.get().razorpayOrderId());
+            .formatted(saved.get().gatewayOrderId());
     // byPayId present but PENDING → continue capture path via byPayId
     saved.set(null);
     service.initiate(customer, orderId, 1000L, "INR", "UPI");
@@ -455,7 +455,7 @@ class PaymentServiceFinalCoverageTest {
             pending.currency(),
             pending.method(),
             PaymentStatus.PENDING,
-            pending.razorpayOrderId(),
+            pending.gatewayOrderId(),
             "pay_pending_id",
             null,
             null,
@@ -472,7 +472,7 @@ class PaymentServiceFinalCoverageTest {
         """
         {"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_pending_id","order_id":"%s","fee":10}}}}
         """
-            .formatted(pending.razorpayOrderId());
+            .formatted(pending.gatewayOrderId());
     assertThat(
             service
                 .handleWebhook(
@@ -487,7 +487,7 @@ class PaymentServiceFinalCoverageTest {
         """
         {"event":"payment.failed","payload":{"payment":{"entity":{"id":"pay_desc","order_id":"%s","error_description":"insufficient funds"}}}}
         """
-            .formatted(saved.get().razorpayOrderId());
+            .formatted(saved.get().gatewayOrderId());
     assertThat(
             service
                 .handleWebhook(sign(withDesc), withDesc.getBytes(StandardCharsets.UTF_8))
@@ -520,7 +520,7 @@ class PaymentServiceFinalCoverageTest {
         """
         {"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_fs","order_id":"%s","fee":"x"}}}}
         """
-            .formatted(saved.get().razorpayOrderId());
+            .formatted(saved.get().gatewayOrderId());
     assertThat(
             service
                 .handleWebhook(sign(feeStr), feeStr.getBytes(StandardCharsets.UTF_8))
@@ -536,7 +536,7 @@ class PaymentServiceFinalCoverageTest {
   }
 
   private static String sign(String body) {
-    return StubRazorpayGatewayClient.hmacHex(
-        StubRazorpayGatewayClient.DEFAULT_WEBHOOK_SECRET, body);
+    return StubCashfreeGatewayClient.hmacHex(
+        StubCashfreeGatewayClient.DEFAULT_WEBHOOK_SECRET, body);
   }
 }

@@ -4,14 +4,10 @@ import com.nammamedmate.notification.application.port.out.CustomerPreferenceStor
 import com.nammamedmate.notification.application.port.out.PharmacyPreferenceStore;
 import com.nammamedmate.notification.application.port.out.PreferenceAuditStore;
 import com.nammamedmate.notification.application.port.out.RecipientIdentityPort;
-import com.nammamedmate.notification.application.port.out.WhatsAppOptoutStore;
 import com.nammamedmate.notification.domain.CustomerNotificationPreferences;
 import com.nammamedmate.notification.domain.PharmacyNotificationPreferences;
 import com.nammamedmate.notification.domain.PreferenceAuditEntry;
-import com.nammamedmate.notification.domain.WhatsAppOptout;
-import com.nammamedmate.notification.domain.WhatsAppOptoutSource;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -28,8 +24,6 @@ final class PreferenceTestFakes {
         new FakeCustomerPreferenceStore(),
         new FakePharmacyPreferenceStore(),
         new FakePreferenceAuditStore(),
-        new FakeWhatsAppOptoutStore(),
-        new FakeRecipientIdentityPort(),
         clock);
   }
 
@@ -79,30 +73,6 @@ final class PreferenceTestFakes {
     @Override
     public void insert(PreferenceAuditEntry entry) {
       entries.add(entry);
-    }
-  }
-
-  static final class FakeWhatsAppOptoutStore implements WhatsAppOptoutStore {
-    final ConcurrentHashMap<String, WhatsAppOptout> active = new ConcurrentHashMap<>();
-
-    @Override
-    public boolean isActivelyOptedOut(String phone) {
-      return active.containsKey(phone);
-    }
-
-    @Override
-    public void upsertActive(UUID id, String phone, WhatsAppOptoutSource source, Instant at) {
-      active.put(phone, new WhatsAppOptout(id, phone, source, at, true));
-    }
-
-    @Override
-    public void deactivateByPhone(String phone) {
-      active.remove(phone);
-    }
-
-    @Override
-    public Optional<WhatsAppOptout> findActiveByPhone(String phone) {
-      return Optional.ofNullable(active.get(phone));
     }
   }
 

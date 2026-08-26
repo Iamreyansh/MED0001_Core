@@ -371,7 +371,7 @@ class SaasBillingServiceGapsTest {
     when(checkout.createCheckout(any(), anyLong(), anyString()))
         .thenReturn(
             new InvoiceCheckoutPort.CheckoutSession(
-                "https://rzp/x", NOW.plusSeconds(60), "Razorpay"));
+                "https://rzp/x", NOW.plusSeconds(60), "Cashfree"));
     service.pay(owner, due2.id(), " ", "pm");
     when(invoices.findByPayIdempotencyKey("pm2")).thenReturn(Optional.empty());
     service.pay(owner, due2.id(), "CARD", "pm2");

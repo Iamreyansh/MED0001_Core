@@ -9,54 +9,48 @@
 | Priority | P1 - Critical |
 | Status | In Development |
 | Owner | Platform Squad |
-| Last Updated | 2026-07-24 |
+| Last Updated | 2026-08-26 |
 
 ## Overview
 
-EPIC-017 covers all outbound notification and communication capabilities for Namma MedMate. It integrates Firebase FCM for push notifications, MSG91/Twilio for SMS, Meta WhatsApp Business API for rich conversational messages, and SendGrid/AWS SES for transactional email. User notification preference management allows customers and pharmacies to control which channels and categories they receive. An in-app notification inbox provides a persistent history of messages, while admin tools allow broadcast, delivery log inspection, and channel health monitoring.
+EPIC-017 covers outbound notifications for Namma MedMate via **Firebase FCM** (push) and **Twilio** (SMS, including OTP). WhatsApp and email channels are out of scope. Preferences and in-app history remain.
 
 ## Goals
 
-- Deliver timely order updates, payment receipts, and alerts to customers, pharmacies, and riders
-- Provide admin broadcast capability for platform-wide announcements
-- Ensure DLT compliance for all SMS templates (TRAI mandate)
-- Respect user notification preferences and opt-outs across all channels
-- Monitor channel health and cost, with automatic fallback between providers
+- Deliver order updates and alerts via Push + SMS
+- Admin broadcast for platform announcements
+- DLT-compliant SMS templates (TRAI)
+- Respect user preferences and opt-outs
+- Monitor SMS/push health and cost (no multi-vendor fallback)
 
 ## Stories
 
 | Story ID | Title | Description |
 |----------|-------|-------------|
-| STORY-001 | Push Notification Service | Firebase FCM push notification sending and device token management |
-| STORY-002 | SMS Service | SMS delivery via MSG91/Twilio for OTP and transactional messages |
-| STORY-003 | WhatsApp Business API | Meta WhatsApp Business API for order updates and campaigns |
-| STORY-004 | Email Service | Transactional and campaign email delivery |
-| STORY-005 | Notification Preferences | User notification preference management |
-| STORY-006 | Notification History | Notification inbox and delivery history for customers |
+| STORY-001 | Push Notification Service | Firebase FCM push and device tokens |
+| STORY-002 | SMS Service | Twilio SMS for OTP and transactional messages |
+| STORY-005 | Notification Preferences | User preference management (push + SMS) |
+| STORY-006 | Notification History | In-app inbox and delivery history |
 
 ## Notification Channel Priority
 
-| Event Type | Primary Channel | Secondary | Tertiary |
-|-----------|----------------|-----------|---------|
-| OTP | SMS | - | - |
-| Order Confirmed | Push + WhatsApp | SMS | Email |
-| Order Out for Delivery | Push | WhatsApp | - |
-| Order Delivered | Push + WhatsApp | Email | - |
-| Payment Receipt | Email | WhatsApp | - |
-| KYC Status | WhatsApp + Email | SMS | - |
-| Promotional Campaign | Push | WhatsApp | Email |
-| Refill Reminder | Push | WhatsApp | - |
+| Event Type | Primary Channel | Secondary |
+|-----------|----------------|-----------|
+| OTP | SMS | - |
+| Order Confirmed | Push + SMS | - |
+| Order Out for Delivery | Push | SMS |
+| Order Delivered | Push | SMS |
+| Payment Receipt | Push | SMS |
+| KYC Status | SMS | Push |
+| Promotional Campaign | Push | SMS |
+| Refill Reminder | Push | SMS |
 
 ## Dependencies
 
 | Dependency | Type |
 |-----------|------|
-| EPIC-001 Order Management | Event source for order notifications |
-| EPIC-005 Finance | Payment and settlement notifications |
-| EPIC-006 Pharmacy Onboarding | KYC status notifications |
-| Firebase FCM | Push delivery |
-| MSG91 | SMS primary provider |
-| Twilio | SMS fallback provider |
-| Meta Cloud API | WhatsApp delivery |
-| SendGrid | Email primary provider |
-| AWS SES | Email fallback provider |
+| EPIC-010 Order Management | Event source |
+| EPIC-012 Finance | Payment notifications |
+| EPIC-003 Pharmacy Onboarding | KYC status notifications |
+| Firebase FCM | Push delivery (HTTP v1) |
+| Twilio | SMS / OTP |

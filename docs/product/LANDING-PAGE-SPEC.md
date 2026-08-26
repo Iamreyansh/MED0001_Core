@@ -237,7 +237,7 @@ Status labels only — never imply all are Live:
 
 | Status | Items (from `EPIC-022` + product) |
 |--------|-----------------------------------|
-| **Live / core** | Razorpay payments, Maps/geo, WhatsApp/SMS/push channels (as rolled out) |
+| **Live / core** | Cashfree payments, Maps/geo, WhatsApp/SMS/push channels (as rolled out) |
 | **Onboarding / phased** | GSTN / DigiLocker / licence / FSSAI KYC APIs, NIC e-invoice, Tally / Zoho |
 | **Roadmap** | Insurance cashless, full pharma catalogue federation — only if GTM agrees |
 

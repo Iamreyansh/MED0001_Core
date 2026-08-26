@@ -21,8 +21,8 @@ headers {
 
 body:json {
   {
-    "payment_id": "{{razorpayPaymentId}}",
-    "payment_signature": "{{razorpayPaymentSignature}}"
+    "payment_id": "{{gatewayPaymentId}}",
+    "payment_signature": "{{cashfreePaymentSignature}}"
   }
 }
 
@@ -33,11 +33,11 @@ script:pre-request {
   if (!bru.getEnvVar("orderId")) {
     throw new Error("orderId missing — place a UPI/CARD order first");
   }
-  if (!bru.getEnvVar("razorpayPaymentId")) {
-    bru.setEnvVar("razorpayPaymentId", "pay_Razorpay98765");
+  if (!bru.getEnvVar("gatewayPaymentId")) {
+    bru.setEnvVar("gatewayPaymentId", "pay_Cashfree98765");
   }
-  if (!bru.getEnvVar("razorpayPaymentSignature")) {
-    throw new Error("razorpayPaymentSignature missing — HMAC of razorpay_order_id|payment_id");
+  if (!bru.getEnvVar("cashfreePaymentSignature")) {
+    throw new Error("cashfreePaymentSignature missing — HMAC of gateway_order_id|payment_id");
   }
 }
 
@@ -61,7 +61,7 @@ tests {
 }
 
 docs {
-  POST /api/v1/orders/:order_id/payment/confirm — verify Razorpay HMAC; Idempotency-Key required; idempotent on payment_id.
+  POST /api/v1/orders/:order_id/payment/confirm — verify Cashfree HMAC; Idempotency-Key required; idempotent on payment_id.
 }
 
 example {
@@ -77,7 +77,7 @@ example {
     }
     body:json: {
       {
-        "payment_id": "pay_Razorpay98765",
+        "payment_id": "pay_Cashfree98765",
         "payment_signature": "sha256_hmac_signature_string"
       }
     }
@@ -96,7 +96,7 @@ example {
             "payment": {
               "method": "UPI",
               "status": "PAID",
-              "transaction_id": "pay_Razorpay98765"
+              "transaction_id": "pay_Cashfree98765"
             },
             "pharmacy_notified": true,
             "confirmed_at": "2026-08-08T06:01:00Z"
@@ -120,7 +120,7 @@ example {
     }
     body:json: {
       {
-        "payment_id": "pay_Razorpay98765",
+        "payment_id": "pay_Cashfree98765",
         "payment_signature": "invalid"
       }
     }

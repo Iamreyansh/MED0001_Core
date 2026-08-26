@@ -244,7 +244,7 @@ class JdbcPaymentMethodStoreTest {
     when(rs.getString("nickname")).thenReturn(record.nickname());
     when(rs.getString("upi_id")).thenReturn(record.upiIdEncrypted());
     when(rs.getString("upi_handle")).thenReturn(record.upiHandle());
-    when(rs.getString("razorpay_token_id")).thenReturn(record.razorpayTokenEncrypted());
+    when(rs.getString("gateway_token_id")).thenReturn(record.cashfreeTokenEncrypted());
     when(rs.getString("card_last4")).thenReturn(record.cardLast4());
     when(rs.getString("card_network")).thenReturn(record.cardNetwork());
     when(rs.getString("card_type")).thenReturn(record.cardType());

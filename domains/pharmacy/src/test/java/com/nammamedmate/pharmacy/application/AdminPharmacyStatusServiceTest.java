@@ -63,7 +63,6 @@ class AdminPharmacyStatusServiceTest {
   private FakeAudit audit;
   private InMemoryOutboxStore outboxStore;
   private RateLimiter rateLimiter;
-  private AutoKycService autoKyc;
   private PharmacyOrderMetricsPort orderMetrics;
   private PharmacyCatalogueStatsPort catalogueStats;
   private ObjectMapper objectMapper;
@@ -78,8 +77,6 @@ class AdminPharmacyStatusServiceTest {
     outboxStore = new InMemoryOutboxStore();
     rateLimiter = mock(RateLimiter.class);
     when(rateLimiter.tryAcquire(any(), any(Integer.class), any(Integer.class))).thenReturn(true);
-    autoKyc = mock(AutoKycService.class);
-    when(autoKyc.latestAutoKycSummary(any())).thenReturn(Map.of("overall_status", "PARTIAL"));
     orderMetrics = new StubPharmacyOrderMetricsClient();
     catalogueStats = new StubPharmacyCatalogueStatsClient();
     objectMapper = new ObjectMapper();
@@ -91,7 +88,6 @@ class AdminPharmacyStatusServiceTest {
         store,
         zones,
         audit,
-        autoKyc,
         orderMetrics,
         catalogueStats,
         rateLimiter,
@@ -425,7 +421,7 @@ class AdminPharmacyStatusServiceTest {
     assertThat(data.get("code")).isEqualTo("PHM-0042");
     @SuppressWarnings("unchecked")
     Map<String, Object> kyc = (Map<String, Object>) data.get("kyc");
-    assertThat(kyc.get("auto_kyc_status")).isEqualTo("PARTIAL");
+    assertThat(kyc.get("auto_kyc_status")).isNull();
     assertThat(kyc.get("documents_summary")).isEqualTo(store.docSummary);
     assertThat(data.get("catalogue_stats")).isNotNull();
     assertThat(data.get("performance")).isNotNull();
@@ -674,8 +670,6 @@ class AdminPharmacyStatusServiceTest {
     assertThat(rows.getFirst().get("document_age_hours")).isEqualTo(0L);
     assertThat(rows.getFirst().get("submitted_at")).isNull();
     assertThat(rows.getFirst().get("created_at")).isNull();
-
-    when(autoKyc.latestAutoKycSummary(any())).thenReturn(null);
     store.put(
         new AdminDetailRow(
             PID,
@@ -1091,7 +1085,6 @@ class AdminPharmacyStatusServiceTest {
             store,
             zones,
             audit,
-            autoKyc,
             orderMetrics,
             catalogueStats,
             rateLimiter,
@@ -1111,7 +1104,6 @@ class AdminPharmacyStatusServiceTest {
             store,
             zones,
             audit,
-            autoKyc,
             new StubPharmacyOrderMetricsClient(),
             new StubPharmacyCatalogueStatsClient(),
             rateLimiter,

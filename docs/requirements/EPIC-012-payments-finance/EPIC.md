@@ -15,13 +15,13 @@
 
 ## Overview
 
-EPIC-012 governs every rupee that flows through the Namma MedMate platform. It covers payment initiation and verification via Razorpay (UPI, Card, COD), the Namma Money in-app wallet for customers, weekly settlement disbursements to pharmacies via RazorpayX, rider earnings payouts, the full refund lifecycle, COD float management at the finance level, Indian tax compliance (TCS Section 194-O, GST on commission, TDS), an append-only financial ledger, and the real-time P&L overview dashboard for the admin finance team. The epic is designed to be fully auditable, with every money movement creating a ledger entry and all Indian regulatory filing obligations tracked and exportable.
+EPIC-012 governs every rupee that flows through the Namma MedMate platform. It covers payment initiation and verification via Cashfree (UPI, Card, COD), the Namma Money in-app wallet for customers, weekly settlement disbursements to pharmacies via Cashfree Payouts, rider earnings payouts, the full refund lifecycle, COD float management at the finance level, Indian tax compliance (TCS Section 194-O, GST on commission, TDS), an append-only financial ledger, and the real-time P&L overview dashboard for the admin finance team. The epic is designed to be fully auditable, with every money movement creating a ledger entry and all Indian regulatory filing obligations tracked and exportable.
 
 ---
 
 ## Goals
 
-- Process UPI and card payments securely via Razorpay with server-side signature verification.
+- Process UPI and card payments securely via Cashfree with server-side signature verification.
 - Ensure weekly pharmacy settlements are accurate (GMV - commission ? TCS) and released on time.
 - Automate rider payout computation including incentives, tips, and COD deductions.
 - Maintain a zero-discrepancy financial ledger that feeds directly into Tally/Zoho accounting exports.
@@ -64,7 +64,7 @@ EPIC-012 governs every rupee that flows through the Namma MedMate platform. It c
 
 | Entity | Description |
 |---|---|
-| `Payment` | Razorpay payment record tied to an order |
+| `Payment` | Cashfree payment record tied to an order |
 | `WalletAccount` | Customer wallet with current balance |
 | `WalletTransaction` | Debit/credit ledger entry with FIFO expiry |
 | `PharmacySettlement` | Weekly settlement cycle record per pharmacy |
@@ -75,7 +75,7 @@ EPIC-012 governs every rupee that flows through the Namma MedMate platform. It c
 | `TaxFiling` | Tax obligation tracking (GSTR-8, TDS, GST) |
 | `TCSRegister` | Monthly TCS collected per pharmacy for GSTR-8 |
 | `FinancialLedger` | Append-only ledger entry for every money movement |
-| `GatewayFee` | Razorpay fee captured per transaction |
+| `GatewayFee` | Cashfree fee captured per transaction |
 
 ---
 
@@ -83,9 +83,9 @@ EPIC-012 governs every rupee that flows through the Namma MedMate platform. It c
 
 | Dependency | Used For |
 |---|---|
-| Razorpay Payment Gateway | UPI / card payment orders and capture |
-| Razorpay Webhook | Payment events: captured, failed, refund.processed |
-| RazorpayX | Pharmacy settlement payouts, rider payouts |
+| Cashfree Payment Gateway | UPI / card payment orders and capture |
+| Cashfree Webhook | Payment events: captured, failed, refund.processed |
+| Cashfree Payouts | Pharmacy settlement payouts, rider payouts |
 | EPIC-010 (Order Management) | Order status drives payment, refund, and settlement triggers |
 | EPIC-011 (Rider Management) | COD collection data, rider earnings data |
 | EPIC-013 (Notifications) | Payment confirmation, refund notification, payout SMS |

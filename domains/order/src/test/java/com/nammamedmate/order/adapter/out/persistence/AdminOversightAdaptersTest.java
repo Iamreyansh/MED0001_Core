@@ -405,8 +405,8 @@ class AdminOversightAdaptersTest {
     when(rs.getLong("total_payable_paise")).thenReturn(100L);
     when(rs.getString("payment_method")).thenReturn("COD");
     when(rs.getString("payment_status")).thenReturn("PENDING_COLLECTION");
-    when(rs.getString("razorpay_order_id")).thenReturn(null);
-    when(rs.getString("razorpay_payment_id")).thenReturn(null);
+    when(rs.getString("gateway_order_id")).thenReturn(null);
+    when(rs.getString("gateway_payment_id")).thenReturn(null);
     when(rs.getObject("prescription_id")).thenReturn(null);
     when(rs.getObject("delivery_address_id")).thenReturn(UUID.randomUUID());
     when(rs.getString("delivery_instructions")).thenReturn(null);

@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Ensures webhook routes expose a rereadable body for HMAC verification (e.g. Razorpay). */
+/** Ensures webhook routes expose a rereadable body for HMAC verification (e.g. Cashfree). */
 public final class WebhookRawBodyFilter extends OncePerRequestFilter {
 
   public static final String CACHED_BODY_ATTR = "com.nammamedmate.webhook.rawBody";
@@ -22,9 +22,7 @@ public final class WebhookRawBodyFilter extends OncePerRequestFilter {
         && !path.startsWith("/api/v1/internal/kyc/")
         && !path.startsWith("/api/v1/payments/webhook")
         && !path.startsWith("/api/v1/integrations/")
-        && !path.startsWith("/api/v1/notifications/whatsapp/webhook")
-        && !path.startsWith("/api/v1/notifications/sms/webhook")
-        && !path.startsWith("/api/v1/notifications/email/webhook");
+        && !path.startsWith("/api/v1/notifications/sms/webhook");
   }
 
   @Override

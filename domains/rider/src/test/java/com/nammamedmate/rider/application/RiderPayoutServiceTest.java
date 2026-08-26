@@ -15,7 +15,7 @@ import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.messaging.ProviderOperationStore;
-import com.nammamedmate.rider.adapter.out.client.StubRazorpayRouteAdapter;
+import com.nammamedmate.rider.adapter.out.client.StubCashfreeRouteAdapter;
 import com.nammamedmate.rider.application.port.out.PlatformPricingConfigStore;
 import com.nammamedmate.rider.application.port.out.RiderPayoutStore;
 import com.nammamedmate.rider.application.port.out.RiderPayoutStore.PayoutRecord;
@@ -54,7 +54,7 @@ class RiderPayoutServiceTest {
   private FakeRiders riders;
   private FakeEarnings earnings;
   private FakePayouts payouts;
-  private StubRazorpayRouteAdapter razorpay;
+  private StubCashfreeRouteAdapter cashfree;
   private InMemoryOutboxStore outbox;
   private RiderPayoutService service;
   private UUID riderId;
@@ -64,7 +64,7 @@ class RiderPayoutServiceTest {
     riders = new FakeRiders();
     earnings = new FakeEarnings();
     payouts = new FakePayouts();
-    razorpay = new StubRazorpayRouteAdapter();
+    cashfree = new StubCashfreeRouteAdapter();
     outbox = new InMemoryOutboxStore();
     Clock clock = Clock.fixed(MONDAY_MORNING, ZoneOffset.UTC);
     service =
@@ -72,7 +72,7 @@ class RiderPayoutServiceTest {
             riders,
             earnings,
             payouts,
-            razorpay,
+            cashfree,
             cfg(),
             new OutboxPublisher(outbox, new ObjectMapper()),
             clock);
@@ -127,7 +127,7 @@ class RiderPayoutServiceTest {
   }
 
   @Test
-  void ac006_manualReleaseTriggersRazorpayAndSms() {
+  void ac006_manualReleaseTriggersCashfreeAndSms() {
     PayoutCycle.Window prev = PayoutCycle.previous(MONDAY_MORNING);
     // Gross 250000 - COD 210000 = net 40000 (≥ ₹100) while float still HELD.
     seedTrip(prev.from(), 250_000L, 0L, 0L);
@@ -140,7 +140,7 @@ class RiderPayoutServiceTest {
     Map<String, Object> data =
         service.release(finance(), riderId, held.id(), "COD cleared", "idem-ac006");
     assertThat(data.get("payout_status")).isEqualTo("RELEASED");
-    assertThat(data.get("razorpay_payout_id")).isNotNull();
+    assertThat(data.get("cashfree_transfer_id")).isNotNull();
     assertThat(outbox.all()).anyMatch(m -> m.type().contains("payout_released"));
   }
 
@@ -148,7 +148,7 @@ class RiderPayoutServiceTest {
   void ac007_failedPayoutRetriedOnceThenFailed() {
     PayoutCycle.Window prev = PayoutCycle.previous(MONDAY_MORNING);
     seedTrip(prev.from(), 50_000L, 0L, 0L);
-    razorpay.failNext(true);
+    cashfree.failNext(true);
     service.computeWeeklyPayouts();
     PayoutRecord pending = payouts.byRider.values().iterator().next();
     assertThat(pending.status()).isEqualTo("PENDING");
@@ -159,11 +159,11 @@ class RiderPayoutServiceTest {
             riders,
             earnings,
             payouts,
-            razorpay,
+            cashfree,
             cfg(),
             new OutboxPublisher(outbox, new ObjectMapper()),
             Clock.fixed(later, ZoneOffset.UTC));
-    razorpay.failNext(true);
+    cashfree.failNext(true);
     retrySvc.retryDuePayouts();
     PayoutRecord failed = payouts.byId.get(pending.id());
     assertThat(failed.status()).isEqualTo("FAILED");
@@ -416,7 +416,7 @@ class RiderPayoutServiceTest {
             riders,
             earnings,
             payouts,
-            razorpay,
+            cashfree,
             cfg(),
             new OutboxPublisher(outbox, new ObjectMapper()),
             Clock.fixed(MONDAY_MORNING, ZoneOffset.UTC),
@@ -426,7 +426,7 @@ class RiderPayoutServiceTest {
     withOps.computeWeeklyPayouts();
     PayoutRecord released = payouts.byRider.values().iterator().next();
     assertThat(released.status()).isEqualTo("RELEASED");
-    verify(ops).ensurePending(eq("PAYOUT"), anyString(), eq("razorpay"));
+    verify(ops).ensurePending(eq("PAYOUT"), anyString(), eq("cashfree"));
     verify(ops).markSent(eq("PAYOUT"), anyString(), anyString());
 
     payouts = new FakePayouts();
@@ -436,13 +436,13 @@ class RiderPayoutServiceTest {
         .thenReturn(
             Optional.of(
                 new ProviderOperationStore.Operation("PAYOUT", "k", "pout_replay", "SENT")));
-    razorpay.failNext(true);
+    cashfree.failNext(true);
     RiderPayoutService replaySvc =
         new RiderPayoutService(
             riders,
             earnings,
             payouts,
-            razorpay,
+            cashfree,
             cfg(),
             new OutboxPublisher(outbox, new ObjectMapper()),
             Clock.fixed(MONDAY_MORNING, ZoneOffset.UTC),
@@ -450,19 +450,19 @@ class RiderPayoutServiceTest {
     replaySvc.computeWeeklyPayouts();
     PayoutRecord replayed = payouts.byRider.values().iterator().next();
     assertThat(replayed.status()).isEqualTo("RELEASED");
-    assertThat(replayed.razorpayPayoutId()).isEqualTo("pout_replay");
+    assertThat(replayed.cashfreeTransferId()).isEqualTo("pout_replay");
 
     payouts = new FakePayouts();
     earnings = new FakeEarnings();
     seedTrip(prev.from(), 20_000L, 0L, 0L);
     when(ops.find(eq("PAYOUT"), anyString())).thenReturn(Optional.empty());
-    razorpay.failNext(true);
+    cashfree.failNext(true);
     RiderPayoutService failSvc =
         new RiderPayoutService(
             riders,
             earnings,
             payouts,
-            razorpay,
+            cashfree,
             cfg(),
             new OutboxPublisher(outbox, new ObjectMapper()),
             Clock.fixed(MONDAY_MORNING, ZoneOffset.UTC),

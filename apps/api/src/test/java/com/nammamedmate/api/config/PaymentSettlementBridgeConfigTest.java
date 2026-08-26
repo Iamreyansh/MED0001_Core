@@ -7,8 +7,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
 import com.nammamedmate.payment.application.port.out.SettlementNotificationPort;
 import com.nammamedmate.pharmacy.application.port.out.NotificationDispatchPort;
 import java.util.UUID;
@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class PaymentSettlementBridgeConfigTest {
 
   @Test
-  void notificationAndRazorpayXBridges() {
+  void notificationAndCashfreePayoutBridges() {
     PaymentSettlementBridgeConfig config = new PaymentSettlementBridgeConfig();
     NotificationDispatchPort notifications = mock(NotificationDispatchPort.class);
     SettlementNotificationPort bridge = config.settlementNotificationBridge(notifications);
@@ -29,15 +29,15 @@ class PaymentSettlementBridgeConfigTest {
     verify(notifications).dispatchSettlementReleased(pharmacyId, settlementId, 100);
     verify(notifications).dispatchSettlementHeld(pharmacyId, settlementId, "reason");
 
-    RazorpayXPayoutPort payment = mock(RazorpayXPayoutPort.class);
+    CashfreePayoutPort payment = mock(CashfreePayoutPort.class);
     when(payment.initiatePayout(any()))
-        .thenReturn(new RazorpayXPayoutPort.PayoutResult("pout_1", 4));
-    var pharmacyPort = config.pharmacyRazorpayXBridge(payment);
+        .thenReturn(new CashfreePayoutPort.PayoutResult("pout_1", 4));
+    var pharmacyPort = config.pharmacyCashfreePayoutBridge(payment);
     var result =
         pharmacyPort.initiatePayout(
-            new com.nammamedmate.pharmacy.application.port.out.RazorpayXPayoutPort.PayoutRequest(
+            new com.nammamedmate.pharmacy.application.port.out.CashfreePayoutPort.PayoutRequest(
                 pharmacyId, settlementId, 500, "4521", "HDFC0001"));
-    assertThat(result.razorpayxPayoutId()).isEqualTo("pout_1");
+    assertThat(result.cashfreeTransferId()).isEqualTo("pout_1");
     assertThat(result.estimatedCreditHours()).isEqualTo(4);
   }
 

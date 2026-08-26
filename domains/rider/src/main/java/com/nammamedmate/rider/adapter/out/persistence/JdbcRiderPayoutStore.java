@@ -29,7 +29,7 @@ public class JdbcRiderPayoutStore implements RiderPayoutStore {
         INSERT INTO rider_payouts (
           id, rider_id, cycle_from, cycle_to, base_earnings_paise, incentives_paise,
           tips_paise, streak_bonus_paise, carry_forward_paise, cod_deducted_paise,
-          net_payout_paise, status, hold_reason, razorpay_payout_id, payout_reference,
+          net_payout_paise, status, hold_reason, cashfree_transfer_id, payout_reference,
           release_notes, released_by, released_at, retry_count, next_retry_at,
           last_attempt_at, created_at, updated_at
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -47,7 +47,7 @@ public class JdbcRiderPayoutStore implements RiderPayoutStore {
         row.netPayoutPaise(),
         row.status(),
         row.holdReason(),
-        row.razorpayPayoutId(),
+        row.cashfreeTransferId(),
         row.payoutReference(),
         row.releaseNotes(),
         row.releasedBy(),
@@ -66,7 +66,7 @@ public class JdbcRiderPayoutStore implements RiderPayoutStore {
         UPDATE rider_payouts SET
           base_earnings_paise = ?, incentives_paise = ?, tips_paise = ?,
           streak_bonus_paise = ?, carry_forward_paise = ?, cod_deducted_paise = ?,
-          net_payout_paise = ?, status = ?, hold_reason = ?, razorpay_payout_id = ?,
+          net_payout_paise = ?, status = ?, hold_reason = ?, cashfree_transfer_id = ?,
           payout_reference = ?, release_notes = ?, released_by = ?, released_at = ?,
           retry_count = ?, next_retry_at = ?, last_attempt_at = ?, updated_at = ?
         WHERE id = ? AND deleted_at IS NULL
@@ -80,7 +80,7 @@ public class JdbcRiderPayoutStore implements RiderPayoutStore {
         row.netPayoutPaise(),
         row.status(),
         row.holdReason(),
-        row.razorpayPayoutId(),
+        row.cashfreeTransferId(),
         row.payoutReference(),
         row.releaseNotes(),
         row.releasedBy(),
@@ -215,7 +215,7 @@ public class JdbcRiderPayoutStore implements RiderPayoutStore {
         rs.getLong("net_payout_paise"),
         rs.getString("status"),
         rs.getString("hold_reason"),
-        rs.getString("razorpay_payout_id"),
+        rs.getString("cashfree_transfer_id"),
         rs.getString("payout_reference"),
         rs.getString("release_notes"),
         (UUID) rs.getObject("released_by"),

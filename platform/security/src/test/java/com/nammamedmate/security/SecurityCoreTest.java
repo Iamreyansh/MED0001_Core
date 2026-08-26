@@ -266,7 +266,7 @@ class SecurityCoreTest {
       "/actuator/metrics",
       "/actuator/info",
       "/api/v1/auth/pharmacy/login",
-      "/api/v1/webhooks/razorpay",
+      "/api/v1/webhooks/cashfree",
       "/v3/api-docs/openapi",
       "/swagger-ui/index.html"
     };

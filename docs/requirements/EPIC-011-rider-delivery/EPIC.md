@@ -83,7 +83,7 @@ EPIC-011 covers the end-to-end lifecycle of delivery riders on the Namma MedMate
 | Google Maps Geocoding API | Address to lat/lng, zone matching |
 | Redis | Live rider location store, assignment queue |
 | WebSocket / SSE server | Real-time location push to customer app |
-| Razorpay Route | Rider payout disbursement |
+| Cashfree Route | Rider payout disbursement |
 | SMS Gateway (MSG91 / Exotel) | OTP, alerts, payout notifications |
 | EPIC-010 (Order Management) | Orders feed into assignment queue |
 | EPIC-012 (Payments & Finance) | Rider payout, COD settlement |

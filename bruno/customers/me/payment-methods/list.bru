@@ -53,7 +53,7 @@ tests {
       expect(u.upi_handle).to.match(/^\*\*\*@/);
     }
     for (const c of body.data.cards) {
-      expect(c).to.not.have.property("razorpay_token_id");
+      expect(c).to.not.have.property("gateway_token_id");
       expect(c.card_last4).to.be.a("string");
     }
   });
@@ -66,7 +66,7 @@ docs {
 
 example {
   name: 200 OK
-  description: Masked UPI + cards; raw upi_id / razorpay_token_id never present.
+  description: Masked UPI + cards; raw upi_id / gateway_token_id never present.
 
   request: {
     url: {{baseUrl}}/api/v1/customers/me/payment-methods

@@ -94,7 +94,7 @@ public class JdbcPaymentMethodStore implements PaymentMethodStore {
         """
         INSERT INTO saved_payment_methods (
           id, customer_id, type, is_default, nickname, upi_id, upi_handle,
-          razorpay_token_id, card_last4, card_network, card_type, idempotency_key,
+          gateway_token_id, card_last4, card_network, card_type, idempotency_key,
           created_at, deleted_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         """,
@@ -105,7 +105,7 @@ public class JdbcPaymentMethodStore implements PaymentMethodStore {
         method.nickname(),
         method.upiIdEncrypted(),
         method.upiHandle(),
-        method.razorpayTokenEncrypted(),
+        method.cashfreeTokenEncrypted(),
         method.cardLast4(),
         method.cardNetwork(),
         method.cardType(),
@@ -171,7 +171,7 @@ public class JdbcPaymentMethodStore implements PaymentMethodStore {
         rs.getString("nickname"),
         rs.getString("upi_id"),
         rs.getString("upi_handle"),
-        rs.getString("razorpay_token_id"),
+        rs.getString("gateway_token_id"),
         rs.getString("card_last4"),
         rs.getString("card_network"),
         rs.getString("card_type"),

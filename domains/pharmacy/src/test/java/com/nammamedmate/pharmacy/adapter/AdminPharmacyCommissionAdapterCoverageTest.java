@@ -11,7 +11,7 @@ import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyCommissionControlle
 import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyCommissionController.ChangeCommissionRequest;
 import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyCommissionController.HoldSettlementRequest;
 import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyCommissionController.ReleaseSettlementRequest;
-import com.nammamedmate.pharmacy.adapter.in.web.RazorpayXPayoutWebhookController;
+import com.nammamedmate.pharmacy.adapter.in.web.CashfreePayoutWebhookController;
 import com.nammamedmate.pharmacy.application.AdminPharmacyCommissionService;
 import com.nammamedmate.pharmacy.application.AdminPharmacySettlementService;
 import com.nammamedmate.pharmacy.application.AdminPharmacySettlementService.PagedResult;
@@ -96,10 +96,10 @@ class AdminPharmacyCommissionAdapterCoverageTest {
   }
 
   @Test
-  void razorpayxWebhookControllerDelegates() {
+  void cashfree_payoutsWebhookControllerDelegates() {
     AdminPharmacySettlementService settlement = mock(AdminPharmacySettlementService.class);
     when(settlement.handlePayoutWebhook(any(), any())).thenReturn(Map.of("status", "PAID"));
-    RazorpayXPayoutWebhookController controller = new RazorpayXPayoutWebhookController(settlement);
+    CashfreePayoutWebhookController controller = new CashfreePayoutWebhookController(settlement);
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setAttribute(
         com.nammamedmate.kernel.webhook.WebhookRawBodyFilter.CACHED_BODY_ATTR, "{}".getBytes());

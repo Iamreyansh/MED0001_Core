@@ -15,7 +15,7 @@ public final class Refund {
   private RefundStatus status;
   private final UUID issuedBy;
   private final RefundIssuedByType issuedByType;
-  private String razorpayRefundId;
+  private String gatewayRefundId;
   private UUID walletTransactionId;
   private Instant processedAt;
   private String failedReason;
@@ -36,7 +36,7 @@ public final class Refund {
       RefundStatus status,
       UUID issuedBy,
       RefundIssuedByType issuedByType,
-      String razorpayRefundId,
+      String gatewayRefundId,
       UUID walletTransactionId,
       Instant processedAt,
       String failedReason,
@@ -51,7 +51,7 @@ public final class Refund {
     this.status = status;
     this.issuedBy = issuedBy;
     this.issuedByType = issuedByType;
-    this.razorpayRefundId = razorpayRefundId;
+    this.gatewayRefundId = gatewayRefundId;
     this.walletTransactionId = walletTransactionId;
     this.processedAt = processedAt;
     this.failedReason = failedReason;
@@ -95,8 +95,8 @@ public final class Refund {
     return issuedByType;
   }
 
-  public String razorpayRefundId() {
-    return razorpayRefundId;
+  public String gatewayRefundId() {
+    return gatewayRefundId;
   }
 
   public UUID walletTransactionId() {
@@ -163,8 +163,8 @@ public final class Refund {
     this.processedAt = at;
   }
 
-  public void setRazorpayRefundId(String razorpayRefundId) {
-    this.razorpayRefundId = razorpayRefundId;
+  public void setCashfreeRefundId(String gatewayRefundId) {
+    this.gatewayRefundId = gatewayRefundId;
   }
 
   public void setWalletTransactionId(UUID walletTransactionId) {

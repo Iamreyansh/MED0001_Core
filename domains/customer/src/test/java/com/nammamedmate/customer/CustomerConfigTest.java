@@ -60,17 +60,17 @@ class CustomerConfigTest {
   }
 
   @Test
-  void razorpayVpaPort_withoutKeys_usesStub() {
+  void cashfreeVpaPort_withoutKeys_usesStub() {
     CustomerConfig config = new CustomerConfig();
-    assertThat(config.razorpayVpaPort(new ObjectMapper(), "", ""))
-        .isInstanceOf(com.nammamedmate.customer.adapter.out.razorpay.StubRazorpayVpaClient.class);
+    assertThat(config.cashfreeVpaPort(new ObjectMapper(), "", ""))
+        .isInstanceOf(com.nammamedmate.customer.adapter.out.cashfree.StubCashfreeVpaClient.class);
   }
 
   @Test
-  void razorpayVpaPort_withKeys_usesLiveClient() {
+  void cashfreeVpaPort_withKeys_usesLiveClient() {
     CustomerConfig config = new CustomerConfig();
-    assertThat(config.razorpayVpaPort(new ObjectMapper(), "key", "secret"))
-        .isInstanceOf(com.nammamedmate.customer.adapter.out.razorpay.RazorpayVpaClient.class);
+    assertThat(config.cashfreeVpaPort(new ObjectMapper(), "key", "secret"))
+        .isInstanceOf(com.nammamedmate.customer.adapter.out.cashfree.CashfreeVpaClient.class);
   }
 
   @Test

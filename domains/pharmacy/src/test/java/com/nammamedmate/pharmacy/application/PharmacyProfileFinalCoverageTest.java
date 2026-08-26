@@ -199,7 +199,6 @@ class PharmacyProfileFinalCoverageTest {
                 new com.nammamedmate.messaging.InMemoryOutboxStore(),
                 new com.fasterxml.jackson.databind.ObjectMapper()),
             rl,
-            mock(AutoKycService.class),
             new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(),
             java.time.Clock.systemUTC());
     AdminPharmacyProfileService admin =

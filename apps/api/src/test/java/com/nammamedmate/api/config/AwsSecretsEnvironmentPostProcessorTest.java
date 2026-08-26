@@ -61,8 +61,8 @@ class AwsSecretsEnvironmentPostProcessorTest {
     props.put("MEDMATE_SECRETS_DB_ARN", "   ");
     props.put("MEDMATE_SECRETS_JWT_ARN", "");
     props.put("MEDMATE_SECRETS_MFA_ARN", " ");
-    props.put("MEDMATE_SECRETS_RAZORPAY_ARN", " ");
-    props.put("MEDMATE_SECRETS_RAZORPAYX_ARN", " ");
+    props.put("MEDMATE_SECRETS_CASHFREE_ARN", " ");
+    props.put("MEDMATE_SECRETS_CASHFREE_PAYOUTS_ARN", " ");
     props.put("MEDMATE_SECRETS_KYC_ARN", " ");
     env.getPropertySources().addFirst(new MapPropertySource("test", props));
 
@@ -172,37 +172,75 @@ class AwsSecretsEnvironmentPostProcessorTest {
   }
 
   @Test
-  void loadsRazorpayFromSecretsManager() {
+  void loadsCashfreeFromSecretsManager() {
     SecretsManagerClient client = mock(SecretsManagerClient.class);
     when(client.getSecretValue(any(GetSecretValueRequest.class)))
         .thenReturn(
             GetSecretValueResponse.builder()
                 .secretString(
-                    "{\"key_id\":\"rzp_test\",\"key_secret\":\"sec\",\"webhook_secret\":\"whsec\"}")
+                    // firstText skips null/blank aliases before a real value; mode is optional.
+                    "{\"app_id\":null,\"key_id\":\"  \",\"client_id\":\"cf_test\","
+                        + "\"secret_key\":null,\"key_secret\":\"\",\"client_secret\":\"sec\","
+                        + "\"webhook_secret\":\"whsec\","
+                        + "\"payouts_client_id\":null,\"payouts_key_id\":\"pcid\","
+                        + "\"payouts_client_secret\":\"  \",\"payouts_key_secret\":\"pcsec\","
+                        + "\"payouts_webhook_secret\":\"pwh\",\"mode\":\"sandbox\"}")
                 .build());
 
     StandardEnvironment env = new StandardEnvironment();
     env.setActiveProfiles("prod");
     env.getPropertySources()
         .addFirst(
-            new MapPropertySource("test", Map.of("MEDMATE_SECRETS_RAZORPAY_ARN", "arn:razorpay")));
+            new MapPropertySource("test", Map.of("MEDMATE_SECRETS_CASHFREE_ARN", "arn:cashfree")));
 
     new AwsSecretsEnvironmentPostProcessor(() -> client)
         .postProcessEnvironment(env, new SpringApplication());
 
-    assertThat(env.getProperty("medmate.razorpay.key-id")).isEqualTo("rzp_test");
-    assertThat(env.getProperty("medmate.razorpay.key-secret")).isEqualTo("sec");
-    assertThat(env.getProperty("medmate.razorpay.webhook-secret")).isEqualTo("whsec");
+    assertThat(env.getProperty("medmate.cashfree.app-id")).isEqualTo("cf_test");
+    assertThat(env.getProperty("medmate.cashfree.secret-key")).isEqualTo("sec");
+    assertThat(env.getProperty("medmate.cashfree.webhook-secret")).isEqualTo("whsec");
+    assertThat(env.getProperty("medmate.cashfree.mode")).isEqualTo("sandbox");
+    assertThat(env.getProperty("medmate.cashfree.payouts-client-id")).isEqualTo("pcid");
+    assertThat(env.getProperty("medmate.cashfree.payouts-client-secret")).isEqualTo("pcsec");
+    assertThat(env.getProperty("medmate.cashfree.payouts-webhook-secret")).isEqualTo("pwh");
   }
 
   @Test
-  void loadsRazorpayxWebhookSecretFromSecretsManager() {
+  void loadsCashfreeWithoutModeAndEmptyPayoutAliases() {
     SecretsManagerClient client = mock(SecretsManagerClient.class);
     when(client.getSecretValue(any(GetSecretValueRequest.class)))
         .thenReturn(
             GetSecretValueResponse.builder()
                 .secretString(
-                    "{\"key_id\":\"rzp_x\",\"key_secret\":\"xsec\",\"webhook_secret\":\"prod-razorpayx-hmac-secret\"}")
+                    "{\"app_id\":\"cf_test\",\"secret_key\":\"sec\",\"webhook_secret\":\"whsec\","
+                        + "\"payouts_client_id\":null,\"payouts_key_id\":\"\","
+                        + "\"payouts_client_secret\":null,\"payouts_key_secret\":\"  \"}")
+                .build());
+
+    StandardEnvironment env = new StandardEnvironment();
+    env.setActiveProfiles("staging");
+    env.getPropertySources()
+        .addFirst(
+            new MapPropertySource("test", Map.of("MEDMATE_SECRETS_CASHFREE_ARN", "arn:cashfree")));
+
+    new AwsSecretsEnvironmentPostProcessor(() -> client)
+        .postProcessEnvironment(env, new SpringApplication());
+
+    assertThat(env.getProperty("medmate.cashfree.app-id")).isEqualTo("cf_test");
+    assertThat(env.getProperty("medmate.cashfree.mode")).isNull();
+    assertThat(env.getProperty("medmate.cashfree.payouts-client-id")).isEmpty();
+    assertThat(env.getProperty("medmate.cashfree.payouts-client-secret")).isEmpty();
+    assertThat(env.getProperty("medmate.cashfree.payouts-webhook-secret")).isEmpty();
+  }
+
+  @Test
+  void loadsCashfreexWebhookSecretFromSecretsManager() {
+    SecretsManagerClient client = mock(SecretsManagerClient.class);
+    when(client.getSecretValue(any(GetSecretValueRequest.class)))
+        .thenReturn(
+            GetSecretValueResponse.builder()
+                .secretString(
+                    "{\"key_id\":\"cf_payouts\",\"key_secret\":\"xsec\",\"webhook_secret\":\"prod-cashfree_payouts-hmac-secret\"}")
                 .build());
 
     StandardEnvironment env = new StandardEnvironment();
@@ -210,15 +248,15 @@ class AwsSecretsEnvironmentPostProcessorTest {
     env.getPropertySources()
         .addFirst(
             new MapPropertySource(
-                "test", Map.of("MEDMATE_SECRETS_RAZORPAYX_ARN", "arn:razorpayx")));
+                "test", Map.of("MEDMATE_SECRETS_CASHFREE_PAYOUTS_ARN", "arn:cashfree_payouts")));
 
     new AwsSecretsEnvironmentPostProcessor(() -> client)
         .postProcessEnvironment(env, new SpringApplication());
 
-    assertThat(env.getProperty("medmate.razorpayx.key-id")).isEqualTo("rzp_x");
-    assertThat(env.getProperty("medmate.razorpayx.key-secret")).isEqualTo("xsec");
-    assertThat(env.getProperty("medmate.razorpayx.webhook-secret"))
-        .isEqualTo("prod-razorpayx-hmac-secret");
+    assertThat(env.getProperty("medmate.cashfree.payouts-client-id")).isEqualTo("cf_payouts");
+    assertThat(env.getProperty("medmate.cashfree.payouts-client-secret")).isEqualTo("xsec");
+    assertThat(env.getProperty("medmate.cashfree.payouts-webhook-secret"))
+        .isEqualTo("prod-cashfree_payouts-hmac-secret");
   }
 
   @Test

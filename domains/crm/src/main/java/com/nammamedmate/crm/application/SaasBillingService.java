@@ -750,7 +750,7 @@ public class SaasBillingService implements InvoiceIssuingPort {
   private Map<String, Object> payResponse(SaasInvoice inv) {
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("invoice_id", inv.id());
-    data.put("payment_gateway", "Razorpay");
+    data.put("payment_gateway", "Cashfree");
     data.put("checkout_url", inv.checkoutUrl());
     data.put("expires_at", inv.checkoutExpiresAt());
     return data;

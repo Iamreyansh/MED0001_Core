@@ -3,9 +3,9 @@ package com.nammamedmate.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nammamedmate.auth.domain.MagicOtp;
-import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.client.StubCashfreePaymentPort;
 import com.nammamedmate.order.application.OrderLifecycleService;
-import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
+import com.nammamedmate.order.application.port.out.CashfreePaymentPort;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -40,7 +40,7 @@ class CancelRefundIT extends AbstractApiIT {
   @Autowired private TestRestTemplate rest;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private OrderLifecycleService lifecycle;
-  @Autowired private RazorpayPaymentPort razorpay;
+  @Autowired private CashfreePaymentPort cashfree;
 
   private UUID customerId;
   private UUID addressId;
@@ -192,7 +192,7 @@ class CancelRefundIT extends AbstractApiIT {
     assertThat(custRefundStatus).isEqualTo("PENDING");
     assertThat(
             jdbc.queryForObject(
-                "SELECT razorpay_refund_id FROM refund WHERE order_id = ?::uuid LIMIT 1",
+                "SELECT gateway_refund_id FROM refund WHERE order_id = ?::uuid LIMIT 1",
                 String.class,
                 upiOrderId))
         .isNull();
@@ -341,7 +341,7 @@ class CancelRefundIT extends AbstractApiIT {
     }
     String rzRefundId =
         jdbc.queryForObject(
-            "SELECT razorpay_refund_id FROM refund WHERE id = ?::uuid",
+            "SELECT gateway_refund_id FROM refund WHERE id = ?::uuid",
             String.class,
             timeoutRefundId);
     assertThat(rzRefundId).isNotNull().startsWith("rfnd_stub_");
@@ -352,21 +352,21 @@ class CancelRefundIT extends AbstractApiIT {
             + rzRefundId
             + "\"}}}}";
     String sig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, body);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, body);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
-    headers.set("X-Razorpay-Signature", sig);
+    headers.set("x-webhook-signature", sig);
     headers.set("Idempotency-Key", UUID.randomUUID().toString());
     ResponseEntity<Map> wh =
         rest.exchange(
-            baseUrl() + "/api/v1/webhooks/razorpay/order-payment",
+            baseUrl() + "/api/v1/webhooks/cashfree/order-payment",
             HttpMethod.POST,
             new HttpEntity<>(body, headers),
             Map.class);
     assertThat(wh.getStatusCode()).isEqualTo(HttpStatus.OK);
     String status =
         jdbc.queryForObject(
-            "SELECT status FROM refund WHERE razorpay_refund_id = ?", String.class, rzRefundId);
+            "SELECT status FROM refund WHERE gateway_refund_id = ?", String.class, rzRefundId);
     assertThat(status).isEqualTo("PROCESSED");
   }
 
@@ -400,9 +400,9 @@ class CancelRefundIT extends AbstractApiIT {
     String orderId = String.valueOf(data(upi).get("order_id"));
     @SuppressWarnings("unchecked")
     Map<String, Object> payment = (Map<String, Object>) data(upi).get("payment");
-    String rzOrderId = String.valueOf(payment.get("razorpay_order_id"));
+    String rzOrderId = String.valueOf(payment.get("gateway_order_id"));
     String paymentId = "pay_cancel_" + UUID.randomUUID().toString().substring(0, 8);
-    String sig = razorpay.signPayment(rzOrderId, paymentId);
+    String sig = cashfree.signPayment(rzOrderId, paymentId);
     ResponseEntity<Map> confirm =
         rest.exchange(
             baseUrl() + "/api/v1/orders/" + orderId + "/payment/confirm",

@@ -13,7 +13,7 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
-import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.client.StubCashfreePaymentPort;
 import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter;
 import com.nammamedmate.order.application.OrderPlacementServiceTest.InMemoryCartStore;
@@ -78,7 +78,7 @@ class OrderPlacementCoverageTest {
 
   private InMemoryCartStore carts;
   private InMemoryOrderStore orders;
-  private StubRazorpayPaymentPort razorpay;
+  private StubCashfreePaymentPort cashfree;
   private RefundService refundService;
   private OrderPlacementService service;
   private final MedmatePrincipal customer =
@@ -90,7 +90,7 @@ class OrderPlacementCoverageTest {
   void setUp() {
     carts = new InMemoryCartStore();
     orders = new InMemoryOrderStore();
-    razorpay = new StubRazorpayPaymentPort();
+    cashfree = new StubCashfreePaymentPort();
     when(rateLimiter.tryAcquire(
             any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
         .thenReturn(true);
@@ -127,7 +127,7 @@ class OrderPlacementCoverageTest {
             zones,
             new StubDeliveryFeeAdapter(),
             new StubPriceCeilingAdapter(),
-            razorpay,
+            cashfree,
             refundService,
             new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
             new ObjectMapper(),
@@ -168,7 +168,7 @@ class OrderPlacementCoverageTest {
             zones,
             new StubDeliveryFeeAdapter(),
             new StubPriceCeilingAdapter(),
-            new StubRazorpayPaymentPort("k", "w", true),
+            new StubCashfreePaymentPort("k", "w", true),
             org.mockito.Mockito.mock(RefundService.class),
             new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
             new ObjectMapper(),
@@ -181,11 +181,11 @@ class OrderPlacementCoverageTest {
         .isEqualTo("PAYMENT_INITIATION_FAILED");
 
     // blank secret defaults + hmac exception path via verify nulls
-    StubRazorpayPaymentPort blankSecrets = new StubRazorpayPaymentPort(" ", " ");
+    StubCashfreePaymentPort blankSecrets = new StubCashfreePaymentPort(" ", " ");
     var created = blankSecrets.createOrder(UUID.randomUUID(), 100);
-    assertThat(blankSecrets.verifyPaymentSignature(created.razorpayOrderId(), null, "x")).isFalse();
+    assertThat(blankSecrets.verifyPaymentSignature(created.gatewayOrderId(), null, "x")).isFalse();
     assertThat(blankSecrets.verifyWebhookSignature("x", null)).isFalse();
-    assertThatThrownBy(() -> StubRazorpayPaymentPort.hmacHex(null, "x"))
+    assertThatThrownBy(() -> StubCashfreePaymentPort.hmacHex(null, "x"))
         .isInstanceOf(IllegalStateException.class);
 
     // rx without prescription id (checkout stubbed)
@@ -214,7 +214,7 @@ class OrderPlacementCoverageTest {
         .isEqualTo("VALIDATION_ERROR");
 
     Order order = orders.findById(oid).orElseThrow();
-    // null razorpay order id
+    // null cashfree order id
     Order noRz =
         new Order(
             order.id(),
@@ -246,7 +246,7 @@ class OrderPlacementCoverageTest {
             T0,
             T0);
     orders.update(noRz);
-    // update won't clear razorpay in our in-memory if we replace - InMemory update replaces
+    // update won't clear cashfree in our in-memory if we replace - InMemory update replaces
     orders.byId.put(noRz.id(), noRz);
     assertThatThrownBy(() -> service.confirmPayment(customer, oid, "p", "s", "c7"))
         .extracting(e -> ((AppException) e).code())
@@ -259,7 +259,7 @@ class OrderPlacementCoverageTest {
     UUID oid2 = UUID.fromString(String.valueOf(p2.get("order_id")));
     Order o2 = orders.findById(oid2).orElseThrow();
     String pay = "pay_ok";
-    String sig = razorpay.signPayment(o2.razorpayOrderId(), pay);
+    String sig = cashfree.signPayment(o2.gatewayOrderId(), pay);
     service.confirmPayment(customer, oid2, pay, sig, "c9");
     assertThatThrownBy(() -> service.confirmPayment(customer, oid2, "pay_other", sig, "c10"))
         .extracting(e -> ((AppException) e).code())
@@ -318,7 +318,7 @@ class OrderPlacementCoverageTest {
         zones,
         new StubDeliveryFeeAdapter(),
         new StubPriceCeilingAdapter(),
-        razorpay,
+        cashfree,
         org.mockito.Mockito.mock(RefundService.class),
         null,
         new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
@@ -328,36 +328,36 @@ class OrderPlacementCoverageTest {
 
     // webhook null body + ignored not pending + missing payment id
     String emptySig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, "");
-    assertThatThrownBy(() -> service.handleRazorpayWebhook(emptySig, null, "w0"))
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, "");
+    assertThatThrownBy(() -> service.handleCashfreeWebhook(emptySig, null, "w0"))
         .extracting(e -> ((AppException) e).code())
         .isIn("PAYMENT_SIGNATURE_INVALID", "VALIDATION_ERROR");
 
     String onlyOrder =
         "{\"event\":\"payment.captured\",\"payload\":{\"payment\":{\"entity\":{\"order_id\":\"order_x\"}}}}";
     String onlyOrderSig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, onlyOrder);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, onlyOrder);
     assertThat(
-            service.handleRazorpayWebhook(
+            service.handleCashfreeWebhook(
                 onlyOrderSig, onlyOrder.getBytes(StandardCharsets.UTF_8), "w1"))
         .containsEntry("ignored", true);
 
     // confirmed order webhook ignored path
     String body =
         "{\"event\":\"payment.captured\",\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_new\",\"order_id\":\"%s\"}}}}"
-            .formatted(o2.razorpayOrderId());
+            .formatted(o2.gatewayOrderId());
     String bodySig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, body);
-    assertThat(service.handleRazorpayWebhook(bodySig, body.getBytes(StandardCharsets.UTF_8), "w2"))
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, body);
+    assertThat(service.handleCashfreeWebhook(bodySig, body.getBytes(StandardCharsets.UTF_8), "w2"))
         .containsEntry("ignored", true);
 
     String refundBody =
         "{\"event\":\"refund.processed\",\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_1\"}}}}";
     String refundSig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, refundBody);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, refundBody);
     when(refundService.handleRefundProcessed(any())).thenReturn(Map.of("status", "PROCESSED"));
     assertThat(
-            service.handleRazorpayWebhook(
+            service.handleCashfreeWebhook(
                 refundSig, refundBody.getBytes(StandardCharsets.UTF_8), "w-refund"))
         .containsEntry("status", "PROCESSED");
 
@@ -425,7 +425,7 @@ class OrderPlacementCoverageTest {
     assertThatThrownBy(() -> OrderPlacementService.parseAmountPaise(null))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
-    assertThat(blankSecrets.verifyPaymentSignature(created.razorpayOrderId(), "pay", "   "))
+    assertThat(blankSecrets.verifyPaymentSignature(created.gatewayOrderId(), "pay", "   "))
         .isFalse();
     assertThatThrownBy(
             () ->
@@ -442,25 +442,25 @@ class OrderPlacementCoverageTest {
     when(rateLimiter.tryAcquire(
             any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
         .thenReturn(true);
-    assertThatThrownBy(() -> service.handleRazorpayWebhook("nope", null, "w-null"))
+    assertThatThrownBy(() -> service.handleCashfreeWebhook("nope", null, "w-null"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("PAYMENT_SIGNATURE_INVALID");
 
     String onlyPay =
         "{\"event\":\"payment.captured\",\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_only\"}}}}";
     String onlyPaySig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, onlyPay);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, onlyPay);
     assertThat(
-            service.handleRazorpayWebhook(
+            service.handleCashfreeWebhook(
                 onlyPaySig, onlyPay.getBytes(StandardCharsets.UTF_8), "w-pay"))
         .containsEntry("ignored", true);
 
     String blankId =
         "{\"event\":\"payment.captured\",\"payload\":{\"payment\":{\"entity\":{\"id\":\"  \",\"order_id\":\"order_x\"}}}}";
     String blankIdSig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, blankId);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, blankId);
     assertThat(
-            service.handleRazorpayWebhook(
+            service.handleCashfreeWebhook(
                 blankIdSig, blankId.getBytes(StandardCharsets.UTF_8), "w-blank"))
         .containsEntry("ignored", true);
 
@@ -494,13 +494,13 @@ class OrderPlacementCoverageTest {
     assertThat(service.placeOrder(customer, rxOk.id(), "COD", null, null, "rx-up").get("status"))
         .isEqualTo("PENDING_ACCEPTANCE");
 
-    new StubRazorpayPaymentPort(null, null).createOrder(UUID.randomUUID(), 50);
+    new StubCashfreePaymentPort(null, null).createOrder(UUID.randomUUID(), 50);
 
     String other = "{\"event\":\"order.paid\"}";
     String otherSig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, other);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, other);
     assertThat(
-            service.handleRazorpayWebhook(
+            service.handleCashfreeWebhook(
                 otherSig, other.getBytes(StandardCharsets.UTF_8), "w-other"))
         .containsEntry("ignored", true);
 
@@ -665,7 +665,7 @@ class OrderPlacementCoverageTest {
             zones,
             emptyFees,
             new StubPriceCeilingAdapter(),
-            razorpay,
+            cashfree,
             org.mockito.Mockito.mock(RefundService.class),
             new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
             new ObjectMapper(),

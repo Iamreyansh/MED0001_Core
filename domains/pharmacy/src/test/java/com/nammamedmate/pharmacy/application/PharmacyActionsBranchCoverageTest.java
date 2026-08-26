@@ -147,7 +147,7 @@ class PharmacyActionsBranchCoverageTest {
     assertThatThrownBy(
             () ->
                 staleActions.sendNotice(
-                    principal(AuthRole.ADMIN_OPERATIONS), PID, "EMAIL", "s", "m", "NORMAL", null))
+                    principal(AuthRole.ADMIN_OPERATIONS), PID, "IN_APP", "s", "m", "NORMAL", null))
         .isInstanceOf(AppException.class)
         .satisfies(
             ex -> assertThat(((AppException) ex).code()).isEqualTo("NOTICE_RATE_LIMIT_EXCEEDED"));
@@ -161,7 +161,7 @@ class PharmacyActionsBranchCoverageTest {
             "x".repeat(250),
             "URGENT",
             "PHARMACY_URGENT_ALERT");
-    assertThat(urgentAll.get("channels_sent")).isEqualTo(List.of("WHATSAPP", "EMAIL", "IN_APP"));
+    assertThat(urgentAll.get("channels_sent")).isEqualTo(List.of("IN_APP"));
   }
 
   @Test
@@ -188,7 +188,7 @@ class PharmacyActionsBranchCoverageTest {
             provider);
 
     redisActions.sendNotice(
-        principal(AuthRole.ADMIN_OPERATIONS), PID, "EMAIL", "Subject", "Body", "NORMAL", null);
+        principal(AuthRole.ADMIN_OPERATIONS), PID, "IN_APP", "Subject", "Body", "NORMAL", null);
     verify(redisTemplate, never()).expire(any(String.class), any(java.time.Duration.class));
   }
 
@@ -576,14 +576,17 @@ class PharmacyActionsBranchCoverageTest {
 
   @Test
   void remainingActionServiceRoleAndValidationBranches() {
-    actions.sendNotice(
-        principal(AuthRole.ADMIN_SUPER),
-        PID,
-        " WHATSAPP ",
-        null,
-        "msg",
-        null,
-        "PHARMACY_GENERAL_NOTICE");
+    assertThatThrownBy(
+            () ->
+                actions.sendNotice(
+                    principal(AuthRole.ADMIN_SUPER),
+                    PID,
+                    " WHATSAPP ",
+                    null,
+                    "msg",
+                    null,
+                    "PHARMACY_GENERAL_NOTICE"))
+        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("CHANNEL_UNAVAILABLE"));
     for (AuthRole role :
         List.of(
             AuthRole.ADMIN_SUPER,
@@ -631,7 +634,7 @@ class PharmacyActionsBranchCoverageTest {
             Clock.fixed(NOW, ZoneOffset.UTC),
             provider);
     redisActions.sendNotice(
-        principal(AuthRole.ADMIN_OPERATIONS), PID, "EMAIL", "Subject", "Body", "NORMAL", null);
+        principal(AuthRole.ADMIN_OPERATIONS), PID, "IN_APP", "Subject", "Body", "NORMAL", null);
     verify(redisTemplate, never()).expire(any(String.class), any(java.time.Duration.class));
   }
 

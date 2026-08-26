@@ -12,7 +12,7 @@
 
 ## Overview
 
-This story covers the financial management layer between Namma MedMate and its pharmacy partners: commission configuration, settlement ledger, TCS (Tax Collected at Source) computation under Section 194-O, net payout calculation, and settlement release/hold workflows. Admin finance staff use these endpoints to view per-pharmacy commission structures, track GMV and earnings across settlement periods, adjust commission tiers with documented reasons, and release or hold weekly settlement payouts via RazorpayX. Every financial action is traceable with before/after values in the audit log. Pharmacies receive automated payout receipts via email when a settlement is released.
+This story covers the financial management layer between Namma MedMate and its pharmacy partners: commission configuration, settlement ledger, TCS (Tax Collected at Source) computation under Section 194-O, net payout calculation, and settlement release/hold workflows. Admin finance staff use these endpoints to view per-pharmacy commission structures, track GMV and earnings across settlement periods, adjust commission tiers with documented reasons, and release or hold weekly settlement payouts via Cashfree Payouts. Every financial action is traceable with before/after values in the audit log. Pharmacies receive automated payout receipts via email when a settlement is released.
 
 ---
 
@@ -36,10 +36,10 @@ This story covers the financial management layer between Namma MedMate and its p
 4. **TCS computation**: TCS (Tax Collected at Source) = 1% of GMV for all marketplace sales, per Section 194-O of the Income Tax Act. TCS is applicable when the pharmacy's annual marketplace GMV exceeds Rs 5,00,000. Below this threshold, TCS is waived and `tcs_deducted = 0`.
 5. **Net payout formula**: `net_payable = GMV - commission_pct% - TCS`. TCS is deducted from the platform's commission, not from the pharmacy's GMV. Net payout is what the pharmacy receives: `pharmacy_net = GMV - commission_earned - TCS`. *(Clarification: platform takes commission + TCS from GMV; pharmacy receives remainder.)*
 6. **Settlement cycle is weekly by default**: Settlements cover Monday-Sunday. Settlement records are auto-created by a settlement generation job that runs every Monday morning. The settlement period is `[last_monday_00:00, last_sunday_23:59]` IST. The settlement is held for 2 business days for fraud review before being released.
-7. **Settlement release triggers RazorpayX payout**: Calling `POST /settlements/:id/release` initiates a RazorpayX payout to the pharmacy's verified bank account. If no verified bank account exists, release fails with `BANK_ACCOUNT_NOT_VERIFIED`. Payout confirmation is received via RazorpayX webhook; settlement status updates to `PAID` asynchronously.
+7. **Settlement release triggers Cashfree Payouts transfer**: Calling `POST /settlements/:id/release` initiates a Cashfree Payouts transfer to the pharmacy's verified bank account. If no verified bank account exists, release fails with `BANK_ACCOUNT_NOT_VERIFIED`. Payout confirmation is received via Cashfree Payouts webhook; settlement status updates to `PAID` asynchronously.
 8. **Only `admin_finance` or `admin_super` can release or hold settlements**: Other admin roles cannot release or hold. Attempting these actions returns HTTP 403.
 9. **A hold requires a reason**: Calling `POST /settlements/:id/hold` requires a non-empty `reason`. The reason is stored and communicated to the pharmacy via email.
-10. **Payout receipts are auto-emailed**: When a settlement status changes to `PAID` (via RazorpayX webhook confirmation), a PDF payout receipt is generated and emailed to the pharmacy owner. The receipt includes: settlement period, GMV, commission, TCS, net paid, UTR number.
+10. **Payout receipts are auto-emailed**: When a settlement status changes to `PAID` (via Cashfree Payouts webhook confirmation), a PDF payout receipt is generated and emailed to the pharmacy owner. The receipt includes: settlement period, GMV, commission, TCS, net paid, UTR number.
 
 ---
 
@@ -273,7 +273,7 @@ POST /api/v1/admin/pharmacies/:id/settlements/:settlement_id/release
     "released_at": "2026-07-24T00:00:00Z",
     "released_by": "admin-finance-uuid",
     "payout_initiated": true,
-    "razorpayx_payout_id": "pout_XXXXXXXXXXXX",
+    "cashfree_transfer_id": "pout_XXXXXXXXXXXX",
     "estimated_credit_hours": 4,
     "message": "Settlement released. Payout initiated to pharmacy bank account."
   },
@@ -360,8 +360,8 @@ POST /api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold
 | `hold_reason` | TEXT | Nullable | Reason for hold (if status=HELD) |
 | `released_by` | UUID | FK ? User.id, nullable | Admin who released |
 | `released_at` | TIMESTAMPTZ | Nullable | Release timestamp |
-| `paid_at` | TIMESTAMPTZ | Nullable | RazorpayX confirmation timestamp |
-| `razorpayx_payout_id` | VARCHAR(100) | Nullable | RazorpayX payout ID for tracking |
+| `paid_at` | TIMESTAMPTZ | Nullable | Cashfree Payouts confirmation timestamp |
+| `cashfree_transfer_id` | VARCHAR(100) | Nullable | Cashfree Payouts transfer ID for tracking |
 | `utr_number` | VARCHAR(50) | Nullable | Bank UTR number for completed payout |
 | `receipt_url` | TEXT | Nullable | CDN URL of generated PDF receipt |
 | `created_at` | TIMESTAMPTZ | Not null, default now() | Settlement record creation |
@@ -390,7 +390,7 @@ POST /api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold
 - [ ] **Given** PATCH `/api/v1/admin/pharmacies/:id/commission` with `effective_from` = today, **then** HTTP 400 `EFFECTIVE_FROM_MUST_BE_FUTURE` is returned.
 - [ ] **Given** a valid commission change is submitted, **then** a `CommissionHistory` record is created and an `AuditLog` entry is written with `action=COMMISSION_CHANGED`, `before_value`, `after_value`, and `actor_id`.
 - [ ] **Given** a pharmacy's annual GMV YTD exceeds Rs 5,00,000, **then** `tcs_applicable=true` and `tcs_deducted = GMV - 1%` in the settlement; below threshold, `tcs_deducted=0`.
-- [ ] **Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/release` on a settlement in `PENDING_RELEASE` status with a verified bank account, **then** RazorpayX payout is initiated, settlement status changes to `RELEASED`, and the pharmacy owner receives a payout confirmation email with UTR.
+- [ ] **Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/release` on a settlement in `PENDING_RELEASE` status with a verified bank account, **then** Cashfree Payouts transfer is initiated, settlement status changes to `RELEASED`, and the pharmacy owner receives a payout confirmation email with UTR.
 - [ ] **Given** POST `/release` is called on a settlement in `HELD` status, **then** HTTP 409 `SETTLEMENT_HELD` is returned.
 - [ ] **Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold` with a `reason`, **then** settlement status changes to `HELD`, the pharmacy owner is notified via email with the hold reason, and the reason is recorded in the settlement record.
 
@@ -401,7 +401,7 @@ POST /api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold
 - STORY-003-005 - Pharmacy Profile Update (bank account verification required for release)
 - STORY-004-001 - Pharmacy Directory (commission shown in detail drawer)
 - EPIC-008 - Orders (GMV aggregation per settlement period)
-- External: RazorpayX - Payout API for settlement disbursements and penny drop
+- External: Cashfree Payouts - Payout API for settlement disbursements and penny drop
 - External: PDF Generation Service - Payout receipt generation
 - Infrastructure: Settlement generation cron job (runs every Monday)
 
@@ -411,6 +411,6 @@ POST /api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold
 
 - Section 194-O TCS is collected by the platform as the e-commerce operator. The platform must file TCS returns quarterly (Form 27EQ). Integration with the tax filing module (EPIC-012) is out of scope here but the settlement data must expose TCS amounts in a format consumable by the tax module.
 - The settlement generation job creates `Settlement` records in `PENDING_RELEASE` status automatically. The 2 business-day fraud review hold is enforced by not auto-releasing until the hold window passes. After the window, settlements are flagged for admin release (not auto-released).
-- If RazorpayX payout fails (e.g., bank account error), settlement status changes to `FAILED`. An admin alert is generated and the pharmacy is notified. Admin must investigate and re-release.
+- If Cashfree Payouts transfer fails (e.g., bank account error), settlement status changes to `FAILED`. An admin alert is generated and the pharmacy is notified. Admin must investigate and re-release.
 - Commission change scheduled job: a cron at 00:01 IST daily checks `CommissionHistory` for records where `effective_from = today` and `applied_at IS NULL`. It updates `Pharmacy.commission_pct` and sets `applied_at`.
 - Net paid to pharmacy: `pharmacy_net = GMV - commission_earned - tcs_deducted`. Example: GMV=100,000; commission=8,000; TCS=1,000; pharmacy_net=91,000.

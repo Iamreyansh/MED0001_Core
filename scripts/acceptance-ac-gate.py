@@ -27,7 +27,7 @@ REQUIRED_BRUNO = [
     ROOT / "bruno/auth/customer/send-otp.bru",
 ]
 REQUIRED_DECISIONS = {
-    "EPIC-003/STORY-003": "D8",
+    "EPIC-003/STORY-004": "D8",
     "EPIC-004/STORY-003": "D6",
     "EPIC-010/STORY-005": "D10",
     "EPIC-012/STORY-003": "D6",

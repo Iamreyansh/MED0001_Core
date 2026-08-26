@@ -85,11 +85,11 @@ class PaymentDomainTest {
     assertThat(p.status()).isEqualTo(PaymentStatus.CAPTURED);
     p.fail("pay_2", "bank", "{}", now.plusSeconds(1));
     assertThat(p.status()).isEqualTo(PaymentStatus.FAILED);
-    assertThat(p.razorpayPaymentId()).isEqualTo("pay_2");
+    assertThat(p.gatewayPaymentId()).isEqualTo("pay_2");
     p.fail(null, "again", null, now.plusSeconds(2));
-    assertThat(p.razorpayPaymentId()).isEqualTo("pay_2");
+    assertThat(p.gatewayPaymentId()).isEqualTo("pay_2");
     p.fail("  ", "blank", null, now.plusSeconds(3));
-    assertThat(p.razorpayPaymentId()).isEqualTo("pay_2");
+    assertThat(p.gatewayPaymentId()).isEqualTo("pay_2");
     Payment withBlankCurrency =
         new Payment(
             UUID.randomUUID(),

@@ -55,8 +55,8 @@ medmate:
       enabled: true
     po-dispatch:
       # Stub channel availability until EPIC-017 notification consumer is live.
-      whatsapp-enabled: true
-      email-enabled: true
+      whatsapp-enabled: false
+      email-enabled: false
   pos:
     # Free-tier bootstrap: Starter/Growth POS feature gates (offers etc. in later stories).
     starter-features-enabled: false
@@ -111,20 +111,17 @@ medmate:
   internal:
     # Blank → S2S endpoints fail closed. Local: application-local.yml.
     service-token: ""
-  razorpay:
-    # Blank keys → StubRazorpayClient (local/CI). Staging/prod: ECS secret env
-    # MEDMATE_RAZORPAY_{KEY_ID,KEY_SECRET,WEBHOOK_SECRET} (see stacks/*/api.tf).
-    key-id: ""
-    key-secret: ""
+  cashfree:
+    # Blank app-id/secret-key → StubCashfreeClient (local/CI). Staging/prod: Secrets Manager.
+    app-id: ""
+    secret-key: ""
     webhook-secret: ""
-    # TEST|LIVE — live keys still hit api.razorpay.com/v1; mode is an audit flag (AC-008).
+    # Separate Cashfree Payouts credentials (blank → StubCashfreePayoutClient).
+    payouts-client-id: ""
+    payouts-client-secret: ""
+    payouts-webhook-secret: ""
+    # TEST|LIVE — TEST uses sandbox.cashfree.com/pg; LIVE uses api.cashfree.com/pg.
     mode: TEST
-  razorpayx:
-    # Blank keys → StubRazorpayXClient. Staging/prod: MEDMATE_RAZORPAYX_*.
-    key-id: ""
-    key-secret: ""
-    # Local: application-local.yml. Staging/prod: MEDMATE_RAZORPAYX_WEBHOOK_SECRET.
-    webhook-secret: ""
   maps:
     # Segregated Google Maps keys (AC-008). Blank → StubMapsClient for that capability.
     geocode:
@@ -133,36 +130,6 @@ medmate:
       api-key: ""
     directions:
       api-key: ""
-  gstn:
-    # Blank → StubGstnClient. Staging/prod: MEDMATE_GSTN_API_KEY.
-    api-key: ""
-    base-url: https://gstn.example.invalid/v1
-  digilocker:
-    # Blank client-id/secret → StubDigiLockerClient.
-    client-id: ""
-    client-secret: ""
-    authorize-url: https://api.digitallocker.gov.in/public/oauth2/1/authorize
-    token-url: https://api.digitallocker.gov.in/public/oauth2/1/token
-  drug-registry:
-    api-key: ""
-    base-url: https://drug-registry.example.invalid/v1
-  fssai:
-    api-key: ""
-    base-url: https://fssai.example.invalid/v1
-  gsp:
-    # Blank client-id/secret → StubGspClient (local/CI). Staging/prod: MEDMATE_GSP_*.
-    client-id: ""
-    client-secret: ""
-    base-url: https://gsp.example.invalid/v1
-  zoho:
-    # Blank → StubZohoBooksClient. Staging/prod: MEDMATE_ZOHO_CLIENT_*.
-    client-id: ""
-    client-secret: ""
-    accounts-base-url: https://accounts.zoho.in
-    books-base-url: https://www.zohoapis.in/books/v3
-  accounting:
-    # Hex (64 chars) or Base64 AES-256 key for Zoho OAuth token ciphertext. Blank → local zero key.
-    token-cipher-key: ""
   teleconsult:
     # Local blank → zero key. Staging/prod: SM teleconsult_encryption_key_base64 or MFA fallback (fail-closed).
     encryption-key-base64: ""
@@ -174,29 +141,6 @@ medmate:
     payout-retry:
       enabled: true
     payout-retry-delay-ms: 300000
-    gsp-token-refresh:
-      enabled: true
-    gsp-token-refresh-delay-ms: 3600000
-    accounting-auto-sync:
-      enabled: true
-    accounting-auto-sync-delay-ms: 60000
-    comms-health-check:
-      enabled: true
-    comms-health-check-delay-ms: 300000
-    comms-daily-reset:
-      enabled: true
-    accounting:
-      sync-poller:
-        enabled: true
-      sync-poll-delay-ms: 2000
-  kyc:
-    # ponytail: feature flag via property, not EPIC-021 settings service (simpler for now)
-    auto-verification-enabled: false
-    # Local: application-local.yml. Staging/prod: MEDMATE_KYC_WEBHOOK_SECRET.
-    webhook-secret: ""
-    jobs:
-      enabled: true
-      retry-delay-ms: 30000
   medicine-schedule:
     jobs:
       enabled: true
@@ -211,6 +155,18 @@ medmate:
     jobs:
       enabled: true
     auto-remediate: true
+
+  # Staging/prod: MEDMATE_TWILIO_{ACCOUNT_SID,AUTH_TOKEN,FROM_NUMBER}
+  twilio:
+    account-sid: ""
+    auth-token: ""
+    api-key: ""
+    from-number: ""
+    messaging-service-sid: ""
+  # Staging/prod: MEDMATE_FCM_{PROJECT_ID,SERVICE_ACCOUNT_JSON}
+  fcm:
+    project-id: ""
+    service-account-json: ""
 
   outbox:
     dispatch:

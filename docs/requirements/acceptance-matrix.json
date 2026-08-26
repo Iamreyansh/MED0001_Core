@@ -1,8 +1,8 @@
 {
   "version": 2,
   "generated_from": "docs/requirements/**/STORY-*.md + AGENT-REQUIREMENT-IMPLEMENTATION.md",
-  "story_count": 129,
-  "ac_count": 1067,
+  "story_count": 122,
+  "ac_count": 1012,
   "stories_missing_acs": [],
   "stories_unknown_tracker": [],
   "stories": [
@@ -138,13 +138,13 @@
       "id": "EPIC-002/STORY-004",
       "path": "docs/requirements/EPIC-002-customer-management/STORY-004-saved-payment-methods.md",
       "acceptance_criteria": [
-        "Given a valid UPI ID, when `POST /customers/me/payment-methods/upi` is called, then Razorpay VPA validation is triggered; if the VPA is valid, a new saved method is created and the stored `upi_id` is encrypted at rest while only the masked `upi_handle` is returned in the response.",
+        "Given a valid UPI ID, when `POST /customers/me/payment-methods/upi` is called, then Cashfree VPA validation is triggered; if the VPA is valid, a new saved method is created and the stored `upi_id` is encrypted at rest while only the masked `upi_handle` is returned in the response.",
         "Given a customer with 5 saved UPI IDs, when `POST /customers/me/payment-methods/upi` is called with a 6th UPI ID, then `422 PAYMENT_METHOD_LIMIT_REACHED` is returned.",
-        "Given `POST /customers/me/payment-methods/card` is called with a `razorpay_token_id` but no `card_last4`, then `400 VALIDATION_ERROR` is returned with a message indicating `card_last4` is required.",
+        "Given `POST /customers/me/payment-methods/card` is called with a `cashfree_token_id` but no `card_last4`, then `400 VALIDATION_ERROR` is returned with a message indicating `card_last4` is required.",
         "Given a saved card is the payment source for an order in `CONFIRMED` status, when `DELETE /customers/me/payment-methods/:id` is called, then `409 PAYMENT_METHOD_IN_ACTIVE_ORDER` is returned.",
         "Given two saved methods A (default) and B (not default), when `PATCH /payment-methods/B/set-default` is called, then B has `is_default: true` and A has `is_default: false` in the same atomic DB transaction.",
         "Given `GET /customers/me/payment-methods`, then no full UPI IDs or card numbers are present in the response - only masked `upi_handle` and `card_last4` are visible.",
-        "Given a card payment method with type=CARD, the `razorpay_token_id` field must never appear in any customer-facing API response (it is internal only)."
+        "Given a card payment method with type=CARD, the `cashfree_token_id` field must never appear in any customer-facing API response (it is internal only)."
       ],
       "ac_count": 7,
       "tracker_status": "staging-deployed",
@@ -202,24 +202,6 @@
       "verified": false
     },
     {
-      "id": "EPIC-003/STORY-003",
-      "path": "docs/requirements/EPIC-003-pharmacy-onboarding-kyc/STORY-003-auto-kyc-verification.md",
-      "acceptance_criteria": [
-        "**Given** `kyc_auto_verification_enabled=true` and a pharmacy submits KYC, **when** `/kyc/submit` is called, **then** an `AutoKycJob` is created and GSTIN check runs synchronously (within 10s), while Drug Licence and FSSAI checks are dispatched to the async queue.",
-        "**Given** all three checks return `PASS` within the async window, **when** the final check resolves, **then** (D8) pharmacy stays `KYC_SUBMITTED` / pending manual review, `auto_activated` remains false, and `pharmacy.kyc.manual_review_required` is published \u2014 auto-KYC never activates.",
-        "**Given** FSSAI check returns `FAIL`, **when** the result is recorded, **then** pharmacy remains `KYC_SUBMITTED`, an admin KYC task is created in the review queue, and the auto-verify result with the FAIL detail is attached to that task.",
-        "**Given** the GSTN API returns a business name with Levenshtein distance > 5 tokens from the platform `business_name`, **when** GSTIN check resolves, **then** check status is `PASS` but an admin flag `BUSINESS_NAME_MISMATCH` with `severity=WARN` is added.",
-        "**Given** the Drug Licence API returns an expiry date < 90 days from today, **when** the result is received, **then** Drug Licence check status is `FAIL` with reason `LICENCE_EXPIRING_SOON`.",
-        "**Given** the external Drug Licence API returns HTTP 500, **when** the error is received, **then** the check status is set to `ERROR`, retried up to 3 times with exponential backoff (10s, 30s, 90s), and after all retries exhausted, the job routes to the manual admin queue.",
-        "**Given** an admin calls GET `/api/v1/admin/pharmacies/:id/kyc/auto-verify-result`, **then** all `KycVerification` records for the latest job are returned including status, details, and any admin flags, with no raw API secrets in the response.",
-        "**Given** `kyc_auto_verification_enabled=false`, **when** an admin calls POST `/api/v1/admin/pharmacies/:id/kyc/auto-verify`, **then** HTTP 503 `FEATURE_FLAG_DISABLED` is returned."
-      ],
-      "ac_count": 8,
-      "tracker_status": "in_progress",
-      "verified": false,
-      "decision": "D8"
-    },
-    {
       "id": "EPIC-003/STORY-004",
       "path": "docs/requirements/EPIC-003-pharmacy-onboarding-kyc/STORY-004-kyc-status-management.md",
       "acceptance_criteria": [
@@ -230,11 +212,13 @@
         "**Given** a pharmacy in `SUSPENDED` status, **when** POST `/api/v1/admin/pharmacies/:id/reactivate` is called with `notes`, **then** pharmacy `status=ACTIVE`, `is_online=true`, and an audit log entry with `action=PHARMACY_REACTIVATED` is written.",
         "**Given** any approve/reject/suspend/reactivate action, **then** an `AuditLog` record is written with the correct `action`, `actor_id`, `actor_role`, `entity_id`, and `payload` including the reason/notes.",
         "**Given** GET `/api/v1/admin/pharmacies?status=KYC_SUBMITTED`, **then** only pharmacies in `KYC_SUBMITTED` status are returned, sorted by `submitted_at` ascending (oldest first) by default.",
-        "**Given** POST `/api/v1/admin/pharmacies/:id/request-documents` with valid `document_types` and `message`, **then** the pharmacy owner receives an in-app + email + WhatsApp notification, and the KYC SLA timer resets."
+        "**Given** POST `/api/v1/admin/pharmacies/:id/request-documents` with valid `document_types` and `message`, **then** the pharmacy owner receives an in-app + email + WhatsApp notification, and the KYC SLA timer resets.",
+        "**Given** all KYC documents are verified, **when** no admin has called approve, **then** pharmacy status stays `PENDING_KYC` or `KYC_SUBMITTED` and the system never auto-activates the pharmacy (D8)."
       ],
-      "ac_count": 8,
+      "ac_count": 9,
       "tracker_status": "staging-deployed",
-      "verified": false
+      "verified": false,
+      "decision": "D8"
     },
     {
       "id": "EPIC-003/STORY-005",
@@ -243,7 +227,7 @@
         "**Given** a pharmacy_owner calls PATCH `/api/v1/pharmacy/profile` with a new `business_name`, **then** the change is NOT immediately applied; a `ProfileChangeRequest` is created with `status=PENDING_APPROVAL`, and the response lists `business_name` in `pending_approval_fields`.",
         "**Given** a pharmacy_owner calls PATCH `/api/v1/pharmacy/profile` with a new `phone`, **then** an OTP is sent to the new phone number and the phone is not updated until OTP verification succeeds.",
         "**Given** `operating_hours` is submitted with Monday `open_time=21:00` and `close_time=09:00` (open after close), **when** the request is processed, **then** HTTP 400 `INVALID_OPERATING_HOURS` is returned.",
-        "**Given** POST `/api/v1/pharmacy/profile/bank-account` is called with valid bank details, **then** a penny drop of Rs 1 is initiated via RazorpayX, the account `verification_status=PENDING`, and the pharmacy owner is notified when verification completes.",
+        "**Given** POST `/api/v1/pharmacy/profile/bank-account` is called with valid bank details, **then** a penny drop of Rs 1 is initiated via Cashfree Payouts, the account `verification_status=PENDING`, and the pharmacy owner is notified when verification completes.",
         "**Given** a verified bank account already exists, **when** POST `/api/v1/pharmacy/profile/bank-account` is called again, **then** HTTP 409 `BANK_ACCOUNT_ALREADY_VERIFIED` is returned.",
         "**Given** PATCH `/api/v1/pharmacy/profile/tax` is called with a new valid `gstin`, **then** GSTIN re-verification is triggered via auto-KYC, and `re_verification_triggered=true` is returned in the response.",
         "**Given** a pharmacy has 3 out of 12 profile fields completed, **when** GET `/api/v1/pharmacy/profile/completeness` is called, **then** `completeness_pct` correctly reflects the proportion and `missing_fields` lists the specific incomplete fields with `impact_pct` and actionable `action` strings.",
@@ -295,8 +279,8 @@
         "**Given** PATCH `/api/v1/admin/pharmacies/:id/commission` with `commission_pct=25.0`, **then** HTTP 400 `INVALID_COMMISSION_PCT` is returned (exceeds 20% max).",
         "**Given** PATCH `/api/v1/admin/pharmacies/:id/commission` with `effective_from` = today, **then** HTTP 400 `EFFECTIVE_FROM_MUST_BE_FUTURE` is returned.",
         "**Given** a valid commission change is submitted, **then** a `CommissionHistory` record is created and an `AuditLog` entry is written with `action=COMMISSION_CHANGED`, `before_value`, `after_value`, and `actor_id`.",
-        "**Given** any pharmacy settlement GMV (D6), **then** TCS is always 1% of settlement GMV; the \u20b95L threshold applies only to TDS 194-O, not TCS.",
-        "**Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/release` on a settlement in `PENDING_RELEASE` status with a verified bank account, **then** RazorpayX payout is initiated, settlement status changes to `RELEASED`, and the pharmacy owner receives a payout confirmation email with UTR.",
+        "**Given** any pharmacy settlement GMV (D6), **then** TCS is always 1% of settlement GMV; the ₹5L threshold applies only to TDS 194-O, not TCS.",
+        "**Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/release` on a settlement in `PENDING_RELEASE` status with a verified bank account, **then** Cashfree Payouts payout is initiated, settlement status changes to `RELEASED`, and the pharmacy owner receives a payout confirmation email with UTR.",
         "**Given** POST `/release` is called on a settlement in `HELD` status, **then** HTTP 409 `SETTLEMENT_HELD` is returned.",
         "**Given** POST `/api/v1/admin/pharmacies/:id/settlements/:settlement_id/hold` with a `reason`, **then** settlement status changes to `HELD`, the pharmacy owner is notified via email with the hold reason, and the reason is recorded in the settlement record."
       ],
@@ -876,8 +860,8 @@
       "path": "docs/requirements/EPIC-010-order-management/STORY-006-order-cancellation-refund.md",
       "acceptance_criteria": [
         "**Given** a customer attempts to cancel an order in `PACKING` status, **when** the cancel request is made, **then** the API returns HTTP 409 with `ORDER_CANNOT_CANCEL`.",
-        "**Given** a customer cancels an order paid via UPI, **when** the cancellation succeeds, **then** a `Refund` record is created with `refund_to: SOURCE` and the Razorpay refund API is called within 60 seconds.",
-        "**Given** an admin cancels a COD order before delivery, **when** cancellation is saved, **then** no Razorpay refund is triggered and the response `refund.initiated = false`.",
+        "**Given** a customer cancels an order paid via UPI, **when** the cancellation succeeds, **then** a `Refund` record is created with `refund_to: SOURCE` and the Cashfree refund API is called within 60 seconds.",
+        "**Given** an admin cancels a COD order before delivery, **when** cancellation is saved, **then** no Cashfree refund is triggered and the response `refund.initiated = false`.",
         "**Given** an admin issues a partial refund of Rs 50 to wallet on a delivered order, **when** the refund is processed, **then** the customer's Namma Money wallet balance increases by Rs 50 and a `Refund` record is created.",
         "**Given** a refund of Rs 250 is attempted on an order with `total_payable = Rs 221.25`, **when** the refund request is submitted, **then** the API returns HTTP 422 with `REFUND_EXCEEDS_REMAINING_REFUNDABLE`.",
         "**Given** the system auto-cancels an order due to pharmacy acceptance timeout, **when** the auto-cancel triggers, **then** a `Refund` and `OrderCancellation` record are created with `cancelled_by_type: SYSTEM`.",
@@ -1051,8 +1035,8 @@
         "AC-003: Weekly payout computation runs automatically on Monday morning for the previous Mon-Sun cycle.",
         "AC-004: A rider with unresolved `cod_in_hand > Rs 2,000` at payout computation time has their payout status set to `HELD`; admin_finance must release it manually.",
         "AC-005: A rider whose net_payout is < Rs 100 has the amount carried forward; no payout is disbursed and `payout_status` is set to `BELOW_THRESHOLD_CARRIED_FORWARD`.",
-        "AC-006: `POST /admin/riders/:id/payout/release` triggers a RazorpayX payout; the rider receives an SMS confirmation on success.",
-        "AC-007: A failed Razorpay payout is auto-retried once after 24 hours; if the retry fails, status is set to `FAILED` and an alert is sent to admin_finance.",
+        "AC-006: `POST /admin/riders/:id/payout/release` triggers a Cashfree Payouts payout; the rider receives an SMS confirmation on success.",
+        "AC-007: A failed Cashfree payout is auto-retried once after 24 hours; if the retry fails, status is set to `FAILED` and an alert is sent to admin_finance.",
         "AC-008: `GET /rider/performance` shows `acceptance_rate_pct` computed as `(accepted / assigned) - 100` over the lifetime of the rider's account."
       ],
       "ac_count": 8,
@@ -1063,12 +1047,12 @@
       "id": "EPIC-012/STORY-001",
       "path": "docs/requirements/EPIC-012-payments-finance/STORY-001-payment-processing.md",
       "acceptance_criteria": [
-        "AC-001: `POST /payments/initiate` creates a Razorpay order and returns `razorpay_order_id` and `razorpay_key_id`; the MedMate payment record is created in `PENDING` state.",
+        "AC-001: `POST /payments/initiate` creates a Cashfree order and returns `cashfree_order_id` and `payment_session_id`; the MedMate payment record is created in `PENDING` state.",
         "AC-002: `POST /payments/verify` with a valid HMAC-SHA256 signature sets payment status to `CAPTURED` and advances the order to the next workflow state.",
         "AC-003: `POST /payments/verify` with an invalid signature returns HTTP 422 `PAYMENT_SIGNATURE_INVALID`; order remains in `PAYMENT_PENDING`.",
         "AC-004: Receiving a `payment.captured` webhook for an already-CAPTURED payment is a no-op (idempotent); returns HTTP 200 without re-processing.",
-        "AC-005: Receiving a webhook with an invalid `X-Razorpay-Signature` header returns HTTP 400 `WEBHOOK_SIGNATURE_INVALID`.",
-        "AC-006: A COD order creation sets `payment_status = PENDING_COD` without calling the Razorpay API; attempting `POST /payments/initiate` for a COD order returns `COD_ORDER_NO_PAYMENT`.",
+        "AC-005: Receiving a webhook with an invalid `x-webhook-signature` header returns HTTP 400 `WEBHOOK_SIGNATURE_INVALID`.",
+        "AC-006: A COD order creation sets `payment_status = PENDING_COD` without calling the Cashfree API; attempting `POST /payments/initiate` for a COD order returns `COD_ORDER_NO_PAYMENT`.",
         "AC-007: When a customer has Rs 50 wallet balance and places a Rs 495 order, `POST /payments/initiate` shows `wallet_deducted = 50.00` and `gateway_amount_paise = 44500`.",
         "AC-008: `GET /payments/:id` for a payment belonging to a different customer returns HTTP 403 `FORBIDDEN`."
       ],
@@ -1101,7 +1085,7 @@
         "AC-002: `net_payable` is correctly computed: GMV Rs 52,000, commission 8%, TCS 1% ? commission Rs 4,160, TCS Rs 520, net Rs 47,320.",
         "AC-003: Releasing a settlement with `net_payable < Rs 100` returns HTTP 422 `AMOUNT_BELOW_THRESHOLD` and carries the amount to the next cycle.",
         "AC-004: Releasing a HELD settlement returns HTTP 422 `SETTLEMENT_HELD`; admin must call the unhold endpoint first.",
-        "AC-005: Releasing a settlement triggers a RazorpayX payout; the pharmacy owner receives an email and WhatsApp notification with the settlement breakdown.",
+        "AC-005: Releasing a settlement triggers a Cashfree Payouts payout; the pharmacy owner receives an email and WhatsApp notification with the settlement breakdown.",
         "AC-006: Bulk release skips settlements > Rs 50,000 and those with HELD status; it returns a summary with released count and failed reasons.",
         "AC-007: `GET /pharmacy/finance/settlements/:id` returns only settlements belonging to the authenticated pharmacy_owner; requesting another pharmacy's settlement returns HTTP 403.",
         "AC-008: Each settlement release creates a `FinancialLedger` entry with type `PAYOUT_PHARMACY`."
@@ -1118,8 +1102,8 @@
         "AC-001: Monday morning cron creates a `RiderPayout` record for each rider who had at least one delivery in the cycle.",
         "AC-002: A rider with `cod_in_hand > Rs 2,000` at computation time has payout auto-set to `HELD`; releasing it via the API without COD resolution returns HTTP 422 `COD_UNRESOLVED`.",
         "AC-003: A payout with `net_payout < Rs 100` is not released; it gets status `BELOW_THRESHOLD_CARRIED` and the amount is added to the next cycle.",
-        "AC-004: Successful `POST /admin/finance/rider-payouts/:id/release` triggers a RazorpayX payout and the rider receives an SMS with the payout amount.",
-        "AC-005: A failed Razorpay payout is automatically retried once after 24 hours; if the retry fails, status is `FAILED` and admin_finance receives an alert.",
+        "AC-004: Successful `POST /admin/finance/rider-payouts/:id/release` triggers a Cashfree Payouts payout and the rider receives an SMS with the payout amount.",
+        "AC-005: A failed Cashfree payout is automatically retried once after 24 hours; if the retry fails, status is `FAILED` and admin_finance receives an alert.",
         "AC-006: Bulk release skips riders with `HELD` status, `net_payout > Rs 10,000`, and `net_payout < Rs 100`; returns a summary with release count and failure reasons.",
         "AC-007: `GET /rider/payouts/history` returns only the authenticated rider's own payout records.",
         "AC-008: Each payout release creates a `FinancialLedger` entry with type `PAYOUT_RIDER`."
@@ -1135,11 +1119,11 @@
         "AC-001: A pharmacy-cancelled order with UPI payment ? Rs 500 is auto-refunded to the source account within 10 minutes; `auto_processed = true`.",
         "AC-002: A refund > Rs 500 remains in `PENDING` state until admin_finance explicitly processes it.",
         "AC-003: A COD cancellation of any amount creates a wallet credit immediately; `refund_to = WALLET`, `status = COMPLETED`.",
-        "AC-004: When the Razorpay `refund.processed` webhook arrives, the refund status is updated to `COMPLETED`; the customer receives a push notification.",
+        "AC-004: When the Cashfree `refund.processed` webhook arrives, the refund status is updated to `COMPLETED`; the customer receives a push notification.",
         "AC-005: A partial refund (e.g., Rs 450 on a Rs 495 order) creates a `Refund` record with `is_partial = true`; the notes field is mandatory for partial refunds.",
         "AC-006: `GET /admin/finance/refunds?status=PENDING` shows `is_overdue = true` for refunds older than 24 hours without action.",
         "AC-007: Attempting to process an already-COMPLETED refund returns HTTP 409 `REFUND_ALREADY_PROCESSED`.",
-        "AC-008: For a hybrid payment (Rs 50 wallet + Rs 445 UPI), the refund for full amount credits Rs 50 to wallet immediately and initiates a Rs 445 Razorpay refund."
+        "AC-008: For a hybrid payment (Rs 50 wallet + Rs 445 UPI), the refund for full amount credits Rs 50 to wallet immediately and initiates a Rs 445 Cashfree refund."
       ],
       "ac_count": 8,
       "tracker_status": "staging-deployed",
@@ -1713,40 +1697,6 @@
       "verified": false
     },
     {
-      "id": "EPIC-017/STORY-003",
-      "path": "docs/requirements/EPIC-017-notifications-comms/STORY-003-whatsapp-business-api.md",
-      "acceptance_criteria": [
-        "POST /whatsapp/send for a phone number in `whatsapp_optouts` returns `422 RECIPIENT_OPTED_OUT` without calling Meta API.",
-        "POST /whatsapp/webhook with incorrect `X-Hub-Signature-256` returns `403 INVALID_SIGNATURE`.",
-        "A delivery receipt webhook updates the log entry's `delivered_at`; a read receipt updates `read_at`.",
-        "POST /whatsapp/send with a PENDING or REJECTED template returns `422 TEMPLATE_NOT_APPROVED`.",
-        "GET /templates returns `rejection_reason` for REJECTED templates and null for APPROVED ones.",
-        "POST /templates/REORDER_REMINDER successfully submits to Meta and returns `status: PENDING`.",
-        "An inbound WA \"STOP\" reply from a customer triggers the opt-out webhook flow and adds the phone to `whatsapp_optouts`.",
-        "GET /logs shows cost_rs values: Rs 0.85 for UTILITY templates, Rs 2.00 for MARKETING templates."
-      ],
-      "ac_count": 8,
-      "tracker_status": "staging-deployed",
-      "verified": false
-    },
-    {
-      "id": "EPIC-017/STORY-004",
-      "path": "docs/requirements/EPIC-017-notifications-comms/STORY-004-email-service.md",
-      "acceptance_criteria": [
-        "POST /email/send to a hard-bounced email returns `422 RECIPIENT_HARD_BOUNCED` without calling SendGrid.",
-        "POST /email/send for a TRANSACTIONAL template to an unsubscribed email is sent successfully (transactional bypass).",
-        "POST /email/send when SendGrid returns 503 automatically retries via AWS SES; log entry has `fallback_used: true`.",
-        "Clicking the unsubscribe link in a MARKETING email calls POST /notifications/unsubscribe and adds the address to `email_unsubscribes`.",
-        "GET /templates returns `open_rate_pct` and `click_rate_pct` computed from delivery log events.",
-        "A spam report from SendGrid webhook immediately marks the email address as unsubscribed.",
-        "POST /email/send with attachment URL that returns 404 sends the email without the attachment and logs a warning.",
-        "Template with `{{undefined_variable}}` sends email with the variable rendered as an empty string (not as literal `{{undefined_variable}}`)."
-      ],
-      "ac_count": 8,
-      "tracker_status": "staging-deployed",
-      "verified": false
-    },
-    {
       "id": "EPIC-017/STORY-005",
       "path": "docs/requirements/EPIC-017-notifications-comms/STORY-005-notification-preferences.md",
       "acceptance_criteria": [
@@ -2140,16 +2090,16 @@
     },
     {
       "id": "EPIC-022/STORY-001",
-      "path": "docs/requirements/EPIC-022-external-integrations/STORY-001-razorpay-integration.md",
+      "path": "docs/requirements/EPIC-022-external-integrations/STORY-001-cashfree-integration.md",
       "acceptance_criteria": [
-        "POST /webhook with invalid `X-Razorpay-Signature` returns `400 INVALID_SIGNATURE` without processing.",
-        "Duplicate `payment.captured` webhook (same `razorpay_payment_id`) is silently ignored (returns 200 but no duplicate ledger entry).",
-        "POST /razorpayx/payout with `amount_paise ? 20000000` uses mode `IMPS`; amount > 20000000 uses mode `NEFT` (auto-selection).",
+        "POST /webhook with invalid `x-webhook-signature` returns `400 INVALID_SIGNATURE` without processing.",
+        "Duplicate `payment.captured` webhook (same `cashfree_payment_id`) is silently ignored (returns 200 but no duplicate ledger entry).",
+        "POST /integrations/cashfree/payouts with `amount_paise ? 20000000` uses mode `IMPS`; amount > 20000000 uses mode `NEFT` (auto-selection).",
         "POST /verify-upi for a valid UPI VPA returns `valid: true` and the registered account holder name.",
-        "POST /fund-account for a pharmacy creates a RazorpayX contact + fund account and stores `fund_account_id` for future payouts.",
+        "POST /fund-account for a pharmacy creates a Cashfree Payouts contact + fund account and stores `fund_account_id` for future payouts.",
         "A failed payout automatically retries once after 1 hour; after 2 failures, a manual-review alert is created.",
-        "`payment.authorized` webhook triggers explicit capture API call to Razorpay (not auto-capture); order status updates to PAYMENT_CAPTURED on success.",
-        "Razorpay test mode (`razorpay_mode: TEST`) routes all API calls to `api.razorpay.com/v1` with test API keys; no live transactions."
+        "`payment.authorized` webhook triggers explicit capture API call to Cashfree (not auto-capture); order status updates to PAYMENT_CAPTURED on success.",
+        "Cashfree test mode (`cashfree_mode: TEST`) routes all API calls to `Cashfree sandbox/production API host` with test API keys; no live transactions."
       ],
       "ac_count": 8,
       "tracker_status": "staging-deployed",
@@ -2167,74 +2117,6 @@
         "POST /directions returns `duration_in_traffic_seconds` (includes real-time traffic) in addition to `duration_seconds` (historical average).",
         "All maps API calls (including cache hits) are logged in `maps_api_call_log` with `was_cache_hit` field.",
         "Geocoding API key, Distance Matrix key, and Directions key are separate keys loaded from AWS Secrets Manager (not shared keys)."
-      ],
-      "ac_count": 8,
-      "tracker_status": "staging-deployed",
-      "verified": false
-    },
-    {
-      "id": "EPIC-022/STORY-003",
-      "path": "docs/requirements/EPIC-022-external-integrations/STORY-003-government-api-integration.md",
-      "acceptance_criteria": [
-        "POST /gstn/verify with an invalid GSTIN checksum returns `422 INVALID_GSTIN_FORMAT` without calling the GSTN API.",
-        "POST /gstn/verify for a previously verified GSTIN within 7 days returns `cache_hit: true` and uses cached data.",
-        "POST /drug-registry/verify-licence returns `is_expired: true` and `status: EXPIRED` for licences past their expiry date.",
-        "POST /digilocker/initiate returns a valid `auth_url` that redirects the user to DigiLocker's authorization page.",
-        "POST /digilocker/callback with an invalid `state` parameter returns `400 INVALID_STATE`.",
-        "A pharmacy with a drug licence expiring within 30 days triggers the `register_due` automation trigger (EPIC-019).",
-        "POST /fssai/verify returns `422 FSSAI_LICENCE_NOT_FOUND` for a licence number that does not exist in the FSSAI database.",
-        "All government API calls are logged in `government_api_call_log`; no API credentials or Aadhaar numbers appear in logs."
-      ],
-      "ac_count": 8,
-      "tracker_status": "staging-deployed",
-      "verified": false
-    },
-    {
-      "id": "EPIC-022/STORY-004",
-      "path": "docs/requirements/EPIC-022-external-integrations/STORY-004-einvoicing-irn.md",
-      "acceptance_criteria": [
-        "POST /generate-irn with invalid invoice schema returns `422 INVALID_INVOICE_SCHEMA` with the failing field in the error message.",
-        "POST /generate-irn for a duplicate invoice (same seller+buyer+invoice_number+FY) returns the existing IRN with `already_existed: true`.",
-        "POST /cancel-irn more than 24 hours after generation returns `422 IRN_CANCELLATION_WINDOW_EXPIRED`.",
-        "GET /status/:irn for a cancelled IRN returns `status: CANCELLED` with `cancelled_at` timestamp.",
-        "When `e_invoicing_enabled: false` for a pharmacy, IRN generation is skipped and `irn: null` appears on the invoice (no error raised).",
-        "The `signed_invoice_json` stored in `einvoice_irn_records` contains a valid digital signature from NIC (verifiable independently).",
-        "A cancelled IRN cannot be regenerated with the same `invoice_number`; a new invoice number is required for a replacement invoice.",
-        "All e-invoice API calls to the NIC portal are logged (request summary, response status, latency) in the audit log."
-      ],
-      "ac_count": 8,
-      "tracker_status": "staging-deployed",
-      "verified": false
-    },
-    {
-      "id": "EPIC-022/STORY-005",
-      "path": "docs/requirements/EPIC-022-external-integrations/STORY-005-accounting-integration.md",
-      "acceptance_criteria": [
-        "POST /sync for a Free plan pharmacy returns `403 PLAN_UPGRADE_REQUIRED`.",
-        "POST /sync when another sync is in progress returns `429 SYNC_IN_PROGRESS`.",
-        "GET /sync-status returns `records_failed: 2` and populates the `errors` array with the specific failed invoice IDs and reasons.",
-        "GET /export-tally-xml generates valid Tally XML that Tally can import without errors for SALES sync type.",
-        "PATCH /config with `auto_sync_enabled: true, sync_frequency: DAILY` sets `next_sync_at` to the next 02:00 IST.",
-        "Zoho Books OAuth2 token refresh happens automatically before expiry; sync jobs do not fail due to expired tokens.",
-        "Syncing the same invoice twice to Zoho Books creates only one voucher (external reference deduplication).",
-        "GET /config for a pharmacy that has not connected any accounting system returns `connected_system: null` and `api_key_status: DISCONNECTED`."
-      ],
-      "ac_count": 8,
-      "tracker_status": "staging-deployed",
-      "verified": false
-    },
-    {
-      "id": "EPIC-022/STORY-006",
-      "path": "docs/requirements/EPIC-022-external-integrations/STORY-006-communication-integrations.md",
-      "acceptance_criteria": [
-        "GET /status returns `status: DOWN` for a channel whose last health check ping failed; `overall_status: DEGRADED` if any channel is not HEALTHY.",
-        "PATCH /config with new API credentials that fail the connectivity test returns `422 CONNECTIVITY_TEST_FAILED` and retains old credentials.",
-        "PATCH /config never returns full API credentials in the response; `api_key_preview` shows only first 4 characters + `****`.",
-        "GET /usage returns `cost_today_rs` computed from actual message count - per-message rate for each channel.",
-        "POST /test sends a real message labelled `is_test: true` in the log; test messages count towards daily_sent_count.",
-        "When MSG91 `status: DOWN`, the platform automatically routes SMS through Twilio (`fallback_sent_today` increments in usage stats).",
-        "When a channel's `daily_limit_pct_used` reaches 80%, an admin alert fires (EPIC-020 alert type: CHANNEL_LIMIT_WARNING).",
-        "Every configuration change creates an audit log entry in `communication_config_audit` with changed fields (credentials masked)."
       ],
       "ac_count": 8,
       "tracker_status": "staging-deployed",

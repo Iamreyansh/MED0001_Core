@@ -10,10 +10,10 @@ import static org.mockito.Mockito.when;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutNotificationPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutPort;
-import com.nammamedmate.rider.application.port.out.RazorpayRoutePort;
+import com.nammamedmate.rider.application.port.out.CashfreeRoutePort;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -22,7 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class PaymentRiderPayoutBridgeConfigTest {
 
   @Test
-  void notificationAndRazorpayRouteBridges() {
+  void notificationAndCashfreeRouteBridges() {
     PaymentRiderPayoutBridgeConfig config = new PaymentRiderPayoutBridgeConfig();
     OutboxPublisher outbox = mock(OutboxPublisher.class);
     RiderPayoutNotificationPort notifications = config.riderPayoutNotificationBridge(outbox);
@@ -35,14 +35,14 @@ class PaymentRiderPayoutBridgeConfigTest {
     assertThat(events.getAllValues().get(0).type()).isEqualTo("rider.notification.payout_released");
     assertThat(events.getAllValues().get(1).type()).isEqualTo("finance.alert.payout_failed");
 
-    RazorpayXPayoutPort payment = mock(RazorpayXPayoutPort.class);
+    CashfreePayoutPort payment = mock(CashfreePayoutPort.class);
     when(payment.initiatePayout(any()))
-        .thenReturn(new RazorpayXPayoutPort.PayoutResult("pout_1", 4));
-    RazorpayRoutePort route = config.riderRazorpayRouteBridge(payment);
+        .thenReturn(new CashfreePayoutPort.PayoutResult("pout_1", 4));
+    CashfreeRoutePort route = config.riderCashfreePayoutBridge(payment);
     assertThat(route.disburse(riderId, 500, payoutId).success()).isTrue();
 
     when(payment.initiatePayout(any()))
-        .thenThrow(new AppException("RAZORPAY_PAYOUT_FAILED", "down", 502));
+        .thenThrow(new AppException("CASHFREE_PAYOUT_FAILED", "down", 502));
     assertThat(route.disburse(riderId, 500, payoutId).success()).isFalse();
   }
 

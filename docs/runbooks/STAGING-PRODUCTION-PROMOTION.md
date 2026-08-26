@@ -9,7 +9,7 @@ Audit canvas: open beside chat —
 ## Preconditions
 
 1. Immutable candidate image tagged with git SHA (staging) then semver `vX.Y.Z` (prod).
-2. Secrets replaced out-of-band: Razorpay/X, MSG91, FCM, SendGrid, WhatsApp, Maps, OCR/GSP. `replace_me` fail-closes boot.
+2. Secrets replaced out-of-band: Cashfree/X, MSG91, FCM, SendGrid, WhatsApp, Maps, OCR/GSP. `replace_me` fail-closes boot.
 3. `MEDMATE_INTERNAL_SERVICE_TOKEN` injected from `${env}/internal`.
 4. `vars.AWS_CI_ROLE_ARN` set for PR quality-gates (deploy role only for terraform/deploy).
 5. Reviewed Terraform plan for the target env (API+worker autoscaling, S3 versioning, outbox/SQS alarms).
@@ -27,7 +27,7 @@ BRUNO_REQUIRED=1 HEALTH_URL=https://core.api.staging.nammamedmate.com/api/v1/hea
 python3 scripts/acceptance-ac-gate.py
 ```
 
-Vendor sandbox proofs (retain logs): Razorpay capture + refund, RazorpayX payout, MSG91 OTP, FCM, WhatsApp, email, Maps geocode. Optional fail-closed: OCR/GSP, DigiLocker, IRN (D21).
+Vendor sandbox proofs (retain logs): Cashfree capture + refund, CashfreePayout payout, MSG91 OTP, FCM, WhatsApp, email, Maps geocode. Optional fail-closed: OCR/GSP, DigiLocker, IRN (D21).
 
 Core journey proofs (retain): rider deliver → `order.delivered` → loyalty/referral/campaign side effects; pharmacy directory metrics non-zero after nightly job; POS checkout idempotency replay; automation `automation.rider.assign_requested`.
 

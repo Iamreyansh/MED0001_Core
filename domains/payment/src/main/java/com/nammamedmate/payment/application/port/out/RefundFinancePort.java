@@ -25,8 +25,8 @@ public interface RefundFinancePort {
       String reason,
       String notes,
       String paymentMethod,
-      String razorpayRefundId,
-      String razorpayPaymentId,
+      String gatewayRefundId,
+      String gatewayPaymentId,
       UUID walletTransactionId,
       boolean autoProcessed,
       UUID issuedBy,
@@ -55,7 +55,7 @@ public interface RefundFinancePort {
 
   Optional<RefundRecord> findById(UUID refundId);
 
-  Optional<RefundRecord> findByRazorpayRefundId(String razorpayRefundId);
+  Optional<RefundRecord> findByGatewayRefundId(String gatewayRefundId);
 
   ListResult list(ListFilter filter);
 
@@ -63,14 +63,14 @@ public interface RefundFinancePort {
 
   KpiSnapshot kpis(Instant dayStart, Instant dayEnd, Instant overdueBefore);
 
-  /** Claim PENDING → INITIATED before Razorpay call (short TX). */
+  /** Claim PENDING → INITIATED before Cashfree call (short TX). */
   boolean claimForProcess(UUID refundId, UUID processedBy, String notes, Instant now);
 
   boolean finalizeGatewayProcess(
-      UUID refundId, String razorpayRefundId, LocalDate expectedBy, Instant now);
+      UUID refundId, String gatewayRefundId, LocalDate expectedBy, Instant now);
 
   /** Persist provider refund id while leaving INITIATED for webhook reconcile. */
-  void attachGatewayRefundId(UUID refundId, String razorpayRefundId, Instant now);
+  void attachGatewayRefundId(UUID refundId, String gatewayRefundId, Instant now);
 
   void markProcessFailed(UUID refundId, String reason, Instant now);
 

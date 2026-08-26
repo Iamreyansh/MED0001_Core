@@ -5,13 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
-import com.nammamedmate.notification.adapter.out.client.StubAttachmentFetcher;
-import com.nammamedmate.notification.adapter.out.client.StubSendGridClient;
-import com.nammamedmate.notification.adapter.out.client.StubSesClient;
-import com.nammamedmate.notification.application.port.out.PreferenceGatePort;
 import com.nammamedmate.notification.domain.CustomerNotificationPreferences;
-import com.nammamedmate.notification.domain.EmailCategory;
-import com.nammamedmate.notification.domain.EmailTemplate;
 import com.nammamedmate.notification.domain.NotificationUserType;
 import com.nammamedmate.notification.domain.PharmacyNotificationPreferences;
 import com.nammamedmate.notification.domain.PreferenceChangeSource;
@@ -22,9 +16,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,9 +32,7 @@ class PreferenceCoverageFillTest {
   private PreferenceTestFakes.FakeCustomerPreferenceStore customers;
   private PreferenceTestFakes.FakePharmacyPreferenceStore pharmacies;
   private PreferenceTestFakes.FakePreferenceAuditStore audits;
-  private PreferenceTestFakes.FakeWhatsAppOptoutStore optouts;
   private PreferenceTestFakes.FakeRecipientIdentityPort identities;
-  private PreferenceServiceAcTest.FakeEmailUnsubStore unsubscribes;
   private PreferenceService prefs;
   private PreferenceGateService gate;
 
@@ -52,11 +42,9 @@ class PreferenceCoverageFillTest {
     customers = new PreferenceTestFakes.FakeCustomerPreferenceStore();
     pharmacies = new PreferenceTestFakes.FakePharmacyPreferenceStore();
     audits = new PreferenceTestFakes.FakePreferenceAuditStore();
-    optouts = new PreferenceTestFakes.FakeWhatsAppOptoutStore();
     identities = new PreferenceTestFakes.FakeRecipientIdentityPort();
-    unsubscribes = new PreferenceServiceAcTest.FakeEmailUnsubStore();
-    prefs = new PreferenceService(customers, pharmacies, audits, optouts, identities, clock);
-    gate = new PreferenceGateService(customers, pharmacies, identities, unsubscribes);
+    prefs = new PreferenceService(customers, pharmacies, audits, clock);
+    gate = new PreferenceGateService(customers, pharmacies, identities);
   }
 
   @Test
@@ -102,56 +90,43 @@ class PreferenceCoverageFillTest {
     mandatoryNull.put("order_alerts", null);
     prefs.patchPharmacyPreferences(owner, Map.of(), mandatoryNull);
     prefs.patchPharmacyPreferences(owner, Map.of("sms", true), Map.of("order_alerts", true));
-    // already-disabled whatsapp → whatsapp false again (BR-8 compound false)
+
+    MedmatePrincipal staff =
+        new MedmatePrincipal(CUST, AuthRole.PHARMACY_STAFF, PHARM, TokenScope.FULL, "j");
+    assertThatThrownBy(() -> prefs.patchPharmacyPreferences(staff, Map.of(), Map.of()))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("FORBIDDEN");
+
     prefs.patchCustomerPreferences(CUST, Map.of("whatsapp", false), Map.of());
     prefs.patchCustomerPreferences(CUST, Map.of("whatsapp", false), Map.of());
-    // promotions false, email true → disable still updates
     customers.update(
         new CustomerNotificationPreferences(
             Ids.newId(), CUST, true, true, true, true, true, true, false, true, true, NOW, NOW));
     prefs.disableCustomerEmailPromotions(CUST, PreferenceChangeSource.SYSTEM, CUST);
+    // promotions still true → L168 first clause false
+    customers.update(
+        new CustomerNotificationPreferences(
+            Ids.newId(), CUST, true, true, true, true, true, true, true, true, true, NOW, NOW));
+    prefs.disableCustomerEmailPromotions(CUST, PreferenceChangeSource.SYSTEM, CUST);
 
+    assertThat(prefs.getCustomerPreferences(CUST).get("whatsapp_optout_active")).isEqualTo(false);
+
+    // non-mandatory category false does not throw
+    prefs.patchCustomerPreferences(CUST, Map.of(), Map.of("offers", false));
+    assertThat(gate.allowsPharmacyChannel(UUID.randomUUID(), "sms", "order_alerts")).isTrue();
+
+    assertThat(gate.allowsPush(null, NotificationUserType.CUSTOMER, "TRANSACTIONAL")).isTrue();
     assertThat(gate.allowsPush(CUST, NotificationUserType.CUSTOMER, "TRANSACTIONAL")).isTrue();
     assertThat(gate.allowsPush(CUST, NotificationUserType.PHARMACY_STAFF, "TRANSACTIONAL"))
         .isTrue();
     assertThat(gate.allowsPush(CUST, NotificationUserType.RIDER, null)).isTrue();
+    assertThat(gate.allowsWhatsApp("+91")).isFalse();
     assertThat(gate.allowsEmail(CUST, "x@y.com", "MARKETING")).isFalse();
-    assertThat(gate.allowsEmail(null, null, null)).isTrue();
-    assertThat(gate.allowsEmail(null, "  ", "LIFECYCLE")).isTrue();
-    assertThat(gate.allowsEmail(Ids.newId(), "z@z.com", "weird")).isTrue();
-    assertThat(gate.allowsEmail(Ids.newId(), "z@z.com", "order_updates")).isTrue();
-    assertThat(gate.allowsEmail(Ids.newId(), "z@z.com", "account_critical")).isTrue();
-    assertThat(gate.allowsEmail(Ids.newId(), "z@z.com", "transactional")).isTrue();
-    assertThat(gate.allowsEmail(Ids.newId(), "z@z.com", "   ")).isTrue();
-    // email channel on + promotions off
-    customers.insert(
-        new CustomerNotificationPreferences(
-            Ids.newId(),
-            UUID.fromString("c2000003-0000-4000-8000-000000000003"),
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            false,
-            true,
-            true,
-            NOW,
-            NOW));
-    assertThat(
-            gate.allowsEmail(
-                UUID.fromString("c2000003-0000-4000-8000-000000000003"), "m@n.com", "MARKETING"))
-        .isFalse();
-    assertThat(
-            gate.allowsEmail(
-                UUID.fromString("c2000003-0000-4000-8000-000000000003"),
-                "m@n.com",
-                "TRANSACTIONAL"))
-        .isTrue();
     assertThat(gate.allowsPharmacyChannel(null, "sms", "order_alerts")).isTrue();
+    assertThat(gate.allowsPharmacyChannel(PHARM, "whatsapp", "order_alerts")).isFalse();
+    assertThat(gate.allowsPharmacyChannel(PHARM, "email", "order_alerts")).isFalse();
     assertThat(gate.allowsPharmacyChannel(PHARM, "sms", "order_alerts")).isTrue();
-    // pharmacy channel on + category off
+
     UUID ph2 = UUID.fromString("a2000003-0000-4000-8000-0000000000aa");
     pharmacies.insert(
         new PharmacyNotificationPreferences(
@@ -177,7 +152,6 @@ class PreferenceCoverageFillTest {
     identities.link(CUST2, "+911111111111");
     assertThat(gate.allowsPush(CUST2, NotificationUserType.CUSTOMER, "TRANSACTIONAL")).isFalse();
     assertThat(gate.allowsPush(CUST2, NotificationUserType.CUSTOMER, "account_critical")).isFalse();
-    // channel on, category off
     customers.update(
         new CustomerNotificationPreferences(
             Ids.newId(),
@@ -197,14 +171,11 @@ class PreferenceCoverageFillTest {
     assertThat(gate.allowsPush(CUST2, NotificationUserType.CUSTOMER, "account_critical")).isTrue();
     assertThat(gate.allowsSms("+911111111111", "PROMOTIONAL")).isFalse();
     assertThat(gate.allowsSms("+911111111111", "OTP")).isTrue();
-    assertThat(gate.allowsWhatsApp("+911111111111")).isTrue();
-    // sms/email channel off short-circuit on &&
+    assertThat(gate.allowsSms("+919999999999", "OTP")).isTrue();
     customers.update(
         new CustomerNotificationPreferences(
             Ids.newId(), CUST2, true, false, true, false, true, true, true, true, true, NOW, NOW));
     assertThat(gate.allowsSms("+911111111111", "OTP")).isFalse();
-    assertThat(gate.allowsEmail(CUST2, "e@e.com", "TRANSACTIONAL")).isFalse();
-    assertThat(gate.allowsEmail(CUST2, "e@e.com", "MARKETING")).isFalse();
 
     CustomerNotificationPreferences gated =
         new CustomerNotificationPreferences(
@@ -225,7 +196,6 @@ class PreferenceCoverageFillTest {
     assertThat(gated.categoryEnabled(null)).isTrue();
     assertThat(gated.channelEnabled(null)).isTrue();
     assertThat(gated.channelEnabled("other")).isTrue();
-    // all channels off for switch-arm coverage
     CustomerNotificationPreferences off =
         new CustomerNotificationPreferences(
             Ids.newId(), CUST2, false, false, false, false, true, true, true, true, true, NOW, NOW);
@@ -234,13 +204,6 @@ class PreferenceCoverageFillTest {
     assertThat(off.channelEnabled("whatsapp")).isFalse();
     assertThat(off.channelEnabled("email")).isFalse();
 
-    PharmacyNotificationPreferences ph =
-        PharmacyNotificationPreferences.defaults(Ids.newId(), PHARM, NOW);
-    pharmacies.update(
-        new PharmacyNotificationPreferences(
-            ph.id(), PHARM, false, false, false, false, false, false, false, false, false, NOW,
-            NOW));
-    // ensure row exists with known id
     pharmacies.insert(
         new PharmacyNotificationPreferences(
             Ids.newId(),
@@ -267,6 +230,7 @@ class PreferenceCoverageFillTest {
     assertThat(loaded.channelEnabled("email")).isFalse();
     assertThat(loaded.channelEnabled("other")).isTrue();
     assertThat(loaded.categoryEnabled(null)).isTrue();
+    assertThat(loaded.categoryEnabled("")).isTrue();
     assertThat(loaded.categoryEnabled("order_alerts")).isFalse();
     assertThat(loaded.categoryEnabled("transactional")).isFalse();
     assertThat(loaded.categoryEnabled("order_updates")).isFalse();
@@ -282,67 +246,9 @@ class PreferenceCoverageFillTest {
             gate.allowsPharmacyChannel(
                 UUID.fromString("a2000002-0000-4000-8000-0000000000aa"), "push", "order_alerts"))
         .isFalse();
-  }
 
-  @Test
-  void emailSendPreferenceBlocked() {
-    EmailServiceAcTest.FakeEmailTemplateStore templates =
-        new EmailServiceAcTest.FakeEmailTemplateStore();
-    templates.upsert(
-        new EmailTemplate(
-            "WEEKLY_OFFERS",
-            "Offers",
-            "hi",
-            "<p>h</p>",
-            "t",
-            EmailCategory.MARKETING,
-            true,
-            1,
-            null,
-            NOW,
-            NOW));
-    PreferenceGatePort deny =
-        new PreferenceGatePort() {
-          @Override
-          public boolean allowsPush(UUID userId, NotificationUserType userType, String category) {
-            return true;
-          }
-
-          @Override
-          public boolean allowsSms(String toPhone, String category) {
-            return true;
-          }
-
-          @Override
-          public boolean allowsWhatsApp(String toPhone) {
-            return true;
-          }
-
-          @Override
-          public boolean allowsEmail(UUID customerId, String toEmail, String category) {
-            return false;
-          }
-        };
-    EmailSendService send =
-        new EmailSendService(
-            templates,
-            new EmailServiceAcTest.FakeEmailDeliveryLogStore(),
-            new EmailServiceAcTest.FakeEmailBounceStore(),
-            unsubscribes,
-            new StubSendGridClient(),
-            new StubSesClient(),
-            new StubAttachmentFetcher(),
-            channel -> Optional.of("SENDGRID"),
-            deny,
-            new UnsubscribeTokenService("test-email-unsubscribe-secret-key!!", clock),
-            clock,
-            "http://localhost:8080");
-    assertThatThrownBy(
-            () ->
-                send.send(
-                    new EmailSendService.SendCommand(
-                        "a@b.com", null, "WEEKLY_OFFERS", Map.of(), List.of(), CUST)))
-        .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("PREFERENCE_BLOCKED");
+    prefs.ensureCustomer(UUID.fromString("c2000009-0000-4000-8000-000000000009"));
+    prefs.ensurePharmacy(UUID.fromString("a2000009-0000-4000-8000-000000000009"));
+    assertThat(audits.entries).isNotEmpty();
   }
 }

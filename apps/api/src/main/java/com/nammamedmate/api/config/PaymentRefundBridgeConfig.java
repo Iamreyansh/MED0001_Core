@@ -61,11 +61,11 @@ public class PaymentRefundBridgeConfig {
                o.total_payable_paise,
                o.wallet_applied_paise,
                o.payment_method AS order_payment_method,
-               o.razorpay_payment_id AS order_razorpay_payment_id,
+               o.gateway_payment_id AS order_gateway_payment_id,
                c.name AS customer_name,
                c.phone AS customer_phone,
                CAST(NULL AS VARCHAR) AS customer_email,
-               p.razorpay_payment_id AS payment_razorpay_payment_id
+               p.gateway_payment_id AS payment_gateway_payment_id
         FROM refund r
         LEFT JOIN orders o ON o.id = r.order_id
         LEFT JOIN customers c ON c.id = o.customer_id
@@ -85,12 +85,12 @@ public class PaymentRefundBridgeConfig {
     }
 
     @Override
-    public Optional<RefundRecord> findByRazorpayRefundId(String razorpayRefundId) {
-      if (razorpayRefundId == null || razorpayRefundId.isBlank()) {
+    public Optional<RefundRecord> findByGatewayRefundId(String gatewayRefundId) {
+      if (gatewayRefundId == null || gatewayRefundId.isBlank()) {
         return Optional.empty();
       }
       List<RefundRecord> rows =
-          jdbc.query(SELECT + " WHERE r.razorpay_refund_id = ?", this::mapRow, razorpayRefundId);
+          jdbc.query(SELECT + " WHERE r.gateway_refund_id = ?", this::mapRow, gatewayRefundId);
       return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
 
@@ -206,17 +206,17 @@ public class PaymentRefundBridgeConfig {
 
     @Override
     public boolean finalizeGatewayProcess(
-        UUID refundId, String razorpayRefundId, LocalDate expectedBy, Instant now) {
+        UUID refundId, String gatewayRefundId, LocalDate expectedBy, Instant now) {
       int updated =
           jdbc.update(
               """
               UPDATE refund SET
-                razorpay_refund_id = ?,
+                gateway_refund_id = ?,
                 expected_by = ?,
                 processed_at = COALESCE(processed_at, ?)
               WHERE id = ? AND status = 'INITIATED'
               """,
-              razorpayRefundId,
+              gatewayRefundId,
               expectedBy == null ? null : Date.valueOf(expectedBy),
               Timestamp.from(now),
               refundId);
@@ -224,15 +224,15 @@ public class PaymentRefundBridgeConfig {
     }
 
     @Override
-    public void attachGatewayRefundId(UUID refundId, String razorpayRefundId, Instant now) {
+    public void attachGatewayRefundId(UUID refundId, String gatewayRefundId, Instant now) {
       jdbc.update(
           """
           UPDATE refund SET
-            razorpay_refund_id = COALESCE(razorpay_refund_id, ?),
+            gateway_refund_id = COALESCE(gateway_refund_id, ?),
             processed_at = COALESCE(processed_at, ?)
           WHERE id = ? AND status = 'INITIATED'
           """,
-          razorpayRefundId,
+          gatewayRefundId,
           Timestamp.from(now),
           refundId);
     }
@@ -310,9 +310,9 @@ public class PaymentRefundBridgeConfig {
 
     private RefundRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
       UUID orderCustomerId = (UUID) rs.getObject("order_customer_id");
-      String orderPayId = columnString(rs, "order_razorpay_payment_id");
-      String paymentPayId = columnString(rs, "payment_razorpay_payment_id");
-      String razorpayPaymentId =
+      String orderPayId = columnString(rs, "order_gateway_payment_id");
+      String paymentPayId = columnString(rs, "payment_gateway_payment_id");
+      String gatewayPaymentId =
           orderPayId != null && !orderPayId.isBlank() ? orderPayId : paymentPayId;
       return new RefundRecord(
           (UUID) rs.getObject("id"),
@@ -330,8 +330,8 @@ public class PaymentRefundBridgeConfig {
           rs.getString("reason"),
           columnString(rs, "notes"),
           columnString(rs, "order_payment_method"),
-          columnString(rs, "razorpay_refund_id"),
-          razorpayPaymentId,
+          columnString(rs, "gateway_refund_id"),
+          gatewayPaymentId,
           (UUID) rs.getObject("wallet_transaction_id"),
           columnBool(rs, "auto_processed"),
           (UUID) rs.getObject("issued_by"),

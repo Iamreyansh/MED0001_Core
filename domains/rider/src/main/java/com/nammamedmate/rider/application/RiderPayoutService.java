@@ -5,9 +5,9 @@ import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.messaging.ProviderOperationStore;
+import com.nammamedmate.rider.application.port.out.CashfreeRoutePort;
+import com.nammamedmate.rider.application.port.out.CashfreeRoutePort.PayoutResult;
 import com.nammamedmate.rider.application.port.out.PlatformPricingConfigStore;
-import com.nammamedmate.rider.application.port.out.RazorpayRoutePort;
-import com.nammamedmate.rider.application.port.out.RazorpayRoutePort.PayoutResult;
 import com.nammamedmate.rider.application.port.out.RiderPayoutStore;
 import com.nammamedmate.rider.application.port.out.RiderPayoutStore.PayoutRecord;
 import com.nammamedmate.rider.application.port.out.RiderStore;
@@ -42,7 +42,7 @@ public class RiderPayoutService {
   private final RiderStore riders;
   private final RiderTripEarningsStore earnings;
   private final RiderPayoutStore payouts;
-  private final RazorpayRoutePort razorpay;
+  private final CashfreeRoutePort cashfree;
   private final PlatformPricingConfigStore config;
   private final OutboxPublisher outbox;
   private final Clock clock;
@@ -52,11 +52,11 @@ public class RiderPayoutService {
       RiderStore riders,
       RiderTripEarningsStore earnings,
       RiderPayoutStore payouts,
-      RazorpayRoutePort razorpay,
+      CashfreeRoutePort cashfree,
       PlatformPricingConfigStore config,
       OutboxPublisher outbox,
       Clock clock) {
-    this(riders, earnings, payouts, razorpay, config, outbox, clock, null);
+    this(riders, earnings, payouts, cashfree, config, outbox, clock, null);
   }
 
   @Autowired
@@ -64,7 +64,7 @@ public class RiderPayoutService {
       RiderStore riders,
       RiderTripEarningsStore earnings,
       RiderPayoutStore payouts,
-      RazorpayRoutePort razorpay,
+      CashfreeRoutePort cashfree,
       PlatformPricingConfigStore config,
       OutboxPublisher outbox,
       Clock clock,
@@ -72,7 +72,7 @@ public class RiderPayoutService {
     this.riders = riders;
     this.earnings = earnings;
     this.payouts = payouts;
-    this.razorpay = razorpay;
+    this.cashfree = cashfree;
     this.config = config;
     this.outbox = outbox;
     this.clock = clock;
@@ -245,7 +245,7 @@ public class RiderPayoutService {
             claimed,
             claimed.status(),
             claimed.holdReason(),
-            claimed.razorpayPayoutId(),
+            claimed.cashfreeTransferId(),
             claimed.payoutReference(),
             notes,
             principal.subject(),
@@ -289,11 +289,11 @@ public class RiderPayoutService {
     PayoutResult result = replayRiderPayout(opKey);
     if (result == null) {
       if (providerOps != null) {
-        providerOps.ensurePending("PAYOUT", opKey, "razorpay");
+        providerOps.ensurePending("PAYOUT", opKey, "cashfree");
       }
-      result = razorpay.disburse(p.riderId(), p.netPayoutPaise(), p.id());
+      result = cashfree.disburse(p.riderId(), p.netPayoutPaise(), p.id());
       if (providerOps != null && result.success()) {
-        providerOps.markSent("PAYOUT", opKey, result.razorpayPayoutId());
+        providerOps.markSent("PAYOUT", opKey, result.cashfreeTransferId());
       }
     }
     if (result.success()) {
@@ -302,7 +302,7 @@ public class RiderPayoutService {
               p,
               "RELEASED",
               null,
-              result.razorpayPayoutId(),
+              result.cashfreeTransferId(),
               result.reference(),
               p.releaseNotes(),
               releasedBy != null ? releasedBy : p.releasedBy(),
@@ -401,7 +401,7 @@ public class RiderPayoutService {
     payload.put("rider_id", riderId.toString());
     payload.put("payout_id", released.id().toString());
     payload.put("net_payout_paise", released.netPayoutPaise());
-    payload.put("razorpay_payout_id", released.razorpayPayoutId());
+    payload.put("cashfree_transfer_id", released.cashfreeTransferId());
     payload.put("channel", "SMS");
     payload.put("template", "rider_payout_success");
     outbox.publish(DomainEvent.of("rider.notification.payout_released", "rider", riderId, payload));
@@ -421,7 +421,7 @@ public class RiderPayoutService {
     data.put("rider_id", p.riderId().toString());
     data.put("net_payout", CodFloatLimits.paiseToRupees(p.netPayoutPaise()));
     data.put("payout_status", p.status());
-    data.put("razorpay_payout_id", p.razorpayPayoutId());
+    data.put("cashfree_transfer_id", p.cashfreeTransferId());
     data.put("released_by", p.releasedBy() == null ? null : p.releasedBy().toString());
     data.put("released_at", p.releasedAt() == null ? null : p.releasedAt().toString());
     return data;
@@ -442,7 +442,7 @@ public class RiderPayoutService {
       PayoutRecord p,
       String status,
       String holdReason,
-      String razorpayId,
+      String cashfreeId,
       String reference,
       String notes,
       UUID releasedBy,
@@ -465,7 +465,7 @@ public class RiderPayoutService {
         p.netPayoutPaise(),
         status,
         holdReason,
-        razorpayId,
+        cashfreeId,
         reference,
         notes,
         releasedBy,

@@ -26,8 +26,8 @@ medmate:
     jobs:
       enabled: true
     po-dispatch:
-      whatsapp-enabled: true
-      email-enabled: true
+      whatsapp-enabled: false
+      email-enabled: false
   pos:
     starter-features-enabled: true
     growth-features-enabled: true
@@ -36,7 +36,6 @@ medmate:
       enabled: true
   kyc:
     webhook-secret: local-kyc-webhook-secret
-  razorpay:
-    webhook-secret: test_razorpay_webhook_secret
-  razorpayx:
-    webhook-secret: local-razorpayx-webhook-secret
+  cashfree:
+    webhook-secret: test_cashfree_webhook_secret
+    payouts-webhook-secret: local-cashfree-payouts-webhook-secret

@@ -20,9 +20,9 @@ headers {
 
 body:json {
   {
-    "razorpay_payment_id": "{{razorpayPaymentId}}",
-    "razorpay_order_id": "{{razorpayOrderId}}",
-    "razorpay_signature": "{{razorpayPaymentSignature}}"
+    "gateway_payment_id": "{{gatewayPaymentId}}",
+    "gateway_order_id": "{{gatewayOrderId}}",
+    "gateway_signature": "{{cashfreePaymentSignature}}"
   }
 }
 
@@ -30,14 +30,14 @@ script:pre-request {
   if (!bru.getEnvVar("accessToken")) {
     throw new Error("accessToken missing — run auth/customer/verify-otp first");
   }
-  if (!bru.getEnvVar("razorpayOrderId")) {
-    throw new Error("razorpayOrderId missing — run payments/initiate first");
+  if (!bru.getEnvVar("gatewayOrderId")) {
+    throw new Error("gatewayOrderId missing — run payments/initiate first");
   }
-  if (!bru.getEnvVar("razorpayPaymentId")) {
-    bru.setEnvVar("razorpayPaymentId", "pay_BrunoVerify001");
+  if (!bru.getEnvVar("gatewayPaymentId")) {
+    bru.setEnvVar("gatewayPaymentId", "pay_BrunoVerify001");
   }
-  if (!bru.getEnvVar("razorpayPaymentSignature")) {
-    throw new Error("razorpayPaymentSignature missing — HMAC of razorpay_order_id|payment_id");
+  if (!bru.getEnvVar("cashfreePaymentSignature")) {
+    throw new Error("cashfreePaymentSignature missing — HMAC of gateway_order_id|payment_id");
   }
 }
 
@@ -60,7 +60,7 @@ tests {
 }
 
 docs {
-  POST /api/v1/payments/verify — HMAC-SHA256 verify after Razorpay checkout. Errors: PAYMENT_SIGNATURE_INVALID, PAYMENT_NOT_FOUND, PAYMENT_ALREADY_VERIFIED.
+  POST /api/v1/payments/verify — HMAC-SHA256 verify after Cashfree checkout. Errors: PAYMENT_SIGNATURE_INVALID, PAYMENT_NOT_FOUND, PAYMENT_ALREADY_VERIFIED.
 }
 
 example {
@@ -75,9 +75,9 @@ example {
     }
     body:json: {
       {
-        "razorpay_payment_id": "pay_XXXXXXXXXXXX",
-        "razorpay_order_id": "order_XXXXXXXXXXXX",
-        "razorpay_signature": "computed_hmac_sha256_hex_string"
+        "gateway_payment_id": "pay_XXXXXXXXXXXX",
+        "gateway_order_id": "order_XXXXXXXXXXXX",
+        "gateway_signature": "computed_hmac_sha256_hex_string"
       }
     }
   }
@@ -116,9 +116,9 @@ example {
     }
     body:json: {
       {
-        "razorpay_payment_id": "pay_XXXXXXXXXXXX",
-        "razorpay_order_id": "order_XXXXXXXXXXXX",
-        "razorpay_signature": "invalid"
+        "gateway_payment_id": "pay_XXXXXXXXXXXX",
+        "gateway_order_id": "order_XXXXXXXXXXXX",
+        "gateway_signature": "invalid"
       }
     }
   }

@@ -64,7 +64,7 @@ List incidents with filter support.
 			{
 				"id": "uuid-inc-1",
 				"incident_number": "INC-20260724-001",
-				"title": "Payment gateway degraded - Razorpay capture success rate below 90%",
+				"title": "Payment gateway degraded - Cashfree capture success rate below 90%",
 				"severity": "P1",
 				"status": "MITIGATING",
 				"detected_at": "2026-07-24T08:00:00Z",
@@ -93,9 +93,9 @@ Declare a new incident.
 
 ```json
 {
-	"title": "Payment gateway degraded - Razorpay capture success rate below 90%",
+	"title": "Payment gateway degraded - Cashfree capture success rate below 90%",
 	"severity": "P1",
-	"description": "Razorpay payment capture success rate dropped to 88% at 08:00 IST. Orders are failing at checkout. Affects all payment methods.",
+	"description": "Cashfree payment capture success rate dropped to 88% at 08:00 IST. Orders are failing at checkout. Affects all payment methods.",
 	"affected_services": ["PAYMENT_GATEWAY", "ORDER_MANAGEMENT"],
 	"impacted_metrics": {
 		"payment_success_rate_pct": 88.0,
@@ -112,7 +112,7 @@ Declare a new incident.
 	"data": {
 		"id": "uuid-inc-1",
 		"incident_number": "INC-20260724-001",
-		"title": "Payment gateway degraded - Razorpay capture success rate below 90%",
+		"title": "Payment gateway degraded - Cashfree capture success rate below 90%",
 		"severity": "P1",
 		"status": "DETECTED",
 		"detected_at": "2026-07-24T09:02:00Z",
@@ -142,7 +142,7 @@ Update incident status during lifecycle.
 ```json
 {
 	"status": "MITIGATING",
-	"update_message": "Identified root cause: Razorpay webhook processing queue backed up. Restarting webhook consumer service. Payment captures resuming."
+	"update_message": "Identified root cause: Cashfree webhook processing queue backed up. Restarting webhook consumer service. Payment captures resuming."
 }
 ```
 
@@ -182,9 +182,9 @@ Resolve an incident with root cause and fix details.
 
 ```json
 {
-	"root_cause": "Razorpay webhook consumer service ran out of memory due to a large batch of pending webhooks from a test run. Service auto-restarted but queue remained backed up.",
+	"root_cause": "Cashfree webhook consumer service ran out of memory due to a large batch of pending webhooks from a test run. Service auto-restarted but queue remained backed up.",
 	"fix_applied": "Manually restarted webhook consumer, cleared stale queue entries, added memory limit to container spec.",
-	"prevention_steps": "1. Add memory limit alert for webhook consumer. 2. Add dead letter queue for stuck webhook events. 3. Separate test and production Razorpay webhooks."
+	"prevention_steps": "1. Add memory limit alert for webhook consumer. 2. Add dead letter queue for stuck webhook events. 3. Separate test and production Cashfree webhooks."
 }
 ```
 

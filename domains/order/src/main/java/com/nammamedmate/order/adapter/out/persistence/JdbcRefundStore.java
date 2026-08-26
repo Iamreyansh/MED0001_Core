@@ -29,7 +29,7 @@ public class JdbcRefundStore implements RefundStore {
                 RefundStatus.valueOf(rs.getString("status")),
                 (UUID) rs.getObject("issued_by"),
                 RefundIssuedByType.valueOf(rs.getString("issued_by_type")),
-                rs.getString("razorpay_refund_id"),
+                rs.getString("gateway_refund_id"),
                 (UUID) rs.getObject("wallet_transaction_id"),
                 rs.getTimestamp("processed_at") == null
                     ? null
@@ -59,7 +59,7 @@ public class JdbcRefundStore implements RefundStore {
         """
         INSERT INTO refund (
           id, order_id, amount_paise, refund_to, reason, notes, status,
-          issued_by, issued_by_type, razorpay_refund_id, wallet_transaction_id,
+          issued_by, issued_by_type, gateway_refund_id, wallet_transaction_id,
           processed_at, failed_reason, idempotency_key, created_at,
           auto_processed, processed_by, expected_by, completed_at
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -73,7 +73,7 @@ public class JdbcRefundStore implements RefundStore {
         refund.status().name(),
         refund.issuedBy(),
         refund.issuedByType().name(),
-        refund.razorpayRefundId(),
+        refund.gatewayRefundId(),
         refund.walletTransactionId(),
         refund.processedAt() == null ? null : Timestamp.from(refund.processedAt()),
         refund.failedReason(),
@@ -91,7 +91,7 @@ public class JdbcRefundStore implements RefundStore {
         """
         UPDATE refund SET
           status = ?,
-          razorpay_refund_id = ?,
+          gateway_refund_id = ?,
           wallet_transaction_id = ?,
           processed_at = ?,
           failed_reason = ?,
@@ -102,7 +102,7 @@ public class JdbcRefundStore implements RefundStore {
         WHERE id = ?
         """,
         refund.status().name(),
-        refund.razorpayRefundId(),
+        refund.gatewayRefundId(),
         refund.walletTransactionId(),
         refund.processedAt() == null ? null : Timestamp.from(refund.processedAt()),
         refund.failedReason(),
@@ -130,12 +130,12 @@ public class JdbcRefundStore implements RefundStore {
   }
 
   @Override
-  public Optional<Refund> findByRazorpayRefundId(String razorpayRefundId) {
-    if (razorpayRefundId == null || razorpayRefundId.isBlank()) {
+  public Optional<Refund> findByGatewayRefundId(String gatewayRefundId) {
+    if (gatewayRefundId == null || gatewayRefundId.isBlank()) {
       return Optional.empty();
     }
     List<Refund> rows =
-        jdbc.query("SELECT * FROM refund WHERE razorpay_refund_id = ?", MAPPER, razorpayRefundId);
+        jdbc.query("SELECT * FROM refund WHERE gateway_refund_id = ?", MAPPER, gatewayRefundId);
     return rows.stream().findFirst();
   }
 

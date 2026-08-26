@@ -6,16 +6,17 @@ import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.pharmacy.application.port.out.AdminPharmacyStore;
+import com.nammamedmate.pharmacy.application.port.out.CashfreePayoutPort;
+import com.nammamedmate.pharmacy.application.port.out.CashfreePayoutPort.PayoutRequest;
+import com.nammamedmate.pharmacy.application.port.out.CashfreePayoutPort.PayoutResult;
 import com.nammamedmate.pharmacy.application.port.out.NotificationDispatchPort;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyProfileStore;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyProfileStore.BankAccountRecord;
-import com.nammamedmate.pharmacy.application.port.out.RazorpayXPayoutPort;
-import com.nammamedmate.pharmacy.application.port.out.RazorpayXPayoutPort.PayoutRequest;
-import com.nammamedmate.pharmacy.application.port.out.RazorpayXPayoutPort.PayoutResult;
 import com.nammamedmate.pharmacy.application.port.out.SettlementStore;
 import com.nammamedmate.pharmacy.application.port.out.SettlementStore.ListFilter;
 import com.nammamedmate.pharmacy.application.port.out.SettlementStore.ListResult;
 import com.nammamedmate.pharmacy.application.port.out.SettlementStore.SettlementRow;
+import com.nammamedmate.pharmacy.domain.WebhookHmac;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
 import java.time.Clock;
@@ -36,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AdminPharmacySettlementService {
 
-  static final String LOCAL_WEBHOOK_SECRET = "local-razorpayx-webhook-secret";
+  static final String LOCAL_WEBHOOK_SECRET = "local-cashfree-payouts-webhook-secret";
 
   private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
   private static final int READ_LIMIT = 60;
@@ -50,7 +51,7 @@ public class AdminPharmacySettlementService {
   private final AdminPharmacyStore pharmacies;
   private final SettlementStore settlements;
   private final PharmacyProfileStore profiles;
-  private final RazorpayXPayoutPort razorpayx;
+  private final CashfreePayoutPort cashfree_payouts;
   private final NotificationDispatchPort notifications;
   private final RateLimiter rateLimiter;
   private final Clock clock;
@@ -61,16 +62,16 @@ public class AdminPharmacySettlementService {
       AdminPharmacyStore pharmacies,
       SettlementStore settlements,
       PharmacyProfileStore profiles,
-      RazorpayXPayoutPort razorpayx,
+      CashfreePayoutPort cashfree_payouts,
       NotificationDispatchPort notifications,
       RateLimiter rateLimiter,
       Clock clock,
       ObjectMapper objectMapper,
-      @Value("${medmate.razorpayx.webhook-secret:}") String webhookSecret) {
+      @Value("${medmate.cashfree.webhook-secret:}") String webhookSecret) {
     this.pharmacies = pharmacies;
     this.settlements = settlements;
     this.profiles = profiles;
-    this.razorpayx = razorpayx;
+    this.cashfree_payouts = cashfree_payouts;
     this.notifications = notifications;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
@@ -85,7 +86,7 @@ public class AdminPharmacySettlementService {
     }
     if (secret == null || secret.isBlank() || LOCAL_WEBHOOK_SECRET.equals(secret)) {
       throw new IllegalStateException(
-          "medmate.razorpayx.webhook-secret must be injected via Secrets Manager for staging/prod");
+          "medmate.cashfree.webhook-secret must be injected via Secrets Manager for staging/prod");
     }
   }
 
@@ -189,7 +190,7 @@ public class AdminPharmacySettlementService {
 
     try {
       PayoutResult payout =
-          razorpayx.initiatePayout(
+          cashfree_payouts.initiatePayout(
               new PayoutRequest(
                   pharmacyId,
                   settlementId,
@@ -198,7 +199,7 @@ public class AdminPharmacySettlementService {
                   bank.ifscCode()));
 
       if (!settlements.finalizeRelease(
-          settlementId, principal.subject(), now, payout.razorpayxPayoutId(), key, now)) {
+          settlementId, principal.subject(), now, payout.cashfreeTransferId(), key, now)) {
         throw new AppException("SETTLEMENT_CONFLICT", "Could not finalize settlement release", 409);
       }
 
@@ -315,7 +316,7 @@ public class AdminPharmacySettlementService {
         "released_at", settlement.releasedAt() == null ? null : settlement.releasedAt().toString());
     data.put("released_by", releasedBy.toString());
     data.put("payout_initiated", payoutInitiated);
-    data.put("razorpayx_payout_id", settlement.razorpayxPayoutId());
+    data.put("cashfree_transfer_id", settlement.cashfreeTransferId());
     data.put("estimated_credit_hours", 4);
     data.put("message", "Settlement released. Payout initiated to pharmacy bank account.");
     return data;
@@ -356,7 +357,7 @@ public class AdminPharmacySettlementService {
       }
     }
     return settlements
-        .findByRazorpayxPayoutId(payoutId)
+        .findByCashfreexPayoutId(payoutId)
         .map(SettlementRow::id)
         .orElseThrow(
             () -> new AppException("SETTLEMENT_NOT_FOUND", "Settlement not found for payout", 404));
@@ -414,7 +415,7 @@ public class AdminPharmacySettlementService {
     if (signatureHeader == null || signatureHeader.isBlank()) {
       throw new AppException("INVALID_WEBHOOK_SIGNATURE", "Missing webhook signature", 401);
     }
-    String expected = AutoKycService.hmacSha256Hex(webhookSecret, rawBody);
+    String expected = WebhookHmac.hmacSha256Hex(webhookSecret, rawBody);
     String provided = signatureHeader.trim();
     if (provided.startsWith("sha256=")) {
       provided = provided.substring("sha256=".length());

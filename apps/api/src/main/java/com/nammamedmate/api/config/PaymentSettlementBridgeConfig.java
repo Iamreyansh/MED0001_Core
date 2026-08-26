@@ -1,7 +1,7 @@
 package com.nammamedmate.api.config;
 
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
 import com.nammamedmate.payment.application.port.out.SettlementNotificationPort;
 import com.nammamedmate.pharmacy.application.port.out.NotificationDispatchPort;
 import java.math.BigDecimal;
@@ -23,7 +23,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Composition-root bridge: payment finance façades ↔ V019 settlement + pharmacy bank + orders. Also
- * re-exports payment RazorpayX as pharmacy's payout port so legacy admin pharmacy settlement
+ * re-exports payment CashfreePayout as pharmacy's payout port so legacy admin pharmacy settlement
  * endpoints share the live|stub client.
  */
 @Configuration
@@ -56,19 +56,19 @@ public class PaymentSettlementBridgeConfig {
 
   @Bean
   @Primary
-  com.nammamedmate.pharmacy.application.port.out.RazorpayXPayoutPort pharmacyRazorpayXBridge(
-      RazorpayXPayoutPort paymentPayout) {
+  com.nammamedmate.pharmacy.application.port.out.CashfreePayoutPort pharmacyCashfreePayoutBridge(
+      CashfreePayoutPort paymentPayout) {
     return request -> {
-      RazorpayXPayoutPort.PayoutResult result =
+      CashfreePayoutPort.PayoutResult result =
           paymentPayout.initiatePayout(
-              new RazorpayXPayoutPort.PayoutRequest(
+              new CashfreePayoutPort.PayoutRequest(
                   request.pharmacyId(),
                   request.settlementId(),
                   request.amountPaise(),
                   request.accountLast4(),
                   request.ifsc()));
-      return new com.nammamedmate.pharmacy.application.port.out.RazorpayXPayoutPort.PayoutResult(
-          result.razorpayxPayoutId(), result.estimatedCreditHours());
+      return new com.nammamedmate.pharmacy.application.port.out.CashfreePayoutPort.PayoutResult(
+          result.cashfreeTransferId(), result.estimatedCreditHours());
     };
   }
 
@@ -312,7 +312,7 @@ public class PaymentSettlementBridgeConfig {
         UUID settlementId,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String notes,
         String idempotencyKey,
         Instant now) {
@@ -323,7 +323,7 @@ public class PaymentSettlementBridgeConfig {
                 status = 'RELEASED',
                 released_by = ?,
                 released_at = ?,
-                razorpayx_payout_id = ?,
+                cashfree_transfer_id = ?,
                 notes = COALESCE(?, notes),
                 updated_at = ?
               WHERE id = ? AND status = 'PENDING_RELEASE'
@@ -331,7 +331,7 @@ public class PaymentSettlementBridgeConfig {
               """,
               releasedBy,
               Timestamp.from(releasedAt),
-              razorpayxPayoutId,
+              cashfreeTransferId,
               notes,
               Timestamp.from(now),
               settlementId,
@@ -466,7 +466,7 @@ public class PaymentSettlementBridgeConfig {
           tsInstant(rs, "held_at"),
           (UUID) rs.getObject("released_by"),
           tsInstant(rs, "released_at"),
-          rs.getString("razorpayx_payout_id"),
+          rs.getString("cashfree_transfer_id"),
           columnString(rs, "notes"),
           rs.getString("release_idempotency_key"));
     }

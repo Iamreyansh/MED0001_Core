@@ -12,13 +12,13 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreeGatewayClient;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort.OrderSnapshot;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
 import com.nammamedmate.payment.application.port.out.PaymentStore;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
 import com.nammamedmate.payment.application.port.out.WalletPort;
 import com.nammamedmate.payment.domain.Payment;
 import com.nammamedmate.payment.domain.PaymentMethod;
@@ -55,9 +55,9 @@ class PaymentServiceCoverageTest {
   @Mock private OrderLookupPort orders;
   @Mock private OrderPaymentStatusPort orderStatus;
   @Mock private FinancialLedgerWriterPort ledger;
-  @Mock private RazorpayGatewayPort razorpayMock;
+  @Mock private CashfreeGatewayPort cashfreeMock;
 
-  private StubRazorpayGatewayClient razorpay;
+  private StubCashfreeGatewayClient cashfree;
   private PaymentService service;
   private final UUID customerId = UUID.randomUUID();
   private final UUID orderId = UUID.randomUUID();
@@ -67,8 +67,8 @@ class PaymentServiceCoverageTest {
 
   @BeforeEach
   void setUp() {
-    razorpay = new StubRazorpayGatewayClient();
-    service = build(razorpay);
+    cashfree = new StubCashfreeGatewayClient();
+    service = build(cashfree);
     when(store.insert(any()))
         .thenAnswer(
             inv -> {
@@ -88,21 +88,21 @@ class PaymentServiceCoverageTest {
                 saved.get() != null && saved.get().id().equals(inv.getArgument(0))
                     ? Optional.of(saved.get())
                     : Optional.empty());
-    when(store.findByRazorpayOrderId(anyString()))
+    when(store.findByGatewayOrderId(anyString()))
         .thenAnswer(
             inv ->
-                saved.get() != null && inv.getArgument(0).equals(saved.get().razorpayOrderId())
+                saved.get() != null && inv.getArgument(0).equals(saved.get().gatewayOrderId())
                     ? Optional.of(saved.get())
                     : Optional.empty());
-    when(store.findByRazorpayPaymentId(anyString()))
+    when(store.findByGatewayPaymentId(anyString()))
         .thenAnswer(
             inv ->
-                saved.get() != null && inv.getArgument(0).equals(saved.get().razorpayPaymentId())
+                saved.get() != null && inv.getArgument(0).equals(saved.get().gatewayPaymentId())
                     ? Optional.of(saved.get())
                     : Optional.empty());
   }
 
-  private PaymentService build(RazorpayGatewayPort rz) {
+  private PaymentService build(CashfreeGatewayPort rz) {
     return new PaymentService(
         store,
         rz,
@@ -191,22 +191,22 @@ class PaymentServiceCoverageTest {
   }
 
   @Test
-  void initiateRazorpayErrors() {
+  void initiateCashfreeErrors() {
     when(orders.findById(orderId))
         .thenReturn(
             Optional.of(new OrderSnapshot(orderId, customerId, "UPI", 100, 0, "PAYMENT_PENDING")));
     when(wallet.debitForOrder(any(), any(), anyLong(), anyString())).thenReturn(0L);
-    PaymentService failing = build(new StubRazorpayGatewayClient("k", "s", "w", true));
+    PaymentService failing = build(new StubCashfreeGatewayClient("k", "s", "w", true));
     assertThatThrownBy(() -> failing.initiate(customer, orderId, 100L, "INR", "UPI"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_ERROR");
+        .isEqualTo("CASHFREE_ERROR");
 
-    when(razorpayMock.keyId()).thenReturn("k");
-    when(razorpayMock.createOrder(any(), anyLong())).thenThrow(new RuntimeException("boom"));
-    PaymentService rt = build(razorpayMock);
+    when(cashfreeMock.keyId()).thenReturn("k");
+    when(cashfreeMock.createOrder(any(), anyLong())).thenThrow(new RuntimeException("boom"));
+    PaymentService rt = build(cashfreeMock);
     assertThatThrownBy(() -> rt.initiate(customer, orderId, 100L, "INR", "UPI"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_ERROR");
+        .isEqualTo("CASHFREE_ERROR");
   }
 
   @Test
@@ -273,9 +273,9 @@ class PaymentServiceCoverageTest {
     when(wallet.debitForOrder(any(), any(), anyLong(), anyString())).thenReturn(0L);
     service.initiate(customer, orderId, 1000L, "INR", "UPI");
     String payId = "pay_1";
-    String sig = razorpay.signPayment(saved.get().razorpayOrderId(), payId);
-    service.verify(customer, payId, saved.get().razorpayOrderId(), sig);
-    assertThatThrownBy(() -> service.verify(customer, payId, saved.get().razorpayOrderId(), sig))
+    String sig = cashfree.signPayment(saved.get().gatewayOrderId(), payId);
+    service.verify(customer, payId, saved.get().gatewayOrderId(), sig);
+    assertThatThrownBy(() -> service.verify(customer, payId, saved.get().gatewayOrderId(), sig))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("PAYMENT_ALREADY_VERIFIED");
 
@@ -291,8 +291,8 @@ class PaymentServiceCoverageTest {
                 service.verify(
                     other,
                     "pay_z",
-                    saved.get().razorpayOrderId(),
-                    razorpay.signPayment(saved.get().razorpayOrderId(), "pay_z")))
+                    saved.get().gatewayOrderId(),
+                    cashfree.signPayment(saved.get().gatewayOrderId(), "pay_z")))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("FORBIDDEN");
   }
@@ -304,7 +304,7 @@ class PaymentServiceCoverageTest {
             Optional.of(new OrderSnapshot(orderId, customerId, "UPI", 1000, 0, "PAYMENT_PENDING")));
     when(wallet.debitForOrder(any(), any(), anyLong(), anyString())).thenReturn(0L);
     service.initiate(customer, orderId, 1000L, "INR", "UPI");
-    String rzOrder = saved.get().razorpayOrderId();
+    String rzOrder = saved.get().gatewayOrderId();
 
     String captured =
         """
@@ -332,7 +332,7 @@ class PaymentServiceCoverageTest {
         """
         {"event":"payment.failed","payload":{"payment":{"entity":{"id":"pay_f2","order_id":"%s","error_code":"X"}}}}
         """
-            .formatted(saved.get().razorpayOrderId());
+            .formatted(saved.get().gatewayOrderId());
     Map<String, Object> failed =
         service.handleWebhook(sign(failNew), failNew.getBytes(StandardCharsets.UTF_8));
     assertThat(failed.get("processed")).isEqualTo(true);
@@ -351,7 +351,7 @@ class PaymentServiceCoverageTest {
     PaymentService withRefunds =
         new PaymentService(
             store,
-            razorpay,
+            cashfree,
             wallet,
             orders,
             orderStatus,
@@ -486,8 +486,53 @@ class PaymentServiceCoverageTest {
     assertThat(ack.get("processed")).isEqualTo(false);
   }
 
+  @Test
+  void webhookCashfreeEventNameAliases() {
+    RefundFacadeService refundFacade = org.mockito.Mockito.mock(RefundFacadeService.class);
+    when(refundFacade.completeFromWebhook(any()))
+        .thenReturn(Map.of("event", "refund", "processed", true));
+    PaymentService withRefunds =
+        new PaymentService(
+            store,
+            cashfree,
+            wallet,
+            orders,
+            orderStatus,
+            ledger,
+            refundFacade,
+            new ObjectMapper(),
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            null);
+    String emptyPay = "{\"payload\":{\"payment\":{\"entity\":{}}}}";
+    for (String event : List.of("PAYMENT_SUCCESS_WEBHOOK", "PAYMENT_SUCCESS", "PAYMENT_CAPTURED")) {
+      String body = "{\"event\":\"" + event + "\"," + emptyPay.substring(1);
+      assertThat(
+              service
+                  .handleWebhook(sign(body), body.getBytes(StandardCharsets.UTF_8))
+                  .get("processed"))
+          .isEqualTo(false);
+    }
+    for (String event : List.of("PAYMENT_FAILED_WEBHOOK", "PAYMENT_FAILED")) {
+      String body = "{\"event\":\"" + event + "\"," + emptyPay.substring(1);
+      assertThat(
+              service
+                  .handleWebhook(sign(body), body.getBytes(StandardCharsets.UTF_8))
+                  .get("processed"))
+          .isEqualTo(false);
+    }
+    for (String event :
+        List.of("refund.created", "REFUND_STATUS_WEBHOOK", "REFUND_PROCESSED", "REFUND_SUCCESS")) {
+      String body = "{\"event\":\"" + event + "\",\"payload\":{}}";
+      assertThat(
+              withRefunds
+                  .handleWebhook(sign(body), body.getBytes(StandardCharsets.UTF_8))
+                  .get("processed"))
+          .isEqualTo(true);
+    }
+  }
+
   private static String sign(String body) {
-    return StubRazorpayGatewayClient.hmacHex(
-        StubRazorpayGatewayClient.DEFAULT_WEBHOOK_SECRET, body);
+    return StubCashfreeGatewayClient.hmacHex(
+        StubCashfreeGatewayClient.DEFAULT_WEBHOOK_SECRET, body);
   }
 }

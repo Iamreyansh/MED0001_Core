@@ -17,9 +17,9 @@ public final class Payment {
   private final String currency;
   private final PaymentMethod method;
   private PaymentStatus status;
-  private String razorpayOrderId;
-  private String razorpayPaymentId;
-  private String razorpaySignature;
+  private String gatewayOrderId;
+  private String gatewayPaymentId;
+  private String gatewaySignature;
   private Long gatewayFeePaise;
   private String gatewayResponseJson;
   private final List<String> webhookEvents;
@@ -40,9 +40,9 @@ public final class Payment {
       String currency,
       PaymentMethod method,
       PaymentStatus status,
-      String razorpayOrderId,
-      String razorpayPaymentId,
-      String razorpaySignature,
+      String gatewayOrderId,
+      String gatewayPaymentId,
+      String gatewaySignature,
       Long gatewayFeePaise,
       String gatewayResponseJson,
       List<String> webhookEvents,
@@ -61,9 +61,9 @@ public final class Payment {
     this.currency = normalizeCurrency(currency);
     this.method = Objects.requireNonNull(method, "method");
     this.status = Objects.requireNonNull(status, "status");
-    this.razorpayOrderId = razorpayOrderId;
-    this.razorpayPaymentId = razorpayPaymentId;
-    this.razorpaySignature = razorpaySignature;
+    this.gatewayOrderId = gatewayOrderId;
+    this.gatewayPaymentId = gatewayPaymentId;
+    this.gatewaySignature = gatewaySignature;
     this.gatewayFeePaise = gatewayFeePaise;
     this.gatewayResponseJson = gatewayResponseJson;
     this.webhookEvents = webhookEvents == null ? new ArrayList<>() : new ArrayList<>(webhookEvents);
@@ -111,16 +111,16 @@ public final class Payment {
     return status;
   }
 
-  public String razorpayOrderId() {
-    return razorpayOrderId;
+  public String gatewayOrderId() {
+    return gatewayOrderId;
   }
 
-  public String razorpayPaymentId() {
-    return razorpayPaymentId;
+  public String gatewayPaymentId() {
+    return gatewayPaymentId;
   }
 
-  public String razorpaySignature() {
-    return razorpaySignature;
+  public String gatewaySignature() {
+    return gatewaySignature;
   }
 
   public Long gatewayFeePaise() {
@@ -160,14 +160,14 @@ public final class Payment {
   }
 
   public void capture(
-      String razorpayPaymentId,
+      String gatewayPaymentId,
       String signature,
       Long gatewayFeePaise,
       String gatewayResponseJson,
       Instant now) {
     this.status = PaymentStatus.CAPTURED;
-    this.razorpayPaymentId = razorpayPaymentId;
-    this.razorpaySignature = signature;
+    this.gatewayPaymentId = gatewayPaymentId;
+    this.gatewaySignature = signature;
     this.gatewayFeePaise = gatewayFeePaise;
     this.gatewayResponseJson = gatewayResponseJson;
     this.capturedAt = now;
@@ -182,10 +182,10 @@ public final class Payment {
   }
 
   public void fail(
-      String razorpayPaymentId, String reason, String gatewayResponseJson, Instant now) {
-    if (razorpayPaymentId != null) {
-      if (!razorpayPaymentId.isBlank()) {
-        this.razorpayPaymentId = razorpayPaymentId;
+      String gatewayPaymentId, String reason, String gatewayResponseJson, Instant now) {
+    if (gatewayPaymentId != null) {
+      if (!gatewayPaymentId.isBlank()) {
+        this.gatewayPaymentId = gatewayPaymentId;
       }
     }
     this.gatewayResponseJson = gatewayResponseJson;

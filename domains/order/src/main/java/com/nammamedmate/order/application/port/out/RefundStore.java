@@ -15,7 +15,7 @@ public interface RefundStore {
 
   Optional<Refund> findByIdempotencyKey(String idempotencyKey);
 
-  Optional<Refund> findByRazorpayRefundId(String razorpayRefundId);
+  Optional<Refund> findByGatewayRefundId(String gatewayRefundId);
 
   List<Refund> listByOrderId(UUID orderId);
 

@@ -48,7 +48,7 @@ public class PharmacyBillingController {
   }
 
   @PostMapping("/pay")
-  @Operation(summary = "Pharmacy owner: initiate Razorpay checkout for an invoice")
+  @Operation(summary = "Pharmacy owner: initiate Cashfree checkout for an invoice")
   public ApiResponse<Map<String, Object>> pay(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,

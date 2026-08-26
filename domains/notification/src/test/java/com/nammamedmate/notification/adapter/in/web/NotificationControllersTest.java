@@ -11,9 +11,6 @@ import static org.mockito.Mockito.when;
 import com.nammamedmate.kernel.webhook.WebhookRawBodyFilter;
 import com.nammamedmate.notification.application.BroadcastService;
 import com.nammamedmate.notification.application.DeviceTokenService;
-import com.nammamedmate.notification.application.EmailAdminService;
-import com.nammamedmate.notification.application.EmailSendService;
-import com.nammamedmate.notification.application.EmailUnsubscribeService;
 import com.nammamedmate.notification.application.InAppNotificationService;
 import com.nammamedmate.notification.application.InternalPushAuth;
 import com.nammamedmate.notification.application.NotificationWebhookAuth;
@@ -21,8 +18,6 @@ import com.nammamedmate.notification.application.PreferenceService;
 import com.nammamedmate.notification.application.PushSendService;
 import com.nammamedmate.notification.application.SmsAdminService;
 import com.nammamedmate.notification.application.SmsSendService;
-import com.nammamedmate.notification.application.WhatsAppAdminService;
-import com.nammamedmate.notification.application.WhatsAppSendService;
 import com.nammamedmate.notification.domain.NotificationUserType;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -49,11 +44,6 @@ class NotificationControllersTest {
   @Mock BroadcastService broadcasts;
   @Mock SmsSendService sms;
   @Mock SmsAdminService smsAdmin;
-  @Mock WhatsAppSendService whatsapp;
-  @Mock WhatsAppAdminService whatsappAdmin;
-  @Mock EmailSendService email;
-  @Mock EmailAdminService emailAdmin;
-  @Mock EmailUnsubscribeService emailUnsubscribe;
   @Mock PreferenceService preferenceService;
   @Mock InAppNotificationService inAppNotifications;
 
@@ -65,11 +55,6 @@ class NotificationControllersTest {
   @InjectMocks AdminBroadcastController adminBroadcast;
   @InjectMocks SmsSendController smsController;
   @InjectMocks AdminSmsController adminSms;
-  @InjectMocks WhatsAppSendController whatsappController;
-  @InjectMocks AdminWhatsAppController adminWhatsApp;
-  @InjectMocks EmailSendController emailController;
-  @InjectMocks AdminEmailController adminEmail;
-  @InjectMocks EmailUnsubscribeController unsubscribeController;
   @InjectMocks CustomerNotificationPreferencesController customerPrefs;
   @InjectMocks PharmacyNotificationPreferencesController pharmacyPrefs;
   @InjectMocks CustomerInAppNotificationController customerInApp;
@@ -210,7 +195,7 @@ class NotificationControllersTest {
                     smsReq,
                     "sig",
                     new SmsSendController.WebhookRequest(
-                        "msg91-1", null, null, Instant.parse("2026-07-24T08:20:04Z")))
+                        "msg-1", null, null, Instant.parse("2026-07-24T08:20:04Z")))
                 .success())
         .isTrue();
     assertThat(
@@ -271,182 +256,6 @@ class NotificationControllersTest {
   }
 
   @Test
-  void whatsappSendWebhookAndAdmin() {
-    doNothing().when(auth).require("tok");
-    when(whatsapp.send(any())).thenReturn(Map.of("status", "SENT"));
-    assertThat(whatsappController.send("tok", null).success()).isTrue();
-    assertThat(
-            whatsappController
-                .send(
-                    "tok",
-                    new WhatsAppSendController.SendRequest(
-                        "+919876543210",
-                        "ORDER_CONFIRMED",
-                        "en",
-                        List.of(Map.of("type", "body", "parameters", List.of()))))
-                .success())
-        .isTrue();
-    assertThat(
-            whatsappController
-                .send(
-                    "tok",
-                    new WhatsAppSendController.SendRequest(
-                        "+919876543210",
-                        "ORDER_CONFIRMED",
-                        "en",
-                        java.util.Arrays.asList(null, Map.of("type", "body"))))
-                .success())
-        .isTrue();
-
-    when(whatsapp.handleWebhook(any(), any())).thenReturn(Map.of("processed", true));
-    org.springframework.mock.web.MockHttpServletRequest request =
-        new org.springframework.mock.web.MockHttpServletRequest();
-    request.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "{}".getBytes());
-    assertThat(whatsappController.webhook("sha256=abc", request).success()).isTrue();
-
-    when(whatsappAdmin.listTemplates(any(), any())).thenReturn(Map.of("templates", List.of()));
-    assertThat(adminWhatsApp.listTemplates(null, null).success()).isTrue();
-    assertThat(adminWhatsApp.listTemplates("UTILITY", "APPROVED").success()).isTrue();
-
-    when(whatsappAdmin.submitTemplate(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Map.of("status", "PENDING"));
-    assertThat(adminWhatsApp.createTemplate(null).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-    assertThat(
-            adminWhatsApp
-                .createTemplate(
-                    new AdminWhatsAppController.CreateTemplateRequest(
-                        "REORDER_REMINDER",
-                        "UTILITY",
-                        "en",
-                        "Hi {{1}}",
-                        Map.of("format", "TEXT"),
-                        "footer",
-                        List.of(Map.of("type", "URL", "text", "Go"))))
-                .getStatusCode())
-        .isEqualTo(HttpStatus.ACCEPTED);
-    assertThat(
-            adminWhatsApp
-                .createTemplate(
-                    new AdminWhatsAppController.CreateTemplateRequest(
-                        "X",
-                        "UTILITY",
-                        "en",
-                        "b",
-                        null,
-                        null,
-                        java.util.Arrays.asList(null, Map.of("type", "URL"))))
-                .getStatusCode())
-        .isEqualTo(HttpStatus.ACCEPTED);
-
-    when(whatsappAdmin.listLogs(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(new WhatsAppAdminService.LogPage(Map.of("logs", List.of()), 1, 20, 0));
-    assertThat(adminWhatsApp.listLogs(null, null, null, null, null, null, null).success()).isTrue();
-    assertThat(
-            adminWhatsApp
-                .listLogs(
-                    "+919876543210",
-                    "ORDER_CONFIRMED",
-                    "SENT",
-                    Instant.parse("2026-07-01T00:00:00Z"),
-                    Instant.parse("2026-07-31T00:00:00Z"),
-                    1,
-                    20)
-                .success())
-        .isTrue();
-  }
-
-  @Test
-  void emailSendWebhookTrackingAdminAndUnsubscribe() {
-    doNothing().when(auth).require("tok");
-    when(email.send(any())).thenReturn(Map.of("status", "SENT"));
-    assertThat(emailController.send("tok", null).success()).isTrue();
-    assertThat(
-            emailController
-                .send(
-                    "tok",
-                    new EmailSendController.SendRequest(
-                        "a@b.com",
-                        "A",
-                        "ORDER_CONFIRMATION",
-                        Map.of("order_id", "1"),
-                        List.of(new EmailSendController.AttachmentRequest("f.pdf", "https://x")),
-                        user))
-                .success())
-        .isTrue();
-
-    when(email.handleWebhook(any())).thenReturn(Map.of("processed", 1));
-    doNothing().when(webhookAuth).requireEmail(any(), any());
-    MockHttpServletRequest emailReq = new MockHttpServletRequest();
-    emailReq.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "[]".getBytes());
-    assertThat(emailController.webhook(emailReq, null, "sig").success()).isTrue();
-    assertThat(
-            emailController
-                .webhook(emailReq, List.of(Map.of("event", "delivered")), "sig")
-                .success())
-        .isTrue();
-    assertThat(emailController.webhook(emailReq, List.of(), "sig").success()).isTrue();
-    assertThat(
-            emailController
-                .webhook(emailReq, Map.of("events", List.of(Map.of("event", "open"))), "sig")
-                .success())
-        .isTrue();
-    assertThat(emailController.webhook(emailReq, Map.of("event", "spamreport"), "sig").success())
-        .isTrue();
-    assertThat(emailController.webhook(emailReq, "ignored", "sig").success()).isTrue();
-
-    when(email.trackOpen(any())).thenReturn(Map.of("opened", true));
-    assertThat(emailController.openPixel(user).getStatusCode()).isEqualTo(HttpStatus.OK);
-    when(email.trackClick(any(), any())).thenReturn(Map.of("clicked", true));
-    assertThat(emailController.clickRedirect(user, "https://example.com").getStatusCode())
-        .isEqualTo(HttpStatus.FOUND);
-
-    when(emailAdmin.listTemplates(any(), any())).thenReturn(Map.of("templates", List.of()));
-    assertThat(adminEmail.listTemplates(null, true).success()).isTrue();
-    when(emailAdmin.upsertTemplate(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Map.of("template_id", "X"));
-    assertThat(adminEmail.upsertTemplate(admin, null).getStatusCode())
-        .isEqualTo(HttpStatus.CREATED);
-    assertThat(
-            adminEmail
-                .upsertTemplate(
-                    admin,
-                    new AdminEmailController.UpsertTemplateRequest(
-                        "Name", "X", "subj", "<p>h</p>", "t", "TRANSACTIONAL"))
-                .getStatusCode())
-        .isEqualTo(HttpStatus.CREATED);
-
-    when(emailAdmin.listLogs(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(new EmailAdminService.LogPage(Map.of("logs", List.of()), 1, 20, 0));
-    assertThat(adminEmail.listLogs(null, null, null, null, null, null, null).success()).isTrue();
-    assertThat(
-            adminEmail
-                .listLogs(
-                    "a@b.com",
-                    "ORDER_CONFIRMATION",
-                    "SENT",
-                    Instant.parse("2026-07-01T00:00:00Z"),
-                    Instant.parse("2026-07-31T00:00:00Z"),
-                    1,
-                    20)
-                .success())
-        .isTrue();
-
-    when(emailUnsubscribe.unsubscribe(any())).thenReturn(Map.of("unsubscribed", true));
-    assertThat(unsubscribeController.unsubscribe("tok", null).success()).isTrue();
-    assertThat(
-            unsubscribeController
-                .unsubscribe(null, new EmailUnsubscribeController.UnsubscribeRequest("tok2"))
-                .success())
-        .isTrue();
-    assertThat(
-            unsubscribeController
-                .unsubscribe("  ", new EmailUnsubscribeController.UnsubscribeRequest("tok3"))
-                .success())
-        .isTrue();
-    assertThat(unsubscribeController.unsubscribe("  ", null).success()).isTrue();
-  }
-
-  @Test
   void preferenceControllers() {
     when(preferenceService.getCustomerPreferences(any())).thenReturn(Map.of("customer_id", user));
     assertThat(customerPrefs.get(customer).success()).isTrue();
@@ -458,7 +267,7 @@ class NotificationControllersTest {
                 .patch(
                     customer,
                     new CustomerNotificationPreferencesController.PatchRequest(
-                        Map.of("whatsapp", false), Map.of("offers", false)))
+                        Map.of("sms", false), Map.of("offers", false)))
                 .success())
         .isTrue();
 

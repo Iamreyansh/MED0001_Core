@@ -13,10 +13,10 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreeGatewayClient;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
 import com.nammamedmate.payment.application.port.out.RefundFinancePort;
 import com.nammamedmate.payment.application.port.out.RefundFinancePort.KpiSnapshot;
 import com.nammamedmate.payment.application.port.out.RefundFinancePort.ListResult;
@@ -66,7 +66,7 @@ class RefundFacadeCoverageTest {
     service =
         new RefundFacadeService(
             refunds,
-            new StubRazorpayGatewayClient(),
+            new StubCashfreeGatewayClient(),
             wallets,
             ledger,
             notifications,
@@ -106,7 +106,7 @@ class RefundFacadeCoverageTest {
 
   @Test
   void webhookIdempotentAndMissingId() throws Exception {
-    when(refunds.findByRazorpayRefundId("rfnd_1"))
+    when(refunds.findByGatewayRefundId("rfnd_1"))
         .thenReturn(Optional.of(row("PROCESSED", "SOURCE")));
     var root =
         new ObjectMapper()
@@ -120,7 +120,7 @@ class RefundFacadeCoverageTest {
                 "{\"event\":\"refund.processed\",\"payload\":{\"refund\":{\"entity\":{\"payment_id\":\"pay\"}}}}");
     assertThat(service.completeFromWebhook(noId).get("processed")).isEqualTo(true);
 
-    when(refunds.findByRazorpayRefundId("rfnd_miss")).thenReturn(Optional.empty());
+    when(refunds.findByGatewayRefundId("rfnd_miss")).thenReturn(Optional.empty());
     var miss =
         new ObjectMapper()
             .readTree(
@@ -168,7 +168,7 @@ class RefundFacadeCoverageTest {
     when(refunds.claimForProcess(any(), any(), any(), any())).thenReturn(true);
     assertThatThrownBy(() -> service.process(finance, refundId, "n"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_REFUND_FAILED");
+        .isEqualTo("CASHFREE_REFUND_FAILED");
     verify(refunds).markProcessFailed(eq(refundId), anyString(), eq(NOW));
   }
 
@@ -257,9 +257,9 @@ class RefundFacadeCoverageTest {
   void finalizeGatewayConflictAndGatewayErrors() {
     when(refunds.findById(refundId)).thenReturn(Optional.of(row("PENDING", "SOURCE")));
     when(refunds.claimForProcess(any(), any(), any(), any())).thenReturn(true);
-    RazorpayGatewayPort gateway = org.mockito.Mockito.mock(RazorpayGatewayPort.class);
+    CashfreeGatewayPort gateway = org.mockito.Mockito.mock(CashfreeGatewayPort.class);
     when(gateway.refund(anyString(), anyLong()))
-        .thenReturn(new RazorpayGatewayPort.RefundResult("rfnd_1", 1000L));
+        .thenReturn(new CashfreeGatewayPort.RefundResult("rfnd_1", 1000L));
     when(refunds.finalizeGatewayProcess(any(), any(), any(), any())).thenReturn(false);
     RefundFacadeService withMockGw =
         new RefundFacadeService(
@@ -270,7 +270,7 @@ class RefundFacadeCoverageTest {
     verify(refunds).attachGatewayRefundId(eq(refundId), eq("rfnd_1"), eq(NOW));
     verify(refunds, never()).markProcessFailed(eq(refundId), anyString(), eq(NOW));
 
-    RazorpayGatewayPort boom = org.mockito.Mockito.mock(RazorpayGatewayPort.class);
+    CashfreeGatewayPort boom = org.mockito.Mockito.mock(CashfreeGatewayPort.class);
     org.mockito.Mockito.doThrow(new AppException("VALIDATION_ERROR", "bad", 400))
         .when(boom)
         .refund(anyString(), anyLong());
@@ -287,7 +287,7 @@ class RefundFacadeCoverageTest {
         .refund(anyString(), anyLong());
     assertThatThrownBy(() -> svc2.process(finance, refundId, "go"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_REFUND_FAILED");
+        .isEqualTo("CASHFREE_REFUND_FAILED");
   }
 
   @Test
@@ -300,7 +300,7 @@ class RefundFacadeCoverageTest {
     RefundFacadeService withTx =
         new RefundFacadeService(
             refunds,
-            new StubRazorpayGatewayClient(),
+            new StubCashfreeGatewayClient(),
             wallets,
             ledger,
             notifications,
@@ -433,7 +433,7 @@ class RefundFacadeCoverageTest {
     assertThat(again.get("processed_by")).isEqualTo(adminId.toString());
     assertThat(again.get("processed_at")).isEqualTo(NOW.toString());
 
-    when(refunds.findByRazorpayRefundId("rfnd_c")).thenReturn(Optional.of(withProcessed));
+    when(refunds.findByGatewayRefundId("rfnd_c")).thenReturn(Optional.of(withProcessed));
     when(refunds.markCompleted(refundId, NOW)).thenReturn(true);
     try {
       service.completeFromWebhook(
@@ -628,7 +628,7 @@ class RefundFacadeCoverageTest {
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("FORBIDDEN");
 
-    // blank razorpay payment id
+    // blank cashfree payment id
     RefundRecord blankPay =
         new RefundRecord(
             refundId,
@@ -661,10 +661,10 @@ class RefundFacadeCoverageTest {
     when(refunds.claimForProcess(any(), any(), any(), any())).thenReturn(true);
     assertThatThrownBy(() -> service.process(finance, refundId, "n"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_REFUND_FAILED");
+        .isEqualTo("CASHFREE_REFUND_FAILED");
 
-    RazorpayGatewayPort boom = org.mockito.Mockito.mock(RazorpayGatewayPort.class);
-    org.mockito.Mockito.doThrow(new AppException("RAZORPAY_ERROR", "gw", 502))
+    CashfreeGatewayPort boom = org.mockito.Mockito.mock(CashfreeGatewayPort.class);
+    org.mockito.Mockito.doThrow(new AppException("CASHFREE_ERROR", "gw", 502))
         .when(boom)
         .refund(anyString(), anyLong());
     RefundFacadeService svc =
@@ -674,7 +674,7 @@ class RefundFacadeCoverageTest {
     when(refunds.claimForProcess(any(), any(), any(), any())).thenReturn(true);
     assertThatThrownBy(() -> svc.process(finance, refundId, "n"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_REFUND_FAILED");
+        .isEqualTo("CASHFREE_REFUND_FAILED");
 
     // claim fails while still PENDING
     when(refunds.findById(refundId)).thenReturn(Optional.of(row("PENDING", "SOURCE")));
@@ -684,7 +684,7 @@ class RefundFacadeCoverageTest {
         .isEqualTo("REFUND_ALREADY_PROCESSED");
 
     // webhook markCompleted false + blank refund id text
-    when(refunds.findByRazorpayRefundId("rfnd_skip"))
+    when(refunds.findByGatewayRefundId("rfnd_skip"))
         .thenReturn(Optional.of(row("INITIATED", "SOURCE")));
     when(refunds.markCompleted(refundId, NOW)).thenReturn(false);
     service.completeFromWebhook(
@@ -859,7 +859,7 @@ class RefundFacadeCoverageTest {
   void process_withProviderOps_replaysAndMarksSent() {
     com.nammamedmate.messaging.ProviderOperationStore ops =
         org.mockito.Mockito.mock(com.nammamedmate.messaging.ProviderOperationStore.class);
-    RazorpayGatewayPort gateway = org.mockito.Mockito.mock(RazorpayGatewayPort.class);
+    CashfreeGatewayPort gateway = org.mockito.Mockito.mock(CashfreeGatewayPort.class);
     RefundFacadeService withOps =
         new RefundFacadeService(
             refunds,
@@ -875,10 +875,10 @@ class RefundFacadeCoverageTest {
     when(refunds.finalizeGatewayProcess(any(), any(), any(), any())).thenReturn(true);
     when(ops.find(eq("REFUND"), anyString())).thenReturn(Optional.empty());
     when(gateway.refund(anyString(), anyLong()))
-        .thenReturn(new RazorpayGatewayPort.RefundResult("rfnd_new", 1000L));
+        .thenReturn(new CashfreeGatewayPort.RefundResult("rfnd_new", 1000L));
 
     assertThat(withOps.process(finance, refundId, "go")).isNotNull();
-    verify(ops).ensurePending(eq("REFUND"), anyString(), eq("razorpay"));
+    verify(ops).ensurePending(eq("REFUND"), anyString(), eq("cashfree"));
     verify(ops).markSent(eq("REFUND"), anyString(), eq("rfnd_new"));
 
     when(ops.find(eq("REFUND"), anyString()))

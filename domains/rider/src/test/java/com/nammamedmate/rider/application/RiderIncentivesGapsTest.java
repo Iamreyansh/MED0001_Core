@@ -13,8 +13,8 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.rider.adapter.out.client.StubCashfreeRouteAdapter;
 import com.nammamedmate.rider.adapter.out.client.StubDistanceMatrixAdapter;
-import com.nammamedmate.rider.adapter.out.client.StubRazorpayRouteAdapter;
 import com.nammamedmate.rider.adapter.out.persistence.JdbcRiderPayoutStore;
 import com.nammamedmate.rider.adapter.out.persistence.JdbcRiderTripEarningsStore;
 import com.nammamedmate.rider.application.port.out.AssignmentOtpCachePort;
@@ -220,7 +220,7 @@ class RiderIncentivesGapsTest {
     FakeRiders riders = new FakeRiders();
     FakeEarnings earnings = new FakeEarnings();
     FakePayouts payouts = new FakePayouts();
-    StubRazorpayRouteAdapter razorpay = new StubRazorpayRouteAdapter();
+    StubCashfreeRouteAdapter cashfree = new StubCashfreeRouteAdapter();
     InMemoryOutboxStore outbox = new InMemoryOutboxStore();
     Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     RiderPayoutService service =
@@ -228,7 +228,7 @@ class RiderIncentivesGapsTest {
             riders,
             earnings,
             payouts,
-            razorpay,
+            cashfree,
             cfg("200000"),
             new OutboxPublisher(outbox, new ObjectMapper()),
             clock);
@@ -289,16 +289,16 @@ class RiderIncentivesGapsTest {
             null,
             NOW,
             NOW));
-    razorpay.failNext(true);
+    cashfree.failNext(true);
     var pending = service.release(finance(), r3, payoutId, "try", "idem-try");
     assertThat(pending.get("payout_status")).isEqualTo("PENDING");
-    razorpay.failNext(true);
+    cashfree.failNext(true);
     RiderPayoutService later =
         new RiderPayoutService(
             riders,
             earnings,
             payouts,
-            razorpay,
+            cashfree,
             cfg("200000"),
             new OutboxPublisher(outbox, new ObjectMapper()),
             Clock.fixed(NOW.plusSeconds(90_000), ZoneOffset.UTC));
@@ -359,7 +359,7 @@ class RiderIncentivesGapsTest {
             null,
             NOW,
             NOW));
-    razorpay.failNext(true);
+    cashfree.failNext(true);
     assertThat(service.release(finance(), r3, payout2, "again", "idem-again").get("payout_status"))
         .isEqualTo("FAILED");
 
@@ -611,7 +611,7 @@ class RiderIncentivesGapsTest {
             riders,
             earnings,
             payouts,
-            new StubRazorpayRouteAdapter(),
+            new StubCashfreeRouteAdapter(),
             highMin,
             new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
             clock);
@@ -769,7 +769,7 @@ class RiderIncentivesGapsTest {
     assertThat(payouts.byRider.get(rC).streakBonusPaise()).isEqualTo(10_000L);
 
     UUID autoFail = Ids.newId();
-    StubRazorpayRouteAdapter rz = new StubRazorpayRouteAdapter();
+    StubCashfreeRouteAdapter rz = new StubCashfreeRouteAdapter();
     RiderPayoutService autoSvc =
         new RiderPayoutService(
             riders,

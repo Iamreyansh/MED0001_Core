@@ -8,11 +8,11 @@
 | Priority     | P1                                        |
 | Status       | In Development                            |
 | Role         | Internal service + admin_super            |
-| Last Updated | 2026-07-24                                |
+| Last Updated | 2026-08-26                                |
 
 ## Overview
 
-The SMS Service provides reliable OTP and transactional SMS delivery through MSG91 as the primary provider and Twilio as the fallback. All templates must be pre-registered on the Distributed Ledger Technology (DLT) portal as mandated by TRAI regulations in India. The service enforces DND (Do Not Disturb) registry checks for promotional messages, tracks per-message costs, and maintains delivery logs for debugging and billing. OTP messages are routed through the fast transactional route to minimize delivery latency.
+The SMS Service provides OTP and transactional SMS delivery through **Twilio only**. All templates must be pre-registered on the DLT portal (TRAI). The service enforces DND checks for promotional messages, tracks per-message costs, and maintains delivery logs. Auth OTP also uses Twilio (`TwilioOtpSmsSender` on staging/prod).
 
 ## User Roles
 
@@ -25,12 +25,12 @@ The SMS Service provides reliable OTP and transactional SMS delivery through MSG
 ## Business Rules
 
 1. **DLT Mandatory Compliance**: Every outgoing SMS must use a DLT-registered template. The `template_id` in the send request must map to a record in the `sms_templates` table with a valid `dlt_template_id`. Sending without a valid DLT template results in a 422 error.
-2. **OTP Route Priority**: OTP category messages are sent via MSG91's "OTP" route which has guaranteed throughput and bypasses carrier batching. OTP codes are 6-digit numeric, expire in 10 minutes.
-3. **Promotional DND Check**: Before sending a `PROMOTIONAL` SMS, the platform must verify the recipient number is not on the TRAI DND registry (via MSG91's DND check API). Numbers on DND skip SMS silently; the log records `status: SKIPPED_DND`.
-4. **Sender ID**: All outgoing SMS use the 6-character sender ID `NMMATE` (registered on DLT portal). If carrier-specific sender ID changes are required, they are managed centrally in the SMS config table.
-5. **Fallback to Twilio**: If MSG91 returns a non-2xx response or times out after 5 seconds, the service automatically retries via Twilio. The fallback attempt is logged as a separate log entry referencing the original attempt.
-6. **Template Variables**: Templates use `{{1}}`, `{{2}}` variable placeholders (MSG91/DLT standard). The `variables` object in the send request maps positional indices to values.
-7. **Cost Tracking**: Each successful SMS send records the cost in the `sms_cost_log` table. MSG91 rate: Rs 0.12/SMS; Twilio rate: Rs 0.20/SMS. Costs are aggregated for monthly billing review.
+2. **OTP Priority**: OTP category messages use Twilio transactional SMS. OTP codes are 6-digit numeric, expire in 10 minutes.
+3. **Promotional DND Check**: Before sending a `PROMOTIONAL` SMS, skip numbers on DND; log `status: SKIPPED_DND`.
+4. **Sender ID**: Outgoing SMS use the registered Twilio/DLT sender (`NMMATE` or Twilio messaging service SID).
+5. **Single Provider**: Twilio is the only SMS provider. No MSG91 fallback.
+6. **Template Variables**: Templates use `{{1}}`, `{{2}}` placeholders. The `variables` object maps positional indices to values.
+7. **Cost Tracking**: Each successful SMS records cost (Twilio rate ~Rs 0.20/SMS).
 8. **Phone Number Format**: All phone numbers must be in E.164 format (e.g., `+919876543210`). The send endpoint validates format before calling the provider.
 9. **No Promotional SMS After 21:00 IST**: Promotional SMS are blocked between 21:00 and 09:00 IST regardless of system-level triggers. The endpoint returns `422 PROMOTIONAL_TIME_RESTRICTED` for requests in this window.
 10. **Template Deactivation**: Deactivating a template (`is_active: false`) prevents it from being used in new send requests. Existing in-flight deliveries are not affected.
@@ -66,10 +66,10 @@ Internal endpoint to send an SMS to a recipient.
 		"log_id": "uuid-sms-log-1",
 		"to_phone": "+919876543210",
 		"template_id": "OTP_VERIFICATION",
-		"provider": "MSG91",
-		"provider_message_id": "msg91-abc123",
+		"provider": "TWILIO",
+		"provider_message_id": "SMXXXXXXXX",
 		"status": "SENT",
-		"cost_rs": 0.12,
+		"cost_rs": 0.20,
 		"sent_at": "2026-07-24T08:20:00Z"
 	},
 	"meta": {}

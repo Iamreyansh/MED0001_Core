@@ -166,8 +166,8 @@ This story defines the admin command centre for order oversight and intervention
     "payment": {
       "method": "UPI",
       "status": "PAID",
-      "transaction_id": "pay_Razorpay98765",
-      "razorpay_order_id": "order_Razorpay12345"
+      "transaction_id": "pay_Cashfree98765",
+      "gateway_order_id": "order_Cashfree12345"
     },
     "prescription_card": {
       "id": "rx_01J3KP7VLLL222",

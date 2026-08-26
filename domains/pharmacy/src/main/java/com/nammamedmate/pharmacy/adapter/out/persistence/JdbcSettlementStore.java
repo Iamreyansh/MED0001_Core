@@ -49,13 +49,13 @@ public class JdbcSettlementStore implements SettlementStore {
   }
 
   @Override
-  public Optional<SettlementRow> findByRazorpayxPayoutId(String razorpayxPayoutId) {
+  public Optional<SettlementRow> findByCashfreexPayoutId(String cashfreeTransferId) {
     return queryOne(
         """
         SELECT * FROM settlement
-        WHERE razorpayx_payout_id = ? AND deleted_at IS NULL
+        WHERE cashfree_transfer_id = ? AND deleted_at IS NULL
         """,
-        razorpayxPayoutId);
+        cashfreeTransferId);
   }
 
   @Override
@@ -94,7 +94,7 @@ public class JdbcSettlementStore implements SettlementStore {
         INSERT INTO settlement (
           id, pharmacy_id, period_start, period_end, gmv_paise, commission_pct,
           commission_earned_paise, tcs_rate_pct, tcs_deducted_paise, net_paid_paise,
-          status, hold_reason, released_by, released_at, paid_at, razorpayx_payout_id,
+          status, hold_reason, released_by, released_at, paid_at, cashfree_transfer_id,
           utr_number, receipt_url, release_idempotency_key, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -113,7 +113,7 @@ public class JdbcSettlementStore implements SettlementStore {
         row.releasedBy(),
         ts(row.releasedAt()),
         ts(row.paidAt()),
-        row.razorpayxPayoutId(),
+        row.cashfreeTransferId(),
         row.utrNumber(),
         row.receiptUrl(),
         row.releaseIdempotencyKey(),
@@ -127,7 +127,7 @@ public class JdbcSettlementStore implements SettlementStore {
       String status,
       UUID releasedBy,
       Instant releasedAt,
-      String razorpayxPayoutId,
+      String cashfreeTransferId,
       String idempotencyKey,
       Instant updatedAt) {
     jdbc.update(
@@ -136,7 +136,7 @@ public class JdbcSettlementStore implements SettlementStore {
           status = ?,
           released_by = ?,
           released_at = ?,
-          razorpayx_payout_id = ?,
+          cashfree_transfer_id = ?,
           release_idempotency_key = ?,
           updated_at = ?
         WHERE id = ? AND deleted_at IS NULL
@@ -144,7 +144,7 @@ public class JdbcSettlementStore implements SettlementStore {
         status,
         releasedBy,
         Timestamp.from(releasedAt),
-        razorpayxPayoutId,
+        cashfreeTransferId,
         idempotencyKey,
         Timestamp.from(updatedAt),
         settlementId);
@@ -174,7 +174,7 @@ public class JdbcSettlementStore implements SettlementStore {
       UUID settlementId,
       UUID releasedBy,
       Instant releasedAt,
-      String razorpayxPayoutId,
+      String cashfreeTransferId,
       String idempotencyKey,
       Instant updatedAt) {
     int updated =
@@ -184,14 +184,14 @@ public class JdbcSettlementStore implements SettlementStore {
               status = 'RELEASED',
               released_by = ?,
               released_at = ?,
-              razorpayx_payout_id = ?,
+              cashfree_transfer_id = ?,
               updated_at = ?
             WHERE id = ? AND status = 'PENDING_RELEASE'
               AND release_idempotency_key = ? AND deleted_at IS NULL
             """,
             releasedBy,
             Timestamp.from(releasedAt),
-            razorpayxPayoutId,
+            cashfreeTransferId,
             Timestamp.from(updatedAt),
             settlementId,
             idempotencyKey);
@@ -360,7 +360,7 @@ public class JdbcSettlementStore implements SettlementStore {
         (UUID) rs.getObject("released_by"),
         tsInstant(rs, "released_at"),
         tsInstant(rs, "paid_at"),
-        rs.getString("razorpayx_payout_id"),
+        rs.getString("cashfree_transfer_id"),
         rs.getString("utr_number"),
         rs.getString("receipt_url"),
         rs.getString("release_idempotency_key"),

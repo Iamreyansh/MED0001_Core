@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.messaging.ProviderOperationStore;
+import com.nammamedmate.order.application.port.out.CashfreePaymentPort;
 import com.nammamedmate.order.application.port.out.OrderCancellationStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
-import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort;
 import com.nammamedmate.order.application.port.out.RefundStore;
 import com.nammamedmate.order.application.port.out.WalletPort;
@@ -48,7 +48,7 @@ public class RefundService implements RefundInitiatorPort {
   private final RefundStore refunds;
   private final OrderCancellationStore cancellations;
   private final OrderStore orders;
-  private final RazorpayPaymentPort razorpay;
+  private final CashfreePaymentPort cashfree;
   private final WalletPort wallet;
   private final Clock clock;
   private final TransactionTemplate tx;
@@ -58,21 +58,21 @@ public class RefundService implements RefundInitiatorPort {
       RefundStore refunds,
       OrderCancellationStore cancellations,
       OrderStore orders,
-      RazorpayPaymentPort razorpay,
+      CashfreePaymentPort cashfree,
       WalletPort wallet,
       Clock clock) {
-    this(refunds, cancellations, orders, razorpay, wallet, clock, null, null);
+    this(refunds, cancellations, orders, cashfree, wallet, clock, null, null);
   }
 
   public RefundService(
       RefundStore refunds,
       OrderCancellationStore cancellations,
       OrderStore orders,
-      RazorpayPaymentPort razorpay,
+      CashfreePaymentPort cashfree,
       WalletPort wallet,
       Clock clock,
       @Nullable PlatformTransactionManager transactionManager) {
-    this(refunds, cancellations, orders, razorpay, wallet, clock, transactionManager, null);
+    this(refunds, cancellations, orders, cashfree, wallet, clock, transactionManager, null);
   }
 
   @Autowired
@@ -80,7 +80,7 @@ public class RefundService implements RefundInitiatorPort {
       RefundStore refunds,
       OrderCancellationStore cancellations,
       OrderStore orders,
-      RazorpayPaymentPort razorpay,
+      CashfreePaymentPort cashfree,
       WalletPort wallet,
       Clock clock,
       @Nullable PlatformTransactionManager transactionManager,
@@ -88,7 +88,7 @@ public class RefundService implements RefundInitiatorPort {
     this.refunds = refunds;
     this.cancellations = cancellations;
     this.orders = orders;
-    this.razorpay = razorpay;
+    this.cashfree = cashfree;
     this.wallet = wallet;
     this.clock = clock;
     this.tx = transactionManager == null ? null : new TransactionTemplate(transactionManager);
@@ -294,12 +294,12 @@ public class RefundService implements RefundInitiatorPort {
   @Transactional
   public Map<String, Object> handleRefundProcessed(JsonNode root) {
     JsonNode entity = root.path("payload").path("refund").path("entity");
-    String razorpayRefundId = text(entity, "id");
-    if (razorpayRefundId == null) {
+    String gatewayRefundId = text(entity, "id");
+    if (gatewayRefundId == null) {
       return Map.of("ignored", true);
     }
     Instant now = clock.instant();
-    Refund refund = refunds.findByRazorpayRefundId(razorpayRefundId).orElse(null);
+    Refund refund = refunds.findByGatewayRefundId(gatewayRefundId).orElse(null);
     if (refund == null) {
       return Map.of("ignored", true);
     }
@@ -405,11 +405,11 @@ public class RefundService implements RefundInitiatorPort {
           });
     }
 
-    // SOURCE auto/manual process: persist INITIATED, then Razorpay outside TX, then attach id
-    String paymentId = order.razorpayPaymentId();
+    // SOURCE auto/manual process: persist INITIATED, then Cashfree outside TX, then attach id
+    String paymentId = order.gatewayPaymentId();
     if (paymentId == null || paymentId.isBlank()) {
       throw new AppException(
-          "VALIDATION_ERROR", "Order has no Razorpay payment for SOURCE refund", 422);
+          "VALIDATION_ERROR", "Order has no Cashfree payment for SOURCE refund", 422);
     }
 
     Refund refund =
@@ -437,21 +437,21 @@ public class RefundService implements RefundInitiatorPort {
 
     try {
       String opKey = "order-refund:" + id;
-      RazorpayPaymentPort.RefundResult rz = replayRefund(opKey, amountPaise);
+      CashfreePaymentPort.RefundResult rz = replayRefund(opKey, amountPaise);
       if (rz == null) {
         if (providerOps != null) {
-          providerOps.ensurePending("REFUND", opKey, "razorpay");
+          providerOps.ensurePending("REFUND", opKey, "cashfree");
         }
-        rz = razorpay.refund(paymentId, amountPaise);
+        rz = cashfree.refund(paymentId, amountPaise);
         if (providerOps != null) {
-          providerOps.markSent("REFUND", opKey, rz.razorpayRefundId());
+          providerOps.markSent("REFUND", opKey, rz.gatewayRefundId());
         }
       }
-      final RazorpayPaymentPort.RefundResult gateway = rz;
+      final CashfreePaymentPort.RefundResult gateway = rz;
       LocalDate expectedBy = addBusinessDays(LocalDate.ofInstant(now, IST), 5);
       inTx(
           () -> {
-            refund.setRazorpayRefundId(gateway.razorpayRefundId());
+            refund.setCashfreeRefundId(gateway.gatewayRefundId());
             refund.setExpectedBy(expectedBy);
             refunds.update(refund);
             refreshOrderPaymentStatus(order.id(), now);
@@ -460,25 +460,25 @@ public class RefundService implements RefundInitiatorPort {
       inTx(
           () -> {
             refund.markFailed(
-                ex.getMessage() == null ? "razorpay refund failed" : ex.getMessage(), now);
+                ex.getMessage() == null ? "cashfree refund failed" : ex.getMessage(), now);
             refunds.update(refund);
           });
       if (ex instanceof AppException app) {
         throw app;
       }
-      throw new AppException("RAZORPAY_REFUND_FAILED", "Failed to initiate Razorpay refund", 502);
+      throw new AppException("CASHFREE_REFUND_FAILED", "Failed to initiate Cashfree refund", 502);
     }
     return refund;
   }
 
-  private RazorpayPaymentPort.RefundResult replayRefund(String opKey, long amountPaise) {
+  private CashfreePaymentPort.RefundResult replayRefund(String opKey, long amountPaise) {
     if (providerOps == null) {
       return null;
     }
     return providerOps
         .find("REFUND", opKey)
         .filter(ProviderOperationStore.Operation::hasProviderRef)
-        .map(op -> new RazorpayPaymentPort.RefundResult(op.providerRef(), amountPaise))
+        .map(op -> new CashfreePaymentPort.RefundResult(op.providerRef(), amountPaise))
         .orElse(null);
   }
 

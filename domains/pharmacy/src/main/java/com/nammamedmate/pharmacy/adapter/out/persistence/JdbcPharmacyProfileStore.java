@@ -37,7 +37,7 @@ public class JdbcPharmacyProfileStore implements PharmacyProfileStore {
             """
             SELECT id, code, business_name, tagline, logo_url, phone, email, pending_phone, pending_email,
                    business_type, address, status, plan, gstin, pan_number, drug_licence_number, fssai_number,
-                   is_gst_registered, e_invoicing_enabled, tds_applicable, tcs_applicable,
+                   is_gst_registered, tds_applicable, tcs_applicable,
                    gstin_reverification_pending, registered_pharmacist_name, created_at, updated_at
             FROM pharmacies WHERE id = ? AND deleted_at IS NULL
             """,
@@ -129,7 +129,7 @@ public class JdbcPharmacyProfileStore implements PharmacyProfileStore {
       String drugLicenceNumber,
       String fssaiNumber,
       Boolean isGstRegistered,
-      Boolean eInvoicingEnabled,
+      Boolean eInvoicingEnabled, // ignored — column dropped in V134
       Boolean tdsApplicable,
       Boolean tcsApplicable,
       String registeredPharmacistName,
@@ -143,7 +143,6 @@ public class JdbcPharmacyProfileStore implements PharmacyProfileStore {
           drug_licence_number = COALESCE(?, drug_licence_number),
           fssai_number = COALESCE(?, fssai_number),
           is_gst_registered = COALESCE(?, is_gst_registered),
-          e_invoicing_enabled = COALESCE(?, e_invoicing_enabled),
           tds_applicable = COALESCE(?, tds_applicable),
           tcs_applicable = COALESCE(?, tcs_applicable),
           registered_pharmacist_name = COALESCE(?, registered_pharmacist_name),
@@ -156,7 +155,6 @@ public class JdbcPharmacyProfileStore implements PharmacyProfileStore {
         drugLicenceNumber,
         fssaiNumber,
         isGstRegistered,
-        eInvoicingEnabled,
         tdsApplicable,
         tcsApplicable,
         registeredPharmacistName,
@@ -368,7 +366,7 @@ public class JdbcPharmacyProfileStore implements PharmacyProfileStore {
         rs.getString("drug_licence_number"),
         rs.getString("fssai_number"),
         rs.getBoolean("is_gst_registered"),
-        rs.getBoolean("e_invoicing_enabled"),
+        false, // e_invoicing_enabled dropped (V134)
         rs.getBoolean("tds_applicable"),
         rs.getBoolean("tcs_applicable"),
         rs.getBoolean("gstin_reverification_pending"),

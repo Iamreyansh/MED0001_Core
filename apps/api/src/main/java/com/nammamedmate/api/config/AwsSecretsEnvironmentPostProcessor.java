@@ -15,7 +15,7 @@ import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
 
 /**
- * For staging/prod: load DB + JWT + MFA + Razorpay/KYC webhook material from Secrets Manager ARNs
+ * For staging/prod: load DB + JWT + MFA + Cashfree/KYC webhook material from Secrets Manager ARNs
  * set on the ECS task. Avoids stuffing PEMs / keys into task environment variables.
  */
 public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
@@ -71,19 +71,39 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
           }
         }
       }
-      String razorpayArn = environment.getProperty("MEDMATE_SECRETS_RAZORPAY_ARN");
-      if (razorpayArn != null && !razorpayArn.isBlank()) {
-        JsonNode razorpay = MAPPER.readTree(getSecret(client, razorpayArn));
-        props.put("medmate.razorpay.key-id", text(razorpay, "key_id"));
-        props.put("medmate.razorpay.key-secret", text(razorpay, "key_secret"));
-        props.put("medmate.razorpay.webhook-secret", text(razorpay, "webhook_secret"));
+      String cashfreeArn = environment.getProperty("MEDMATE_SECRETS_CASHFREE_ARN");
+      if (cashfreeArn != null && !cashfreeArn.isBlank()) {
+        JsonNode cashfree = MAPPER.readTree(getSecret(client, cashfreeArn));
+        props.put("medmate.cashfree.app-id", firstText(cashfree, "app_id", "key_id", "client_id"));
+        props.put(
+            "medmate.cashfree.secret-key",
+            firstText(cashfree, "secret_key", "key_secret", "client_secret"));
+        props.put("medmate.cashfree.webhook-secret", text(cashfree, "webhook_secret"));
+        props.put(
+            "medmate.cashfree.payouts-client-id",
+            firstText(cashfree, "payouts_client_id", "payouts_key_id"));
+        props.put(
+            "medmate.cashfree.payouts-client-secret",
+            firstText(cashfree, "payouts_client_secret", "payouts_key_secret"));
+        props.put(
+            "medmate.cashfree.payouts-webhook-secret",
+            firstText(cashfree, "payouts_webhook_secret"));
+        if (cashfree.hasNonNull("mode")) {
+          props.put("medmate.cashfree.mode", text(cashfree, "mode"));
+        }
       }
-      String razorpayxArn = environment.getProperty("MEDMATE_SECRETS_RAZORPAYX_ARN");
-      if (razorpayxArn != null && !razorpayxArn.isBlank()) {
-        JsonNode razorpayx = MAPPER.readTree(getSecret(client, razorpayxArn));
-        props.put("medmate.razorpayx.key-id", text(razorpayx, "key_id"));
-        props.put("medmate.razorpayx.key-secret", text(razorpayx, "key_secret"));
-        props.put("medmate.razorpayx.webhook-secret", text(razorpayx, "webhook_secret"));
+      String cashfreePayoutsArn = environment.getProperty("MEDMATE_SECRETS_CASHFREE_PAYOUTS_ARN");
+      if (cashfreePayoutsArn != null && !cashfreePayoutsArn.isBlank()) {
+        JsonNode payouts = MAPPER.readTree(getSecret(client, cashfreePayoutsArn));
+        props.put(
+            "medmate.cashfree.payouts-client-id",
+            firstText(payouts, "payouts_client_id", "client_id", "key_id"));
+        props.put(
+            "medmate.cashfree.payouts-client-secret",
+            firstText(payouts, "payouts_client_secret", "client_secret", "key_secret"));
+        props.put(
+            "medmate.cashfree.payouts-webhook-secret",
+            firstText(payouts, "payouts_webhook_secret", "webhook_secret"));
       }
       String kycArn = environment.getProperty("MEDMATE_SECRETS_KYC_ARN");
       if (kycArn != null && !kycArn.isBlank()) {
@@ -131,6 +151,16 @@ public class AwsSecretsEnvironmentPostProcessor implements EnvironmentPostProces
       throw new IllegalStateException("Secret missing field: " + field);
     }
     return v.asText();
+  }
+
+  private static String firstText(JsonNode node, String... fields) {
+    for (String field : fields) {
+      JsonNode v = node.get(field);
+      if (v != null && !v.isNull() && !v.asText().isBlank()) {
+        return v.asText();
+      }
+    }
+    return "";
   }
 
   @Override

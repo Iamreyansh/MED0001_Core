@@ -54,7 +54,7 @@ EPIC-008 covers the full lifecycle of prescriptions on Namma MedMate - from cust
 |------------|------|-------------|
 | AWS S3 private bucket | Infrastructure | DevOps |
 | OCR service (AWS Textract / custom) | Service | Platform |
-| Razorpay Webhook | External | EPIC-010 |
+| Cashfree Webhook | External | EPIC-010 |
 | Teleconsult e-Rx generation | Upstream | EPIC-009 |
 | Pharmacy inventory / POS | Downstream | EPIC-006 |
 | Notification service (WhatsApp + Push) | Service | EPIC-003 |

@@ -41,14 +41,14 @@ data "aws_secretsmanager_secret" "maps_geocode" {
   name = "${local.name}/maps-geocode"
 }
 
-# Placeholders so API boot guards pass. Replace vendor keys/webhook secrets
+# Placeholders so API boot guards pass. Replace Cashfree app/secret keys
 # out-of-band; TF will not overwrite secret_string after create.
-resource "random_password" "razorpay_webhook" {
+resource "random_password" "cashfree_webhook" {
   length  = 48
   special = false
 }
 
-resource "random_password" "razorpayx_webhook" {
+resource "random_password" "cashfree_payouts_webhook" {
   length  = 48
   special = false
 }
@@ -58,35 +58,21 @@ resource "random_password" "kyc_webhook" {
   special = false
 }
 
-resource "aws_secretsmanager_secret" "razorpay" {
-  name       = "${local.name}/razorpay"
+resource "aws_secretsmanager_secret" "cashfree" {
+  name       = "${local.name}/cashfree"
   kms_key_id = aws_kms_key.this.arn
 }
 
-resource "aws_secretsmanager_secret_version" "razorpay" {
-  secret_id = aws_secretsmanager_secret.razorpay.id
+resource "aws_secretsmanager_secret_version" "cashfree" {
+  secret_id = aws_secretsmanager_secret.cashfree.id
   secret_string = jsonencode({
-    key_id         = "rzp_live_replace_me"
-    key_secret     = "replace_me"
-    webhook_secret = random_password.razorpay_webhook.result
-  })
-
-  lifecycle {
-    ignore_changes = [secret_string]
-  }
-}
-
-resource "aws_secretsmanager_secret" "razorpayx" {
-  name       = "${local.name}/razorpayx"
-  kms_key_id = aws_kms_key.this.arn
-}
-
-resource "aws_secretsmanager_secret_version" "razorpayx" {
-  secret_id = aws_secretsmanager_secret.razorpayx.id
-  secret_string = jsonencode({
-    key_id         = "rzp_live_replace_me"
-    key_secret     = "replace_me"
-    webhook_secret = random_password.razorpayx_webhook.result
+    app_id                 = "placeholder_cashfree_app_id"
+    secret_key             = "placeholder_cashfree_secret_key"
+    webhook_secret         = random_password.cashfree_webhook.result
+    payouts_client_id      = "placeholder_cashfree_payouts_client_id"
+    payouts_client_secret  = "placeholder_cashfree_payouts_client_secret"
+    payouts_webhook_secret = random_password.cashfree_payouts_webhook.result
+    mode                   = "TEST"
   })
 
   lifecycle {
@@ -111,11 +97,6 @@ resource "aws_secretsmanager_secret_version" "kyc" {
 }
 
 resource "random_password" "sms_webhook" {
-  length  = 48
-  special = false
-}
-
-resource "random_password" "email_webhook" {
   length  = 48
   special = false
 }
@@ -149,13 +130,13 @@ resource "aws_secretsmanager_secret" "comms" {
 resource "aws_secretsmanager_secret_version" "comms" {
   secret_id = aws_secretsmanager_secret.comms.id
   secret_string = jsonencode({
-    msg91_auth_key       = "replace_me"
-    fcm_server_key       = "replace_me"
-    sendgrid_api_key     = "replace_me"
-    whatsapp_token       = "replace_me"
-    whatsapp_app_secret  = "replace_me"
-    sms_webhook_secret   = random_password.sms_webhook.result
-    email_webhook_secret = random_password.email_webhook.result
+    twilio_account_sid       = "replace_me"
+    twilio_auth_token        = "replace_me"
+    twilio_api_key           = "replace_me"
+    twilio_from_number       = "replace_me"
+    fcm_project_id           = "replace_me"
+    fcm_service_account_json = "replace_me"
+    sms_webhook_secret       = random_password.sms_webhook.result
   })
 
   lifecycle {

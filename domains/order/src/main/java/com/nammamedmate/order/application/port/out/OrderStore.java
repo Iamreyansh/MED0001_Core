@@ -21,7 +21,7 @@ public interface OrderStore {
 
   Optional<Order> findByPlacementIdempotencyKey(String idempotencyKey);
 
-  Optional<Order> findByRazorpayOrderId(String razorpayOrderId);
+  Optional<Order> findByGatewayOrderId(String gatewayOrderId);
 
   /** Allocate next daily sequence for IST date; returns 1-based seq. */
   int nextSequence(LocalDate dateIst);

@@ -10,6 +10,8 @@ class KycRequestSanitizerTest {
 
   @Test
   void redactsNestedSecrets() {
+    assertThat(KycRequestSanitizer.sanitise(null)).isEmpty();
+    assertThat(KycRequestSanitizer.sanitise(Map.of())).isEmpty();
     assertThat(KycRequestSanitizer.sanitise(Map.of("nested", Map.of("secret", "x", "field", "ok"))))
         .containsKey("nested");
     assertThat(KycRequestSanitizer.sanitise(Map.of("Authorization", "Bearer x", "gstin", "27TEST")))

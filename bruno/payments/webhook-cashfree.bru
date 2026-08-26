@@ -1,0 +1,206 @@
+meta {
+  name: webhook-cashfree
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/payments/webhook/cashfree
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+  x-webhook-signature: {{cashfreeWebhookSignature}}
+  x-webhook-timestamp: {{cashfreeWebhookTimestamp}}
+}
+
+body:json {
+  {
+    "entity": "event",
+    "event": "payment.captured",
+    "payload": {
+      "payment": {
+        "entity": {
+          "id": "{{gatewayPaymentId}}",
+          "order_id": "{{gatewayOrderId}}",
+          "amount": 44500,
+          "currency": "INR",
+          "status": "captured",
+          "method": "upi",
+          "captured": true
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  const secret = bru.getEnvVar("cashfreeWebhookSecret") || "test_cashfree_webhook_secret";
+  const paymentId = bru.getEnvVar("gatewayPaymentId") || "pay_BrunoWebhookPay001";
+  const orderId = bru.getEnvVar("gatewayOrderId");
+  if (!orderId) {
+    throw new Error("gatewayOrderId missing — run payments/initiate first");
+  }
+  bru.setEnvVar("gatewayPaymentId", paymentId);
+  const payload = JSON.stringify({
+    entity: "event",
+    event: "payment.captured",
+    payload: {
+      payment: {
+        entity: {
+          id: paymentId,
+          order_id: orderId,
+          amount: 44500,
+          currency: "INR",
+          status: "captured",
+          method: "upi",
+          captured: true
+        }
+      }
+    }
+  });
+  const signature = CryptoJS.HmacSHA256(payload, secret).toString(CryptoJS.enc.Hex);
+  bru.setEnvVar("cashfreeWebhookSignature", signature);
+  req.setHeader("x-webhook-signature", signature);
+  req.setBody(payload);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.payment_id) {
+    bru.setEnvVar("gatewayPaymentId", body.data.payment_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("webhook envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("object");
+    expect(body.data.event).to.equal("payment.captured");
+  });
+}
+
+docs {
+  POST /api/v1/payments/webhook/cashfree — public; x-webhook-signature HMAC. Events: payment.captured, payment.failed, refund.processed. Errors: WEBHOOK_SIGNATURE_INVALID (400), UNKNOWN_EVENT (200).
+}
+
+example {
+  name: 200 OK
+  description: payment.captured processed
+  request: {
+    url: {{baseUrl}}/api/v1/payments/webhook/cashfree
+    method: post
+    mode: json
+    headers: {
+      x-webhook-signature: hex_hmac_of_body
+    }
+    body:json: {
+      {
+        "entity": "event",
+        "event": "payment.captured",
+        "payload": {
+          "payment": {
+            "entity": {
+              "id": "pay_XXXXXXXXXXXX",
+              "order_id": "order_XXXXXXXXXXXX",
+              "amount": 44500,
+              "currency": "INR",
+              "status": "captured",
+              "method": "upi",
+              "captured": true
+            }
+          }
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "event": "payment.captured",
+            "payment_id": "pay_XXXXXXXXXXXX",
+            "processed": true
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 WEBHOOK_SIGNATURE_INVALID
+  description: Bad x-webhook-signature
+  request: {
+    url: {{baseUrl}}/api/v1/payments/webhook/cashfree
+    method: post
+    mode: json
+    headers: {
+      x-webhook-signature: invalid
+    }
+    body:json: {
+      {
+        "event": "payment.captured"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "WEBHOOK_SIGNATURE_INVALID",
+            "message": "Webhook signature invalid"
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 200 UNKNOWN_EVENT
+  description: Unhandled event type acknowledged with no action
+  request: {
+    url: {{baseUrl}}/api/v1/payments/webhook/cashfree
+    method: post
+    mode: json
+    headers: {
+      x-webhook-signature: hex_hmac_of_body
+    }
+    body:json: {
+      {
+        "event": "order.paid"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "UNKNOWN_EVENT",
+            "message": "Event type not handled: order.paid"
+          }
+        }
+      '''
+    }
+  }
+}

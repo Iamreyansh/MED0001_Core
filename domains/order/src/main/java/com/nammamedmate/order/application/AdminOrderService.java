@@ -784,8 +784,8 @@ public class AdminOrderService {
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("method", order.paymentMethod().name());
     m.put("status", order.paymentStatus().name());
-    m.put("transaction_id", order.razorpayPaymentId());
-    m.put("razorpay_order_id", order.razorpayOrderId());
+    m.put("transaction_id", order.gatewayPaymentId());
+    m.put("gateway_order_id", order.gatewayOrderId());
     return m;
   }
 

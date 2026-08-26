@@ -56,7 +56,6 @@ class PharmacyProfileServiceMoreTest {
     audit = new FakeAudit();
     RateLimiter rateLimiter = mock(RateLimiter.class);
     when(rateLimiter.tryAcquire(any(), any(Integer.class), any(Integer.class))).thenReturn(true);
-    AutoKycService autoKyc = mock(AutoKycService.class);
     AesGcmCipher cipher = new AesGcmCipher(AES_KEY, new SecureRandom(new byte[] {1}));
     service =
         new PharmacyProfileService(
@@ -69,7 +68,6 @@ class PharmacyProfileServiceMoreTest {
             cipher,
             new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
             rateLimiter,
-            autoKyc,
             new BCryptPasswordEncoder(),
             () -> MagicProfileOtp.CODE,
             new SecureRandom(new byte[] {2}),
@@ -225,7 +223,6 @@ class PharmacyProfileServiceMoreTest {
             new AesGcmCipher(AES_KEY),
             new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
             rl,
-            mock(AutoKycService.class),
             new BCryptPasswordEncoder(),
             () -> "000000",
             new SecureRandom(new byte[] {3}),

@@ -46,8 +46,8 @@ script:post-response {
     if (body.data.order_number) {
       bru.setEnvVar("orderNumber", body.data.order_number);
     }
-    if (body.data.payment && body.data.payment.razorpay_order_id) {
-      bru.setEnvVar("razorpayOrderId", body.data.payment.razorpay_order_id);
+    if (body.data.payment && body.data.payment.gateway_order_id) {
+      bru.setEnvVar("gatewayOrderId", body.data.payment.gateway_order_id);
     }
   }
 }
@@ -65,7 +65,7 @@ tests {
 }
 
 docs {
-  POST /api/v1/orders — place order from cart (Idempotency-Key required). COD confirms immediately; UPI/CARD returns PAYMENT_PENDING + razorpay_order_id.
+  POST /api/v1/orders — place order from cart (Idempotency-Key required). COD confirms immediately; UPI/CARD returns PAYMENT_PENDING + gateway_order_id.
 }
 
 example {
@@ -102,7 +102,7 @@ example {
               "method": "COD",
               "status": "PENDING_COLLECTION",
               "transaction_id": null,
-              "razorpay_order_id": null
+              "gateway_order_id": null
             },
             "created_at": "2026-08-08T06:00:00Z"
           }

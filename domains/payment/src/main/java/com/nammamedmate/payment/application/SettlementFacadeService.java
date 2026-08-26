@@ -3,6 +3,9 @@ package com.nammamedmate.payment.application;
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.messaging.ProviderOperationStore;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort.PayoutRequest;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.BankSnapshot;
@@ -12,9 +15,6 @@ import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.List
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.ListResult;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.SettlementRecord;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.Totals;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutRequest;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.SettlementNotificationPort;
 import com.nammamedmate.payment.application.port.out.TcsRegisterWriterPort;
 import com.nammamedmate.payment.domain.MoneyFormats;
@@ -40,7 +40,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** EPIC-012 STORY-003 finance façade over pharmacy settlements + ledger + RazorpayX. */
+/** EPIC-012 STORY-003 finance façade over pharmacy settlements + ledger + CashfreePayout. */
 @Service
 public class SettlementFacadeService {
 
@@ -50,7 +50,7 @@ public class SettlementFacadeService {
   private static final BigDecimal GST_ON_COMMISSION = new BigDecimal("0.18");
 
   private final PharmacySettlementPort settlements;
-  private final RazorpayXPayoutPort razorpayx;
+  private final CashfreePayoutPort cashfree_payouts;
   private final FinancialLedgerWriterPort ledger;
   private final SettlementNotificationPort notifications;
   private final TcsRegisterWriterPort tcsRegister;
@@ -60,17 +60,17 @@ public class SettlementFacadeService {
 
   public SettlementFacadeService(
       PharmacySettlementPort settlements,
-      RazorpayXPayoutPort razorpayx,
+      CashfreePayoutPort cashfree_payouts,
       FinancialLedgerWriterPort ledger,
       SettlementNotificationPort notifications,
       TcsRegisterWriterPort tcsRegister,
       Clock clock) {
-    this(settlements, razorpayx, ledger, notifications, tcsRegister, clock, null, null);
+    this(settlements, cashfree_payouts, ledger, notifications, tcsRegister, clock, null, null);
   }
 
   public SettlementFacadeService(
       PharmacySettlementPort settlements,
-      RazorpayXPayoutPort razorpayx,
+      CashfreePayoutPort cashfree_payouts,
       FinancialLedgerWriterPort ledger,
       SettlementNotificationPort notifications,
       TcsRegisterWriterPort tcsRegister,
@@ -78,7 +78,7 @@ public class SettlementFacadeService {
       @Nullable PlatformTransactionManager transactionManager) {
     this(
         settlements,
-        razorpayx,
+        cashfree_payouts,
         ledger,
         notifications,
         tcsRegister,
@@ -90,7 +90,7 @@ public class SettlementFacadeService {
   @Autowired
   public SettlementFacadeService(
       PharmacySettlementPort settlements,
-      RazorpayXPayoutPort razorpayx,
+      CashfreePayoutPort cashfree_payouts,
       FinancialLedgerWriterPort ledger,
       SettlementNotificationPort notifications,
       TcsRegisterWriterPort tcsRegister,
@@ -98,7 +98,7 @@ public class SettlementFacadeService {
       @Nullable PlatformTransactionManager transactionManager,
       @Nullable ProviderOperationStore providerOps) {
     this.settlements = settlements;
-    this.razorpayx = razorpayx;
+    this.cashfree_payouts = cashfree_payouts;
     this.ledger = ledger;
     this.notifications = notifications;
     this.tcsRegister = tcsRegister;
@@ -180,7 +180,7 @@ public class SettlementFacadeService {
   }
 
   /**
-   * Release runs claim → RazorpayX (outside TX) → finalize+ledger. Claim/finalize use short
+   * Release runs claim → CashfreePayout (outside TX) → finalize+ledger. Claim/finalize use short
    * transactions so a provider accept is not rolled back with an uncommitted Idempotency-Key.
    */
   public Map<String, Object> release(
@@ -241,10 +241,10 @@ public class SettlementFacadeService {
       PayoutResult payout = replayPayout(opKey);
       if (payout == null) {
         if (providerOps != null) {
-          providerOps.ensurePending("PAYOUT", opKey, "razorpayx");
+          providerOps.ensurePending("PAYOUT", opKey, "cashfree_payouts");
         }
         payout =
-            razorpayx.initiatePayout(
+            cashfree_payouts.initiatePayout(
                 new PayoutRequest(
                     settlement.pharmacyId(),
                     settlementId,
@@ -252,7 +252,7 @@ public class SettlementFacadeService {
                     last4FromMasked(bank.accountNumberMasked()),
                     bank.ifsc()));
         if (providerOps != null) {
-          providerOps.markSent("PAYOUT", opKey, payout.razorpayxPayoutId());
+          providerOps.markSent("PAYOUT", opKey, payout.cashfreeTransferId());
         }
       }
       final PayoutResult confirmed = payout;
@@ -263,7 +263,7 @@ public class SettlementFacadeService {
                 settlementId,
                 principal.subject(),
                 now,
-                confirmed.razorpayxPayoutId(),
+                confirmed.cashfreeTransferId(),
                 notes,
                 key,
                 now)) {
@@ -282,7 +282,7 @@ public class SettlementFacadeService {
                 settlement.pharmacyId(), settlementId, settlement.netPayablePaise());
             if (providerOps != null) {
               providerOps.markSucceeded(
-                  "PAYOUT", "settlement:" + settlementId, confirmed.razorpayxPayoutId());
+                  "PAYOUT", "settlement:" + settlementId, confirmed.cashfreeTransferId());
             }
           });
     } catch (RuntimeException ex) {
@@ -291,12 +291,12 @@ public class SettlementFacadeService {
       }
       inTx(() -> settlements.markReleaseFailed(settlementId, key, now));
       if (ex instanceof AppException app) {
-        if ("RAZORPAY_PAYOUT_FAILED".equals(app.code()) || "RAZORPAY_ERROR".equals(app.code())) {
-          throw new AppException("RAZORPAY_PAYOUT_FAILED", app.getMessage(), 502);
+        if ("CASHFREE_PAYOUT_FAILED".equals(app.code()) || "CASHFREE_ERROR".equals(app.code())) {
+          throw new AppException("CASHFREE_PAYOUT_FAILED", app.getMessage(), 502);
         }
         throw app;
       }
-      throw new AppException("RAZORPAY_PAYOUT_FAILED", "Failed to initiate payout", 502);
+      throw new AppException("CASHFREE_PAYOUT_FAILED", "Failed to initiate payout", 502);
     }
 
     SettlementRecord updated = requireSettlement(settlementId);
@@ -449,7 +449,7 @@ public class SettlementFacadeService {
     data.put("pharmacy_id", settlement.pharmacyId().toString());
     data.put("net_payable", MoneyFormats.paiseToRupees(settlement.netPayablePaise()));
     data.put("status", SettlementStatuses.toApiStatus(settlement.status()));
-    data.put("razorpay_payout_id", settlement.razorpayxPayoutId());
+    data.put("cashfree_transfer_id", settlement.cashfreeTransferId());
     data.put("released_by", releasedBy.toString());
     data.put(
         "released_at", settlement.releasedAt() == null ? null : settlement.releasedAt().toString());

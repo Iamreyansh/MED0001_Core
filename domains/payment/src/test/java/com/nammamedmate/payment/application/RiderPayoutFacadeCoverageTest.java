@@ -12,9 +12,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.RiderPayoutNotificationPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutPort.EarningsEntry;
@@ -45,7 +45,7 @@ class RiderPayoutFacadeCoverageTest {
   private static final Instant NOW = Instant.parse("2026-07-24T10:00:00Z");
 
   @Mock RiderPayoutPort payouts;
-  @Mock RazorpayXPayoutPort razorpayx;
+  @Mock CashfreePayoutPort cashfree_payouts;
   @Mock FinancialLedgerWriterPort ledger;
   @Mock RiderPayoutNotificationPort notifications;
 
@@ -63,7 +63,7 @@ class RiderPayoutFacadeCoverageTest {
   void setUp() {
     service =
         new RiderPayoutFacadeService(
-            payouts, razorpayx, ledger, notifications, Clock.fixed(NOW, ZoneOffset.UTC));
+            payouts, cashfree_payouts, ledger, notifications, Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   @Test
@@ -232,7 +232,7 @@ class RiderPayoutFacadeCoverageTest {
     when(payouts.findPaymentInstrument(riderId))
         .thenReturn(Optional.of(new PaymentInstrument("UPI", "x")));
     when(payouts.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout", 4));
     when(payouts.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(false);
 
@@ -243,11 +243,11 @@ class RiderPayoutFacadeCoverageTest {
     verify(payouts, never()).scheduleRetry(any(), any(), anyString(), any(), any());
     verify(notifications).payoutFailed(eq(riderId), eq(payoutId), anyString());
 
-    when(razorpayx.initiatePayout(any())).thenThrow(new RuntimeException("boom"));
+    when(cashfree_payouts.initiatePayout(any())).thenThrow(new RuntimeException("boom"));
     when(payouts.findByIdempotencyKey("k2")).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, null, "k2"))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
     verify(payouts).scheduleRetry(eq(payoutId), eq("k2"), anyString(), any(), eq(NOW));
   }
 
@@ -345,7 +345,7 @@ class RiderPayoutFacadeCoverageTest {
     when(payouts.findPaymentInstrument(riderId))
         .thenReturn(Optional.of(new PaymentInstrument("UPI", "x")));
     when(payouts.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout", 4));
     when(payouts.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(true);
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, "n", "ok"))
@@ -353,17 +353,19 @@ class RiderPayoutFacadeCoverageTest {
         .isEqualTo("PAYOUT_NOT_FOUND");
 
     when(payouts.findById(payoutId)).thenReturn(Optional.of(row("PENDING", 100_000L)));
-    org.mockito.Mockito.doThrow(new AppException("RAZORPAY_ERROR", " ", 502))
-        .when(razorpayx)
+    org.mockito.Mockito.doThrow(new AppException("CASHFREE_ERROR", " ", 502))
+        .when(cashfree_payouts)
         .initiatePayout(any());
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, null, "err"))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
 
-    org.mockito.Mockito.doThrow(new RuntimeException()).when(razorpayx).initiatePayout(any());
+    org.mockito.Mockito.doThrow(new RuntimeException())
+        .when(cashfree_payouts)
+        .initiatePayout(any());
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, null, "rt"))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
   }
 
   @Test
@@ -530,7 +532,7 @@ class RiderPayoutFacadeCoverageTest {
     when(payouts.findPaymentInstrument(riderId))
         .thenReturn(Optional.of(new PaymentInstrument("UPI", "x")));
     when(payouts.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout", 4));
     when(payouts.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(false);
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, "n", "fin-fail"))
@@ -547,7 +549,7 @@ class RiderPayoutFacadeCoverageTest {
     when(payouts.findPaymentInstrument(riderId))
         .thenReturn(Optional.of(new PaymentInstrument("UPI", "x")));
     when(payouts.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout_rt", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout_rt", 4));
     when(payouts.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenThrow(new RuntimeException("db down"));
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, "n", "fin-rt"))
@@ -556,7 +558,7 @@ class RiderPayoutFacadeCoverageTest {
   }
 
   @Test
-  void release_withTransactionManager_andNonRazorpayAppException() {
+  void release_withTransactionManager_andNonCashfreeAppException() {
     org.springframework.transaction.PlatformTransactionManager tm =
         org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
     org.springframework.transaction.TransactionStatus status =
@@ -564,7 +566,7 @@ class RiderPayoutFacadeCoverageTest {
     when(tm.getTransaction(any())).thenReturn(status);
     RiderPayoutFacadeService withTx =
         new RiderPayoutFacadeService(
-            payouts, razorpayx, ledger, notifications, Clock.fixed(NOW, ZoneOffset.UTC), tm);
+            payouts, cashfree_payouts, ledger, notifications, Clock.fixed(NOW, ZoneOffset.UTC), tm);
 
     when(payouts.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
     when(payouts.findById(payoutId)).thenReturn(Optional.of(row("PENDING", 100_000L)));
@@ -574,7 +576,7 @@ class RiderPayoutFacadeCoverageTest {
         .thenReturn(Optional.of(new PaymentInstrument("UPI", "x")));
     when(payouts.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
     org.mockito.Mockito.doThrow(new AppException("VALIDATION_ERROR", "nope", 400))
-        .when(razorpayx)
+        .when(cashfree_payouts)
         .initiatePayout(any());
     assertThatThrownBy(() -> withTx.release(finance, riderId, payoutId, null, "tm-key"))
         .extracting(e -> ((AppException) e).code())

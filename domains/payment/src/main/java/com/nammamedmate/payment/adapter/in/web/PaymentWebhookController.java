@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/payments/webhook")
-@Tag(name = "Razorpay payment webhooks")
+@Tag(name = "Cashfree payment webhooks")
 public class PaymentWebhookController {
 
   private final PaymentService payments;
@@ -40,23 +40,25 @@ public class PaymentWebhookController {
     this.objectMapper = objectMapper == null ? new ObjectMapper() : objectMapper;
   }
 
-  @PostMapping("/razorpay")
+  @PostMapping("/cashfree")
   @ResponseStatus(HttpStatus.OK)
   @Operation(
-      summary = "Razorpay payment.captured / payment.failed / refund.processed webhook",
-      description = "HMAC via X-Razorpay-Signature. Idempotent on razorpay_payment_id.")
-  public ApiResponse<Map<String, Object>> razorpay(
-      @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature,
+      summary = "Cashfree PG lifecycle webhook",
+      description =
+          "HMAC via x-webhook-signature (+ x-webhook-timestamp). Idempotent on payment id.")
+  public ApiResponse<Map<String, Object>> cashfree(
+      @RequestHeader(value = "x-webhook-signature", required = false) String signature,
+      @RequestHeader(value = "x-webhook-timestamp", required = false) String timestamp,
       HttpServletRequest request) {
     byte[] rawBody = WebhookRawBodyFilter.rawBody(request);
     WebhookInbox box = inbox == null ? null : inbox.getIfAvailable();
     String eventId = eventId(rawBody);
-    if (box != null && eventId != null && box.alreadyReceived("razorpay", eventId)) {
+    if (box != null && eventId != null && box.alreadyReceived("cashfree", eventId)) {
       return ApiResponse.ok(Map.of("event", "duplicate", "processed", false));
     }
-    Map<String, Object> data = payments.handleWebhook(signature, rawBody);
+    Map<String, Object> data = payments.handleWebhook(signature, timestamp, rawBody);
     if (box != null && eventId != null) {
-      box.claim("razorpay", eventId, new String(rawBody, java.nio.charset.StandardCharsets.UTF_8));
+      box.claim("cashfree", eventId, new String(rawBody, java.nio.charset.StandardCharsets.UTF_8));
     }
     return ApiResponse.ok(data);
   }
@@ -65,7 +67,18 @@ public class PaymentWebhookController {
     try {
       JsonNode root = objectMapper.readTree(rawBody);
       JsonNode id = root.get("id");
-      return id == null || id.isNull() ? null : id.asText();
+      if (id != null && !id.isNull() && !id.asText().isBlank()) {
+        return id.asText();
+      }
+      JsonNode data = root.path("data");
+      JsonNode payment = data.path("payment");
+      if (!payment.isMissingNode()) {
+        String cfPaymentId = payment.path("cf_payment_id").asText(null);
+        if (cfPaymentId != null && !cfPaymentId.isBlank()) {
+          return cfPaymentId;
+        }
+      }
+      return null;
     } catch (Exception e) {
       return null;
     }

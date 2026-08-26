@@ -269,7 +269,7 @@ public class JdbcCustomerProfileStore implements CustomerProfileStore {
           nickname = NULL,
           upi_id = CASE WHEN type = 'UPI' THEN 'REDACTED' ELSE NULL END,
           upi_handle = CASE WHEN type = 'UPI' THEN 'REDACTED' ELSE NULL END,
-          razorpay_token_id = CASE WHEN type = 'CARD' THEN 'REDACTED' ELSE NULL END,
+          gateway_token_id = CASE WHEN type = 'CARD' THEN 'REDACTED' ELSE NULL END,
           card_last4 = CASE WHEN type = 'CARD' THEN '0000' ELSE NULL END,
           is_default = FALSE,
           deleted_at = COALESCE(deleted_at, ?)

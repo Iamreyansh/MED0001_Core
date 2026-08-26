@@ -9,23 +9,17 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** HMAC-SHA256 verification for SMS (MSG91) and email (SendGrid) webhooks. */
+/** HMAC-SHA256 verification for SMS (Twilio) webhooks. */
 @Component
 public class NotificationWebhookAuth {
 
   public static final String DEFAULT_SMS_SECRET = "test_sms_webhook_secret";
-  public static final String DEFAULT_EMAIL_SECRET = "test_email_webhook_secret";
 
   private final String smsSecret;
-  private final String emailSecret;
 
-  public NotificationWebhookAuth(
-      @Value("${medmate.sms.webhook-secret:}") String smsSecret,
-      @Value("${medmate.email.webhook-secret:}") String emailSecret) {
+  public NotificationWebhookAuth(@Value("${medmate.sms.webhook-secret:}") String smsSecret) {
     this.smsSecret =
         smsSecret == null || smsSecret.isBlank() ? DEFAULT_SMS_SECRET : smsSecret.trim();
-    this.emailSecret =
-        emailSecret == null || emailSecret.isBlank() ? DEFAULT_EMAIL_SECRET : emailSecret.trim();
   }
 
   public void requireSms(String signatureHeader, byte[] rawBody) {
@@ -34,39 +28,25 @@ public class NotificationWebhookAuth {
     }
   }
 
-  public void requireEmail(String signatureHeader, byte[] rawBody) {
-    if (!verify(emailSecret, signatureHeader, rawBody)) {
-      throw new AppException(
-          "INVALID_SIGNATURE", "Email webhook signature verification failed", 403);
-    }
-  }
-
   public String signSms(byte[] rawBody) {
     return "sha256=" + hmacHex(smsSecret, rawBody);
   }
 
-  public String signEmail(byte[] rawBody) {
-    return "sha256=" + hmacHex(emailSecret, rawBody);
-  }
-
-  public static void validateSecretsForDeployedProfile(String smsSecret, String emailSecret) {
-    if (blankOrDefault(smsSecret, DEFAULT_SMS_SECRET)
-        || blankOrDefault(emailSecret, DEFAULT_EMAIL_SECRET)
-        || isPlaceholder(smsSecret)
-        || isPlaceholder(emailSecret)) {
-      throw new IllegalStateException(
-          "medmate.sms.webhook-secret and medmate.email.webhook-secret must be injected");
+  public static void validateSecretsForDeployedProfile(
+      String smsSecret, String ignoredEmailSecret) {
+    if (blankOrDefault(smsSecret, DEFAULT_SMS_SECRET) || isPlaceholder(smsSecret)) {
+      throw new IllegalStateException("medmate.sms.webhook-secret must be injected");
     }
   }
 
   public static void validateVendorKeysForDeployedProfile(
-      String msg91, String fcm, String sendgrid, String whatsapp) {
-    if (isPlaceholder(msg91)
-        || isPlaceholder(fcm)
-        || isPlaceholder(sendgrid)
-        || isPlaceholder(whatsapp)) {
+      String twilioSid, String twilioToken, String fcmProjectId, String fcmServiceAccountJson) {
+    if (isPlaceholder(twilioSid)
+        || isPlaceholder(twilioToken)
+        || isPlaceholder(fcmProjectId)
+        || isPlaceholder(fcmServiceAccountJson)) {
       throw new IllegalStateException(
-          "comms vendor keys must be injected (not blank or replace_me) in staging/prod");
+          "Twilio + FCM vendor keys must be injected (not blank or replace_me) in staging/prod");
     }
   }
 

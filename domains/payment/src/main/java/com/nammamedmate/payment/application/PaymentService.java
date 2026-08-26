@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort.OrderSnapshot;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
 import com.nammamedmate.payment.application.port.out.PaymentStore;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
 import com.nammamedmate.payment.application.port.out.WalletPort;
 import com.nammamedmate.payment.domain.MoneyFormats;
 import com.nammamedmate.payment.domain.Payment;
@@ -33,11 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PaymentService {
 
-  public static final Duration RAZORPAY_ORDER_TTL = Duration.ofMinutes(15);
+  public static final Duration CASHFREE_ORDER_TTL = Duration.ofMinutes(15);
   private static final BigDecimal DEFAULT_COMMISSION_PCT = new BigDecimal("8.00");
 
   private final PaymentStore payments;
-  private final RazorpayGatewayPort razorpay;
+  private final CashfreeGatewayPort cashfree;
   private final WalletPort wallet;
   private final OrderLookupPort orders;
   private final OrderPaymentStatusPort orderStatus;
@@ -49,7 +49,7 @@ public class PaymentService {
 
   public PaymentService(
       PaymentStore payments,
-      RazorpayGatewayPort razorpay,
+      CashfreeGatewayPort cashfree,
       WalletPort wallet,
       OrderLookupPort orders,
       OrderPaymentStatusPort orderStatus,
@@ -59,7 +59,7 @@ public class PaymentService {
       Clock clock,
       @Value("${medmate.payment.commission-pct:8.00}") BigDecimal commissionPct) {
     this.payments = payments;
-    this.razorpay = razorpay;
+    this.cashfree = cashfree;
     this.wallet = wallet;
     this.orders = orders;
     this.orderStatus = orderStatus;
@@ -96,7 +96,7 @@ public class PaymentService {
         throw new AppException(
             "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key already used for another payment", 409);
       }
-      return initiateView(existingKey, razorpay.keyId());
+      return initiateView(existingKey, cashfree.keyId());
     }
     if (orderId == null) {
       throw new AppException("VALIDATION_ERROR", "order_id is required", 400);
@@ -164,22 +164,24 @@ public class PaymentService {
 
     PaymentMethod effective = gatewayPortion <= 0 ? PaymentMethod.WALLET_ONLY : requested;
 
-    String razorpayOrderId = null;
-    String keyId = razorpay.keyId();
+    String gatewayOrderId = null;
+    String paymentSessionId = null;
+    String keyId = cashfree.keyId();
     if (gatewayPortion > 0) {
       try {
-        var rz = razorpay.createOrder(orderId, gatewayPortion);
-        razorpayOrderId = rz.razorpayOrderId();
+        var rz = cashfree.createOrder(orderId, gatewayPortion);
+        gatewayOrderId = rz.gatewayOrderId();
+        paymentSessionId = rz.paymentSessionId();
         if (rz.keyId() != null && !rz.keyId().isBlank()) {
           keyId = rz.keyId();
         }
       } catch (AppException e) {
-        if ("RAZORPAY_ERROR".equals(e.code()) || "PAYMENT_INITIATION_FAILED".equals(e.code())) {
-          throw new AppException("RAZORPAY_ERROR", e.getMessage(), 502);
+        if ("CASHFREE_ERROR".equals(e.code()) || "PAYMENT_INITIATION_FAILED".equals(e.code())) {
+          throw new AppException("CASHFREE_ERROR", e.getMessage(), 502);
         }
         throw e;
       } catch (RuntimeException e) {
-        throw new AppException("RAZORPAY_ERROR", "Razorpay order creation failed", 502);
+        throw new AppException("CASHFREE_ERROR", "Cashfree order creation failed", 502);
       }
     }
 
@@ -198,7 +200,7 @@ public class PaymentService {
               normalizeCurrency(currency),
               effective,
               gatewayPortion <= 0 ? PaymentStatus.CAPTURED : PaymentStatus.PENDING,
-              razorpayOrderId,
+              gatewayOrderId,
               null,
               null,
               null,
@@ -229,7 +231,7 @@ public class PaymentService {
               normalizeCurrency(currency),
               effective,
               status,
-              razorpayOrderId,
+              gatewayOrderId,
               null,
               null,
               null,
@@ -248,54 +250,59 @@ public class PaymentService {
       }
     }
 
-    return initiateView(payment, keyId);
+    return initiateView(payment, keyId, paymentSessionId);
   }
 
   private Map<String, Object> initiateView(Payment payment, String keyId) {
+    return initiateView(payment, keyId, null);
+  }
+
+  private Map<String, Object> initiateView(Payment payment, String keyId, String paymentSessionId) {
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("payment_id", payment.id());
     data.put("order_id", payment.orderId());
-    data.put("razorpay_order_id", payment.razorpayOrderId());
-    data.put("razorpay_key_id", keyId);
+    data.put("gateway_order_id", payment.gatewayOrderId());
+    data.put("payment_session_id", paymentSessionId);
+    data.put("cashfree_app_id", keyId);
     data.put("amount_paise", payment.amountPaise());
     data.put("amount_rupees", MoneyFormats.paiseToRupees(payment.amountPaise()));
     data.put("currency", payment.currency());
     data.put("method", payment.method().name());
     data.put("wallet_deducted", MoneyFormats.paiseToRupees(payment.walletPortionPaise()));
     data.put("gateway_amount_paise", payment.gatewayPortionPaise());
-    data.put("expires_at", payment.createdAt().plus(RAZORPAY_ORDER_TTL));
+    data.put("expires_at", payment.createdAt().plus(CASHFREE_ORDER_TTL));
     return data;
   }
 
   @Transactional
   public Map<String, Object> verify(
       MedmatePrincipal principal,
-      String razorpayPaymentId,
-      String razorpayOrderId,
-      String razorpaySignature) {
+      String gatewayPaymentId,
+      String gatewayOrderId,
+      String gatewaySignature) {
     requireCustomer(principal);
-    if (razorpayOrderId == null) {
-      throw new AppException("VALIDATION_ERROR", "razorpay_order_id is required", 400);
+    if (gatewayOrderId == null) {
+      throw new AppException("VALIDATION_ERROR", "gateway_order_id is required", 400);
     }
-    if (razorpayOrderId.isBlank()) {
-      throw new AppException("VALIDATION_ERROR", "razorpay_order_id is required", 400);
+    if (gatewayOrderId.isBlank()) {
+      throw new AppException("VALIDATION_ERROR", "gateway_order_id is required", 400);
     }
-    if (razorpayPaymentId == null) {
-      throw new AppException("VALIDATION_ERROR", "razorpay_payment_id is required", 400);
+    if (gatewayPaymentId == null) {
+      throw new AppException("VALIDATION_ERROR", "gateway_payment_id is required", 400);
     }
-    if (razorpayPaymentId.isBlank()) {
-      throw new AppException("VALIDATION_ERROR", "razorpay_payment_id is required", 400);
+    if (gatewayPaymentId.isBlank()) {
+      throw new AppException("VALIDATION_ERROR", "gateway_payment_id is required", 400);
     }
-    if (razorpaySignature == null) {
+    if (gatewaySignature == null) {
       throw new AppException("PAYMENT_SIGNATURE_INVALID", "HMAC signature missing", 422);
     }
-    if (razorpaySignature.isBlank()) {
+    if (gatewaySignature.isBlank()) {
       throw new AppException("PAYMENT_SIGNATURE_INVALID", "HMAC signature missing", 422);
     }
 
     Payment payment =
         payments
-            .findByRazorpayOrderId(razorpayOrderId.trim())
+            .findByGatewayOrderId(gatewayOrderId.trim())
             .orElseThrow(() -> new AppException("PAYMENT_NOT_FOUND", "Payment not found", 404));
     if (!payment.customerId().equals(principal.subject())) {
       throw new AppException("FORBIDDEN", "Payment belongs to a different customer", 403);
@@ -303,42 +310,52 @@ public class PaymentService {
     if (payment.status() == PaymentStatus.CAPTURED) {
       throw new AppException("PAYMENT_ALREADY_VERIFIED", "Payment already captured", 409);
     }
-    if (!razorpay.verifyPaymentSignature(
-        razorpayOrderId.trim(), razorpayPaymentId.trim(), razorpaySignature.trim())) {
+    if (!cashfree.verifyPaymentSignature(
+        gatewayOrderId.trim(), gatewayPaymentId.trim(), gatewaySignature.trim())) {
       throw new AppException("PAYMENT_SIGNATURE_INVALID", "HMAC verification failed", 422);
     }
 
     Instant now = clock.instant();
     long fee = estimateGatewayFee(payment.gatewayPortionPaise());
-    payment.capture(razorpayPaymentId.trim(), razorpaySignature.trim(), fee, null, now);
+    payment.capture(gatewayPaymentId.trim(), gatewaySignature.trim(), fee, null, now);
     payments.update(payment);
     writeCaptureLedger(payment, fee);
-    orderStatus.onCaptured(payment.orderId(), razorpayPaymentId.trim());
+    orderStatus.onCaptured(payment.orderId(), gatewayPaymentId.trim());
     return verifyView(payment);
   }
 
   @Transactional
   public Map<String, Object> handleWebhook(String signatureHeader, byte[] rawBody) {
+    return handleWebhook(signatureHeader, null, rawBody);
+  }
+
+  @Transactional
+  public Map<String, Object> handleWebhook(
+      String signatureHeader, String timestampHeader, byte[] rawBody) {
     byte[] body = rawBody == null ? new byte[0] : rawBody;
-    if (!razorpay.verifyWebhookSignature(signatureHeader, body)) {
+    if (!cashfree.verifyWebhookSignature(signatureHeader, timestampHeader, body)) {
       // BR-007: reject + log without body/secrets
       org.slf4j.LoggerFactory.getLogger(PaymentService.class)
-          .warn("Razorpay webhook signature invalid (bytes={})", body.length);
+          .warn("Cashfree webhook signature invalid (bytes={})", body.length);
       throw new AppException("WEBHOOK_SIGNATURE_INVALID", "Webhook signature invalid", 400);
     }
     try {
       JsonNode root = objectMapper.readTree(body);
       String event = text(root, "event");
       if (event == null) {
+        event = text(root, "type");
+      }
+      if (event == null) {
         return webhookAck(null, null, false);
       }
-      if ("refund.processed".equals(event)) {
+      String normalized = event.trim().toUpperCase(java.util.Locale.ROOT).replace(' ', '_');
+      if (isRefundEvent(event, normalized)) {
         return refundFacade.completeFromWebhook(root);
       }
-      if ("payment.failed".equals(event)) {
+      if (isPaymentFailedEvent(event, normalized)) {
         return handlePaymentFailed(root, event);
       }
-      if ("payment.captured".equals(event)) {
+      if (isPaymentSuccessEvent(event, normalized)) {
         return handlePaymentCaptured(root, event);
       }
       // Story: UNKNOWN_EVENT at HTTP 200 — acknowledge, no action
@@ -374,12 +391,12 @@ public class PaymentService {
   private Map<String, Object> handlePaymentCaptured(JsonNode root, String event) {
     JsonNode entity = root.path("payload").path("payment").path("entity");
     String paymentId = text(entity, "id");
-    String razorpayOrderId = text(entity, "order_id");
+    String gatewayOrderId = text(entity, "order_id");
     if (paymentId == null) {
       return webhookAck(event, null, false);
     }
-    // Idempotent by razorpay_payment_id
-    var byPayId = payments.findByRazorpayPaymentId(paymentId);
+    // Idempotent by gateway_payment_id
+    var byPayId = payments.findByGatewayPaymentId(paymentId);
     if (byPayId.isPresent()) {
       if (byPayId.get().status() == PaymentStatus.CAPTURED) {
         return webhookAck(event, paymentId, false);
@@ -388,9 +405,9 @@ public class PaymentService {
     Payment payment =
         byPayId.orElseGet(
             () ->
-                razorpayOrderId == null
+                gatewayOrderId == null
                     ? null
-                    : payments.findByRazorpayOrderId(razorpayOrderId).orElse(null));
+                    : payments.findByGatewayOrderId(gatewayOrderId).orElse(null));
     if (payment == null) {
       return webhookAck(event, paymentId, false);
     }
@@ -418,9 +435,9 @@ public class PaymentService {
   private Map<String, Object> handlePaymentFailed(JsonNode root, String event) {
     JsonNode entity = root.path("payload").path("payment").path("entity");
     String paymentId = text(entity, "id");
-    String razorpayOrderId = text(entity, "order_id");
+    String gatewayOrderId = text(entity, "order_id");
     if (paymentId != null) {
-      var byPayId = payments.findByRazorpayPaymentId(paymentId);
+      var byPayId = payments.findByGatewayPaymentId(paymentId);
       if (byPayId.isPresent()) {
         if (byPayId.get().status() == PaymentStatus.FAILED) {
           return webhookAck(event, paymentId, false);
@@ -428,12 +445,10 @@ public class PaymentService {
       }
     }
     Payment payment =
-        razorpayOrderId == null
-            ? null
-            : payments.findByRazorpayOrderId(razorpayOrderId).orElse(null);
+        gatewayOrderId == null ? null : payments.findByGatewayOrderId(gatewayOrderId).orElse(null);
     if (payment == null) {
       if (paymentId != null) {
-        payment = payments.findByRazorpayPaymentId(paymentId).orElse(null);
+        payment = payments.findByGatewayPaymentId(paymentId).orElse(null);
       }
     }
     if (payment == null) {
@@ -486,13 +501,13 @@ public class PaymentService {
           "PAYMENT",
           0L,
           gatewayFeePaise,
-          "Razorpay gateway fee",
+          "Cashfree gateway fee",
           meta);
     }
   }
 
   private static long estimateGatewayFee(long gatewayPortionPaise) {
-    // ponytail: ~2% stub fee until live Razorpay fee field present; upgrade: use entity.fee
+    // ponytail: ~2% stub fee until live Cashfree fee field present; upgrade: use entity.fee
     long base = Math.max(0L, gatewayPortionPaise);
     return BigDecimal.valueOf(base)
         .multiply(new BigDecimal("0.02"))
@@ -507,7 +522,7 @@ public class PaymentService {
     data.put("payment_status", payment.status().name());
     data.put("amount", MoneyFormats.paiseToRupees(payment.amountPaise()));
     data.put("method", payment.method().name());
-    data.put("transaction_id", payment.razorpayPaymentId());
+    data.put("transaction_id", payment.gatewayPaymentId());
     data.put("captured_at", payment.capturedAt());
     return data;
   }
@@ -522,8 +537,8 @@ public class PaymentService {
     data.put("gateway_portion", MoneyFormats.paiseToRupees(payment.gatewayPortionPaise()));
     data.put("method", payment.method().name());
     data.put("status", payment.status().name());
-    data.put("razorpay_payment_id", payment.razorpayPaymentId());
-    data.put("razorpay_order_id", payment.razorpayOrderId());
+    data.put("gateway_payment_id", payment.gatewayPaymentId());
+    data.put("gateway_order_id", payment.gatewayOrderId());
     data.put(
         "gateway_fee",
         payment.gatewayFeePaise() == null
@@ -561,6 +576,27 @@ public class PaymentService {
     }
     String s = v.asText("");
     return s.isBlank() ? null : s;
+  }
+
+  private static boolean isPaymentSuccessEvent(String raw, String normalized) {
+    return "payment.captured".equals(raw)
+        || "PAYMENT_SUCCESS_WEBHOOK".equals(normalized)
+        || "PAYMENT_SUCCESS".equals(normalized)
+        || "PAYMENT_CAPTURED".equals(normalized);
+  }
+
+  private static boolean isPaymentFailedEvent(String raw, String normalized) {
+    return "payment.failed".equals(raw)
+        || "PAYMENT_FAILED_WEBHOOK".equals(normalized)
+        || "PAYMENT_FAILED".equals(normalized);
+  }
+
+  private static boolean isRefundEvent(String raw, String normalized) {
+    return "refund.processed".equals(raw)
+        || "refund.created".equals(raw)
+        || "REFUND_STATUS_WEBHOOK".equals(normalized)
+        || "REFUND_PROCESSED".equals(normalized)
+        || "REFUND_SUCCESS".equals(normalized);
   }
 
   private static String normalizeCurrency(String currency) {

@@ -53,7 +53,7 @@ public class CustomerPaymentMethodController {
 
   @PostMapping("/upi")
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Save a UPI VPA after Razorpay validation")
+  @Operation(summary = "Save a UPI VPA after Cashfree validation")
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "201",
@@ -84,7 +84,7 @@ public class CustomerPaymentMethodController {
 
   @PostMapping("/card")
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Save a Razorpay-tokenised card")
+  @Operation(summary = "Save a Cashfree-tokenised card")
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "201",
@@ -97,7 +97,7 @@ public class CustomerPaymentMethodController {
         description = "CARD_ALREADY_SAVED"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "422",
-        description = "INVALID_RAZORPAY_TOKEN | PAYMENT_METHOD_LIMIT_REACHED")
+        description = "INVALID_CASHFREE_TOKEN | PAYMENT_METHOD_LIMIT_REACHED")
   })
   public ApiResponse<Map<String, Object>> saveCard(
       @AuthenticationPrincipal MedmatePrincipal principal,
@@ -109,7 +109,7 @@ public class CustomerPaymentMethodController {
             body == null
                 ? null
                 : new CardCommand(
-                    body.razorpayTokenId(),
+                    body.gatewayTokenId(),
                     body.cardLast4(),
                     body.cardNetwork(),
                     body.cardType(),
@@ -158,7 +158,7 @@ public class CustomerPaymentMethodController {
 
   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
   public record CardRequest(
-      String razorpayTokenId,
+      String gatewayTokenId,
       String cardLast4,
       String cardNetwork,
       String cardType,

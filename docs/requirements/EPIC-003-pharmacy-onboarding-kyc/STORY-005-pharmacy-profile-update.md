@@ -34,7 +34,7 @@ This story covers self-service management of a pharmacy's profile after account 
 2. **Phone changes require OTP verification**: PATCH `/pharmacy/profile` with a new `phone` value triggers a 6-digit OTP to the new phone number. The phone is only updated after OTP is verified via a separate step. The old phone remains active during this process.
 3. **Logo size and format constraints**: Logo uploads must be PNG or JPG, maximum 2 MB. Logo is uploaded to the CDN; the returned `logo_url` is the CDN URL. Non-conforming files return `INVALID_LOGO`.
 4. **GSTIN changes require re-verification**: If `gstin` is updated via PATCH `/pharmacy/profile/tax`, auto-KYC for the GSTIN check is re-triggered and the pharmacy is temporarily flagged as `PENDING_GSTIN_REVERIFICATION` in admin. Business remains operational during re-verification.
-5. **Bank account is verified via penny drop**: Saving a bank account (POST `/pharmacy/profile/bank-account`) initiates a Rs 1 transfer to the provided account via RazorpayX. If the transfer succeeds and account confirms, `verification_status=VERIFIED`. If it fails within 24 hours, status is `FAILED` and the pharmacy must re-enter details.
+5. **Bank account is verified via penny drop**: Saving a bank account (POST `/pharmacy/profile/bank-account`) initiates a Rs 1 transfer to the provided account via CashfreePayout. If the transfer succeeds and account confirms, `verification_status=VERIFIED`. If it fails within 24 hours, status is `FAILED` and the pharmacy must re-enter details.
 6. **Profile completeness < 100% shows persistent dashboard reminder**: The completeness score is recalculated on every profile update. Fields contributing to 100%: business_name, phone, email, logo, address (all sub-fields), gstin, drug_licence_number, fssai_number, pan_number, operating_hours (at least 5 days configured), bank_account (verified), tagline, registered_pharmacist_name.
 7. **Operating hours are per-day-of-week**: `operating_hours` is an array of 7 entries (one per day, 0=Monday to 6=Sunday). Each entry has `open_time` (HH:MM 24h), `close_time` (HH:MM 24h), and `is_closed` (boolean). `open_time` must be before `close_time` unless `is_closed=true`. Overlapping or missing days are not permitted.
 8. **Admin profile edits are audit-logged**: Any profile field changed by an admin (not the pharmacy owner) is written to `AuditLog` with `actor_id`, `actor_role`, `changed_fields`, `old_values`, and `new_values`.
@@ -354,7 +354,7 @@ GET /api/v1/pharmacy/profile/bank-account
 | `ifsc_code` | CHAR(11) | Not null | RBI-registered IFSC code |
 | `account_type` | ENUM | Not null | CURRENT \| SAVINGS |
 | `verification_status` | ENUM | Not null, default PENDING | PENDING \| VERIFIED \| FAILED |
-| `penny_drop_reference` | VARCHAR(100) | Nullable | RazorpayX payout reference ID |
+| `penny_drop_reference` | VARCHAR(100) | Nullable | CashfreePayout payout reference ID |
 | `verified_at` | TIMESTAMPTZ | Nullable | Timestamp when verification completed |
 | `created_at` | TIMESTAMPTZ | Not null, default now() | Record creation |
 
@@ -390,7 +390,7 @@ GET /api/v1/pharmacy/profile/bank-account
 - [ ] **Given** a pharmacy_owner calls PATCH `/api/v1/pharmacy/profile` with a new `business_name`, **then** the change is NOT immediately applied; a `ProfileChangeRequest` is created with `status=PENDING_APPROVAL`, and the response lists `business_name` in `pending_approval_fields`.
 - [ ] **Given** a pharmacy_owner calls PATCH `/api/v1/pharmacy/profile` with a new `phone`, **then** an OTP is sent to the new phone number and the phone is not updated until OTP verification succeeds.
 - [ ] **Given** `operating_hours` is submitted with Monday `open_time=21:00` and `close_time=09:00` (open after close), **when** the request is processed, **then** HTTP 400 `INVALID_OPERATING_HOURS` is returned.
-- [ ] **Given** POST `/api/v1/pharmacy/profile/bank-account` is called with valid bank details, **then** a penny drop of Rs 1 is initiated via RazorpayX, the account `verification_status=PENDING`, and the pharmacy owner is notified when verification completes.
+- [ ] **Given** POST `/api/v1/pharmacy/profile/bank-account` is called with valid bank details, **then** a penny drop of Rs 1 is initiated via CashfreePayout, the account `verification_status=PENDING`, and the pharmacy owner is notified when verification completes.
 - [ ] **Given** a verified bank account already exists, **when** POST `/api/v1/pharmacy/profile/bank-account` is called again, **then** HTTP 409 `BANK_ACCOUNT_ALREADY_VERIFIED` is returned.
 - [ ] **Given** PATCH `/api/v1/pharmacy/profile/tax` is called with a new valid `gstin`, **then** GSTIN re-verification is triggered via auto-KYC, and `re_verification_triggered=true` is returned in the response.
 - [ ] **Given** a pharmacy has 3 out of 12 profile fields completed, **when** GET `/api/v1/pharmacy/profile/completeness` is called, **then** `completeness_pct` correctly reflects the proportion and `missing_fields` lists the specific incomplete fields with `impact_pct` and actionable `action` strings.
@@ -404,7 +404,7 @@ GET /api/v1/pharmacy/profile/bank-account
 - STORY-003-003 - Auto-KYC (re-triggered on GSTIN change)
 - EPIC-001 / STORY-002 - OTP service (phone and email change verification)
 - EPIC-002 / STORY-001 - Notification service (bank account verification result, profile change approval)
-- External: RazorpayX - Penny drop payout API for bank account verification
+- External: CashfreePayout - Penny drop payout API for bank account verification
 - External: RBI IFSC Registry - IFSC code validation
 
 ---
@@ -414,5 +414,5 @@ GET /api/v1/pharmacy/profile/bank-account
 - Account number is stored AES-256 encrypted using a KMS-managed key. Only the last 4 digits are stored in plaintext for display.
 - Logo upload flow: the pharmacy dashboard calls a separate pre-signed upload URL endpoint (not defined here; part of EPIC-001 media upload service). After uploading the file, the CDN URL is sent to PATCH `/pharmacy/profile` as `logo_url`.
 - Profile completeness weights: each contributing field is weighted equally at 100/N%. Current N=12 contributing fields; if fields are added in future, the denominator scales automatically.
-- Penny drop verification timing: initiate immediately on POST. Listen for RazorpayX webhook `payout.processed` or `payout.failed`. If no webhook within 24 hours, mark as `FAILED` and notify pharmacy.
+- Penny drop verification timing: initiate immediately on POST. Listen for CashfreePayout webhook `payout.processed` or `payout.failed`. If no webhook within 24 hours, mark as `FAILED` and notify pharmacy.
 - Operating hours are used by the customer app to show "Open Now" / "Closed" status and by the delivery routing engine for order assignment. Cache operating hours in Redis with 5-minute TTL.

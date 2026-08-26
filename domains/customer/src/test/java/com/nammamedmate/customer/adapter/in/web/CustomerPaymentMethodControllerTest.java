@@ -83,7 +83,7 @@ class CustomerPaymentMethodControllerTest {
 
     ArgumentCaptor<CardCommand> captor = ArgumentCaptor.forClass(CardCommand.class);
     verify(service).saveCard(eq(customer), captor.capture(), isNull());
-    assertThat(captor.getValue().razorpayTokenId()).isEqualTo("token_x");
+    assertThat(captor.getValue().gatewayTokenId()).isEqualTo("token_x");
     assertThat(captor.getValue().cardLast4()).isEqualTo("4242");
   }
 

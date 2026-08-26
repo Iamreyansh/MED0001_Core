@@ -24,10 +24,10 @@ vars {
   mfaCode: 
   totpSecret: 
   mfaBackupCode: 
-  razorpayWebhookSecret: test_razorpay_webhook_secret
-  razorpayWebhookSignature: 
-  razorpayOrderId: 
-  razorpayPaymentId: 
+  cashfreeWebhookSecret: test_cashfree_webhook_secret
+  cashfreeWebhookSignature: 
+  gatewayOrderId: 
+  gatewayPaymentId: 
   internalServiceToken: local-internal-wallet-token
 }
 vars:secret [
@@ -44,6 +44,6 @@ vars:secret [
   mfaChallengeToken,
   totpSecret,
   mfaBackupCode,
-  razorpayWebhookSecret,
+  cashfreeWebhookSecret,
   internalServiceToken
 ]

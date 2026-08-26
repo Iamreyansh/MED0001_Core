@@ -36,6 +36,6 @@ class PaymentRefundBridgeConfigTest {
     when(jdbc.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), any()))
         .thenReturn(java.util.List.of());
     assertThat(port.findById(UUID.randomUUID())).isEmpty();
-    assertThat(port.findByRazorpayRefundId("rfnd_x")).isEmpty();
+    assertThat(port.findByGatewayRefundId("rfnd_x")).isEmpty();
   }
 }

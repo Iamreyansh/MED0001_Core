@@ -47,8 +47,8 @@ script:post-response {
   const body = res.getBody();
   if (body && body.success && body.data) {
     if (body.data.payment_id) bru.setEnvVar("paymentId", body.data.payment_id);
-    if (body.data.razorpay_order_id) bru.setEnvVar("razorpayOrderId", body.data.razorpay_order_id);
-    if (body.data.razorpay_key_id) bru.setEnvVar("razorpayKeyId", body.data.razorpay_key_id);
+    if (body.data.gateway_order_id) bru.setEnvVar("gatewayOrderId", body.data.gateway_order_id);
+    if (body.data.cashfree_app_id) bru.setEnvVar("cashfreeKeyId", body.data.cashfree_app_id);
   }
 }
 
@@ -60,13 +60,13 @@ tests {
     const body = res.getBody();
     expect(body.success).to.equal(true);
     expect(body.data.payment_id).to.be.a("string");
-    expect(body.data.razorpay_order_id).to.be.a("string");
-    expect(body.data.razorpay_key_id).to.be.a("string");
+    expect(body.data.gateway_order_id).to.be.a("string");
+    expect(body.data.cashfree_app_id).to.be.a("string");
   });
 }
 
 docs {
-  POST /api/v1/payments/initiate — create Razorpay order; returns SDK credentials. Errors: ORDER_NOT_FOUND, ORDER_NOT_YOURS, PAYMENT_ALREADY_INITIATED, COD_ORDER_NO_PAYMENT, INVALID_AMOUNT, RAZORPAY_ERROR.
+  POST /api/v1/payments/initiate — create Cashfree order; returns SDK credentials. Errors: ORDER_NOT_FOUND, ORDER_NOT_YOURS, PAYMENT_ALREADY_INITIATED, COD_ORDER_NO_PAYMENT, INVALID_AMOUNT, CASHFREE_ERROR.
 }
 
 example {
@@ -98,8 +98,8 @@ example {
           "data": {
             "payment_id": "paymmmmm-mmmm-4mmm-8mmm-mmmmmmmmmmmm",
             "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
-            "razorpay_order_id": "order_XXXXXXXXXXXX",
-            "razorpay_key_id": "rzp_test_stub",
+            "gateway_order_id": "order_XXXXXXXXXXXX",
+            "cashfree_app_id": "cf_test_stub",
             "amount_paise": 49500,
             "amount_rupees": 495.00,
             "currency": "INR",

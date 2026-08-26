@@ -48,7 +48,7 @@ tests {
     const body = res.getBody();
     if (res.getStatus() === 200) {
       expect(body.success).to.equal(true);
-      expect(body.data.payment_gateway).to.equal("Razorpay");
+      expect(body.data.payment_gateway).to.equal("Cashfree");
       expect(body.data).to.have.property("checkout_url");
     } else {
       expect(body.success).to.equal(false);
@@ -58,7 +58,7 @@ tests {
 }
 
 docs {
-  POST /api/v1/pharmacy/billing/pay — Razorpay checkout stub; Idempotency-Key required.
+  POST /api/v1/pharmacy/billing/pay — Cashfree checkout stub; Idempotency-Key required.
 }
 
 example {
@@ -86,8 +86,8 @@ example {
           "success": true,
           "data": {
             "invoice_id": "11111111-1111-4111-8111-111111111112",
-            "payment_gateway": "Razorpay",
-            "checkout_url": "https://razorpay.com/checkout/pay_abc123",
+            "payment_gateway": "Cashfree",
+            "checkout_url": "https://cashfree.com/checkout/pay_abc123",
             "expires_at": "2026-07-24T10:30:00Z"
           }
         }

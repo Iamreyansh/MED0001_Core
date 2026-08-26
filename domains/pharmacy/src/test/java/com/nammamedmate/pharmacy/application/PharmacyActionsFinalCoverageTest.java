@@ -89,9 +89,9 @@ class PharmacyActionsFinalCoverageTest {
   void validationWhitespaceAndNullBranches() {
     MedmatePrincipal ops = principal(AuthRole.ADMIN_OPERATIONS);
     assertThatThrownBy(() -> actions.sendNotice(ops, PID, "EMAIL", "  ", "msg", "NORMAL", null))
-        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("SUBJECT_REQUIRED"));
+        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("CHANNEL_UNAVAILABLE"));
     assertThatThrownBy(() -> actions.sendNotice(ops, PID, "WHATSAPP", null, "msg", "NORMAL", "  "))
-        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("TEMPLATE_REQUIRED"));
+        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("CHANNEL_UNAVAILABLE"));
     assertThatThrownBy(() -> actions.sendNotice(ops, PID, "  ", null, "msg", "NORMAL", null))
         .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("INVALID_CHANNEL"));
     assertThatThrownBy(() -> actions.sendNotice(ops, PID, "EMAIL", "sub", "  ", "NORMAL", null))
@@ -105,19 +105,20 @@ class PharmacyActionsFinalCoverageTest {
     actions.logCall(principal(AuthRole.ADMIN_SUPER), PID, 10, "RESOLVED", null);
     actions.addNote(ops, PID, "n", false);
     actions.listNotes(ops, PID, null, 3, null);
-    actions.sendNotice(ops, PID, "EMAIL", "sub", "m", "  ", null);
-    actions.sendNoticeInternal(ops, PID, "EMAIL", "sub", "body", "NORMAL", null, Ids.newId(), true);
+    actions.sendNotice(ops, PID, "IN_APP", "sub", "m", "  ", null);
+    actions.sendNoticeInternal(
+        ops, PID, "IN_APP", "sub", "body", "NORMAL", null, Ids.newId(), true);
     assertThatThrownBy(() -> actions.addNote(ops, PID, null, false))
         .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("NOTE_REQUIRED"));
     actions.listNotes(ops, PID, null, 2, 20);
     actions.listNotes(ops, PID, null, null, 20);
-    actions.sendNotice(ops, PID, "EMAIL", "sub", "m", "NORMAL", "   ");
+    actions.sendNotice(ops, PID, "IN_APP", "sub", "m", "NORMAL", "   ");
     assertThat(
             actions
                 .sendNoticeInternal(
                     ops,
                     UUID.fromString("22222222-2222-4222-8222-222222222222"),
-                    "EMAIL",
+                    "IN_APP",
                     "sub",
                     "m",
                     "NORMAL",

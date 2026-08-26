@@ -112,7 +112,7 @@ class PharmacyCommissionJdbcCoverageTest {
 
     when(jdbc.query(any(String.class), any(RowMapper.class), eq("pout_1")))
         .thenReturn(List.of(settlementRow()));
-    assertThat(store.findByRazorpayxPayoutId("pout_1")).isPresent();
+    assertThat(store.findByCashfreexPayoutId("pout_1")).isPresent();
 
     when(jdbc.query(
             any(String.class),
@@ -308,7 +308,7 @@ class PharmacyCommissionJdbcCoverageTest {
     when(rs.getObject("released_by")).thenReturn(null);
     when(rs.getTimestamp("released_at")).thenReturn(releasedAt);
     when(rs.getTimestamp("paid_at")).thenReturn(paidAt);
-    when(rs.getString("razorpayx_payout_id")).thenReturn(null);
+    when(rs.getString("cashfree_transfer_id")).thenReturn(null);
     when(rs.getString("utr_number")).thenReturn(null);
     when(rs.getString("receipt_url")).thenReturn(null);
     when(rs.getString("release_idempotency_key")).thenReturn(null);

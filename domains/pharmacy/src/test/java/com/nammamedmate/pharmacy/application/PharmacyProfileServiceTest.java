@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,7 +61,6 @@ class PharmacyProfileServiceTest {
   private FakeProfileOtps otps;
   private FakePincodes pincodes;
   private InMemoryOutboxStore outboxStore;
-  private AutoKycService autoKyc;
   private PharmacyProfileService service;
   private AdminPharmacyProfileService adminService;
   private FakeAudit audit;
@@ -78,7 +76,6 @@ class PharmacyProfileServiceTest {
     audit = new FakeAudit();
     RateLimiter rateLimiter = mock(RateLimiter.class);
     when(rateLimiter.tryAcquire(any(), any(Integer.class), any(Integer.class))).thenReturn(true);
-    autoKyc = mock(AutoKycService.class);
     AesGcmCipher cipher = new AesGcmCipher(AES_KEY, new SecureRandom(new byte[] {1}));
     service =
         new PharmacyProfileService(
@@ -96,7 +93,6 @@ class PharmacyProfileServiceTest {
             cipher,
             new OutboxPublisher(outboxStore, new ObjectMapper()),
             rateLimiter,
-            autoKyc,
             new BCryptPasswordEncoder(),
             () -> MagicProfileOtp.CODE,
             new SecureRandom(new byte[] {2}),
@@ -255,7 +251,6 @@ class PharmacyProfileServiceTest {
   void gstinChangeTriggersReVerification() {
     Map<String, Object> data = service.patchTax(owner(), Map.of("gstin", "29AABPP1235F1ZY"));
     assertThat(data.get("re_verification_triggered")).isEqualTo(true);
-    verify(autoKyc).triggerGstinReverification(PID);
     assertThat(profiles.get().gstinReverificationPending()).isTrue();
   }
 

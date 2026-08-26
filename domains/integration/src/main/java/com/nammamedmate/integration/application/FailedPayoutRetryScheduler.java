@@ -4,7 +4,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** AC-006: auto-retry failed RazorpayX payouts once after 1 hour. */
+/** AC-006: auto-retry failed CashfreePayout payouts once after 1 hour. */
 @Component
 @ConditionalOnProperty(
     name = "medmate.integration.payout-retry.enabled",
@@ -12,9 +12,9 @@ import org.springframework.stereotype.Component;
     matchIfMissing = true)
 public class FailedPayoutRetryScheduler {
 
-  private final RazorpayIntegrationService service;
+  private final CashfreeIntegrationService service;
 
-  public FailedPayoutRetryScheduler(RazorpayIntegrationService service) {
+  public FailedPayoutRetryScheduler(CashfreeIntegrationService service) {
     this.service = service;
   }
 

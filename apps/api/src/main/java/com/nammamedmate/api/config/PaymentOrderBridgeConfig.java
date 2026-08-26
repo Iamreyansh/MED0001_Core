@@ -5,13 +5,13 @@ import com.nammamedmate.customer.application.WalletService.AdminCreditCommand;
 import com.nammamedmate.customer.application.WalletService.TxPage;
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.order.application.OrderPlacementService;
-import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
+import com.nammamedmate.order.application.port.out.CashfreePaymentPort;
 import com.nammamedmate.payment.application.PaymentService;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
 import com.nammamedmate.payment.application.port.out.WalletPort;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -35,24 +35,24 @@ public class PaymentOrderBridgeConfig {
 
   @Bean
   @Primary
-  RazorpayPaymentPort orderRazorpayFromPaymentDomain(
-      RazorpayGatewayPort gateway, @Lazy PaymentService payments) {
-    return new RazorpayPaymentPort() {
+  CashfreePaymentPort orderCashfreeFromPaymentDomain(
+      CashfreeGatewayPort gateway, @Lazy PaymentService payments) {
+    return new CashfreePaymentPort() {
       @Override
       public CreateOrderResult createOrder(UUID orderId, long amountPaise) {
         var created = gateway.createOrder(orderId, amountPaise);
-        return new CreateOrderResult(created.razorpayOrderId(), created.amountPaise());
+        return new CreateOrderResult(created.gatewayOrderId(), created.amountPaise());
       }
 
       @Override
       public boolean verifyPaymentSignature(
-          String razorpayOrderId, String paymentId, String signature) {
-        return gateway.verifyPaymentSignature(razorpayOrderId, paymentId, signature);
+          String gatewayOrderId, String paymentId, String signature) {
+        return gateway.verifyPaymentSignature(gatewayOrderId, paymentId, signature);
       }
 
       @Override
-      public String signPayment(String razorpayOrderId, String paymentId) {
-        return gateway.signPayment(razorpayOrderId, paymentId);
+      public String signPayment(String gatewayOrderId, String paymentId) {
+        return gateway.signPayment(gatewayOrderId, paymentId);
       }
 
       @Override
@@ -61,9 +61,9 @@ public class PaymentOrderBridgeConfig {
       }
 
       @Override
-      public RefundResult refund(String razorpayPaymentId, long amountPaise) {
-        var refunded = gateway.refund(razorpayPaymentId, amountPaise);
-        return new RefundResult(refunded.razorpayRefundId(), refunded.amountPaise());
+      public RefundResult refund(String gatewayPaymentId, long amountPaise) {
+        var refunded = gateway.refund(gatewayPaymentId, amountPaise);
+        return new RefundResult(refunded.gatewayRefundId(), refunded.amountPaise());
       }
 
       @Override
@@ -231,8 +231,8 @@ public class PaymentOrderBridgeConfig {
   OrderPaymentStatusPort orderPaymentStatusPort(@Lazy OrderPlacementService orderPlacement) {
     return new OrderPaymentStatusPort() {
       @Override
-      public void onCaptured(UUID orderId, String razorpayPaymentId) {
-        orderPlacement.applyExternalPaymentCapture(orderId, razorpayPaymentId);
+      public void onCaptured(UUID orderId, String gatewayPaymentId) {
+        orderPlacement.applyExternalPaymentCapture(orderId, gatewayPaymentId);
       }
 
       @Override

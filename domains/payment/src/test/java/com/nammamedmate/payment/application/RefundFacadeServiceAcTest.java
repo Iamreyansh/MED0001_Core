@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreeGatewayClient;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.RefundFinancePort;
@@ -50,7 +50,7 @@ class RefundFacadeServiceAcTest {
   @Mock private FinancialLedgerWriterPort ledger;
   @Mock private RefundNotificationPort notifications;
 
-  private StubRazorpayGatewayClient razorpay;
+  private StubCashfreeGatewayClient cashfree;
   private RefundFacadeService service;
   private final UUID adminId = UUID.randomUUID();
   private final UUID customerId = UUID.randomUUID();
@@ -65,10 +65,10 @@ class RefundFacadeServiceAcTest {
 
   @BeforeEach
   void setUp() {
-    razorpay = new StubRazorpayGatewayClient();
+    cashfree = new StubCashfreeGatewayClient();
     service =
         new RefundFacadeService(
-            refunds, razorpay, wallets, ledger, notifications, Clock.fixed(NOW, ZoneOffset.UTC));
+            refunds, cashfree, wallets, ledger, notifications, Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   private RefundRecord pendingSource(long amountPaise, Instant createdAt) {
@@ -142,7 +142,7 @@ class RefundFacadeServiceAcTest {
 
     Map<String, Object> result = service.process(finance, refundId, "Approved");
     assertThat(result.get("status")).isEqualTo("PROCESSING");
-    assertThat(result.get("razorpay_refund_id")).isNotNull();
+    assertThat(result.get("gateway_refund_id")).isNotNull();
     verify(refunds).finalizeGatewayProcess(eq(refundId), anyString(), any(), eq(NOW));
   }
 
@@ -252,7 +252,7 @@ class RefundFacadeServiceAcTest {
             LocalDate.parse("2026-07-29"),
             null,
             NOW);
-    when(refunds.findByRazorpayRefundId("rfnd_XXXXXXXXXXXX")).thenReturn(Optional.of(row));
+    when(refunds.findByGatewayRefundId("rfnd_XXXXXXXXXXXX")).thenReturn(Optional.of(row));
     when(refunds.markCompleted(refundId, NOW)).thenReturn(true);
 
     var root =
@@ -418,21 +418,21 @@ class RefundFacadeServiceAcTest {
   }
 
   @Test
-  void razorpayFailureMarksFailed() {
+  void cashfreeFailureMarksFailed() {
     RefundRecord row = pendingSource(60000L, NOW);
     when(refunds.findById(refundId)).thenReturn(Optional.of(row));
     when(refunds.claimForProcess(eq(refundId), eq(adminId), any(), eq(NOW))).thenReturn(true);
     RefundFacadeService failing =
         new RefundFacadeService(
             refunds,
-            new StubRazorpayGatewayClient("k", "s", "w", true),
+            new StubCashfreeGatewayClient("k", "s", "w", true),
             wallets,
             ledger,
             notifications,
             Clock.fixed(NOW, ZoneOffset.UTC));
     assertThatThrownBy(() -> failing.process(finance, refundId, "go"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_REFUND_FAILED");
+        .isEqualTo("CASHFREE_REFUND_FAILED");
     verify(refunds).markProcessFailed(eq(refundId), anyString(), eq(NOW));
   }
 }

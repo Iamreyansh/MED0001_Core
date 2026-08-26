@@ -10,7 +10,6 @@ import com.nammamedmate.messaging.ConsumerInbox;
 import com.nammamedmate.messaging.OutboxMessage;
 import com.nammamedmate.notification.adapter.in.messaging.CustomerNotificationRequestedHandler;
 import com.nammamedmate.notification.adapter.in.messaging.NotificationDispatchConsumer;
-import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
 import com.nammamedmate.rider.adapter.in.messaging.AutomationRiderAssignConsumer;
 import java.time.Instant;
 import java.util.Map;
@@ -30,7 +29,6 @@ public class DomainEventRouter {
   private final ObjectMapper objectMapper;
   private final ObjectProvider<CustomerNotificationRequestedHandler> notifications;
   private final ObjectProvider<NotificationDispatchConsumer> dispatch;
-  private final ObjectProvider<AutoKycOutboxConsumer> autoKyc;
   private final ObjectProvider<OrderDeliveredLoyaltyConsumer> loyalty;
   private final ObjectProvider<OrderDeliveredReferralConsumer> referral;
   private final ObjectProvider<OrderDeliveredCampaignConsumer> campaigns;
@@ -42,7 +40,6 @@ public class DomainEventRouter {
       ObjectMapper objectMapper,
       ObjectProvider<CustomerNotificationRequestedHandler> notifications,
       ObjectProvider<NotificationDispatchConsumer> dispatch,
-      ObjectProvider<AutoKycOutboxConsumer> autoKyc,
       ObjectProvider<OrderDeliveredLoyaltyConsumer> loyalty,
       ObjectProvider<OrderDeliveredReferralConsumer> referral,
       ObjectProvider<OrderDeliveredCampaignConsumer> campaigns,
@@ -52,7 +49,6 @@ public class DomainEventRouter {
     this.objectMapper = objectMapper;
     this.notifications = notifications;
     this.dispatch = dispatch;
-    this.autoKyc = autoKyc;
     this.loyalty = loyalty;
     this.referral = referral;
     this.campaigns = campaigns;
@@ -94,8 +90,9 @@ public class DomainEventRouter {
 
   private void routeDomain(String type, OutboxMessage envelope, String messageBody) {
     switch (type) {
-      case "pharmacy.kyc.auto_verify_requested", "pharmacy.kyc.async_check_requested" ->
-          require(autoKyc.getIfAvailable(), type).accept(envelope);
+      case "pharmacy.kyc.auto_verify_requested", "pharmacy.kyc.async_check_requested" -> {
+        // Auto-KYC removed — ignore leftover outbox events.
+      }
       case "order.delivered" -> {
         Optional.ofNullable(loyalty.getIfAvailable()).ifPresent(c -> c.accept(envelope));
         Optional.ofNullable(referral.getIfAvailable()).ifPresent(c -> c.accept(envelope));

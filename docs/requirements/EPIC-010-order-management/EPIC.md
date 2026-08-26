@@ -37,7 +37,7 @@ EPIC-010 is the core commerce engine of Namma MedMate - everything from adding m
 - Customer cart (add/remove/update, coupon, prescription, address, pharmacy switch)
 - Smart pharmacy auto-selection scoring algorithm
 - Rx quote broadcast to 3km radius pharmacies with 15-minute response window
-- Order placement with Razorpay UPI/Card/COD and Namma Money wallet
+- Order placement with Cashfree UPI/Card/COD and Namma Money wallet
 - Full order state machine (PENDING_ACCEPTANCE ? DELIVERED)
 - Live order tracking with ETA countdown
 - Cancellation, refund routing (source/wallet), and eligibility checks
@@ -94,7 +94,7 @@ POST /api/v1/orders (place order)
 
 | Dependency | Type | Epic/System |
 |------------|------|-------------|
-| Razorpay payment gateway | External | Payment processing |
+| Cashfree payment gateway | External | Payment processing |
 | EPIC-006 - Pharmacy POS/inventory | Bidirectional | Stock checks, order line items |
 | EPIC-008 - Prescription management | Bidirectional | Rx validation at checkout |
 | EPIC-009 - Teleconsult | Upstream | e-Rx links to cart |

@@ -66,7 +66,7 @@ public class AdminFinanceRiderPayoutController {
 
   @PostMapping("/{riderId}/release")
   @RequiresPermission("finance:update")
-  @Operation(summary = "Admin: release rider payout via Razorpay Route")
+  @Operation(summary = "Admin: release rider payout via Cashfree Route")
   public ApiResponse<Map<String, Object>> release(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @PathVariable UUID riderId,

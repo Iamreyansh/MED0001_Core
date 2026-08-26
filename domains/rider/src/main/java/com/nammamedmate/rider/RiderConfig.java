@@ -5,12 +5,13 @@ import com.nammamedmate.rider.adapter.out.cache.RedisAssignmentOtpCache;
 import com.nammamedmate.rider.adapter.out.cache.RedisRiderLiveStatusCache;
 import com.nammamedmate.rider.adapter.out.cache.RedisRiderLocationCache;
 import com.nammamedmate.rider.adapter.out.client.StubAadhaarKycAdapter;
+import com.nammamedmate.rider.adapter.out.client.StubCashfreeRouteAdapter;
 import com.nammamedmate.rider.adapter.out.client.StubDistanceMatrixAdapter;
-import com.nammamedmate.rider.adapter.out.client.StubRazorpayRouteAdapter;
 import com.nammamedmate.rider.adapter.out.sse.InMemoryOrderLocationPush;
 import com.nammamedmate.rider.application.port.out.AadhaarKycPort;
 import com.nammamedmate.rider.application.port.out.ActiveDeliveryPort;
 import com.nammamedmate.rider.application.port.out.AssignmentOtpCachePort;
+import com.nammamedmate.rider.application.port.out.CashfreeRoutePort;
 import com.nammamedmate.rider.application.port.out.CodDepositConfirmedPort;
 import com.nammamedmate.rider.application.port.out.CustomerOrderLocationPort;
 import com.nammamedmate.rider.application.port.out.DispatchOrderPort;
@@ -19,7 +20,6 @@ import com.nammamedmate.rider.application.port.out.DispatchOrderPort.QueuePage;
 import com.nammamedmate.rider.application.port.out.DistanceMatrixPort;
 import com.nammamedmate.rider.application.port.out.FinanceCodDailyReconciliationPort;
 import com.nammamedmate.rider.application.port.out.OrderLocationPushPort;
-import com.nammamedmate.rider.application.port.out.RazorpayRoutePort;
 import com.nammamedmate.rider.application.port.out.RiderLiveStatusCachePort;
 import com.nammamedmate.rider.application.port.out.RiderLocationCachePort;
 import com.nammamedmate.rider.domain.AssignmentOtps;
@@ -115,9 +115,9 @@ public class RiderConfig {
   }
 
   @Bean
-  @ConditionalOnMissingBean(RazorpayRoutePort.class)
-  RazorpayRoutePort razorpayRoutePort() {
-    return new StubRazorpayRouteAdapter();
+  @ConditionalOnMissingBean(CashfreeRoutePort.class)
+  CashfreeRoutePort cashfreeRoutePort() {
+    return new StubCashfreeRouteAdapter();
   }
 
   @Bean

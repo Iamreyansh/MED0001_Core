@@ -58,7 +58,7 @@ tests {
 }
 
 docs {
-  POST /api/v1/customers/me/payment-methods/upi — validate VPA via Razorpay then save (encrypted at rest).
+  POST /api/v1/customers/me/payment-methods/upi — validate VPA via Cashfree then save (encrypted at rest).
   Optional Idempotency-Key header replays the original create.
   Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 409 UPI_ALREADY_SAVED, 422 INVALID_UPI_VPA | PAYMENT_METHOD_LIMIT_REACHED, 503 VPA_VALIDATION_TIMEOUT | VPA_VALIDATION_FAILED
 }
@@ -109,7 +109,7 @@ example {
 
 example {
   name: 422 INVALID_UPI_VPA
-  description: Razorpay reports the VPA as invalid.
+  description: Cashfree reports the VPA as invalid.
 
   request: {
     url: {{baseUrl}}/api/v1/customers/me/payment-methods/upi

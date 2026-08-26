@@ -32,7 +32,7 @@ public interface PharmacySettlementPort {
       Instant heldAt,
       UUID releasedBy,
       Instant releasedAt,
-      String razorpayxPayoutId,
+      String cashfreeTransferId,
       String notes,
       String releaseIdempotencyKey) {}
 
@@ -91,7 +91,7 @@ public interface PharmacySettlementPort {
       UUID settlementId,
       UUID releasedBy,
       Instant releasedAt,
-      String razorpayxPayoutId,
+      String cashfreeTransferId,
       String notes,
       String idempotencyKey,
       Instant now);

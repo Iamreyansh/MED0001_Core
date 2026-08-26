@@ -29,7 +29,7 @@ public class OrderPaymentController {
   }
 
   @PostMapping("/{orderId}/payment/confirm")
-  @Operation(summary = "Confirm Razorpay payment (customer)")
+  @Operation(summary = "Confirm Cashfree payment (customer)")
   public ApiResponse<Map<String, Object>> confirm(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @PathVariable("orderId") UUID orderId,

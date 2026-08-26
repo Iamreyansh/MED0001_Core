@@ -16,7 +16,6 @@ import com.nammamedmate.pharmacy.application.port.out.PharmacyCallLogStore.CallL
 import com.nammamedmate.pharmacy.application.port.out.PharmacyNoticeStore;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyNoticeStore.NoticeRow;
 import com.nammamedmate.pharmacy.domain.CallDurationFormatter;
-import com.nammamedmate.pharmacy.domain.WhatsAppTemplateRegistry;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
 import java.time.Clock;
@@ -137,21 +136,18 @@ public class AdminPharmacyActionsService {
     }
 
     List<String> resolvedChannels = resolveChannels(normalizedChannel, normalizedPriority);
-    if (resolvedChannels.contains("WHATSAPP")) {
-      if (templateName == null || templateName.isBlank()) {
-        throw new AppException("TEMPLATE_REQUIRED", "template_name required for WhatsApp", 400);
-      }
-      if (!WhatsAppTemplateRegistry.isApproved(templateName)) {
-        throw new AppException("INVALID_TEMPLATE", "template_name is not approved", 400);
-      }
+    if ("WHATSAPP".equals(normalizedChannel) || "EMAIL".equals(normalizedChannel)) {
+      throw new AppException(
+          "CHANNEL_UNAVAILABLE", normalizedChannel + " channel is not available", 503);
     }
-    if (resolvedChannels.contains("EMAIL") || resolvedChannels.contains("IN_APP")) {
-      if (subject == null || subject.isBlank()) {
-        throw new AppException("SUBJECT_REQUIRED", "subject required for EMAIL or IN_APP", 400);
-      }
-      if (subject.length() > 200) {
-        throw new AppException("VALIDATION_ERROR", "subject max 200 chars", 400);
-      }
+    // Drop unavailable channels from ALL / URGENT fan-out; remaining is always IN_APP.
+    resolvedChannels =
+        resolvedChannels.stream().filter(c -> !"WHATSAPP".equals(c) && !"EMAIL".equals(c)).toList();
+    if (subject == null || subject.isBlank()) {
+      throw new AppException("SUBJECT_REQUIRED", "subject required for EMAIL or IN_APP", 400);
+    }
+    if (subject.length() > 200) {
+      throw new AppException("VALIDATION_ERROR", "subject max 200 chars", 400);
     }
 
     Instant now = clock.instant();

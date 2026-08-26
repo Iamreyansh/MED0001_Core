@@ -22,7 +22,7 @@ public interface RiderPayoutStore {
       long netPayoutPaise,
       String status,
       String holdReason,
-      String razorpayPayoutId,
+      String cashfreeTransferId,
       String payoutReference,
       String releaseNotes,
       UUID releasedBy,

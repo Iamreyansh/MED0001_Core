@@ -58,4 +58,4 @@ EPIC-001 covers all authentication, session management, and role-based access co
 
 ## Dependencies
 
-- EPIC-000 (Infrastructure) - SMS gateway (MSG91 / Twilio), Redis for session store, Razorpay for payment method tokenisation
+- EPIC-000 (Infrastructure) - SMS gateway (MSG91 / Twilio), Redis for session store, Cashfree for payment method tokenisation

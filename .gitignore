@@ -39,3 +39,4 @@ override.tf.json
 *_override.tf.json
 
 cursor-agent/
+.cursor/cashfree-skills/

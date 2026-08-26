@@ -86,5 +86,5 @@ EPIC-004 provides Namma MedMate's admin team with the operational tooling to man
 | EPIC-008 - Orders | Order data for performance metrics and GMV calculations |
 | EPIC-009 - Zone Management | Zone list and pharmacy zone assignments |
 | EPIC-002 - Notifications | WhatsApp/email/in-app admin notices |
-| External: RazorpayX | Settlement payouts to pharmacy bank accounts |
+| External: CashfreePayout | Settlement payouts to pharmacy bank accounts |
 | Infrastructure: Redis | Performance metric caching (computed daily) |

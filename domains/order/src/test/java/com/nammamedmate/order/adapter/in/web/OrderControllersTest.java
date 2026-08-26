@@ -50,7 +50,7 @@ class OrderControllersTest {
   @Mock private OrderCancellationService orderCancellation;
   @Mock private ReorderService reorderService;
   @Mock private AdminOrderService adminOrderService;
-  @Mock private com.nammamedmate.order.application.port.out.RazorpayPaymentPort razorpay;
+  @Mock private com.nammamedmate.order.application.port.out.CashfreePaymentPort cashfree;
 
   private CartSmartSelectController cartSmartSelectController;
   private CartController cartController;
@@ -59,7 +59,7 @@ class OrderControllersTest {
   private RxQuotePharmacyController rxPharmacyController;
   private OrderController orderController;
   private OrderPaymentController orderPaymentController;
-  private RazorpayOrderPaymentWebhookController webhookController;
+  private CashfreeOrderPaymentWebhookController webhookController;
   private PharmacyOrderLifecycleController pharmacyOrderLifecycleController;
   private AdminOrderLifecycleController adminOrderLifecycleController;
   private AdminOrderCancelRefundController adminCancelRefundController;
@@ -84,7 +84,7 @@ class OrderControllersTest {
     orderController =
         new OrderController(orderPlacement, orderLifecycle, orderCancellation, reorderService);
     orderPaymentController = new OrderPaymentController(orderPlacement);
-    webhookController = new RazorpayOrderPaymentWebhookController(razorpay);
+    webhookController = new CashfreeOrderPaymentWebhookController(cashfree);
     pharmacyOrderLifecycleController = new PharmacyOrderLifecycleController(orderLifecycle);
     adminOrderLifecycleController = new AdminOrderLifecycleController(orderLifecycle);
     adminCancelRefundController = new AdminOrderCancelRefundController(orderCancellation);
@@ -311,7 +311,7 @@ class OrderControllersTest {
     orderPaymentController.codCollect(rider, orderId, null);
     verify(orderPlacement).collectCod(rider, orderId, null);
 
-    when(razorpay.handleWebhook(eq("sig"), any())).thenReturn(Map.of("processed", true));
+    when(cashfree.handleWebhook(eq("sig"), any())).thenReturn(Map.of("processed", true));
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setAttribute(
         com.nammamedmate.kernel.webhook.WebhookRawBodyFilter.CACHED_BODY_ATTR, "{}".getBytes());

@@ -7,18 +7,33 @@ import org.junit.jupiter.api.Test;
 class NotificationConfigCoverageTest {
 
   @Test
-  void deployedHttpBeansRequireSecretsAndConstruct() {
+  void deployedHttpBeansRequireSecretsAndConstruct() throws Exception {
     NotificationConfig cfg = new NotificationConfig();
-    assertThat(cfg.httpFcmClient("fcm-key")).isNotNull();
-    assertThat(cfg.httpMsg91Client("msg91-key")).isNotNull();
-    assertThat(cfg.httpTwilioClient("sid", "tok")).isNotNull();
-    assertThat(cfg.httpMetaWhatsAppClient("tok", "sec")).isNotNull();
-    assertThat(cfg.httpSendGridClient("sg")).isNotNull();
-    assertThat(cfg.httpSesClient("ap-south-1")).isNotNull();
+    assertThat(cfg.notificationClock()).isNotNull();
     assertThat(cfg.stubFcmClient()).isNotNull();
-    assertThat(cfg.stubMsg91Client()).isNotNull();
     assertThat(cfg.stubTwilioClient()).isNotNull();
-    assertThat(cfg.stubSendGridClient()).isNotNull();
-    assertThat(cfg.stubSesClient()).isNotNull();
+    assertThat(cfg.stubAttachmentFetcher()).isNotNull();
+    assertThat(cfg.stubRecipientDisplayName().displayName(null, null)).isEmpty();
+    assertThat(
+            cfg.stubRecipientDisplayName()
+                .displayName(java.util.UUID.randomUUID(), null)
+                .orElseThrow())
+        .isEqualTo("Recipient");
+
+    java.security.KeyPairGenerator gen = java.security.KeyPairGenerator.getInstance("RSA");
+    gen.initialize(2048);
+    java.security.KeyPair pair = gen.generateKeyPair();
+    String pem =
+        "-----BEGIN PRIVATE KEY-----\n"
+            + java.util.Base64.getMimeEncoder(
+                    64, "\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII))
+                .encodeToString(pair.getPrivate().getEncoded())
+            + "\n-----END PRIVATE KEY-----\n";
+    String saJson =
+        "{\"client_email\":\"sa@medmate.iam.gserviceaccount.com\",\"private_key\":\""
+            + pem.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+            + "\"}";
+    assertThat(cfg.httpFcmClient("proj", saJson)).isNotNull();
+    assertThat(cfg.httpTwilioClient("sid", "tok", "key")).isNotNull();
   }
 }

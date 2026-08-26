@@ -11,11 +11,9 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
-import com.nammamedmate.notification.application.EmailSendService;
 import com.nammamedmate.notification.application.InAppNotificationService;
 import com.nammamedmate.notification.application.PushSendService;
 import com.nammamedmate.notification.application.SmsSendService;
-import com.nammamedmate.notification.application.WhatsAppSendService;
 import com.nammamedmate.notification.application.port.out.RecipientIdentityPort;
 import com.nammamedmate.notification.domain.InAppNotification;
 import com.nammamedmate.notification.domain.InAppNotificationType;
@@ -33,8 +31,6 @@ class CustomerNotificationRequestedHandlerTest {
   private InAppNotificationService inApp;
   private PushSendService push;
   private SmsSendService sms;
-  private WhatsAppSendService whatsapp;
-  private EmailSendService email;
   private RecipientIdentityPort identities;
   private CustomerNotificationRequestedHandler handler;
 
@@ -43,8 +39,6 @@ class CustomerNotificationRequestedHandlerTest {
     inApp = mock(InAppNotificationService.class);
     push = mock(PushSendService.class);
     sms = mock(SmsSendService.class);
-    whatsapp = mock(WhatsAppSendService.class);
-    email = mock(EmailSendService.class);
     identities = mock(RecipientIdentityPort.class);
     when(inApp.create(any(), any(), any(), any(), any()))
         .thenReturn(
@@ -61,8 +55,22 @@ class CustomerNotificationRequestedHandlerTest {
                 null,
                 null));
     handler =
-        new CustomerNotificationRequestedHandler(
-            inApp, new ObjectMapper(), push, sms, whatsapp, email, identities);
+        new CustomerNotificationRequestedHandler(inApp, new ObjectMapper(), push, sms, identities);
+  }
+
+  @Test
+  void skipsWhatsAppAndEmailChannels() {
+    handler.handlePayload(
+        Map.of(
+            "channels",
+            List.of("WHATSAPP", "EMAIL"),
+            "customer_id",
+            CUST.toString(),
+            "title",
+            "t",
+            "body",
+            "b"));
+    verifyNoInteractions(push, sms);
   }
 
   @Test
@@ -90,7 +98,7 @@ class CustomerNotificationRequestedHandlerTest {
   }
 
   @Test
-  void smsWhatsappEmailUseTemplateWithoutTitle() {
+  void smsUsesTemplateWithoutTitle() {
     when(identities.findPhoneByCustomerId(CUST)).thenReturn(Optional.of("+919876543210"));
     handler.handlePayload(
         Map.of(
@@ -100,15 +108,9 @@ class CustomerNotificationRequestedHandlerTest {
             List.of("SMS", "WHATSAPP", "EMAIL"),
             "template",
             "delivery_otp",
-            "email",
-            "a@b.com",
             "variables",
-            Map.of("1", "1234"),
-            "components",
-            List.of(Map.of("type", "body"))));
+            Map.of("1", "1234")));
     verify(sms).send(any(SmsSendService.SendCommand.class));
-    verify(whatsapp).send(any(WhatsAppSendService.SendCommand.class));
-    verify(email).send(any(EmailSendService.SendCommand.class));
     verifyNoInteractions(push);
   }
 
@@ -152,7 +154,7 @@ class CustomerNotificationRequestedHandlerTest {
   }
 
   @Test
-  void missingSendServiceThrows() {
+  void missingSendServiceThrowsForSmsOnly() {
     CustomerNotificationRequestedHandler bare =
         new CustomerNotificationRequestedHandler(inApp, new ObjectMapper());
     assertThatThrownBy(
@@ -160,15 +162,9 @@ class CustomerNotificationRequestedHandlerTest {
                 bare.handlePayload(
                     Map.of("channel", "SMS", "phone", "+919876543210", "template", "x")))
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(
-            () ->
-                bare.handlePayload(
-                    Map.of("channel", "WHATSAPP", "phone", "+919876543210", "template", "x")))
-        .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(
-            () ->
-                bare.handlePayload(Map.of("channel", "EMAIL", "email", "a@b.com", "template", "x")))
-        .isInstanceOf(IllegalStateException.class);
+    // Removed channels are skipped (no throw)
+    bare.handlePayload(Map.of("channel", "WHATSAPP", "phone", "+919876543210", "template", "x"));
+    bare.handlePayload(Map.of("channel", "EMAIL", "email", "a@b.com", "template", "x"));
   }
 
   @Test
@@ -197,7 +193,7 @@ class CustomerNotificationRequestedHandlerTest {
             Map.of("n", 1)));
     verify(inApp).create(CUST, InAppNotificationType.ORDER_UPDATE, "t", "b", null);
     verify(push).send(any(PushSendService.SendCommand.class));
-    verifyNoInteractions(sms, whatsapp, email);
+    verifyNoInteractions(sms);
   }
 
   @Test
@@ -245,8 +241,6 @@ class CustomerNotificationRequestedHandlerTest {
             "Sent",
             "channels",
             java.util.Arrays.asList(" ", "push"),
-            "components",
-            List.of("skip", Map.of("type", "body")),
             "variables",
             Map.of("a", "1")));
     verify(push).send(any(PushSendService.SendCommand.class));
@@ -278,21 +272,9 @@ class CustomerNotificationRequestedHandlerTest {
     handler.handlePayload(Map.of("channel", "SMS", "phone", "+919876543210"));
     handler.handlePayload(Map.of("channel", "WHATSAPP", "phone", "+919876543210"));
     handler.handlePayload(Map.of("channel", "EMAIL", "email", "a@b.com"));
-    handler.handlePayload(
-        Map.of(
-            "channel",
-            "EMAIL",
-            "to_email",
-            "a@b.com",
-            "template",
-            "INV",
-            "variables",
-            "not-a-map"));
-    verify(email).send(any(EmailSendService.SendCommand.class));
 
     CustomerNotificationRequestedHandler noId =
-        new CustomerNotificationRequestedHandler(
-            inApp, new ObjectMapper(), push, sms, whatsapp, email, null);
+        new CustomerNotificationRequestedHandler(inApp, new ObjectMapper(), push, sms, null);
     noId.handlePayload(
         Map.of("channel", "SMS", "customer_id", CUST.toString(), "template", "delivery_otp"));
 
@@ -301,38 +283,19 @@ class CustomerNotificationRequestedHandlerTest {
     handler.handlePayload(
         "observability.incident.postmortem_reminder",
         Map.of("admin_ids", List.of(CUST.toString())));
-    handler.handlePayload(
-        Map.of(
-            "channel",
-            "PUSH",
-            "customer_id",
-            CUST.toString(),
-            "recipient_ids",
-            List.of(CUST.toString()),
-            "admin_ids",
-            List.of(CUST.toString()),
-            "pharmacy_id",
-            CUST.toString(),
-            "title",
-            "Dup",
-            "body",
-            "Ids",
-            "template",
-            "ORDER_CONFIRMED"));
-    handler.handlePayload(
-        Map.of("channel", "WHATSAPP", "phone", "+919876543210", "template", "order_rejected"));
-    handler.handlePayload(
-        Map.of(
-            "channel",
-            "WHATSAPP",
-            "phone",
-            "+919876543210",
-            "template",
-            "order_rejected",
-            "components",
-            List.of("skip")));
-    verify(whatsapp, org.mockito.Mockito.atLeastOnce())
-        .send(any(WhatsAppSendService.SendCommand.class));
+    Map<String, Object> richPush = new java.util.LinkedHashMap<>();
+    richPush.put("channel", "PUSH");
+    richPush.put("customer_id", CUST.toString());
+    richPush.put("recipient_ids", List.of(CUST.toString()));
+    richPush.put("admin_ids", List.of(CUST.toString()));
+    richPush.put("pharmacy_id", CUST.toString());
+    richPush.put("title", "Dup");
+    richPush.put("body", "Ids");
+    richPush.put("template", "ORDER_CONFIRMED");
+    richPush.put("action_url", "nmmedmate://x");
+    richPush.put("image_url", "https://cdn/x.png");
+    richPush.put("priority", "HIGH");
+    handler.handlePayload(richPush);
   }
 
   @Test
@@ -371,5 +334,14 @@ class CustomerNotificationRequestedHandlerTest {
             "body",
             "Ids"));
     verify(push, org.mockito.Mockito.atLeastOnce()).send(any(PushSendService.SendCommand.class));
+  }
+
+  @Test
+  void pushWithoutFcmServiceReturnsInAppOnly() {
+    CustomerNotificationRequestedHandler noPush =
+        new CustomerNotificationRequestedHandler(inApp, new ObjectMapper(), null, sms, identities);
+    noPush.handlePayload(
+        Map.of("channel", "PUSH", "customer_id", CUST.toString(), "title", "t", "body", "b"));
+    verify(inApp).create(CUST, InAppNotificationType.ORDER_UPDATE, "t", "b", null);
   }
 }

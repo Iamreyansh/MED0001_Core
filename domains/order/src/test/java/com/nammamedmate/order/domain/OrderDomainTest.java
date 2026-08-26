@@ -138,9 +138,9 @@ class OrderDomainTest {
             T0,
             T0);
     upi.markPaymentPending("order_stub_x", T0);
-    assertThat(upi.razorpayOrderId()).isEqualTo("order_stub_x");
+    assertThat(upi.gatewayOrderId()).isEqualTo("order_stub_x");
     upi.confirm(T0, eta, "pay_1");
     assertThat(upi.paymentStatus()).isEqualTo(PaymentStatus.PAID);
-    assertThat(upi.razorpayPaymentId()).isEqualTo("pay_1");
+    assertThat(upi.gatewayPaymentId()).isEqualTo("pay_1");
   }
 }

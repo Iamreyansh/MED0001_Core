@@ -21,7 +21,6 @@ import com.nammamedmate.pharmacy.adapter.out.scan.GuardDutyDeferredVirusScanner;
 import com.nammamedmate.pharmacy.adapter.out.scan.LoggingVirusScanner;
 import com.nammamedmate.pharmacy.adapter.out.storage.LocalKycObjectStore;
 import com.nammamedmate.pharmacy.adapter.out.storage.S3KycObjectStore;
-import com.nammamedmate.pharmacy.application.AutoKycService;
 import com.nammamedmate.pharmacy.application.PharmacyKycService;
 import com.nammamedmate.pharmacy.application.port.out.KycDocumentStore.KycAccessAuditRecord;
 import com.nammamedmate.pharmacy.application.port.out.KycDocumentStore.KycDocumentRecord;
@@ -54,8 +53,7 @@ class PharmacyKycAdapterCoverageTest {
   private static final UUID PID = Ids.newId();
   private static final UUID DOC_ID = Ids.newId();
   private static final UUID ADMIN_ID = Ids.newId();
-
-  // ─── Controller delegation ───────────────────────────────────────────────────
+  private static final UUID ZONE_ID = Ids.newId();
 
   @Test
   void pharmacyKycControllerDelegates() throws IOException {
@@ -89,18 +87,13 @@ class PharmacyKycAdapterCoverageTest {
   @Test
   void adminKycControllerDelegates() {
     PharmacyKycService service = mock(PharmacyKycService.class);
-    AutoKycService autoKyc = mock(AutoKycService.class);
     when(service.adminGetKyc(any(), any())).thenReturn(Map.of("pharmacy_id", PID.toString()));
     when(service.adminVerifyDocument(any(), any(), any(), eq(true), any()))
         .thenReturn(Map.of("status", "VERIFIED"));
     when(service.adminVerifyDocument(any(), any(), any(), eq(false), any()))
         .thenReturn(Map.of("status", "REJECTED"));
-    when(autoKyc.adminTriggerAutoVerify(any(), any(), any()))
-        .thenReturn(Map.of("job_id", Ids.newId().toString()));
-    when(autoKyc.adminGetAutoVerifyResult(any(), any(), any()))
-        .thenReturn(Map.of("overall_status", "PASS"));
 
-    AdminPharmacyKycController controller = new AdminPharmacyKycController(service, autoKyc);
+    AdminPharmacyKycController controller = new AdminPharmacyKycController(service);
     MedmatePrincipal adminPrincipal =
         new MedmatePrincipal(ADMIN_ID, AuthRole.ADMIN_OPERATIONS, null, TokenScope.FULL, "j");
 
@@ -129,8 +122,6 @@ class PharmacyKycAdapterCoverageTest {
         .extracting(ex -> ((com.nammamedmate.kernel.error.AppException) ex).code())
         .isEqualTo("VALIDATION_ERROR");
   }
-
-  // ─── LoggingVirusScanner ─────────────────────────────────────────────────────
 
   @Test
   void virusScannerPassesCleanFile() {
@@ -186,8 +177,6 @@ class PharmacyKycAdapterCoverageTest {
     store.put(key, "data".getBytes(), "application/pdf");
     store.delete(key);
   }
-
-  // ─── JdbcKycDocumentStore ────────────────────────────────────────────────────
 
   @Test
   @SuppressWarnings("unchecked")
@@ -334,220 +323,77 @@ class PharmacyKycAdapterCoverageTest {
     assertThat(doc.verifiedAt()).isNull();
   }
 
-  private static KycDocumentRecord sampleDoc(UUID id, UUID pharmacyId, String status) {
-    return new KycDocumentRecord(
-        id,
-        pharmacyId,
-        "DRUG_LICENCE",
-        "kyc/" + pharmacyId + "/DRUG_LICENCE/" + id + ".pdf",
-        "dl.pdf",
-        1024L,
-        "application/pdf",
-        status,
-        null,
-        LocalDate.of(2027, 6, 30),
-        null,
-        null,
-        NOW,
-        NOW);
-  }
-
-  private static ResultSet mockDocRsWithVerifiedAt() throws Exception {
-    ResultSet rs = mockDocRs();
-    when(rs.getTimestamp("verified_at")).thenReturn(Timestamp.from(NOW));
-    return rs;
-  }
-
-  private static ResultSet mockDocRs() throws Exception {
-    ResultSet rs = mock(ResultSet.class);
-    when(rs.getObject("id")).thenReturn(DOC_ID);
-    when(rs.getObject("pharmacy_id")).thenReturn(PID);
-    when(rs.getString("document_type")).thenReturn("DRUG_LICENCE");
-    when(rs.getString("file_key")).thenReturn("kyc/p/DL/x.pdf");
-    when(rs.getString("file_name")).thenReturn("dl.pdf");
-    when(rs.getLong("file_size_bytes")).thenReturn(1024L);
-    when(rs.getString("file_mime_type")).thenReturn("application/pdf");
-    when(rs.getString("status")).thenReturn("UPLOADED");
-    when(rs.getString("rejection_reason")).thenReturn(null);
-    when(rs.getDate("expiry_date")).thenReturn(Date.valueOf("2027-06-30"));
-    when(rs.getObject("verified_by")).thenReturn(null);
-    when(rs.getTimestamp("verified_at")).thenReturn(null);
-    when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
-    when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(NOW));
-    return rs;
-  }
-
-  private static ResultSet mockDocRsWithNulls() throws Exception {
-    ResultSet rs = mock(ResultSet.class);
-    when(rs.getObject("id")).thenReturn(DOC_ID);
-    when(rs.getObject("pharmacy_id")).thenReturn(PID);
-    when(rs.getString("document_type")).thenReturn("PAN_CARD");
-    when(rs.getString("file_key")).thenReturn("kyc/p/PAN/x.pdf");
-    when(rs.getString("file_name")).thenReturn("pan.pdf");
-    when(rs.getLong("file_size_bytes")).thenReturn(512L);
-    when(rs.getString("file_mime_type")).thenReturn("image/jpeg");
-    when(rs.getString("status")).thenReturn("UPLOADED");
-    when(rs.getString("rejection_reason")).thenReturn(null);
-    when(rs.getDate("expiry_date")).thenReturn(null);
-    when(rs.getObject("verified_by")).thenReturn(null);
-    when(rs.getTimestamp("verified_at")).thenReturn(null);
-    when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
-    when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(NOW));
-    return rs;
-  }
-
-  // ─── Auto-KYC adapters (STORY-003) ───────────────────────────────────────────
-
   @Test
-  void autoKycOutboxConsumerRoutesEvents() {
-    AutoKycService autoKyc = mock(AutoKycService.class);
+  @SuppressWarnings("unchecked")
+  void jdbcKycVerificationStoreThrowsOnInvalidJson() throws Exception {
+    JdbcTemplate jdbc = mock(JdbcTemplate.class);
     com.fasterxml.jackson.databind.ObjectMapper mapper =
-        new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
-    com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer consumer =
-        new com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer(autoKyc, mapper);
+        new com.fasterxml.jackson.databind.ObjectMapper();
+    com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore store =
+        new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore(
+            jdbc, mapper);
+    ResultSet badRs = mock(ResultSet.class);
+    UUID id = Ids.newId();
+    when(badRs.getObject("id")).thenReturn(id);
+    when(badRs.getObject("pharmacy_id")).thenReturn(PID);
+    when(badRs.getObject("job_id")).thenReturn(Ids.newId());
+    when(badRs.getString("verification_type")).thenReturn("GSTIN");
+    when(badRs.getString("api_provider")).thenReturn("GSTN_SANDBOX_API");
+    when(badRs.getString("request_payload")).thenReturn("{bad-json");
+    when(jdbc.query(anyString(), any(RowMapper.class), eq(id)))
+        .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(badRs, 0)));
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.findById(id))
+        .isInstanceOf(IllegalStateException.class);
 
-    UUID pharmacyId = Ids.newId();
-    UUID verificationId = Ids.newId();
-    com.nammamedmate.messaging.InMemoryOutboxStore outboxStore =
-        new com.nammamedmate.messaging.InMemoryOutboxStore();
-    com.nammamedmate.messaging.OutboxPublisher publisher =
-        new com.nammamedmate.messaging.OutboxPublisher(outboxStore, mapper);
-    publisher.publish(
-        com.nammamedmate.messaging.DomainEvent.of(
-            "pharmacy.kyc.auto_verify_requested",
-            "pharmacy",
-            pharmacyId,
-            Map.of("pharmacy_id", pharmacyId.toString())));
-    consumer.accept(outboxStore.all().getFirst());
-    org.mockito.Mockito.verify(autoKyc).handleAutoVerifyRequested(pharmacyId);
+    ResultSet flagsRs = mockVerificationRs();
+    when(flagsRs.getString("admin_flags")).thenReturn("{invalid");
+    when(jdbc.query(contains("kyc_verifications WHERE id"), any(RowMapper.class), any()))
+        .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(flagsRs, 0)));
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.findById(id))
+        .isInstanceOf(IllegalStateException.class);
 
-    publisher.publish(
-        com.nammamedmate.messaging.DomainEvent.of(
-            "pharmacy.kyc.async_check_requested",
-            "pharmacy",
-            pharmacyId,
-            Map.of("verification_id", verificationId.toString())));
-    consumer.accept(outboxStore.all().get(1));
-    org.mockito.Mockito.verify(autoKyc).processAsyncCheck(verificationId);
+    com.fasterxml.jackson.databind.ObjectMapper broken =
+        mock(com.fasterxml.jackson.databind.ObjectMapper.class);
+    when(broken.writeValueAsString(any()))
+        .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("x") {});
+    com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore brokenStore =
+        new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore(
+            jdbc, broken);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                brokenStore.insert(
+                    new com.nammamedmate.pharmacy.application.port.out.KycVerificationStore
+                        .KycVerificationRecord(
+                        Ids.newId(),
+                        PID,
+                        Ids.newId(),
+                        "GSTIN",
+                        "GSTN_SANDBOX_API",
+                        Map.of("gstin", "27TEST"),
+                        null,
+                        "PENDING",
+                        null,
+                        List.of(),
+                        0,
+                        null,
+                        null,
+                        NOW)))
+        .isInstanceOf(IllegalStateException.class);
 
-    consumer.accept(null);
-    consumer.accept(
-        new com.nammamedmate.messaging.OutboxMessage(Ids.newId(), null, "{}", NOW, false));
-    consumer.accept(com.nammamedmate.messaging.OutboxMessage.pending("other.event", "{}"));
-    consumer.accept(
-        com.nammamedmate.messaging.OutboxMessage.pending(
-            "pharmacy.kyc.async_check_requested", "not-json"));
-    publisher.publish(
-        com.nammamedmate.messaging.DomainEvent.of(
-            "pharmacy.kyc.async_check_requested",
-            "pharmacy",
-            pharmacyId,
-            Map.of("pharmacy_id", pharmacyId.toString())));
-    consumer.accept(outboxStore.all().get(2));
-    consumer.accept(
-        com.nammamedmate.messaging.OutboxMessage.pending(
-            "pharmacy.kyc.auto_verify_requested", "bad-json"));
-  }
-
-  @Test
-  void internalKycWebhookControllerDelegates() {
-    AutoKycService autoKyc = mock(AutoKycService.class);
-    when(autoKyc.handleWebhookCallback(any(), any()))
-        .thenReturn(Map.of("acknowledged", true, "verification_id", DOC_ID.toString()));
-    com.nammamedmate.pharmacy.adapter.in.web.InternalKycWebhookController controller =
-        new com.nammamedmate.pharmacy.adapter.in.web.InternalKycWebhookController(autoKyc);
-    org.springframework.mock.web.MockHttpServletRequest request =
-        new org.springframework.mock.web.MockHttpServletRequest();
-    request.setAttribute(
-        com.nammamedmate.kernel.webhook.WebhookRawBodyFilter.CACHED_BODY_ATTR,
-        "{}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-    assertThat(controller.webhookCallback("sig", request).success()).isTrue();
-  }
-
-  @Test
-  void adminAutoVerifyEndpointsDelegate() {
-    PharmacyKycService service = mock(PharmacyKycService.class);
-    AutoKycService autoKyc = mock(AutoKycService.class);
-    when(autoKyc.adminTriggerAutoVerify(any(), any(), any()))
-        .thenReturn(Map.of("job_id", DOC_ID.toString()));
-    when(autoKyc.adminGetAutoVerifyResult(any(), any(), any()))
-        .thenReturn(Map.of("overall_status", "PASS"));
-    AdminPharmacyKycController controller = new AdminPharmacyKycController(service, autoKyc);
-    MedmatePrincipal admin =
-        new MedmatePrincipal(ADMIN_ID, AuthRole.ADMIN_OPERATIONS, null, TokenScope.FULL, "j");
-    assertThat(
-            controller
-                .triggerAutoVerify(
-                    admin, PID, new AdminPharmacyKycController.AutoVerifyRequest(null))
-                .success())
-        .isTrue();
-    assertThat(
-            controller
-                .triggerAutoVerify(
-                    admin, PID, new AdminPharmacyKycController.AutoVerifyRequest(List.of("GSTIN")))
-                .success())
-        .isTrue();
-    assertThat(controller.getAutoVerifyResult(admin, PID, DOC_ID).success()).isTrue();
-    assertThat(controller.triggerAutoVerify(admin, PID, null).success()).isTrue();
-  }
-
-  @Test
-  void stubKycClientsCoverEdgeCases() {
-    var gstin = new com.nammamedmate.pharmacy.adapter.out.kyc.StubGstinVerificationClient();
-    assertThat(gstin.verifyGstin(null, null).status()).isEqualTo("PASS");
-    assertThat(gstin.verifyGstin("X", null).status()).isEqualTo("PASS");
-    assertThat(gstin.verifyGstin("27invalidGST", "Biz").status()).isEqualTo("FAIL");
-    assertThat(gstin.verifyGstin("27errorGST", "Biz").status()).isEqualTo("ERROR");
-    assertThat(gstin.verifyGstin("27timeoutGST", "Biz").status()).isEqualTo("ERROR");
-    assertThat(gstin.verifyGstin("27TEST", null).details())
-        .containsEntry("business_name_registered", "REGISTERED NAME");
-
-    var drug = new com.nammamedmate.pharmacy.adapter.out.kyc.StubDrugLicenceVerificationClient();
-    assertThat(drug.verifyDrugLicence(null, null).status()).isEqualTo("FAIL");
-    assertThat(drug.verifyDrugLicence("DL-XX-1", "XX").status()).isEqualTo("FAIL");
-    assertThat(drug.verifyDrugLicence("DL-fail-1", "MH").status()).isEqualTo("FAIL");
-    assertThat(drug.verifyDrugLicence("DL-error-1", "MH").status()).isEqualTo("ERROR");
-    assertThat(drug.verifyDrugLicence("DL-expiring-1", "MH").status()).isEqualTo("PASS");
-
-    var fssai = new com.nammamedmate.pharmacy.adapter.out.kyc.StubFssaiVerificationClient();
-    assertThat(fssai.verifyFssai(null).status()).isEqualTo("PASS");
-    assertThat(fssai.verifyFssai("error-fssai").status()).isEqualTo("ERROR");
-    assertThat(fssai.verifyFssai("fail-fssai").status()).isEqualTo("FAIL");
-  }
-
-  @Test
-  void kycDomainHelpers() {
-    assertThat(com.nammamedmate.pharmacy.domain.KycRequestSanitizer.sanitise(null)).isEmpty();
-    assertThat(com.nammamedmate.pharmacy.domain.KycRequestSanitizer.sanitise(Map.of())).isEmpty();
-    assertThat(
-            com.nammamedmate.pharmacy.domain.KycRequestSanitizer.sanitise(
-                Map.of("api_key", "secret", "nested", Map.of("token", "x"))))
-        .containsEntry("api_key", "[REDACTED]");
-    assertThat(com.nammamedmate.pharmacy.domain.BusinessNameMatcher.tokenDistance("", "")).isZero();
-    assertThat(
-            com.nammamedmate.pharmacy.domain.BusinessNameMatcher.isSignificantMismatch(
-                "Alpha Beta Gamma Delta Epsilon Zeta", "One Two Three Four Five Six Seven"))
-        .isTrue();
-  }
-
-  @Test
-  void stubPortsInstantiate() {
-    assertThat(new com.nammamedmate.pharmacy.adapter.out.kyc.StubGstinVerificationClient())
-        .isNotNull();
-    assertThat(new com.nammamedmate.pharmacy.adapter.out.kyc.StubDrugLicenceVerificationClient())
-        .isNotNull();
-    assertThat(new com.nammamedmate.pharmacy.adapter.out.kyc.StubFssaiVerificationClient())
-        .isNotNull();
+    com.nammamedmate.pharmacy.adapter.out.persistence.JdbcPharmacyRegistrationStore pharmacyStore =
+        new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcPharmacyRegistrationStore(
+            jdbc, mapper);
+    // D8: auto-KYC activation helper is intentionally a no-op.
+    pharmacyStore.activateAfterAutoKyc(PID, ZONE_ID, NOW);
+    verify(jdbc, never()).update(contains("is_online = TRUE"), eq(ZONE_ID), any(), any(), eq(PID));
   }
 
   @Test
   @SuppressWarnings("unchecked")
-  void jdbcAutoKycStoresOperations() throws Exception {
+  void jdbcKycVerificationAndPincodeStoresOperations() throws Exception {
     JdbcTemplate jdbc = mock(JdbcTemplate.class);
     com.fasterxml.jackson.databind.ObjectMapper mapper =
         new com.fasterxml.jackson.databind.ObjectMapper();
-    com.nammamedmate.pharmacy.adapter.out.persistence.JdbcAutoKycJobStore jobStore =
-        new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcAutoKycJobStore(jdbc);
     com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore verificationStore =
         new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore(
             jdbc, mapper);
@@ -555,15 +401,6 @@ class PharmacyKycAdapterCoverageTest {
         new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcPincodeZoneStore(jdbc);
 
     UUID jobId = Ids.newId();
-    jobStore.insert(
-        new com.nammamedmate.pharmacy.application.port.out.AutoKycJobStore.AutoKycJobRecord(
-            jobId, PID, ADMIN_ID, "ADMIN", "PENDING", false, NOW, NOW));
-    jobStore.insert(
-        new com.nammamedmate.pharmacy.application.port.out.AutoKycJobStore.AutoKycJobRecord(
-            Ids.newId(), PID, ADMIN_ID, "ADMIN", "PENDING", false, NOW, null));
-    jobStore.updateOverallStatus(jobId, "PARTIAL", NOW);
-    jobStore.updateOverallStatus(Ids.newId(), "PENDING", null);
-    jobStore.markAutoActivated(jobId, NOW);
 
     verificationStore.insert(
         new com.nammamedmate.pharmacy.application.port.out.KycVerificationStore
@@ -602,19 +439,6 @@ class PharmacyKycAdapterCoverageTest {
     verificationStore.updateResult(
         Ids.newId(), "PASS", Map.of("ok", true), Map.of("gstin", "27TEST"), List.of(), 1, NOW, NOW);
     verificationStore.updateResult(Ids.newId(), "ERROR", null, null, null, 0, null, null);
-
-    when(jdbc.query(anyString(), any(RowMapper.class), eq(jobId)))
-        .thenAnswer(
-            inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(mockAutoKycJobRs(), 0)));
-    assertThat(jobStore.findById(jobId)).isPresent();
-    when(jdbc.query(contains("ORDER BY triggered_at DESC"), any(RowMapper.class), eq(PID)))
-        .thenAnswer(
-            inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(mockAutoKycJobRs(), 0)));
-    assertThat(jobStore.findLatestByPharmacy(PID)).isPresent();
-    when(jdbc.query(contains("overall_status IN"), any(RowMapper.class), eq(PID)))
-        .thenAnswer(
-            inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(mockAutoKycJobRs(), 0)));
-    assertThat(jobStore.findInProgressByPharmacy(PID)).isPresent();
 
     when(jdbc.query(anyString(), any(RowMapper.class), eq(PID))).thenReturn(List.of());
     assertThat(pincodeZoneStore.findZoneIdByPincode("560001")).isEmpty();
@@ -694,90 +518,67 @@ class PharmacyKycAdapterCoverageTest {
     when(jdbc.query(contains("kyc_verifications WHERE id"), any(RowMapper.class), any()))
         .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(flagsRs, 0)));
     assertThat(nullFlagsStore.findById((UUID) flagsRs.getObject("id"))).isPresent();
-
-    ResultSet completedJobRs = mockAutoKycJobRs();
-    when(completedJobRs.getTimestamp("completed_at")).thenReturn(Timestamp.from(NOW));
-    when(jdbc.query(anyString(), any(RowMapper.class), eq(jobId)))
-        .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(completedJobRs, 0)));
-    assertThat(jobStore.findById(jobId).orElseThrow().completedAt()).isEqualTo(NOW);
   }
 
-  @Test
-  @SuppressWarnings("unchecked")
-  void jdbcKycVerificationStoreThrowsOnInvalidJson() throws Exception {
-    JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    com.fasterxml.jackson.databind.ObjectMapper mapper =
-        new com.fasterxml.jackson.databind.ObjectMapper();
-    com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore store =
-        new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore(
-            jdbc, mapper);
-    ResultSet badRs = mock(ResultSet.class);
-    UUID id = Ids.newId();
-    when(badRs.getObject("id")).thenReturn(id);
-    when(badRs.getObject("pharmacy_id")).thenReturn(PID);
-    when(badRs.getObject("job_id")).thenReturn(Ids.newId());
-    when(badRs.getString("verification_type")).thenReturn("GSTIN");
-    when(badRs.getString("api_provider")).thenReturn("GSTN_SANDBOX_API");
-    when(badRs.getString("request_payload")).thenReturn("{bad-json");
-    when(jdbc.query(anyString(), any(RowMapper.class), eq(id)))
-        .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(badRs, 0)));
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.findById(id))
-        .isInstanceOf(IllegalStateException.class);
-
-    ResultSet flagsRs = mockVerificationRs();
-    when(flagsRs.getString("admin_flags")).thenReturn("{invalid");
-    when(jdbc.query(contains("kyc_verifications WHERE id"), any(RowMapper.class), any()))
-        .thenAnswer(inv -> List.of(((RowMapper<?>) inv.getArgument(1)).mapRow(flagsRs, 0)));
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.findById(id))
-        .isInstanceOf(IllegalStateException.class);
-
-    com.fasterxml.jackson.databind.ObjectMapper broken =
-        mock(com.fasterxml.jackson.databind.ObjectMapper.class);
-    when(broken.writeValueAsString(any()))
-        .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("x") {});
-    com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore brokenStore =
-        new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcKycVerificationStore(
-            jdbc, broken);
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                brokenStore.insert(
-                    new com.nammamedmate.pharmacy.application.port.out.KycVerificationStore
-                        .KycVerificationRecord(
-                        Ids.newId(),
-                        PID,
-                        Ids.newId(),
-                        "GSTIN",
-                        "GSTN_SANDBOX_API",
-                        Map.of("gstin", "27TEST"),
-                        null,
-                        "PENDING",
-                        null,
-                        List.of(),
-                        0,
-                        null,
-                        null,
-                        NOW)))
-        .isInstanceOf(IllegalStateException.class);
-
-    com.nammamedmate.pharmacy.adapter.out.persistence.JdbcPharmacyRegistrationStore pharmacyStore =
-        new com.nammamedmate.pharmacy.adapter.out.persistence.JdbcPharmacyRegistrationStore(
-            jdbc, mapper);
-    // D8: auto-KYC activation helper is intentionally a no-op.
-    pharmacyStore.activateAfterAutoKyc(PID, ZONE_ID, NOW);
-    verify(jdbc, never()).update(contains("is_online = TRUE"), eq(ZONE_ID), any(), any(), eq(PID));
+  private static KycDocumentRecord sampleDoc(UUID id, UUID pharmacyId, String status) {
+    return new KycDocumentRecord(
+        id,
+        pharmacyId,
+        "DRUG_LICENCE",
+        "kyc/" + pharmacyId + "/DRUG_LICENCE/" + id + ".pdf",
+        "dl.pdf",
+        1024L,
+        "application/pdf",
+        status,
+        null,
+        LocalDate.of(2027, 6, 30),
+        null,
+        null,
+        NOW,
+        NOW);
   }
 
-  private static ResultSet mockAutoKycJobRs() throws Exception {
+  private static ResultSet mockDocRsWithVerifiedAt() throws Exception {
+    ResultSet rs = mockDocRs();
+    when(rs.getTimestamp("verified_at")).thenReturn(Timestamp.from(NOW));
+    return rs;
+  }
+
+  private static ResultSet mockDocRs() throws Exception {
     ResultSet rs = mock(ResultSet.class);
-    UUID jobId = Ids.newId();
-    when(rs.getObject("id")).thenReturn(jobId);
+    when(rs.getObject("id")).thenReturn(DOC_ID);
     when(rs.getObject("pharmacy_id")).thenReturn(PID);
-    when(rs.getObject("triggered_by")).thenReturn(ADMIN_ID);
-    when(rs.getString("trigger_source")).thenReturn("ADMIN");
-    when(rs.getString("overall_status")).thenReturn("PENDING");
-    when(rs.getBoolean("auto_activated")).thenReturn(false);
-    when(rs.getTimestamp("triggered_at")).thenReturn(Timestamp.from(NOW));
-    when(rs.getTimestamp("completed_at")).thenReturn(null);
+    when(rs.getString("document_type")).thenReturn("DRUG_LICENCE");
+    when(rs.getString("file_key")).thenReturn("kyc/p/DL/x.pdf");
+    when(rs.getString("file_name")).thenReturn("dl.pdf");
+    when(rs.getLong("file_size_bytes")).thenReturn(1024L);
+    when(rs.getString("file_mime_type")).thenReturn("application/pdf");
+    when(rs.getString("status")).thenReturn("UPLOADED");
+    when(rs.getString("rejection_reason")).thenReturn(null);
+    when(rs.getDate("expiry_date")).thenReturn(Date.valueOf("2027-06-30"));
+    when(rs.getObject("verified_by")).thenReturn(null);
+    when(rs.getTimestamp("verified_at")).thenReturn(null);
+    when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
+    when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(NOW));
+    return rs;
+  }
+
+  private static ResultSet mockDocRsWithNulls() throws Exception {
+    ResultSet rs = mock(ResultSet.class);
+    when(rs.getObject("id")).thenReturn(DOC_ID);
+    when(rs.getObject("pharmacy_id")).thenReturn(PID);
+    when(rs.getString("document_type")).thenReturn("PAN_CARD");
+    when(rs.getString("file_key")).thenReturn("kyc/p/PAN/x.pdf");
+    when(rs.getString("file_name")).thenReturn("pan.pdf");
+    when(rs.getLong("file_size_bytes")).thenReturn(512L);
+    when(rs.getString("file_mime_type")).thenReturn("image/jpeg");
+    when(rs.getString("status")).thenReturn("UPLOADED");
+    when(rs.getString("rejection_reason")).thenReturn(null);
+    when(rs.getDate("expiry_date")).thenReturn(null);
+    when(rs.getObject("verified_by")).thenReturn(null);
+    when(rs.getTimestamp("verified_at")).thenReturn(null);
+    when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
+    when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(NOW));
     return rs;
   }
 
@@ -801,6 +602,4 @@ class PharmacyKycAdapterCoverageTest {
     when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(NOW));
     return rs;
   }
-
-  private static final UUID ZONE_ID = Ids.newId();
 }

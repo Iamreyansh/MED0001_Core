@@ -1,0 +1,141 @@
+meta {
+  name: fund-account
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/cashfree/beneficiaries
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Internal-Token: {{internalServiceToken}}
+}
+
+body:json {
+  {
+    "entity_type": "PHARMACY",
+    "entity_id": "{{pharmacyId}}",
+    "bank_name": "HDFC Bank",
+    "account_number": "50100123456789",
+    "ifsc": "HDFC0001234",
+    "account_holder_name": "Apollo Pharmacy India Ltd"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("pharmacyId")) {
+    bru.setEnvVar("pharmacyId", crypto.randomUUID());
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.beneficiary_id) {
+    bru.setEnvVar("cashfree_payoutsFundAccountId", body.data.beneficiary_id);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("fund-account envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.have.property("beneficiary_id");
+    expect(body.data.account_last4).to.equal("6789");
+    expect(body.data).to.have.property("cashfree_contact_id");
+  });
+}
+
+docs {
+  POST /api/v1/integrations/cashfree/beneficiaries — S2S fund account. Errors: INVALID_IFSC, INVALID_ACCOUNT_NUMBER, CASHFREE_PAYOUTS_UNAVAILABLE.
+}
+
+example {
+  name: 200 OK
+  description: Contact + fund account created
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/cashfree/beneficiaries
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "entity_type": "PHARMACY",
+        "entity_id": "pharmaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        "bank_name": "HDFC Bank",
+        "account_number": "50100123456789",
+        "ifsc": "HDFC0001234",
+        "account_holder_name": "Apollo Pharmacy India Ltd"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "beneficiary_id": "fa_abc456",
+            "entity_type": "PHARMACY",
+            "entity_id": "pharmaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "bank_name": "HDFC Bank",
+            "account_last4": "6789",
+            "ifsc": "HDFC0001234",
+            "account_holder_name": "Apollo Pharmacy India Ltd",
+            "cashfree_contact_id": "cont_ghi012",
+            "created_at": "2026-07-24T10:12:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 INVALID_IFSC
+  description: Bad IFSC
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/cashfree/beneficiaries
+    method: post
+    mode: json
+    headers: {
+      X-Internal-Token: {{internalServiceToken}}
+    }
+    body:json: {
+      {
+        "entity_type": "PHARMACY",
+        "entity_id": "pharmaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        "bank_name": "HDFC Bank",
+        "account_number": "50100123456789",
+        "ifsc": "BAD",
+        "account_holder_name": "Apollo Pharmacy India Ltd"
+      }
+    }
+  }
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_IFSC",
+            "message": "IFSC code format invalid"
+          }
+        }
+      '''
+    }
+  }
+}

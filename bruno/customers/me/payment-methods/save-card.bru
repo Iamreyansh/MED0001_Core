@@ -20,7 +20,7 @@ headers {
 
 body:json {
   {
-    "razorpay_token_id": "token_demo4242",
+    "gateway_token_id": "token_demo4242",
     "card_last4": "4242",
     "card_network": "VISA",
     "card_type": "CREDIT",
@@ -56,19 +56,19 @@ tests {
     expect(body.success).to.equal(true);
     expect(body.data.type).to.equal("CARD");
     expect(body.data.card_last4).to.equal("4242");
-    expect(body.data).to.not.have.property("razorpay_token_id");
+    expect(body.data).to.not.have.property("gateway_token_id");
   });
 }
 
 docs {
-  POST /api/v1/customers/me/payment-methods/card — save Razorpay token metadata only (token encrypted at rest).
+  POST /api/v1/customers/me/payment-methods/card — save Cashfree token metadata only (token encrypted at rest).
   Optional Idempotency-Key header replays the original create.
-  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 409 CARD_ALREADY_SAVED, 422 INVALID_RAZORPAY_TOKEN | PAYMENT_METHOD_LIMIT_REACHED
+  Errors: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 409 CARD_ALREADY_SAVED, 422 INVALID_CASHFREE_TOKEN | PAYMENT_METHOD_LIMIT_REACHED
 }
 
 example {
   name: 201 Created
-  description: Tokenised card saved; razorpay_token_id never returned.
+  description: Tokenised card saved; gateway_token_id never returned.
 
   request: {
     url: {{baseUrl}}/api/v1/customers/me/payment-methods/card
@@ -80,7 +80,7 @@ example {
     }
     body:json: {
       {
-        "razorpay_token_id": "token_demo4242",
+        "gateway_token_id": "token_demo4242",
         "card_last4": "4242",
         "card_network": "VISA",
         "card_type": "CREDIT",
@@ -128,7 +128,7 @@ example {
     }
     body:json: {
       {
-        "razorpay_token_id": "token_nolast4",
+        "gateway_token_id": "token_nolast4",
         "card_network": "VISA",
         "card_type": "CREDIT"
       }

@@ -22,7 +22,6 @@ import com.nammamedmate.messaging.SchedulerLease;
 import com.nammamedmate.messaging.SqsEventDispatcher;
 import com.nammamedmate.messaging.SqsOutboxTransport;
 import com.nammamedmate.messaging.WebhookInbox;
-import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
 import com.nammamedmate.security.AesGcmCipher;
 import com.nammamedmate.security.InMemoryTokenRevocationStore;
 import com.nammamedmate.security.Rs256JwtService;
@@ -81,7 +80,7 @@ public class PlatformConfig {
   }
 
   /**
-   * Dedicated cipher for saved payment methods (UPI / Razorpay token). Falls back to MFA key when
+   * Dedicated cipher for saved payment methods (UPI / Cashfree token). Falls back to MFA key when
    * payment key is unset (local/legacy secrets).
    */
   @Bean
@@ -201,7 +200,6 @@ public class PlatformConfig {
       OutboxStore store,
       ObjectProvider<SqsClient> sqs,
       @Value("${medmate.sqs.queue-url:}") String queueUrl,
-      AutoKycOutboxConsumer autoKycOutboxConsumer,
       OrderDeliveredReferralConsumer orderDeliveredReferralConsumer,
       OrderDeliveredLoyaltyConsumer orderDeliveredLoyaltyConsumer,
       AutomationTriggerConsumer automationTriggerConsumer) {
@@ -213,7 +211,6 @@ public class PlatformConfig {
             new SqsOutboxTransport(sqs.getObject(), url).accept(message);
             return;
           }
-          autoKycOutboxConsumer.accept(message);
           orderDeliveredReferralConsumer.accept(message);
           orderDeliveredLoyaltyConsumer.accept(message);
           automationTriggerConsumer.accept(message);
@@ -248,26 +245,16 @@ public class PlatformConfig {
   @Bean
   @Profile({"prod", "staging"})
   org.springframework.boot.ApplicationRunner notificationWebhookSecretGuard(
-      @Value("${medmate.sms.webhook-secret:}") String smsSecret,
-      @Value("${medmate.email.webhook-secret:}") String emailSecret) {
+      @Value("${medmate.sms.webhook-secret:}") String smsSecret) {
     return args ->
         com.nammamedmate.notification.application.NotificationWebhookAuth
-            .validateSecretsForDeployedProfile(smsSecret, emailSecret);
+            .validateSecretsForDeployedProfile(smsSecret, null);
   }
 
   @Bean
   @Profile({"prod", "staging"})
-  org.springframework.boot.ApplicationRunner kycWebhookSecretGuard(
-      @Value("${medmate.kyc.webhook-secret:}") String webhookSecret) {
-    return args ->
-        com.nammamedmate.pharmacy.application.AutoKycService
-            .validateWebhookSecretForDeployedProfile(webhookSecret, true);
-  }
-
-  @Bean
-  @Profile({"prod", "staging"})
-  org.springframework.boot.ApplicationRunner razorpayxWebhookSecretGuard(
-      @Value("${medmate.razorpayx.webhook-secret:}") String webhookSecret) {
+  org.springframework.boot.ApplicationRunner cashfreePayoutWebhookSecretGuard(
+      @Value("${medmate.cashfree.payouts-webhook-secret:}") String webhookSecret) {
     return args ->
         com.nammamedmate.pharmacy.application.AdminPharmacySettlementService
             .validateWebhookSecretForDeployedProfile(webhookSecret, true);
@@ -275,35 +262,36 @@ public class PlatformConfig {
 
   @Bean
   @Profile({"prod", "staging"})
-  org.springframework.boot.ApplicationRunner razorpayPaymentSecretsGuard(
-      @Value("${medmate.razorpay.key-id:}") String keyId,
-      @Value("${medmate.razorpay.key-secret:}") String keySecret,
-      @Value("${medmate.razorpay.webhook-secret:}") String webhookSecret) {
+  org.springframework.boot.ApplicationRunner cashfreePaymentSecretsGuard(
+      @Value("${medmate.cashfree.app-id:}") String appId,
+      @Value("${medmate.cashfree.secret-key:}") String secretKey,
+      @Value("${medmate.cashfree.webhook-secret:}") String webhookSecret) {
     return args ->
-        com.nammamedmate.payment.PaymentConfig.validateRazorpaySecretsForDeployedProfile(
-            keyId, keySecret, webhookSecret, true);
+        com.nammamedmate.payment.PaymentConfig.validateCashfreeSecretsForDeployedProfile(
+            appId, secretKey, webhookSecret, true);
   }
 
   @Bean
   @Profile({"prod", "staging"})
-  org.springframework.boot.ApplicationRunner razorpayXSecretsGuard(
-      @Value("${medmate.razorpayx.key-id:}") String keyId,
-      @Value("${medmate.razorpayx.key-secret:}") String keySecret) {
+  org.springframework.boot.ApplicationRunner cashfreePayoutSecretsGuard(
+      @Value("${medmate.cashfree.payouts-client-id:}") String clientId,
+      @Value("${medmate.cashfree.payouts-client-secret:}") String clientSecret) {
     return args ->
-        com.nammamedmate.payment.PaymentConfig.validateRazorpayXSecretsForDeployedProfile(
-            keyId, keySecret, true);
+        com.nammamedmate.payment.PaymentConfig.validateCashfreePayoutSecretsForDeployedProfile(
+            clientId, clientSecret, true);
   }
 
   @Bean
   @Profile({"prod", "staging"})
   org.springframework.boot.ApplicationRunner commsVendorSecretsGuard(
-      @Value("${medmate.msg91.auth-key:}") String msg91,
-      @Value("${medmate.fcm.server-key:}") String fcm,
-      @Value("${medmate.sendgrid.api-key:}") String sendgrid,
-      @Value("${medmate.whatsapp.access-token:}") String whatsapp) {
+      @Value("${medmate.twilio.account-sid:}") String twilioSid,
+      @Value("${medmate.twilio.auth-token:}") String twilioToken,
+      @Value("${medmate.fcm.project-id:}") String fcmProjectId,
+      @Value("${medmate.fcm.service-account-json:}") String fcmServiceAccountJson) {
     return args ->
         com.nammamedmate.notification.application.NotificationWebhookAuth
-            .validateVendorKeysForDeployedProfile(msg91, fcm, sendgrid, whatsapp);
+            .validateVendorKeysForDeployedProfile(
+                twilioSid, twilioToken, fcmProjectId, fcmServiceAccountJson);
   }
 
   @Bean

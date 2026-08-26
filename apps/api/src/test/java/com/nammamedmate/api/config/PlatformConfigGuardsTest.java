@@ -14,7 +14,6 @@ import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredLoyaltyConsu
 import com.nammamedmate.customer.adapter.in.messaging.OrderDeliveredReferralConsumer;
 import com.nammamedmate.messaging.OutboxMessage;
 import com.nammamedmate.messaging.OutboxStore;
-import com.nammamedmate.pharmacy.adapter.in.messaging.AutoKycOutboxConsumer;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -43,7 +42,6 @@ class PlatformConfigGuardsTest {
   void localDispatcherFallsBackToInProcessConsumers() {
     OutboxStore store = mock(OutboxStore.class);
     ObjectProvider<SqsClient> sqs = mock(ObjectProvider.class);
-    AutoKycOutboxConsumer kyc = mock(AutoKycOutboxConsumer.class);
     OrderDeliveredReferralConsumer referral = mock(OrderDeliveredReferralConsumer.class);
     OrderDeliveredLoyaltyConsumer loyalty = mock(OrderDeliveredLoyaltyConsumer.class);
     AutomationTriggerConsumer automation = mock(AutomationTriggerConsumer.class);
@@ -51,16 +49,15 @@ class PlatformConfigGuardsTest {
         new OutboxMessage(
             java.util.UUID.randomUUID(), "order.delivered", "{}", java.time.Instant.now(), false);
     when(store.claimUnpublished(anyInt(), any(), any())).thenReturn(java.util.List.of(msg));
-    var dispatcher = cfg.sqsEventDispatcher(store, sqs, "", kyc, referral, loyalty, automation);
+    var dispatcher = cfg.sqsEventDispatcher(store, sqs, "", referral, loyalty, automation);
     dispatcher.dispatchOnce();
-    verify(kyc).accept(msg);
     verify(referral).accept(msg);
     verify(loyalty).accept(msg);
     verify(automation).accept(msg);
 
     SqsClient client = mock(SqsClient.class);
     when(sqs.getObject()).thenReturn(client);
-    cfg.sqsEventDispatcher(store, sqs, "https://sqs.example/q", kyc, referral, loyalty, automation)
+    cfg.sqsEventDispatcher(store, sqs, "https://sqs.example/q", referral, loyalty, automation)
         .dispatchOnce();
     verify(client)
         .sendMessage(any(software.amazon.awssdk.services.sqs.model.SendMessageRequest.class));

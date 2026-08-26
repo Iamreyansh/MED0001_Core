@@ -3,7 +3,7 @@ package com.nammamedmate.customer.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.nammamedmate.customer.adapter.out.razorpay.StubRazorpayVpaClient;
+import com.nammamedmate.customer.adapter.out.cashfree.StubCashfreeVpaClient;
 import com.nammamedmate.customer.application.PaymentMethodService.CardCommand;
 import com.nammamedmate.customer.application.PaymentMethodService.UpiCommand;
 import com.nammamedmate.customer.application.port.out.PaymentMethodInActiveOrderPort;
@@ -59,7 +59,7 @@ class PaymentMethodServiceTest {
             methods,
             profiles,
             activeOrders,
-            new StubRazorpayVpaClient(),
+            new StubCashfreeVpaClient(),
             cipher,
             rateLimiter,
             CLOCK,
@@ -127,7 +127,7 @@ class PaymentMethodServiceTest {
   }
 
   @Test
-  void saveUpi_invalidVpaFromRazorpay() {
+  void saveUpi_invalidVpaFromCashfree() {
     assertThatThrownBy(() -> service.saveUpi(principal, new UpiCommand("foo@invalid", null), null))
         .isInstanceOf(AppException.class)
         .extracting(ex -> ((AppException) ex).code())
@@ -135,7 +135,7 @@ class PaymentMethodServiceTest {
   }
 
   @Test
-  void saveUpi_timeoutFromRazorpay() {
+  void saveUpi_timeoutFromCashfree() {
     assertThatThrownBy(
             () -> service.saveUpi(principal, new UpiCommand("timeout@okaxis", null), null))
         .isInstanceOf(AppException.class)
@@ -182,11 +182,11 @@ class PaymentMethodServiceTest {
     assertThat(created.get("card_last4")).isEqualTo("4242");
     assertThat(created.get("card_network")).isEqualTo("VISA");
     assertThat(created.get("card_type")).isEqualTo("CREDIT");
-    assertThat(created).doesNotContainKey("razorpay_token_id");
+    assertThat(created).doesNotContainKey("gateway_token_id");
 
     PaymentMethodRecord stored =
         methods.findByIdForCustomer((UUID) created.get("id"), customerId).orElseThrow();
-    assertThat(cipher.decrypt(stored.razorpayTokenEncrypted())).isEqualTo("token_abc123");
+    assertThat(cipher.decrypt(stored.cashfreeTokenEncrypted())).isEqualTo("token_abc123");
   }
 
   @Test
@@ -199,7 +199,7 @@ class PaymentMethodServiceTest {
                     null))
         .isInstanceOf(AppException.class)
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("INVALID_RAZORPAY_TOKEN");
+        .isEqualTo("INVALID_CASHFREE_TOKEN");
   }
 
   @Test
@@ -235,7 +235,7 @@ class PaymentMethodServiceTest {
     assertThat(upi.get(0)).doesNotContainKey("upi_id");
     assertThat(cards).hasSize(1);
     assertThat(cards.get(0).get("card_last4")).isEqualTo("4242");
-    assertThat(cards.get(0)).doesNotContainKey("razorpay_token_id");
+    assertThat(cards.get(0)).doesNotContainKey("gateway_token_id");
   }
 
   @Test
@@ -249,7 +249,7 @@ class PaymentMethodServiceTest {
             methods,
             profiles,
             methodId -> methodId.equals(id),
-            new StubRazorpayVpaClient(),
+            new StubCashfreeVpaClient(),
             cipher,
             rateLimiter,
             CLOCK,
@@ -364,7 +364,7 @@ class PaymentMethodServiceTest {
             methods,
             profiles,
             activeOrders,
-            new StubRazorpayVpaClient(),
+            new StubCashfreeVpaClient(),
             cipher,
             tight,
             CLOCK,

@@ -14,7 +14,7 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
-import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.client.StubCashfreePaymentPort;
 import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter;
 import com.nammamedmate.order.application.port.out.CartStore;
@@ -84,7 +84,7 @@ class OrderPlacementServiceTest {
 
   private InMemoryCartStore carts;
   private InMemoryOrderStore orders;
-  private StubRazorpayPaymentPort razorpay;
+  private StubCashfreePaymentPort cashfree;
   private InMemoryOutboxStore outboxStore;
   private OrderPlacementService service;
   private final MedmatePrincipal customer =
@@ -97,7 +97,7 @@ class OrderPlacementServiceTest {
   void setUp() {
     carts = new InMemoryCartStore();
     orders = new InMemoryOrderStore();
-    razorpay = new StubRazorpayPaymentPort();
+    cashfree = new StubCashfreePaymentPort();
     outboxStore = new InMemoryOutboxStore();
     when(rateLimiter.tryAcquire(
             any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
@@ -138,7 +138,7 @@ class OrderPlacementServiceTest {
             zones,
             new StubDeliveryFeeAdapter(),
             new StubPriceCeilingAdapter(),
-            razorpay,
+            cashfree,
             org.mockito.Mockito.mock(RefundService.class),
             new OutboxPublisher(outboxStore, new ObjectMapper()),
             new ObjectMapper(),
@@ -253,8 +253,8 @@ class OrderPlacementServiceTest {
         service.placeOrder(customer, cart.id(), "UPI", null, null, "idem-upi-2");
     UUID orderId = (UUID) placed.get("order_id");
     Order order = orders.findById(orderId).orElseThrow();
-    String paymentId = "pay_Razorpay98765";
-    String sig = razorpay.signPayment(order.razorpayOrderId(), paymentId);
+    String paymentId = "pay_Cashfree98765";
+    String sig = cashfree.signPayment(order.gatewayOrderId(), paymentId);
 
     Map<String, Object> first =
         service.confirmPayment(customer, orderId, paymentId, sig, "idem-c1");
@@ -276,7 +276,7 @@ class OrderPlacementServiceTest {
     UUID orderId = (UUID) placed.get("order_id");
     Order order = orders.findById(orderId).orElseThrow();
     String paymentId = "pay_notify";
-    String sig = razorpay.signPayment(order.razorpayOrderId(), paymentId);
+    String sig = cashfree.signPayment(order.gatewayOrderId(), paymentId);
 
     Map<String, Object> confirmed =
         service.confirmPayment(customer, orderId, paymentId, sig, "idem-n1");
@@ -349,11 +349,11 @@ class OrderPlacementServiceTest {
         """
         {"event":"payment.captured","payload":{"payment":{"entity":{"id":"%s","order_id":"%s"}}}}
         """
-            .formatted(paymentId, o.razorpayOrderId());
+            .formatted(paymentId, o.gatewayOrderId());
     String sig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, body);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, body);
     Map<String, Object> wh =
-        service.handleRazorpayWebhook(sig, body.getBytes(StandardCharsets.UTF_8), "idem-wh-1");
+        service.handleCashfreeWebhook(sig, body.getBytes(StandardCharsets.UTF_8), "idem-wh-1");
     assertThat(wh.get("status")).isEqualTo("PENDING_ACCEPTANCE");
   }
 
@@ -548,9 +548,9 @@ class OrderPlacementServiceTest {
     }
 
     @Override
-    public Optional<Order> findByRazorpayOrderId(String razorpayOrderId) {
+    public Optional<Order> findByGatewayOrderId(String gatewayOrderId) {
       return byId.values().stream()
-          .filter(o -> razorpayOrderId.equals(o.razorpayOrderId()))
+          .filter(o -> gatewayOrderId.equals(o.gatewayOrderId()))
           .findFirst();
     }
 

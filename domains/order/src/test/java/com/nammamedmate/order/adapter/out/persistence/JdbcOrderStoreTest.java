@@ -91,9 +91,9 @@ class JdbcOrderStoreTest {
     assertThat(store.findByPharmacyAndId(pharmacyId, UUID.randomUUID())).isEmpty();
     stubOrderQuery();
     assertThat(store.findByPlacementIdempotencyKey("idem-1")).isPresent();
-    assertThat(store.findByRazorpayOrderId("order_rz")).isPresent();
+    assertThat(store.findByGatewayOrderId("order_rz")).isPresent();
     assertThat(store.findByPlacementIdempotencyKey(" ")).isEmpty();
-    assertThat(store.findByRazorpayOrderId(null)).isEmpty();
+    assertThat(store.findByGatewayOrderId(null)).isEmpty();
     assertThat(store.findPendingAcceptanceTimedOut(t0, 10)).hasSize(1);
     assertThat(store.findReadyWithoutRiderEscalation(t0, 10)).hasSize(1);
     assertThat(store.findOpenPastSlaDeadline(t0, 10)).hasSize(1);
@@ -192,8 +192,8 @@ class JdbcOrderStoreTest {
     when(rs.getLong("total_payable_paise")).thenReturn(11500L);
     when(rs.getString("payment_method")).thenReturn("COD");
     when(rs.getString("payment_status")).thenReturn("PENDING_COLLECTION");
-    when(rs.getString("razorpay_order_id")).thenReturn("order_rz");
-    when(rs.getString("razorpay_payment_id")).thenReturn(null);
+    when(rs.getString("gateway_order_id")).thenReturn("order_rz");
+    when(rs.getString("gateway_payment_id")).thenReturn(null);
     when(rs.getObject("prescription_id")).thenReturn(null);
     when(rs.getObject("delivery_address_id")).thenReturn(addressId);
     when(rs.getString("delivery_instructions")).thenReturn(null);

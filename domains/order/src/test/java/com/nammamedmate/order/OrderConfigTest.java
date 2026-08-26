@@ -51,8 +51,8 @@ class OrderConfigTest {
         .isInstanceOf(com.nammamedmate.order.adapter.out.persistence.StubWalletPort.class);
     assertThat(config.priceCeilingPort(jdbc))
         .isInstanceOf(com.nammamedmate.order.adapter.out.persistence.JdbcPriceCeilingAdapter.class);
-    assertThat(config.razorpayPaymentPort("sec", "wh"))
-        .isInstanceOf(com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort.class);
+    assertThat(config.cashfreePaymentPort("sec", "wh"))
+        .isInstanceOf(com.nammamedmate.order.adapter.out.client.StubCashfreePaymentPort.class);
 
     java.util.UUID id = java.util.UUID.randomUUID();
     config.platformCouponPort().record("NAMMA25", id, id, 100, 1000);

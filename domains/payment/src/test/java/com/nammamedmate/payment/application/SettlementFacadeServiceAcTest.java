@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.BankSnapshot;
@@ -18,8 +20,6 @@ import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.KpiS
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.ListResult;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.SettlementRecord;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.Totals;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.SettlementNotificationPort;
 import com.nammamedmate.payment.application.port.out.TcsRegisterWriterPort;
 import com.nammamedmate.payment.domain.SettlementStatuses;
@@ -49,7 +49,7 @@ class SettlementFacadeServiceAcTest {
   private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
   @Mock private PharmacySettlementPort settlements;
-  @Mock private RazorpayXPayoutPort razorpayx;
+  @Mock private CashfreePayoutPort cashfree_payouts;
   @Mock private FinancialLedgerWriterPort ledger;
   @Mock private SettlementNotificationPort notifications;
   @Mock private TcsRegisterWriterPort tcsRegister;
@@ -67,7 +67,7 @@ class SettlementFacadeServiceAcTest {
   void setUp() {
     service =
         new SettlementFacadeService(
-            settlements, razorpayx, ledger, notifications, tcsRegister, CLOCK);
+            settlements, cashfree_payouts, ledger, notifications, tcsRegister, CLOCK);
   }
 
   @Test
@@ -111,7 +111,7 @@ class SettlementFacadeServiceAcTest {
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("AMOUNT_BELOW_THRESHOLD");
     verify(settlements).markBelowThreshold(eq(settlementId), anyString(), eq(NOW));
-    verify(razorpayx, never()).initiatePayout(any());
+    verify(cashfree_payouts, never()).initiatePayout(any());
   }
 
   @Test
@@ -161,7 +161,7 @@ class SettlementFacadeServiceAcTest {
         .thenReturn(
             Optional.of(new BankSnapshot("XXXXXXXXXXXX4521", "HDFC", "HDFC0001", "VERIFIED")));
     when(settlements.claimForRelease(settlementId, pharmacyId, "idem-1", NOW)).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout_abc", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout_abc", 4));
     when(settlements.finalizeRelease(
             eq(settlementId),
             eq(finance.subject()),
@@ -174,7 +174,7 @@ class SettlementFacadeServiceAcTest {
 
     Map<String, Object> result = service.release(finance, settlementId, "ok", "idem-1");
     assertThat(result.get("status")).isEqualTo("RELEASED");
-    assertThat(result.get("razorpay_payout_id")).isEqualTo("pout_abc");
+    assertThat(result.get("cashfree_transfer_id")).isEqualTo("pout_abc");
     assertThat(result.get("notification_sent")).isEqualTo(true);
 
     ArgumentCaptor<String> type = ArgumentCaptor.forClass(String.class);
@@ -212,7 +212,7 @@ class SettlementFacadeServiceAcTest {
             Optional.of(new BankSnapshot("XXXXXXXXXXXX1111", "SBI", "SBIN0001", "VERIFIED")));
     when(settlements.claimForRelease(eq(ok.id()), eq(pharmacyId), anyString(), eq(NOW)))
         .thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout_b", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout_b", 4));
     when(settlements.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(true);
 
@@ -335,12 +335,12 @@ class SettlementFacadeServiceAcTest {
     SettlementRecord released = releasedOf(pending(100_000L, 1, 0, 100_000L));
     when(settlements.findByIdempotencyKey("idem")).thenReturn(Optional.of(released));
     Map<String, Object> result = service.release(finance, settlementId, null, "idem");
-    assertThat(result.get("razorpay_payout_id")).isEqualTo("pout_x");
-    verify(razorpayx, never()).initiatePayout(any());
+    assertThat(result.get("cashfree_transfer_id")).isEqualTo("pout_x");
+    verify(cashfree_payouts, never()).initiatePayout(any());
   }
 
   @Test
-  void payoutFailure_mapsToRazorpayPayoutFailed() {
+  void payoutFailure_mapsToCashfreePayoutFailed() {
     SettlementRecord row = pending(100_000L, 1, 0, 100_000L);
     when(settlements.findByIdempotencyKey("k")).thenReturn(Optional.empty());
     when(settlements.findById(settlementId)).thenReturn(Optional.of(row));
@@ -348,12 +348,12 @@ class SettlementFacadeServiceAcTest {
         .thenReturn(
             Optional.of(new BankSnapshot("XXXXXXXXXXXX9999", "ICICI", "ICIC0001", "VERIFIED")));
     when(settlements.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any()))
-        .thenThrow(new AppException("RAZORPAY_PAYOUT_FAILED", "down", 502));
+    when(cashfree_payouts.initiatePayout(any()))
+        .thenThrow(new AppException("CASHFREE_PAYOUT_FAILED", "down", 502));
 
     assertThatThrownBy(() -> service.release(finance, settlementId, null, "k"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
     verify(settlements).markReleaseFailed(settlementId, "k", NOW);
   }
 
@@ -417,7 +417,7 @@ class SettlementFacadeServiceAcTest {
         NOW,
         base.releasedBy(),
         base.releasedAt(),
-        base.razorpayxPayoutId(),
+        base.cashfreeTransferId(),
         base.notes(),
         base.releaseIdempotencyKey());
   }

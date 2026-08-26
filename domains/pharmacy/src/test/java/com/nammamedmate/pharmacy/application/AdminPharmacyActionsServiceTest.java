@@ -118,21 +118,31 @@ class AdminPharmacyActionsServiceTest {
     pharmacies.putActive(PID2, "SUSPENDED");
   }
 
-  /** AC1: WA notice creates PharmacyNotice, audit NOTICE_SENT, decrements rate_limit_remaining. */
+  /**
+   * AC1: IN_APP notice creates PharmacyNotice, audit NOTICE_SENT, decrements rate_limit_remaining.
+   */
   @Test
-  void ac1_whatsappNoticeCreatesRecordAuditAndRateLimit() {
+  void ac1_inAppNoticeCreatesRecordAuditAndRateLimit() {
     MedmatePrincipal ops = principal(AuthRole.ADMIN_OPERATIONS);
     Map<String, Object> result =
-        actions.sendNotice(
-            ops, PID, "WHATSAPP", null, "Renewal reminder", "NORMAL", "PHARMACY_GENERAL_NOTICE");
+        actions.sendNotice(ops, PID, "IN_APP", "Subject", "Renewal reminder", "NORMAL", null);
 
     assertThat(result.get("notice_id")).isNotNull();
-    assertThat(result.get("channels_sent")).isEqualTo(List.of("WHATSAPP"));
+    assertThat(result.get("channels_sent")).isEqualTo(List.of("IN_APP"));
     assertThat(result.get("rate_limit_remaining")).isEqualTo(2);
     assertThat(notices.inserted).hasSize(1);
-    assertThat(notificationPort.lastTemplate).isEqualTo("PHARMACY_GENERAL_NOTICE");
     assertThat(audit.entries).hasSize(1);
     assertThat(audit.entries.getFirst().action()).isEqualTo("NOTICE_SENT");
+  }
+
+  @Test
+  void whatsappChannelReturnsUnavailable() {
+    MedmatePrincipal ops = principal(AuthRole.ADMIN_OPERATIONS);
+    assertThatThrownBy(
+            () ->
+                actions.sendNotice(
+                    ops, PID, "WHATSAPP", null, "msg", "NORMAL", "PHARMACY_GENERAL_NOTICE"))
+        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("CHANNEL_UNAVAILABLE"));
   }
 
   /** AC2: 4th notice in rolling hour returns 429 NOTICE_RATE_LIMIT_EXCEEDED. */
@@ -144,7 +154,7 @@ class AdminPharmacyActionsServiceTest {
     }
 
     assertThatThrownBy(
-            () -> actions.sendNotice(ops, PID, "EMAIL", "Subject", "Body", "NORMAL", null))
+            () -> actions.sendNotice(ops, PID, "IN_APP", "Subject", "Body", "NORMAL", null))
         .isInstanceOf(AppException.class)
         .satisfies(
             ex -> {
@@ -228,13 +238,7 @@ class AdminPharmacyActionsServiceTest {
             ops,
             List.of(PID, PID2, PID3),
             "SEND_NOTICE",
-            Map.of(
-                "channel",
-                "WHATSAPP",
-                "message",
-                "Bulk notice",
-                "template_name",
-                "PHARMACY_GENERAL_NOTICE"));
+            Map.of("channel", "IN_APP", "subject", "Bulk notice", "message", "Bulk notice"));
 
     assertThat(submit.get("job_id")).isNotNull();
     assertThat(submit.get("status")).isEqualTo("QUEUED");
@@ -255,7 +259,7 @@ class AdminPharmacyActionsServiceTest {
             entry -> assertThat(entry.get("reason")).isEqualTo("NOTICE_RATE_LIMIT_EXCEEDED"));
   }
 
-  /** AC8: Invalid WhatsApp template returns 400 INVALID_TEMPLATE without dispatch. */
+  /** AC8: WhatsApp channel is unavailable after vendor cleanup. */
   @Test
   void ac8_invalidTemplateRejected() {
     MedmatePrincipal ops = principal(AuthRole.ADMIN_OPERATIONS);
@@ -263,7 +267,7 @@ class AdminPharmacyActionsServiceTest {
             () ->
                 actions.sendNotice(ops, PID, "WHATSAPP", null, "msg", "NORMAL", "UNKNOWN_TEMPLATE"))
         .isInstanceOf(AppException.class)
-        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("INVALID_TEMPLATE"));
+        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("CHANNEL_UNAVAILABLE"));
     assertThat(notices.inserted).isEmpty();
     assertThat(notificationPort.dispatchCount).isZero();
   }
@@ -324,16 +328,16 @@ class AdminPharmacyActionsServiceTest {
     MedmatePrincipal ops = principal(AuthRole.ADMIN_OPERATIONS);
     UUID missing = Ids.newId();
     assertThatThrownBy(
-            () ->
-                actions.sendNotice(
-                    ops, missing, "WHATSAPP", null, "m", "NORMAL", "PHARMACY_GENERAL_NOTICE"))
+            () -> actions.sendNotice(ops, missing, "IN_APP", "Subject", "m", "NORMAL", null))
         .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("PHARMACY_NOT_FOUND"));
 
     assertThatThrownBy(() -> actions.sendNotice(ops, PID, "BAD", null, "m", "NORMAL", null))
         .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("INVALID_CHANNEL"));
     assertThatThrownBy(() -> actions.sendNotice(ops, PID, "WHATSAPP", null, "m", "NORMAL", null))
-        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("TEMPLATE_REQUIRED"));
+        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("CHANNEL_UNAVAILABLE"));
     assertThatThrownBy(() -> actions.sendNotice(ops, PID, "IN_APP", null, "m", "NORMAL", null))
+        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("SUBJECT_REQUIRED"));
+    assertThatThrownBy(() -> actions.sendNotice(ops, PID, "IN_APP", "  ", "m", "NORMAL", null))
         .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("SUBJECT_REQUIRED"));
     assertThatThrownBy(() -> actions.addNote(ops, missing, "n", false))
         .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("PHARMACY_NOT_FOUND"));
@@ -377,16 +381,17 @@ class AdminPharmacyActionsServiceTest {
 
   @Test
   void emailNoticeWithComplianceRole() {
-    Map<String, Object> result =
-        actions.sendNotice(
-            principal(AuthRole.ADMIN_COMPLIANCE),
-            PID,
-            "EMAIL",
-            "Compliance notice",
-            "Please renew FSSAI",
-            "NORMAL",
-            null);
-    assertThat(result.get("channels_sent")).isEqualTo(List.of("EMAIL"));
+    assertThatThrownBy(
+            () ->
+                actions.sendNotice(
+                    principal(AuthRole.ADMIN_COMPLIANCE),
+                    PID,
+                    "EMAIL",
+                    "Compliance notice",
+                    "Please renew FSSAI",
+                    "NORMAL",
+                    null))
+        .satisfies(ex -> assertThat(((AppException) ex).code()).isEqualTo("CHANNEL_UNAVAILABLE"));
   }
 
   @Test
@@ -456,11 +461,11 @@ class AdminPharmacyActionsServiceTest {
         bulkActions.sendNoticeInternal(
             principal(AuthRole.ADMIN_OPERATIONS),
             PID2,
-            "WHATSAPP",
-            null,
+            "IN_APP",
+            "Subject",
             "msg",
             "NORMAL",
-            "PHARMACY_GENERAL_NOTICE",
+            null,
             Ids.newId(),
             false);
     assertThat(result.skipReason()).isEqualTo("PHARMACY_NOT_ACTIVE");
@@ -493,7 +498,7 @@ class AdminPharmacyActionsServiceTest {
             Clock.fixed(NOW, ZoneOffset.UTC),
             provider);
     redisActions.sendNotice(
-        principal(AuthRole.ADMIN_OPERATIONS), PID, "EMAIL", "Subject", "Body", "NORMAL", null);
+        principal(AuthRole.ADMIN_OPERATIONS), PID, "IN_APP", "Subject", "Body", "NORMAL", null);
     verify(redisTemplate).expire(any(String.class), any(java.time.Duration.class));
   }
 

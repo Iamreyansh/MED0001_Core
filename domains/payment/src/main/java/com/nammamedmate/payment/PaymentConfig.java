@@ -2,19 +2,19 @@ package com.nammamedmate.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.payment.adapter.out.client.LiveRazorpayGatewayClient;
-import com.nammamedmate.payment.adapter.out.client.LiveRazorpayXPayoutClient;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayGatewayClient;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayXPayoutClient;
+import com.nammamedmate.payment.adapter.out.client.LiveCashfreeGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.LiveCashfreePayoutClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreeGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreePayoutClient;
 import com.nammamedmate.payment.adapter.out.persistence.LocalTaxFilingObjectStore;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
 import com.nammamedmate.payment.application.port.out.CodFloatAlertPort;
 import com.nammamedmate.payment.application.port.out.CodFloatPort;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
 import com.nammamedmate.payment.application.port.out.RefundFinancePort;
 import com.nammamedmate.payment.application.port.out.RefundNotificationPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutNotificationPort;
@@ -48,42 +48,42 @@ public class PaymentConfig {
   /**
    * Fail-closed for staging/prod: never fall back to stub secrets that can forge verify/webhooks.
    */
-  public static void validateRazorpaySecretsForDeployedProfile(
+  public static void validateCashfreeSecretsForDeployedProfile(
       String keyId, String keySecret, String webhookSecret, boolean deployedProfile) {
     if (!deployedProfile) {
       return;
     }
     if (blank(keyId) || blank(keySecret) || blank(webhookSecret)) {
       throw new IllegalStateException(
-          "medmate.razorpay.key-id, key-secret, and webhook-secret must be set for staging/prod");
+          "medmate.cashfree.app-id, secret-key, and webhook-secret must be set for staging/prod");
     }
-    if (StubRazorpayGatewayClient.DEFAULT_KEY_SECRET.equals(keySecret)
-        || StubRazorpayGatewayClient.DEFAULT_WEBHOOK_SECRET.equals(webhookSecret)
-        || StubRazorpayGatewayClient.DEFAULT_KEY_ID.equals(keyId)
-        || "rzp_live_replace_me".equals(keyId)
-        || "rzp_test_replace_me".equals(keyId)
+    if (StubCashfreeGatewayClient.DEFAULT_KEY_SECRET.equals(keySecret)
+        || StubCashfreeGatewayClient.DEFAULT_WEBHOOK_SECRET.equals(webhookSecret)
+        || StubCashfreeGatewayClient.DEFAULT_KEY_ID.equals(keyId)
+        || "cf_live_replace_me".equals(keyId)
+        || "cf_test_replace_me".equals(keyId)
         || "replace_me".equals(keySecret)) {
       throw new IllegalStateException(
-          "medmate.razorpay.* must not use stub/default secrets in staging/prod");
+          "medmate.cashfree.* must not use stub/default secrets in staging/prod");
     }
   }
 
-  /** Fail-closed RazorpayX key pair for staging/prod. */
-  public static void validateRazorpayXSecretsForDeployedProfile(
+  /** Fail-closed CashfreePayout key pair for staging/prod. */
+  public static void validateCashfreePayoutSecretsForDeployedProfile(
       String keyId, String keySecret, boolean deployedProfile) {
     if (!deployedProfile) {
       return;
     }
     if (blank(keyId) || blank(keySecret)) {
       throw new IllegalStateException(
-          "medmate.razorpayx.key-id and key-secret must be set for staging/prod");
+          "medmate.cashfree.payouts-client-id and payouts-client-secret must be set for staging/prod");
     }
-    if (StubRazorpayXPayoutClient.DEFAULT_KEY_ID.equals(keyId)
-        || StubRazorpayXPayoutClient.DEFAULT_KEY_SECRET.equals(keySecret)
-        || "rzp_test_replace_me".equals(keyId)
+    if (StubCashfreePayoutClient.DEFAULT_KEY_ID.equals(keyId)
+        || StubCashfreePayoutClient.DEFAULT_KEY_SECRET.equals(keySecret)
+        || "cf_test_replace_me".equals(keyId)
         || "replace_me".equals(keySecret)) {
       throw new IllegalStateException(
-          "medmate.razorpayx.* must not use stub/default secrets in staging/prod");
+          "medmate.cashfree.* must not use stub/default secrets in staging/prod");
     }
   }
 
@@ -104,23 +104,23 @@ public class PaymentConfig {
   }
 
   @Bean
-  @ConditionalOnMissingBean(RazorpayGatewayPort.class)
-  RazorpayGatewayPort razorpayGatewayPort(
+  @ConditionalOnMissingBean(CashfreeGatewayPort.class)
+  CashfreeGatewayPort cashfreeGatewayPort(
       ObjectMapper objectMapper,
       Environment environment,
-      @Value("${medmate.razorpay.key-id:}") String keyId,
-      @Value("${medmate.razorpay.key-secret:}") String keySecret,
-      @Value("${medmate.razorpay.webhook-secret:}") String webhookSecret) {
+      @Value("${medmate.cashfree.app-id:}") String keyId,
+      @Value("${medmate.cashfree.secret-key:}") String keySecret,
+      @Value("${medmate.cashfree.webhook-secret:}") String webhookSecret) {
     boolean deployed = isDeployedProfile(environment);
-    validateRazorpaySecretsForDeployedProfile(keyId, keySecret, webhookSecret, deployed);
+    validateCashfreeSecretsForDeployedProfile(keyId, keySecret, webhookSecret, deployed);
     if (blank(keyId) || blank(keySecret) || blank(webhookSecret)) {
-      return new StubRazorpayGatewayClient(
-          blank(keyId) ? StubRazorpayGatewayClient.DEFAULT_KEY_ID : keyId,
+      return new StubCashfreeGatewayClient(
+          blank(keyId) ? StubCashfreeGatewayClient.DEFAULT_KEY_ID : keyId,
           keySecret,
           webhookSecret);
     }
-    return new LiveRazorpayGatewayClient(
-        keyId, keySecret, webhookSecret, objectMapper, PaymentConfig::razorpayHttpPost);
+    return new LiveCashfreeGatewayClient(
+        keyId, keySecret, webhookSecret, objectMapper, PaymentConfig::cashfreeHttpPost);
   }
 
   @Bean
@@ -219,7 +219,7 @@ public class PaymentConfig {
   OrderPaymentStatusPort stubOrderPaymentStatusPort() {
     return new OrderPaymentStatusPort() {
       @Override
-      public void onCaptured(UUID orderId, String razorpayPaymentId) {
+      public void onCaptured(UUID orderId, String gatewayPaymentId) {
         // no-op until apps/api bridge
       }
 
@@ -231,19 +231,19 @@ public class PaymentConfig {
   }
 
   @Bean
-  @ConditionalOnMissingBean(RazorpayXPayoutPort.class)
-  RazorpayXPayoutPort paymentRazorpayXPayoutPort(
+  @ConditionalOnMissingBean(CashfreePayoutPort.class)
+  CashfreePayoutPort paymentCashfreePayoutPort(
       ObjectMapper objectMapper,
       Environment environment,
-      @Value("${medmate.razorpayx.key-id:}") String keyId,
-      @Value("${medmate.razorpayx.key-secret:}") String keySecret) {
+      @Value("${medmate.cashfree.payouts-client-id:}") String clientId,
+      @Value("${medmate.cashfree.payouts-client-secret:}") String clientSecret) {
     boolean deployed = isDeployedProfile(environment);
-    validateRazorpayXSecretsForDeployedProfile(keyId, keySecret, deployed);
-    if (blank(keyId) || blank(keySecret)) {
-      return new StubRazorpayXPayoutClient();
+    validateCashfreePayoutSecretsForDeployedProfile(clientId, clientSecret, deployed);
+    if (blank(clientId) || blank(clientSecret)) {
+      return new StubCashfreePayoutClient();
     }
-    return new LiveRazorpayXPayoutClient(
-        keyId, keySecret, objectMapper, PaymentConfig::razorpayXHttpPost);
+    return new LiveCashfreePayoutClient(
+        clientId, clientSecret, objectMapper, PaymentConfig::cashfreePayoutHttpPost);
   }
 
   @Bean
@@ -334,7 +334,7 @@ public class PaymentConfig {
       }
 
       @Override
-      public Optional<RefundRecord> findByRazorpayRefundId(String razorpayRefundId) {
+      public Optional<RefundRecord> findByGatewayRefundId(String gatewayRefundId) {
         return Optional.empty();
       }
 
@@ -360,12 +360,12 @@ public class PaymentConfig {
 
       @Override
       public boolean finalizeGatewayProcess(
-          UUID refundId, String razorpayRefundId, LocalDate expectedBy, Instant now) {
+          UUID refundId, String gatewayRefundId, LocalDate expectedBy, Instant now) {
         return false;
       }
 
       @Override
-      public void attachGatewayRefundId(UUID refundId, String razorpayRefundId, Instant now) {}
+      public void attachGatewayRefundId(UUID refundId, String gatewayRefundId, Instant now) {}
 
       @Override
       public void markProcessFailed(UUID refundId, String reason, Instant now) {}
@@ -389,7 +389,7 @@ public class PaymentConfig {
     return new RiderPayoutNotificationPort() {
       @Override
       public void payoutReleased(
-          UUID riderId, UUID payoutId, long netPaise, String razorpayPayoutId) {
+          UUID riderId, UUID payoutId, long netPaise, String cashfreeTransferId) {
         // no-op until apps/api outbox bridge
       }
 
@@ -472,7 +472,7 @@ public class PaymentConfig {
           UUID payoutId,
           UUID releasedBy,
           Instant releasedAt,
-          String razorpayxPayoutId,
+          String cashfreeTransferId,
           String notes,
           String idempotencyKey,
           Instant now) {
@@ -564,7 +564,7 @@ public class PaymentConfig {
           UUID settlementId,
           UUID releasedBy,
           Instant releasedAt,
-          String razorpayxPayoutId,
+          String cashfreeTransferId,
           String notes,
           String idempotencyKey,
           Instant now) {
@@ -591,8 +591,8 @@ public class PaymentConfig {
     };
   }
 
-  /** Live Razorpay HTTP — kept here so JaCoCo excludes Config. */
-  static String razorpayHttpPost(LiveRazorpayGatewayClient.Request request) {
+  /** Live Cashfree HTTP — kept here so JaCoCo excludes Config. */
+  static String cashfreeHttpPost(LiveCashfreeGatewayClient.Request request) {
     try {
       HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
       HttpRequest.Builder builder =
@@ -605,7 +605,7 @@ public class PaymentConfig {
       HttpResponse<String> response =
           client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() >= 400) {
-        throw new AppException("RAZORPAY_ERROR", "Razorpay HTTP " + response.statusCode(), 502);
+        throw new AppException("CASHFREE_ERROR", "Cashfree HTTP " + response.statusCode(), 502);
       }
       return response.body();
     } catch (AppException e) {
@@ -614,12 +614,12 @@ public class PaymentConfig {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      throw new AppException("RAZORPAY_ERROR", "Razorpay request failed", 502);
+      throw new AppException("CASHFREE_ERROR", "Cashfree request failed", 502);
     }
   }
 
-  /** Live RazorpayX HTTP — kept here so JaCoCo excludes Config. */
-  static String razorpayXHttpPost(LiveRazorpayXPayoutClient.Request request) {
+  /** Live CashfreePayout HTTP — kept here so JaCoCo excludes Config. */
+  static String cashfreePayoutHttpPost(LiveCashfreePayoutClient.Request request) {
     try {
       HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
       HttpRequest.Builder builder =
@@ -633,7 +633,7 @@ public class PaymentConfig {
           client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() >= 400) {
         throw new AppException(
-            "RAZORPAY_PAYOUT_FAILED", "RazorpayX HTTP " + response.statusCode(), 502);
+            "CASHFREE_PAYOUT_FAILED", "CashfreePayout HTTP " + response.statusCode(), 502);
       }
       return response.body();
     } catch (AppException e) {
@@ -642,7 +642,7 @@ public class PaymentConfig {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      throw new AppException("RAZORPAY_PAYOUT_FAILED", "RazorpayX request failed", 502);
+      throw new AppException("CASHFREE_PAYOUT_FAILED", "CashfreePayout request failed", 502);
     }
   }
 }

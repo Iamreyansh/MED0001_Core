@@ -2,10 +2,10 @@ package com.nammamedmate.payment.application;
 
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort.PayoutRequest;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutRequest;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.RiderPayoutNotificationPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutPort.EarningsEntry;
@@ -35,7 +35,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** EPIC-012 STORY-004 finance façade over rider payouts + ledger + Razorpay Route/X. */
+/** EPIC-012 STORY-004 finance façade over rider payouts + ledger + Cashfree Route/X. */
 @Service
 public class RiderPayoutFacadeService {
 
@@ -44,7 +44,7 @@ public class RiderPayoutFacadeService {
   private static final int MAX_LIMIT = 100;
 
   private final RiderPayoutPort payouts;
-  private final RazorpayXPayoutPort razorpayx;
+  private final CashfreePayoutPort cashfree_payouts;
   private final FinancialLedgerWriterPort ledger;
   private final RiderPayoutNotificationPort notifications;
   private final Clock clock;
@@ -52,23 +52,23 @@ public class RiderPayoutFacadeService {
 
   public RiderPayoutFacadeService(
       RiderPayoutPort payouts,
-      RazorpayXPayoutPort razorpayx,
+      CashfreePayoutPort cashfree_payouts,
       FinancialLedgerWriterPort ledger,
       RiderPayoutNotificationPort notifications,
       Clock clock) {
-    this(payouts, razorpayx, ledger, notifications, clock, null);
+    this(payouts, cashfree_payouts, ledger, notifications, clock, null);
   }
 
   @Autowired
   public RiderPayoutFacadeService(
       RiderPayoutPort payouts,
-      RazorpayXPayoutPort razorpayx,
+      CashfreePayoutPort cashfree_payouts,
       FinancialLedgerWriterPort ledger,
       RiderPayoutNotificationPort notifications,
       Clock clock,
       @Nullable PlatformTransactionManager transactionManager) {
     this.payouts = payouts;
-    this.razorpayx = razorpayx;
+    this.cashfree_payouts = cashfree_payouts;
     this.ledger = ledger;
     this.notifications = notifications;
     this.clock = clock;
@@ -182,7 +182,7 @@ public class RiderPayoutFacadeService {
   }
 
   /**
-   * Claim → Razorpay (outside TX) → finalize+ledger. Avoids rolling back a committed claim after a
+   * Claim → Cashfree (outside TX) → finalize+ledger. Avoids rolling back a committed claim after a
    * successful provider payout.
    */
   public Map<String, Object> release(
@@ -264,7 +264,7 @@ public class RiderPayoutFacadeService {
     PayoutResult result;
     try {
       result =
-          razorpayx.initiatePayout(
+          cashfree_payouts.initiatePayout(
               new PayoutRequest(riderId, payoutId, payout.netPayoutPaise(), "0000", "XXXX0000"));
     } catch (RuntimeException ex) {
       // Provider never accepted — safe to retry once after 24h
@@ -278,32 +278,32 @@ public class RiderPayoutFacadeService {
             }
           });
       if (ex instanceof AppException app) {
-        if ("RAZORPAY_PAYOUT_FAILED".equals(app.code()) || "RAZORPAY_ERROR".equals(app.code())) {
-          throw new AppException("RAZORPAY_PAYOUT_FAILED", app.getMessage(), 502);
+        if ("CASHFREE_PAYOUT_FAILED".equals(app.code()) || "CASHFREE_ERROR".equals(app.code())) {
+          throw new AppException("CASHFREE_PAYOUT_FAILED", app.getMessage(), 502);
         }
         throw app;
       }
-      throw new AppException("RAZORPAY_PAYOUT_FAILED", "Failed to initiate payout", 502);
+      throw new AppException("CASHFREE_PAYOUT_FAILED", "Failed to initiate payout", 502);
     }
 
     try {
       inTx(
           () -> {
             if (!payouts.finalizeRelease(
-                payoutId, principal.subject(), now, result.razorpayxPayoutId(), notes, key, now)) {
+                payoutId, principal.subject(), now, result.cashfreeTransferId(), notes, key, now)) {
               throw new AppException("PAYOUT_CONFLICT", "Could not finalize payout release", 409);
             }
             payouts.adjustEarningsWallet(riderId, -payout.netPayoutPaise(), now);
             writeLedger(payout);
             notifications.payoutReleased(
-                riderId, payoutId, payout.netPayoutPaise(), result.razorpayxPayoutId());
+                riderId, payoutId, payout.netPayoutPaise(), result.cashfreeTransferId());
           });
     } catch (RuntimeException ex) {
       // Provider already accepted — NEVER scheduleRetry (would double-disburse). Mark FAILED for
       // ops reconcile using stored payout id in the error trail.
       String err =
           "Provider accepted payout "
-              + result.razorpayxPayoutId()
+              + result.cashfreeTransferId()
               + " but finalize failed: "
               + messageOf(ex);
       inTx(
@@ -432,7 +432,7 @@ public class RiderPayoutFacadeService {
     data.put("rider_id", p.riderId().toString());
     data.put("net_payout", MoneyFormats.paiseToRupees(p.netPayoutPaise()));
     data.put("status", RiderPayoutStatuses.toApiStatus(p.status()));
-    data.put("razorpay_payout_id", p.razorpayPayoutId());
+    data.put("cashfree_transfer_id", p.cashfreeTransferId());
     data.put("released_by", p.releasedBy() == null ? null : p.releasedBy().toString());
     data.put("released_at", p.releasedAt() == null ? null : p.releasedAt().toString());
     return data;
@@ -528,6 +528,6 @@ public class RiderPayoutFacadeService {
 
   private static String messageOf(Throwable ex) {
     String msg = ex.getMessage();
-    return msg == null || msg.isBlank() ? "razorpay_payout_failed" : msg;
+    return msg == null || msg.isBlank() ? "cashfree_payout_failed" : msg;
   }
 }

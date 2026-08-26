@@ -23,7 +23,7 @@ public class WeeklyPayoutScheduler {
     payouts.computeWeeklyPayouts();
   }
 
-  /** AC-007: poll for Razorpay retry after 24h. */
+  /** AC-007: poll for Cashfree retry after 24h. */
   @Scheduled(fixedDelayString = "${medmate.rider.payout-retry-delay-ms:300000}")
   public void retryFailedPayouts() {
     payouts.retryDuePayouts();

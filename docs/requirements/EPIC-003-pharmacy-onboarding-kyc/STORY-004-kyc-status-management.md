@@ -444,6 +444,7 @@ POST /api/v1/admin/pharmacies/:id/request-documents
 - [ ] **Given** any approve/reject/suspend/reactivate action, **then** an `AuditLog` record is written with the correct `action`, `actor_id`, `actor_role`, `entity_id`, and `payload` including the reason/notes.
 - [ ] **Given** GET `/api/v1/admin/pharmacies?status=KYC_SUBMITTED`, **then** only pharmacies in `KYC_SUBMITTED` status are returned, sorted by `submitted_at` ascending (oldest first) by default.
 - [ ] **Given** POST `/api/v1/admin/pharmacies/:id/request-documents` with valid `document_types` and `message`, **then** the pharmacy owner receives an in-app + email + WhatsApp notification, and the KYC SLA timer resets.
+- [ ] **Given** all KYC documents are verified, **when** no admin has called approve, **then** pharmacy status stays `PENDING_KYC` or `KYC_SUBMITTED` and the system never auto-activates the pharmacy (D8).
 
 ---
 
@@ -451,7 +452,7 @@ POST /api/v1/admin/pharmacies/:id/request-documents
 
 - STORY-003-001 - Pharmacy registration (pharmacy records must exist)
 - STORY-003-002 - KYC document upload (documents must be submitted before approval)
-- STORY-003-003 - Auto-KYC (auto-verify result surfaced in admin detail view)
+- Government auto-KYC is out of scope; activation is an explicit admin approve only (D8)
 - EPIC-001 / STORY-005 - Role-based access control (admin role enforcement)
 - EPIC-002 / STORY-001 - Notification service (WhatsApp templates for approve/reject/suspend)
 - EPIC-007 / STORY-001 - Plan initialisation at approval

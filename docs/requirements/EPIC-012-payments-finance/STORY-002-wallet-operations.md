@@ -38,7 +38,7 @@ The Namma Money wallet is an in-app store-of-value for customers. Credits are is
 | BR-002 | **Idempotency:** `POST /wallet/debit` is idempotent per `idempotency_key`. A second request with the same key returns the original result without re-processing. |
 | BR-003 | **Credit expiry:** wallet credits expire 365 days after issuance. Credits are consumed in FIFO order (oldest first) on each debit. |
 | BR-004 | Manual admin credits are capped at **Rs 1,000 per transaction** per customer. |
-| BR-005 | **Refund routing:** COD order refunds always go to the wallet (instant). Online payment refunds go to the source account (Razorpay refund API) unless the customer explicitly chooses wallet. Wallet-paid portions of refunds always return to the wallet. |
+| BR-005 | **Refund routing:** COD order refunds always go to the wallet (instant). Online payment refunds go to the source account (Cashfree refund API) unless the customer explicitly chooses wallet. Wallet-paid portions of refunds always return to the wallet. |
 | BR-006 | The wallet is **not a bank account** - customers cannot withdraw to UPI or bank. The only way credits leave is via checkout debits. |
 | BR-007 | All wallet mutations (debit/credit) use **database-level transactions** to ensure atomicity; partial writes are never committed. |
 | BR-008 | The `balance_before` and `balance_after` fields are stored on each `WalletTransaction` record for audit - they are recorded at the time of the mutation and are not recomputed from history. |
@@ -298,7 +298,7 @@ The Namma Money wallet is an in-app store-of-value for customers. Credits are is
 
 | Dependency | Type | Notes |
 |---|---|---|
-| Payment Processing (EPIC-012/STORY-001) | Internal | Wallet debit at checkout before Razorpay order creation |
+| Payment Processing (EPIC-012/STORY-001) | Internal | Wallet debit at checkout before Cashfree order creation |
 | Refund Processing (EPIC-012/STORY-005) | Internal | Refunds trigger wallet credits |
 | Order Management (EPIC-010) | Internal | `reference_id` links to order |
 | Financial Ledger (EPIC-012/STORY-008) | Internal | Wallet credits/debits create ledger entries |

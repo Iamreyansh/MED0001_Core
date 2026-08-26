@@ -32,7 +32,7 @@ public class PaymentController {
   }
 
   @PostMapping("/initiate")
-  @Operation(summary = "Initiate Razorpay payment for an order")
+  @Operation(summary = "Initiate Cashfree payment for an order")
   public ResponseEntity<ApiResponse<Map<String, Object>>> initiate(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
@@ -51,14 +51,14 @@ public class PaymentController {
   }
 
   @PostMapping("/verify")
-  @Operation(summary = "Verify Razorpay payment signature after checkout")
+  @Operation(summary = "Verify Cashfree payment signature after checkout")
   public ApiResponse<Map<String, Object>> verify(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @RequestBody(required = false) VerifyRequest body) {
     VerifyRequest req = body == null ? new VerifyRequest(null, null, null) : body;
     return ApiResponse.ok(
         payments.verify(
-            principal, req.razorpayPaymentId(), req.razorpayOrderId(), req.razorpaySignature()));
+            principal, req.gatewayPaymentId(), req.gatewayOrderId(), req.gatewaySignature()));
   }
 
   @GetMapping("/{paymentId}")
@@ -74,5 +74,5 @@ public class PaymentController {
 
   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
   public record VerifyRequest(
-      String razorpayPaymentId, String razorpayOrderId, String razorpaySignature) {}
+      String gatewayPaymentId, String gatewayOrderId, String gatewaySignature) {}
 }

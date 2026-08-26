@@ -10,7 +10,7 @@ class FailedPayoutRetrySchedulerTest {
 
   @Test
   void delegatesToService() {
-    RazorpayIntegrationService service = mock(RazorpayIntegrationService.class);
+    CashfreeIntegrationService service = mock(CashfreeIntegrationService.class);
     when(service.retryFailedPayouts()).thenReturn(2);
     new FailedPayoutRetryScheduler(service).retryFailedPayouts();
     verify(service).retryFailedPayouts();

@@ -264,7 +264,7 @@ class PharmacyProfileJdbcCoverageTest {
     when(rs.getString("drug_licence_number")).thenReturn(null);
     when(rs.getString("fssai_number")).thenReturn(null);
     when(rs.getBoolean("is_gst_registered")).thenReturn(false);
-    when(rs.getBoolean("e_invoicing_enabled")).thenReturn(false);
+    // e_invoicing_enabled dropped
     when(rs.getBoolean("tds_applicable")).thenReturn(false);
     when(rs.getBoolean("tcs_applicable")).thenReturn(true);
     when(rs.getBoolean("gstin_reverification_pending")).thenReturn(false);

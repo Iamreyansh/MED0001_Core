@@ -14,7 +14,7 @@
 
 ## Overview
 
-This story governs the weekly settlement of funds owed to pharmacies for orders fulfilled on the Namma MedMate platform. Every Monday, a cron job auto-generates settlement records for each pharmacy covering the previous Mon-Sun cycle. The net payable is computed as `GMV - commission_pct ? TCS (1%)`. Admins can release, hold, or bulk-release settlements via Admin HQ. Release triggers an immediate RazorpayX payout to the pharmacy's verified bank account, followed by an automated email and WhatsApp notification with the settlement details. Pharmacies can view their own settlement history in the Pharmacy Dashboard.
+This story governs the weekly settlement of funds owed to pharmacies for orders fulfilled on the Namma MedMate platform. Every Monday, a cron job auto-generates settlement records for each pharmacy covering the previous Mon-Sun cycle. The net payable is computed as `GMV - commission_pct ? TCS (1%)`. Admins can release, hold, or bulk-release settlements via Admin HQ. Release triggers an immediate Cashfree Payouts transfer to the pharmacy's verified bank account, followed by an automated email and WhatsApp notification with the settlement details. Pharmacies can view their own settlement history in the Pharmacy Dashboard.
 
 ---
 
@@ -38,7 +38,7 @@ This story governs the weekly settlement of funds owed to pharmacies for orders 
 | BR-003 | Only orders in `DELIVERED` status with `payment_status = CAPTURED` or `COLLECTED_COD` are included in the GMV for a settlement cycle. |
 | BR-004 | Only pharmacies with `status = ACTIVE` and a **verified bank account** on file receive settlements. |
 | BR-005 | A settlement below **Rs 100** is not released; the amount is carried forward and added to the next cycle's settlement. |
-| BR-006 | Releasing a settlement triggers a **RazorpayX payout** to the pharmacy's bank account; the payout receipt is auto-emailed and sent via WhatsApp to the pharmacy owner. |
+| BR-006 | Releasing a settlement triggers a **Cashfree Payouts transfer** to the pharmacy's bank account; the payout receipt is auto-emailed and sent via WhatsApp to the pharmacy owner. |
 | BR-007 | A `HELD` settlement requires an admin_finance decision to release or carry forward; hold reason is recorded. |
 | BR-008 | **Bulk release** applies only to settlements with `status = PENDING` and `net_payable ? Rs 50,000`; larger settlements require individual review and release. |
 | BR-009 | TCS deduction is tracked per pharmacy per month in `TCSRegister` for GSTR-8 filing. |
@@ -148,7 +148,7 @@ This story governs the weekly settlement of funds owed to pharmacies for orders 
 ### POST /api/v1/admin/finance/settlements/:settlement_id/release
 
 **Auth:** `Bearer JWT` (admin_finance, admin_super)  
-**Description:** Release a pharmacy settlement. Triggers RazorpayX payout.
+**Description:** Release a pharmacy settlement. Triggers Cashfree Payouts transfer.
 
 **Request Body:**
 ```json
@@ -166,7 +166,7 @@ This story governs the weekly settlement of funds owed to pharmacies for orders 
     "pharmacy_id": "pharmacy_uuid",
     "net_payable": 47320.00,
     "status": "RELEASED",
-    "razorpay_payout_id": "pout_XXXXXXXXXXXX",
+    "cashfree_transfer_id": "pout_XXXXXXXXXXXX",
     "released_by": "admin_uuid",
     "released_at": "2026-07-24T10:00:00Z",
     "notification_sent": true
@@ -183,7 +183,7 @@ This story governs the weekly settlement of funds owed to pharmacies for orders 
 | `SETTLEMENT_HELD` | 422 | Settlement is on HOLD; unhold before releasing |
 | `PHARMACY_NO_BANK_ACCOUNT` | 422 | Pharmacy has no verified bank account |
 | `AMOUNT_BELOW_THRESHOLD` | 422 | net_payable < Rs 100; will be carried forward |
-| `RAZORPAY_PAYOUT_FAILED` | 502 | RazorpayX API error |
+| `CASHFREE_PAYOUT_FAILED` | 502 | Cashfree Payouts API error |
 
 ---
 
@@ -320,7 +320,7 @@ This story governs the weekly settlement of funds owed to pharmacies for orders 
 | `hold_reason` | TEXT | Yes | Hold reason text |
 | `held_by` | UUID | Yes | FK ? AdminUser |
 | `held_at` | TIMESTAMPTZ | Yes | Hold timestamp |
-| `razorpay_payout_id` | VARCHAR(100) | Yes | RazorpayX payout reference |
+| `cashfree_transfer_id` | VARCHAR(100) | Yes | Cashfree Payouts transfer reference |
 | `released_by` | UUID | Yes | FK ? AdminUser |
 | `released_at` | TIMESTAMPTZ | Yes | Release timestamp |
 | `notes` | TEXT | Yes | Admin release/hold notes |
@@ -351,7 +351,7 @@ This story governs the weekly settlement of funds owed to pharmacies for orders 
 | AC-002 | `net_payable` is correctly computed: GMV Rs 52,000, commission 8%, TCS 1% ? commission Rs 4,160, TCS Rs 520, net Rs 47,320. |
 | AC-003 | Releasing a settlement with `net_payable < Rs 100` returns HTTP 422 `AMOUNT_BELOW_THRESHOLD` and carries the amount to the next cycle. |
 | AC-004 | Releasing a HELD settlement returns HTTP 422 `SETTLEMENT_HELD`; admin must call the unhold endpoint first. |
-| AC-005 | Releasing a settlement triggers a RazorpayX payout; the pharmacy owner receives an email and WhatsApp notification with the settlement breakdown. |
+| AC-005 | Releasing a settlement triggers a Cashfree Payouts transfer; the pharmacy owner receives an email and WhatsApp notification with the settlement breakdown. |
 | AC-006 | Bulk release skips settlements > Rs 50,000 and those with HELD status; it returns a summary with released count and failed reasons. |
 | AC-007 | `GET /pharmacy/finance/settlements/:id` returns only settlements belonging to the authenticated pharmacy_owner; requesting another pharmacy's settlement returns HTTP 403. |
 | AC-008 | Each settlement release creates a `FinancialLedger` entry with type `PAYOUT_PHARMACY`. |
@@ -363,7 +363,7 @@ This story governs the weekly settlement of funds owed to pharmacies for orders 
 | Dependency | Type | Notes |
 |---|---|---|
 | Order Management (EPIC-010) | Internal | Delivered orders feed GMV calculation |
-| RazorpayX | External | Pharmacy bank account payout |
+| Cashfree Payouts | External | Pharmacy bank account payout |
 | Tax Module (EPIC-012/STORY-007) | Internal | TCS register updated on each settlement generation |
 | Financial Ledger (EPIC-012/STORY-008) | Internal | Ledger entry on payout release |
 | Notification Service (EPIC-013) | Internal | Email + WhatsApp to pharmacy on settlement release |

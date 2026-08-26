@@ -26,17 +26,6 @@ class DomainHelpersTest {
     assertThat(PayoutModes.UPI).isEqualTo("UPI");
     assertThat(MapsApiTypes.GEOCODE).isEqualTo("GEOCODE");
     assertThat(MapsApiTypes.ZONE_CHECK).isEqualTo("ZONE_CHECK");
-    assertThat(EinvoiceStatuses.ACTIVE).isEqualTo("ACTIVE");
-    assertThat(EinvoiceStatuses.CANCELLED).isEqualTo("CANCELLED");
-    assertThat(EinvoiceApiTypes.GENERATE_IRN).isEqualTo("GENERATE_IRN");
-    assertThat(EinvoiceApiTypes.TOKEN_REFRESH).isEqualTo("TOKEN_REFRESH");
-  }
-
-  @Test
-  void financialYearsIndianFy() {
-    assertThat(FinancialYears.of(java.time.LocalDate.of(2026, 7, 24))).isEqualTo("2026-27");
-    assertThat(FinancialYears.of(java.time.LocalDate.of(2026, 3, 31))).isEqualTo("2025-26");
-    assertThat(FinancialYears.of(java.time.LocalDate.of(2026, 4, 1))).isEqualTo("2026-27");
   }
 
   @Test

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,7 +59,6 @@ class PharmacyProfileGapsCoverageTest {
   private FakeProfileOtps otps;
   private InMemoryOutboxStore outbox;
   private RateLimiter rateLimiter;
-  private AutoKycService autoKyc;
   private PharmacyProfileService service;
   private AdminPharmacyProfileService adminService;
 
@@ -73,7 +71,6 @@ class PharmacyProfileGapsCoverageTest {
     outbox = new InMemoryOutboxStore();
     rateLimiter = mock(RateLimiter.class);
     when(rateLimiter.tryAcquire(any(), any(Integer.class), any(Integer.class))).thenReturn(true);
-    autoKyc = mock(AutoKycService.class);
     service = buildService(null);
     adminService =
         new AdminPharmacyProfileService(
@@ -93,7 +90,6 @@ class PharmacyProfileGapsCoverageTest {
         new AesGcmCipher(AES_KEY, new SecureRandom(new byte[] {3})),
         new OutboxPublisher(outbox, new ObjectMapper()),
         rateLimiter,
-        autoKyc,
         new BCryptPasswordEncoder(),
         otpGen,
         new SecureRandom(new byte[] {4}),
@@ -124,7 +120,6 @@ class PharmacyProfileGapsCoverageTest {
   void patchTaxGstinReverifyAndSameGstin() {
     Map<String, Object> changed = service.patchTax(owner(), Map.of("gstin", "29AABPP1235F1ZY"));
     assertThat(changed.get("re_verification_triggered")).isEqualTo(true);
-    verify(autoKyc).triggerGstinReverification(PID);
 
     Map<String, Object> same = service.patchTax(owner(), Map.of("gstin", profiles.get().gstin()));
     assertThat(same.get("re_verification_triggered")).isEqualTo(false);
@@ -409,7 +404,6 @@ class PharmacyProfileGapsCoverageTest {
             new AesGcmCipher(AES_KEY, new SecureRandom(new byte[] {5})),
             new OutboxPublisher(outbox, new ObjectMapper()),
             rateLimiter,
-            autoKyc,
             new BCryptPasswordEncoder(),
             Clock.fixed(NOW, ZoneOffset.UTC));
     assertThat(autowired.getProfile(owner())).isNotEmpty();
@@ -437,7 +431,6 @@ class PharmacyProfileGapsCoverageTest {
             new AesGcmCipher(AES_KEY, new SecureRandom(new byte[] {5})),
             new OutboxPublisher(outbox, new ObjectMapper()),
             rateLimiter,
-            autoKyc,
             new BCryptPasswordEncoder(),
             Clock.fixed(NOW, ZoneOffset.UTC),
             notifier);
@@ -455,7 +448,6 @@ class PharmacyProfileGapsCoverageTest {
             new AesGcmCipher(AES_KEY, new SecureRandom(new byte[] {5})),
             new OutboxPublisher(outbox, new ObjectMapper()),
             rateLimiter,
-            autoKyc,
             new BCryptPasswordEncoder(),
             () -> MagicProfileOtp.CODE,
             new SecureRandom(new byte[] {6}),

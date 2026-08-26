@@ -33,8 +33,8 @@ script:post-response {
   const body = res.getBody();
   if (body && body.success && body.data && body.data.refund_id) {
     bru.setEnvVar("financeRefundId", body.data.refund_id);
-    if (body.data.razorpay_refund_id) {
-      bru.setEnvVar("razorpayRefundId", body.data.razorpay_refund_id);
+    if (body.data.gateway_refund_id) {
+      bru.setEnvVar("gatewayRefundId", body.data.gateway_refund_id);
     }
   }
 }
@@ -54,7 +54,7 @@ tests {
 
 docs {
   POST /api/v1/admin/finance/refunds/:refund_id/process — admin_finance processes PENDING refund.
-  Errors: REFUND_NOT_FOUND 404, REFUND_ALREADY_PROCESSED 409, RAZORPAY_REFUND_FAILED 502.
+  Errors: REFUND_NOT_FOUND 404, REFUND_ALREADY_PROCESSED 409, CASHFREE_REFUND_FAILED 502.
 }
 
 example {
@@ -85,7 +85,7 @@ example {
             "refund_amount": 450.00,
             "refund_to": "SOURCE_ACCOUNT",
             "status": "PROCESSING",
-            "razorpay_refund_id": "rfnd_XXXXXXXXXXXX",
+            "gateway_refund_id": "rfnd_XXXXXXXXXXXX",
             "expected_by": "2026-07-29",
             "processed_by": "a0000001-0000-4000-8000-0000000000a1",
             "processed_at": "2026-07-24T10:30:00Z"

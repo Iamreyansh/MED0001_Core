@@ -30,7 +30,7 @@ public interface RiderPayoutPort {
       long netPayoutPaise,
       String status,
       String holdReason,
-      String razorpayPayoutId,
+      String cashfreeTransferId,
       String payoutReference,
       String releaseNotes,
       UUID releasedBy,
@@ -102,7 +102,7 @@ public interface RiderPayoutPort {
       UUID payoutId,
       UUID releasedBy,
       Instant releasedAt,
-      String razorpayPayoutId,
+      String cashfreeTransferId,
       String notes,
       String idempotencyKey,
       Instant now);

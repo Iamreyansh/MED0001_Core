@@ -2,11 +2,11 @@ package com.nammamedmate.api.config;
 
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutNotificationPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutPort;
 import com.nammamedmate.payment.domain.RiderPayoutStatuses;
-import com.nammamedmate.rider.application.port.out.RazorpayRoutePort;
+import com.nammamedmate.rider.application.port.out.CashfreeRoutePort;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -27,8 +27,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Composition-root bridge: payment finance façades ↔ V042 rider_payouts + riders/zones/earnings.
- * Also re-exports payment RazorpayX as rider {@link RazorpayRoutePort} so legacy admin rider payout
- * endpoints share the live|stub client.
+ * Also re-exports payment CashfreePayout as rider {@link CashfreePayoutPort} so legacy admin rider
+ * payout endpoints share the live|stub client.
  */
 @Configuration
 public class PaymentRiderPayoutBridgeConfig {
@@ -45,12 +45,12 @@ public class PaymentRiderPayoutBridgeConfig {
     return new RiderPayoutNotificationPort() {
       @Override
       public void payoutReleased(
-          UUID riderId, UUID payoutId, long netPaise, String razorpayPayoutId) {
+          UUID riderId, UUID payoutId, long netPaise, String cashfreeTransferId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("rider_id", riderId.toString());
         payload.put("payout_id", payoutId.toString());
         payload.put("net_payout_paise", netPaise);
-        payload.put("razorpay_payout_id", razorpayPayoutId);
+        payload.put("cashfree_transfer_id", cashfreeTransferId);
         payload.put("channel", "SMS");
         payload.put("template", "rider_payout_success");
         outbox.publish(
@@ -70,19 +70,20 @@ public class PaymentRiderPayoutBridgeConfig {
 
   @Bean
   @Primary
-  RazorpayRoutePort riderRazorpayRouteBridge(RazorpayXPayoutPort paymentPayout) {
+  CashfreeRoutePort riderCashfreePayoutBridge(
+      com.nammamedmate.payment.application.port.out.CashfreePayoutPort paymentPayout) {
     return (riderId, netPayoutPaise, payoutId) -> {
       try {
-        RazorpayXPayoutPort.PayoutResult result =
+        CashfreePayoutPort.PayoutResult result =
             paymentPayout.initiatePayout(
-                new RazorpayXPayoutPort.PayoutRequest(
+                new CashfreePayoutPort.PayoutRequest(
                     riderId, payoutId, netPayoutPaise, "0000", "XXXX0000"));
         String ref = "RPX-" + payoutId.toString().substring(0, 8).toUpperCase();
-        return RazorpayRoutePort.PayoutResult.ok(result.razorpayxPayoutId(), ref);
+        return CashfreeRoutePort.PayoutResult.ok(result.cashfreeTransferId(), ref);
       } catch (RuntimeException ex) {
         String msg = ex.getMessage();
-        return RazorpayRoutePort.PayoutResult.fail(
-            msg == null || msg.isBlank() ? "razorpay_route_failed" : msg);
+        return CashfreeRoutePort.PayoutResult.fail(
+            msg == null || msg.isBlank() ? "cashfree_route_failed" : msg);
       }
     };
   }
@@ -402,7 +403,7 @@ public class PaymentRiderPayoutBridgeConfig {
         UUID payoutId,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayPayoutId,
+        String cashfreeTransferId,
         String notes,
         String idempotencyKey,
         Instant now) {
@@ -413,7 +414,7 @@ public class PaymentRiderPayoutBridgeConfig {
                 status = 'RELEASED',
                 released_by = ?,
                 released_at = ?,
-                razorpay_payout_id = ?,
+                cashfree_transfer_id = ?,
                 release_notes = COALESCE(?, release_notes),
                 hold_reason = NULL,
                 next_retry_at = NULL,
@@ -425,7 +426,7 @@ public class PaymentRiderPayoutBridgeConfig {
               """,
               releasedBy,
               Timestamp.from(releasedAt),
-              razorpayPayoutId,
+              cashfreeTransferId,
               notes,
               Timestamp.from(now),
               Timestamp.from(now),
@@ -567,7 +568,7 @@ public class PaymentRiderPayoutBridgeConfig {
           rs.getLong("net_payout_paise"),
           rs.getString("status"),
           rs.getString("hold_reason"),
-          rs.getString("razorpay_payout_id"),
+          rs.getString("cashfree_transfer_id"),
           columnString(rs, "payout_reference"),
           columnString(rs, "release_notes"),
           (UUID) rs.getObject("released_by"),

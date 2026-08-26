@@ -51,9 +51,14 @@ class HandlebarsRendererTest {
   @Test
   void htmlToPlainTextAndExtractHrefs() {
     assertThat(HandlebarsRenderer.htmlToPlainText(null)).isEmpty();
+    assertThat(HandlebarsRenderer.htmlToPlainText("")).isEmpty();
+    assertThat(HandlebarsRenderer.htmlToPlainText("   ")).isEmpty();
     assertThat(HandlebarsRenderer.htmlToPlainText("<p>Hi<br/>there</p>")).contains("Hi");
     assertThat(HandlebarsRenderer.extractHrefs(null)).isEmpty();
     assertThat(HandlebarsRenderer.extractHrefs("<a href=\"https://x\">y</a>"))
         .containsExactly("https://x");
+    assertThat(HandlebarsRenderer.resolve(Map.of("a", 1), " ")).isNull();
+    assertThat(HandlebarsRenderer.render("{{#if nest.x}}Y{{/if}}", Map.of("nest", "notmap")))
+        .isEmpty();
   }
 }

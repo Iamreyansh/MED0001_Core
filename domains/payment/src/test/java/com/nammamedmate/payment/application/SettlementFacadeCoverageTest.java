@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.BankSnapshot;
@@ -19,8 +21,6 @@ import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.Line
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.ListResult;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.SettlementRecord;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort.Totals;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.SettlementNotificationPort;
 import com.nammamedmate.payment.application.port.out.TcsRegisterWriterPort;
 import com.nammamedmate.security.AuthRole;
@@ -47,7 +47,7 @@ class SettlementFacadeCoverageTest {
   private static final Instant NOW = Instant.parse("2026-07-24T10:00:00Z");
 
   @Mock PharmacySettlementPort settlements;
-  @Mock RazorpayXPayoutPort razorpayx;
+  @Mock CashfreePayoutPort cashfree_payouts;
   @Mock FinancialLedgerWriterPort ledger;
   @Mock SettlementNotificationPort notifications;
   @Mock TcsRegisterWriterPort tcsRegister;
@@ -65,7 +65,7 @@ class SettlementFacadeCoverageTest {
     service =
         new SettlementFacadeService(
             settlements,
-            razorpayx,
+            cashfree_payouts,
             ledger,
             notifications,
             tcsRegister,
@@ -186,7 +186,7 @@ class SettlementFacadeCoverageTest {
         .isEqualTo("SETTLEMENT_CONFLICT");
 
     when(settlements.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("p", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("p", 4));
     when(settlements.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(false);
     assertThatThrownBy(() -> service.release(finance, settlementId, null, "k2"))
@@ -194,10 +194,10 @@ class SettlementFacadeCoverageTest {
         .isEqualTo("SETTLEMENT_CONFLICT");
 
     when(settlements.findByIdempotencyKey("k3")).thenReturn(Optional.empty());
-    when(razorpayx.initiatePayout(any())).thenThrow(new RuntimeException("boom"));
+    when(cashfree_payouts.initiatePayout(any())).thenThrow(new RuntimeException("boom"));
     assertThatThrownBy(() -> service.release(finance, settlementId, null, "k3"))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
   }
 
   @Test
@@ -356,7 +356,7 @@ class SettlementFacadeCoverageTest {
   }
 
   @Test
-  void mapsNonRazorpayAndRazorpayErrorCodes() {
+  void mapsNonCashfreeAndCashfreeErrorCodes() {
     SettlementRecord pending =
         new SettlementRecord(
             settlementId,
@@ -387,19 +387,19 @@ class SettlementFacadeCoverageTest {
 
     when(settlements.findByIdempotencyKey("k4")).thenReturn(Optional.empty());
     org.mockito.Mockito.doThrow(new AppException("SETTLEMENT_CONFLICT", "x", 409))
-        .when(razorpayx)
+        .when(cashfree_payouts)
         .initiatePayout(any());
     assertThatThrownBy(() -> service.release(finance, settlementId, null, "k4"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("SETTLEMENT_CONFLICT");
 
     when(settlements.findByIdempotencyKey("k5")).thenReturn(Optional.empty());
-    org.mockito.Mockito.doThrow(new AppException("RAZORPAY_ERROR", "gw", 502))
-        .when(razorpayx)
+    org.mockito.Mockito.doThrow(new AppException("CASHFREE_ERROR", "gw", 502))
+        .when(cashfree_payouts)
         .initiatePayout(any());
     assertThatThrownBy(() -> service.release(finance, settlementId, null, "k5"))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
   }
 
   @Test
@@ -435,7 +435,7 @@ class SettlementFacadeCoverageTest {
 
     when(settlements.findByIdempotencyKey("short")).thenReturn(Optional.empty());
     when(settlements.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("p", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("p", 4));
     when(settlements.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(true);
     when(settlements.findById(settlementId)).thenReturn(Optional.of(row), Optional.of(row));
@@ -524,7 +524,7 @@ class SettlementFacadeCoverageTest {
     when(settlements.findVerifiedBank(pharmacyId))
         .thenReturn(Optional.of(new BankSnapshot("XXXX4521", "B", "IFSC", "VERIFIED")));
     when(settlements.claimForRelease(eq(ok.id()), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("p", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("p", 4));
     when(settlements.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(true);
     Map<String, Object> bulk =
@@ -638,7 +638,7 @@ class SettlementFacadeCoverageTest {
     SettlementFacadeService withTx =
         new SettlementFacadeService(
             settlements,
-            razorpayx,
+            cashfree_payouts,
             ledger,
             notifications,
             tcsRegister,
@@ -697,7 +697,7 @@ class SettlementFacadeCoverageTest {
     when(settlements.findVerifiedBank(pharmacyId))
         .thenReturn(Optional.of(new BankSnapshot("XXXXXXXXXXXX1111", "SBI", "SBIN", "VERIFIED")));
     when(settlements.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout_tx", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout_tx", 4));
     when(settlements.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(true);
 
@@ -714,7 +714,7 @@ class SettlementFacadeCoverageTest {
     SettlementFacadeService withOps =
         new SettlementFacadeService(
             settlements,
-            razorpayx,
+            cashfree_payouts,
             ledger,
             notifications,
             tcsRegister,
@@ -752,11 +752,11 @@ class SettlementFacadeCoverageTest {
     when(settlements.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(true);
     when(ops.find(eq("PAYOUT"), anyString())).thenReturn(Optional.empty());
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout_new", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout_new", 4));
 
     assertThat(withOps.release(finance, settlementId, "n", "ops-new").get("status"))
         .isEqualTo("PENDING");
-    verify(ops).ensurePending(eq("PAYOUT"), anyString(), eq("razorpayx"));
+    verify(ops).ensurePending(eq("PAYOUT"), anyString(), eq("cashfree_payouts"));
     verify(ops).markSent(eq("PAYOUT"), anyString(), eq("pout_new"));
     verify(ops).markSucceeded(eq("PAYOUT"), anyString(), eq("pout_new"));
 
@@ -769,10 +769,10 @@ class SettlementFacadeCoverageTest {
         .isEqualTo("PENDING");
 
     when(ops.find(eq("PAYOUT"), anyString())).thenReturn(Optional.empty());
-    when(razorpayx.initiatePayout(any())).thenThrow(new RuntimeException("gw down"));
+    when(cashfree_payouts.initiatePayout(any())).thenThrow(new RuntimeException("gw down"));
     assertThatThrownBy(() -> withOps.release(finance, settlementId, "n", "ops-fail"))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
     verify(ops)
         .markAmbiguous(
             eq("PAYOUT"), anyString(), org.mockito.ArgumentMatchers.isNull(), anyString());

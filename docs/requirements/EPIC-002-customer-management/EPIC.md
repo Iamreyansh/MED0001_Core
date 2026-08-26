@@ -16,7 +16,7 @@ EPIC-002 covers the complete lifecycle of a customer on the Namma MedMate platfo
 1. Enable customers to manage a complete, reusable profile (name, avatar, DOB, language preference) with minimal friction.
 2. Provide a flexible, multi-address book with lat/lng for precise delivery zone matching.
 3. Operate a closed-loop Namma Money wallet for refunds, goodwill credits, and promotional disbursements.
-4. Tokenise and securely store up to 5 UPI IDs and 5 cards per customer via Razorpay, with zero raw card data on-platform.
+4. Tokenise and securely store up to 5 UPI IDs and 5 cards per customer via Cashfree, with zero raw card data on-platform.
 5. Drive retention through a tiered loyalty programme and a referral system that rewards both parties after a qualifying delivery.
 
 ## Scope
@@ -26,7 +26,7 @@ EPIC-002 covers the complete lifecycle of a customer on the Namma MedMate platfo
 - Customer segmentation (NEW / REGULAR / LOYAL / VIP) and flagging by admin
 - Saved delivery addresses with geocoding support (max 10 per customer)
 - Namma Money wallet - balance, transactions, admin credit
-- Saved payment methods - UPI ID validation + card tokenisation via Razorpay
+- Saved payment methods - UPI ID validation + card tokenisation via Cashfree
 - Loyalty tier tracking and point history
 - Referral code generation, application, and reward disbursement
 
@@ -58,4 +58,4 @@ EPIC-002 covers the complete lifecycle of a customer on the Namma MedMate platfo
 
 - EPIC-001 - Authentication & Identity (customer must be authenticated for all profile APIs)
 - EPIC-003 - Order Management (wallet debit, loyalty point award happen at order completion)
-- EPIC-008 - Payment Gateway (Razorpay UPI VPA validation and card tokenisation)
+- EPIC-008 - Payment Gateway (Cashfree UPI VPA validation and card tokenisation)

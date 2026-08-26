@@ -47,9 +47,9 @@ class JdbcOrderStoreCoverageTest {
     assertThat(store.findById(id)).isEmpty();
     assertThat(store.findByCustomerAndId(id, id)).isEmpty();
     assertThat(store.findByPlacementIdempotencyKey("x")).isEmpty();
-    assertThat(store.findByRazorpayOrderId("x")).isEmpty();
+    assertThat(store.findByGatewayOrderId("x")).isEmpty();
     assertThat(store.findByPlacementIdempotencyKey("")).isEmpty();
-    assertThat(store.findByRazorpayOrderId("  ")).isEmpty();
+    assertThat(store.findByGatewayOrderId("  ")).isEmpty();
 
     when(jdbc.query(anyString(), any(ResultSetExtractor.class), any(UUID.class)))
         .thenAnswer(
@@ -110,8 +110,8 @@ class JdbcOrderStoreCoverageTest {
               when(rs.getLong("total_payable_paise")).thenReturn(0L);
               when(rs.getString("payment_method")).thenReturn("COD");
               when(rs.getString("payment_status")).thenReturn("PAID");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
               when(rs.getObject("prescription_id")).thenReturn(null);
               when(rs.getObject("delivery_address_id")).thenReturn(id);
               when(rs.getString("delivery_instructions")).thenReturn(null);
@@ -152,8 +152,8 @@ class JdbcOrderStoreCoverageTest {
               when(rs.getLong("total_payable_paise")).thenReturn(20L);
               when(rs.getString("payment_method")).thenReturn("UPI");
               when(rs.getString("payment_status")).thenReturn("PAID");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
               when(rs.getObject("prescription_id")).thenReturn(null);
               when(rs.getObject("delivery_address_id")).thenReturn(id);
               when(rs.getString("delivery_instructions")).thenReturn(null);
@@ -191,8 +191,8 @@ class JdbcOrderStoreCoverageTest {
               when(rs.getLong("total_payable_paise")).thenReturn(0L);
               when(rs.getString("payment_method")).thenReturn("COD");
               when(rs.getString("payment_status")).thenReturn("PAID");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
               when(rs.getObject("prescription_id")).thenReturn(null);
               when(rs.getObject("delivery_address_id")).thenReturn(id);
               when(rs.getString("delivery_instructions")).thenReturn(null);

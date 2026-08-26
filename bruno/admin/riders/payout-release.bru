@@ -44,8 +44,8 @@ script:post-response {
   const body = res.getBody();
   if (body && body.success && body.data) {
     bru.setEnvVar("lastPayoutStatus", String(body.data.payout_status));
-    if (body.data.razorpay_payout_id) {
-      bru.setEnvVar("razorpayPayoutId", body.data.razorpay_payout_id);
+    if (body.data.cashfree_transfer_id) {
+      bru.setEnvVar("cashfreeTransferId", body.data.cashfree_transfer_id);
     }
   }
 }
@@ -68,7 +68,7 @@ tests {
 }
 
 docs {
-  POST /api/v1/admin/riders/:id/payout/release — RazorpayX stub disbursement.
+  POST /api/v1/admin/riders/:id/payout/release — CashfreePayout stub disbursement.
   Requires Idempotency-Key header.
 }
 
@@ -101,7 +101,7 @@ example {
             "rider_id": "a0000001-0000-4000-8000-0000000000r1",
             "net_payout": 1500.00,
             "payout_status": "RELEASED",
-            "razorpay_payout_id": "pout_uuid",
+            "cashfree_transfer_id": "pout_uuid",
             "released_by": "d0000001-0000-4000-8000-0000000000a1",
             "released_at": "2026-07-24T16:00:00Z"
           },

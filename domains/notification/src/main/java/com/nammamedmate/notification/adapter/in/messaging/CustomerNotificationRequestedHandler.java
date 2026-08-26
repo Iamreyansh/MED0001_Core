@@ -2,11 +2,9 @@ package com.nammamedmate.notification.adapter.in.messaging;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nammamedmate.notification.application.EmailSendService;
 import com.nammamedmate.notification.application.InAppNotificationService;
 import com.nammamedmate.notification.application.PushSendService;
 import com.nammamedmate.notification.application.SmsSendService;
-import com.nammamedmate.notification.application.WhatsAppSendService;
 import com.nammamedmate.notification.application.port.out.RecipientIdentityPort;
 import com.nammamedmate.notification.domain.InAppNotification;
 import com.nammamedmate.notification.domain.InAppNotificationType;
@@ -35,13 +33,11 @@ public class CustomerNotificationRequestedHandler {
   private final ObjectMapper objectMapper;
   private final PushSendService push;
   private final SmsSendService sms;
-  private final WhatsAppSendService whatsapp;
-  private final EmailSendService email;
   private final RecipientIdentityPort identities;
 
   public CustomerNotificationRequestedHandler(
       InAppNotificationService notifications, ObjectMapper objectMapper) {
-    this(notifications, objectMapper, null, null, null, null, null);
+    this(notifications, objectMapper, null, null, null);
   }
 
   @Autowired
@@ -50,15 +46,11 @@ public class CustomerNotificationRequestedHandler {
       ObjectMapper objectMapper,
       PushSendService push,
       SmsSendService sms,
-      WhatsAppSendService whatsapp,
-      EmailSendService email,
       RecipientIdentityPort identities) {
     this.notifications = notifications;
     this.objectMapper = objectMapper;
     this.push = push;
     this.sms = sms;
-    this.whatsapp = whatsapp;
-    this.email = email;
     this.identities = identities;
   }
 
@@ -114,12 +106,8 @@ public class CustomerNotificationRequestedHandler {
         dispatchSms(payload);
         yield null;
       }
-      case "WHATSAPP" -> {
-        dispatchWhatsApp(payload);
-        yield null;
-      }
-      case "EMAIL" -> {
-        dispatchEmail(payload);
+      case "WHATSAPP", "EMAIL" -> {
+        log.info("Skipping removed channel={}", channel);
         yield null;
       }
       default -> {
@@ -189,45 +177,6 @@ public class CustomerNotificationRequestedHandler {
             template,
             stringVars(payload.get("variables")),
             stringVal(payload.get("priority"))));
-  }
-
-  private void dispatchWhatsApp(Map<String, Object> payload) {
-    if (whatsapp == null) {
-      throw new IllegalStateException("No consumer for WHATSAPP");
-    }
-    String phone = resolvePhone(payload);
-    String template = first(payload, "template", "template_name");
-    if (phone == null || template == null) {
-      log.warn("WhatsApp skipped — missing phone or template");
-      return;
-    }
-    String language = stringVal(payload.get("template_language"));
-    whatsapp.send(
-        new WhatsAppSendService.SendCommand(
-            phone, template, language, components(payload.get("components"))));
-  }
-
-  private void dispatchEmail(Map<String, Object> payload) {
-    if (email == null) {
-      throw new IllegalStateException("No consumer for EMAIL");
-    }
-    String to = first(payload, "email", "to_email");
-    String template = first(payload, "template", "template_id");
-    if (to == null || template == null) {
-      log.warn("Email skipped — missing email or template");
-      return;
-    }
-    @SuppressWarnings("unchecked")
-    Map<String, Object> vars =
-        payload.get("variables") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-    email.send(
-        new EmailSendService.SendCommand(
-            to,
-            stringVal(payload.get("to_name")),
-            template,
-            vars,
-            List.of(),
-            parseUuid(payload.get("customer_id"))));
   }
 
   private String resolvePhone(Map<String, Object> payload) {
@@ -347,20 +296,6 @@ public class CustomerNotificationRequestedHandler {
         ids.add(id);
       }
     }
-  }
-
-  @SuppressWarnings("unchecked")
-  private static List<Map<String, Object>> components(Object raw) {
-    if (!(raw instanceof List<?> list)) {
-      return List.of();
-    }
-    List<Map<String, Object>> out = new ArrayList<>();
-    for (Object item : list) {
-      if (item instanceof Map<?, ?> m) {
-        out.add(new LinkedHashMap<>((Map<String, Object>) m));
-      }
-    }
-    return out;
   }
 
   private static Map<String, String> stringVars(Object raw) {

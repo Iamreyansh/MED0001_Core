@@ -39,7 +39,7 @@ public class JdbcPaymentStore implements PaymentStore {
         """
         INSERT INTO payment (
           id, order_id, customer_id, amount_paise, wallet_portion_paise, gateway_portion_paise,
-          currency, method, status, razorpay_order_id, razorpay_payment_id, razorpay_signature,
+          currency, method, status, gateway_order_id, gateway_payment_id, gateway_signature,
           gateway_fee_paise, gateway_response, webhook_events, captured_at, failed_at,
           failure_reason, idempotency_key, created_at, updated_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?,?,?,?,?,?)
@@ -53,9 +53,9 @@ public class JdbcPaymentStore implements PaymentStore {
         payment.currency(),
         payment.method().name(),
         payment.status().name(),
-        payment.razorpayOrderId(),
-        payment.razorpayPaymentId(),
-        payment.razorpaySignature(),
+        payment.gatewayOrderId(),
+        payment.gatewayPaymentId(),
+        payment.gatewaySignature(),
         payment.gatewayFeePaise(),
         payment.gatewayResponseJson(),
         writeEvents(payment.webhookEvents()),
@@ -74,8 +74,8 @@ public class JdbcPaymentStore implements PaymentStore {
         """
         UPDATE payment SET
           amount_paise = ?, wallet_portion_paise = ?, gateway_portion_paise = ?,
-          currency = ?, method = ?, status = ?, razorpay_order_id = ?, razorpay_payment_id = ?,
-          razorpay_signature = ?, gateway_fee_paise = ?, gateway_response = ?::jsonb,
+          currency = ?, method = ?, status = ?, gateway_order_id = ?, gateway_payment_id = ?,
+          gateway_signature = ?, gateway_fee_paise = ?, gateway_response = ?::jsonb,
           webhook_events = ?::jsonb, captured_at = ?, failed_at = ?, failure_reason = ?,
           idempotency_key = ?, updated_at = ?
         WHERE id = ?
@@ -86,9 +86,9 @@ public class JdbcPaymentStore implements PaymentStore {
         payment.currency(),
         payment.method().name(),
         payment.status().name(),
-        payment.razorpayOrderId(),
-        payment.razorpayPaymentId(),
-        payment.razorpaySignature(),
+        payment.gatewayOrderId(),
+        payment.gatewayPaymentId(),
+        payment.gatewaySignature(),
         payment.gatewayFeePaise(),
         payment.gatewayResponseJson(),
         writeEvents(payment.webhookEvents()),
@@ -114,9 +114,9 @@ public class JdbcPaymentStore implements PaymentStore {
   }
 
   @Override
-  public Optional<Payment> findByRazorpayOrderId(String razorpayOrderId) {
+  public Optional<Payment> findByGatewayOrderId(String gatewayOrderId) {
     List<Payment> rows =
-        jdbc.query("SELECT * FROM payment WHERE razorpay_order_id = ?", mapper, razorpayOrderId);
+        jdbc.query("SELECT * FROM payment WHERE gateway_order_id = ?", mapper, gatewayOrderId);
     return rows.stream().findFirst();
   }
 
@@ -132,10 +132,9 @@ public class JdbcPaymentStore implements PaymentStore {
   }
 
   @Override
-  public Optional<Payment> findByRazorpayPaymentId(String razorpayPaymentId) {
+  public Optional<Payment> findByGatewayPaymentId(String gatewayPaymentId) {
     List<Payment> rows =
-        jdbc.query(
-            "SELECT * FROM payment WHERE razorpay_payment_id = ?", mapper, razorpayPaymentId);
+        jdbc.query("SELECT * FROM payment WHERE gateway_payment_id = ?", mapper, gatewayPaymentId);
     return rows.stream().findFirst();
   }
 
@@ -150,9 +149,9 @@ public class JdbcPaymentStore implements PaymentStore {
         rs.getString("currency"),
         PaymentMethod.valueOf(rs.getString("method")),
         PaymentStatus.valueOf(rs.getString("status")),
-        rs.getString("razorpay_order_id"),
-        rs.getString("razorpay_payment_id"),
-        rs.getString("razorpay_signature"),
+        rs.getString("gateway_order_id"),
+        rs.getString("gateway_payment_id"),
+        rs.getString("gateway_signature"),
         (Long) rs.getObject("gateway_fee_paise"),
         readJsonText(rs.getObject("gateway_response")),
         readEvents(rs.getObject("webhook_events")),

@@ -13,23 +13,24 @@ import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.pharmacy.adapter.out.messaging.StubNotificationDispatchClient;
-import com.nammamedmate.pharmacy.adapter.out.payout.StubRazorpayXPayoutClient;
+import com.nammamedmate.pharmacy.adapter.out.payout.StubCashfreePayoutClient;
 import com.nammamedmate.pharmacy.application.port.out.AdminPharmacyStore;
 import com.nammamedmate.pharmacy.application.port.out.AdminPharmacyStore.AdminDetailRow;
 import com.nammamedmate.pharmacy.application.port.out.AuditLogStore;
 import com.nammamedmate.pharmacy.application.port.out.AuditLogStore.AuditLogRecord;
+import com.nammamedmate.pharmacy.application.port.out.CashfreePayoutPort;
 import com.nammamedmate.pharmacy.application.port.out.CommissionHistoryStore;
 import com.nammamedmate.pharmacy.application.port.out.CommissionHistoryStore.CommissionHistoryRow;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyOrderMetricsPort;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyProfileStore;
 import com.nammamedmate.pharmacy.application.port.out.PharmacyProfileStore.BankAccountRecord;
-import com.nammamedmate.pharmacy.application.port.out.RazorpayXPayoutPort;
 import com.nammamedmate.pharmacy.application.port.out.SettlementStore;
 import com.nammamedmate.pharmacy.application.port.out.SettlementStore.ListFilter;
 import com.nammamedmate.pharmacy.application.port.out.SettlementStore.ListResult;
 import com.nammamedmate.pharmacy.application.port.out.SettlementStore.SettlementRow;
 import com.nammamedmate.pharmacy.domain.SettlementCalculator;
 import com.nammamedmate.pharmacy.domain.SettlementPeriod;
+import com.nammamedmate.pharmacy.domain.WebhookHmac;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
 import com.nammamedmate.security.TokenScope;
@@ -57,7 +58,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
   private static final UUID PID = UUID.fromString("11111111-1111-4111-8111-111111111111");
   private static final UUID FINANCE = UUID.fromString("22222222-2222-4222-8222-222222222222");
   private static final UUID SETTLEMENT_ID = UUID.fromString("33333333-3333-4333-8333-333333333333");
-  private static final String WEBHOOK_SECRET = "test-razorpayx-webhook-secret";
+  private static final String WEBHOOK_SECRET = "test-cashfree_payouts-webhook-secret";
 
   private FakePharmacyStore pharmacies;
   private FakeCommissionHistory commissionHistory;
@@ -88,7 +89,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
     ObjectMapper mapper = new ObjectMapper();
     OutboxPublisher publisher = new OutboxPublisher(outboxStore, mapper);
     StubNotificationDispatchClient notifications = new StubNotificationDispatchClient(publisher);
-    RazorpayXPayoutPort razorpayx = new StubRazorpayXPayoutClient();
+    CashfreePayoutPort cashfree_payouts = new StubCashfreePayoutClient();
 
     commissionService =
         new AdminPharmacyCommissionService(
@@ -106,7 +107,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
             pharmacies,
             settlements,
             profiles,
-            razorpayx,
+            cashfree_payouts,
             notifications,
             rateLimiter,
             clock,
@@ -271,7 +272,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
           }
         }
         """
-            .formatted(settlements.byId.get(SETTLEMENT_ID).razorpayxPayoutId(), SETTLEMENT_ID);
+            .formatted(settlements.byId.get(SETTLEMENT_ID).cashfreeTransferId(), SETTLEMENT_ID);
 
     Map<String, Object> paid = signedWebhook(webhook);
     assertThat(paid.get("status")).isEqualTo("PAID");
@@ -282,12 +283,12 @@ class AdminPharmacyCommissionSettlementServiceTest {
         """
         {"event":"payout.updated","payload":{"payout":{"entity":{"id":"%s","status":"processed","reference_id":"%s"}}}}
         """
-            .formatted(settlements.byId.get(SETTLEMENT_ID).razorpayxPayoutId(), SETTLEMENT_ID);
+            .formatted(settlements.byId.get(SETTLEMENT_ID).cashfreeTransferId(), SETTLEMENT_ID);
     assertThat(signedWebhook(updatedEvent)).containsEntry("status", "PAID");
 
     String payoutIdOnly =
         "{\"event\":\"payout.processed\",\"payload\":{\"payout\":{\"entity\":{\"id\":\""
-            + settlements.byId.get(SETTLEMENT_ID).razorpayxPayoutId()
+            + settlements.byId.get(SETTLEMENT_ID).cashfreeTransferId()
             + "\",\"status\":\"processed\"}}}}";
     assertThat(signedWebhook(payoutIdOnly)).containsEntry("status", "PAID");
   }
@@ -1026,7 +1027,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
   void webhook_processedWithoutUtr_setsEmptyUtr() {
     settlements.byId.put(SETTLEMENT_ID, pendingSettlement("PENDING_RELEASE"));
     settlementService.release(finance(), PID, SETTLEMENT_ID, null, "idem-no-utr");
-    String payoutId = settlements.byId.get(SETTLEMENT_ID).razorpayxPayoutId();
+    String payoutId = settlements.byId.get(SETTLEMENT_ID).cashfreeTransferId();
     String webhook =
         """
         {"event":"payout.processed","payload":{"payout":{"entity":{"id":"%s","status":"processed","reference_id":"%s"}}}}
@@ -1194,7 +1195,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
         AdminPharmacySettlementService.LOCAL_WEBHOOK_SECRET, false);
     AdminPharmacySettlementService.validateWebhookSecretForDeployedProfile("", false);
     AdminPharmacySettlementService.validateWebhookSecretForDeployedProfile(
-        "prod-razorpayx-hmac-secret", true);
+        "prod-cashfree_payouts-hmac-secret", true);
     assertThatThrownBy(
             () -> AdminPharmacySettlementService.validateWebhookSecretForDeployedProfile("", true))
         .isInstanceOf(IllegalStateException.class);
@@ -1291,7 +1292,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
             pharmacies,
             settlements,
             profiles,
-            new StubRazorpayXPayoutClient(),
+            new StubCashfreePayoutClient(),
             new StubNotificationDispatchClient(
                 new OutboxPublisher(outboxStore, new ObjectMapper())),
             rateLimiter,
@@ -1368,7 +1369,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
             pharmacies,
             guarded,
             profiles,
-            new StubRazorpayXPayoutClient(),
+            new StubCashfreePayoutClient(),
             new StubNotificationDispatchClient(
                 new OutboxPublisher(outboxStore, new ObjectMapper())),
             rateLimiter,
@@ -1381,7 +1382,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("SETTLEMENT_CONFLICT");
 
-    RazorpayXPayoutPort failingPayout =
+    CashfreePayoutPort failingPayout =
         request -> {
           throw new IllegalStateException("payout down");
         };
@@ -1526,7 +1527,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
             pharmacies,
             replayStore,
             profiles,
-            new StubRazorpayXPayoutClient(),
+            new StubCashfreePayoutClient(),
             new StubNotificationDispatchClient(
                 new OutboxPublisher(outboxStore, new ObjectMapper())),
             rateLimiter,
@@ -1568,7 +1569,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
             pharmacies,
             failedReplayStore,
             profiles,
-            new StubRazorpayXPayoutClient(),
+            new StubCashfreePayoutClient(),
             new StubNotificationDispatchClient(
                 new OutboxPublisher(outboxStore, new ObjectMapper())),
             rateLimiter,
@@ -1586,7 +1587,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
             pharmacies,
             vanishing,
             profiles,
-            new StubRazorpayXPayoutClient(),
+            new StubCashfreePayoutClient(),
             new StubNotificationDispatchClient(
                 new OutboxPublisher(outboxStore, new ObjectMapper())),
             rateLimiter,
@@ -1619,7 +1620,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
   }
 
   private String signWebhook(String body) {
-    return AutoKycService.hmacSha256Hex(WEBHOOK_SECRET, body.getBytes(StandardCharsets.UTF_8));
+    return WebhookHmac.hmacSha256Hex(WEBHOOK_SECRET, body.getBytes(StandardCharsets.UTF_8));
   }
 
   private SettlementRow pendingSettlement(String status) {
@@ -1858,9 +1859,9 @@ class AdminPharmacyCommissionSettlementServiceTest {
     }
 
     @Override
-    public Optional<SettlementRow> findByRazorpayxPayoutId(String razorpayxPayoutId) {
+    public Optional<SettlementRow> findByCashfreexPayoutId(String cashfreeTransferId) {
       return byId.values().stream()
-          .filter(r -> razorpayxPayoutId.equals(r.razorpayxPayoutId()))
+          .filter(r -> cashfreeTransferId.equals(r.cashfreeTransferId()))
           .findFirst();
     }
 
@@ -1908,7 +1909,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
               old.releasedBy(),
               old.releasedAt(),
               old.paidAt(),
-              old.razorpayxPayoutId(),
+              old.cashfreeTransferId(),
               old.utrNumber(),
               old.receiptUrl(),
               idempotencyKey,
@@ -1924,7 +1925,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
         UUID settlementId,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String idempotencyKey,
         Instant updatedAt) {
       SettlementRow old = byId.get(settlementId);
@@ -1950,7 +1951,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
               releasedBy,
               releasedAt,
               old.paidAt(),
-              razorpayxPayoutId,
+              cashfreeTransferId,
               old.utrNumber(),
               old.receiptUrl(),
               idempotencyKey,
@@ -1984,7 +1985,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
               old.releasedBy(),
               old.releasedAt(),
               old.paidAt(),
-              old.razorpayxPayoutId(),
+              old.cashfreeTransferId(),
               old.utrNumber(),
               old.receiptUrl(),
               idempotencyKey,
@@ -2001,7 +2002,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
         String status,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String idempotencyKey,
         Instant updatedAt) {
       SettlementRow old = byId.get(settlementId);
@@ -2022,7 +2023,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
               releasedBy,
               releasedAt,
               old.paidAt(),
-              razorpayxPayoutId,
+              cashfreeTransferId,
               old.utrNumber(),
               old.receiptUrl(),
               idempotencyKey,
@@ -2055,7 +2056,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
               old.releasedBy(),
               old.releasedAt(),
               old.paidAt(),
-              old.razorpayxPayoutId(),
+              old.cashfreeTransferId(),
               old.utrNumber(),
               old.receiptUrl(),
               old.releaseIdempotencyKey(),
@@ -2088,7 +2089,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
               old.releasedBy(),
               old.releasedAt(),
               paidAt,
-              old.razorpayxPayoutId(),
+              old.cashfreeTransferId(),
               utrNumber,
               receiptUrl,
               old.releaseIdempotencyKey(),
@@ -2360,8 +2361,8 @@ class AdminPharmacyCommissionSettlementServiceTest {
     }
 
     @Override
-    public Optional<SettlementRow> findByRazorpayxPayoutId(String razorpayxPayoutId) {
-      return delegate.findByRazorpayxPayoutId(razorpayxPayoutId);
+    public Optional<SettlementRow> findByCashfreexPayoutId(String cashfreeTransferId) {
+      return delegate.findByCashfreexPayoutId(cashfreeTransferId);
     }
 
     @Override
@@ -2386,7 +2387,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
         String status,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String idempotencyKey,
         Instant updatedAt) {
       delegate.updateReleased(
@@ -2394,7 +2395,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
           status,
           releasedBy,
           releasedAt,
-          razorpayxPayoutId,
+          cashfreeTransferId,
           idempotencyKey,
           updatedAt);
     }
@@ -2410,11 +2411,11 @@ class AdminPharmacyCommissionSettlementServiceTest {
         UUID settlementId,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String idempotencyKey,
         Instant updatedAt) {
       return delegate.finalizeRelease(
-          settlementId, releasedBy, releasedAt, razorpayxPayoutId, idempotencyKey, updatedAt);
+          settlementId, releasedBy, releasedAt, cashfreeTransferId, idempotencyKey, updatedAt);
     }
 
     @Override
@@ -2481,8 +2482,8 @@ class AdminPharmacyCommissionSettlementServiceTest {
     }
 
     @Override
-    public Optional<SettlementRow> findByRazorpayxPayoutId(String razorpayxPayoutId) {
-      return delegate.findByRazorpayxPayoutId(razorpayxPayoutId);
+    public Optional<SettlementRow> findByCashfreexPayoutId(String cashfreeTransferId) {
+      return delegate.findByCashfreexPayoutId(cashfreeTransferId);
     }
 
     @Override
@@ -2507,7 +2508,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
         String status,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String idempotencyKey,
         Instant updatedAt) {
       delegate.updateReleased(
@@ -2515,7 +2516,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
           status,
           releasedBy,
           releasedAt,
-          razorpayxPayoutId,
+          cashfreeTransferId,
           idempotencyKey,
           updatedAt);
     }
@@ -2531,11 +2532,11 @@ class AdminPharmacyCommissionSettlementServiceTest {
         UUID settlementId,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String idempotencyKey,
         Instant updatedAt) {
       return delegate.finalizeRelease(
-          settlementId, releasedBy, releasedAt, razorpayxPayoutId, idempotencyKey, updatedAt);
+          settlementId, releasedBy, releasedAt, cashfreeTransferId, idempotencyKey, updatedAt);
     }
 
     @Override
@@ -2598,8 +2599,8 @@ class AdminPharmacyCommissionSettlementServiceTest {
     }
 
     @Override
-    public Optional<SettlementRow> findByRazorpayxPayoutId(String razorpayxPayoutId) {
-      return delegate.findByRazorpayxPayoutId(razorpayxPayoutId);
+    public Optional<SettlementRow> findByCashfreexPayoutId(String cashfreeTransferId) {
+      return delegate.findByCashfreexPayoutId(cashfreeTransferId);
     }
 
     @Override
@@ -2624,7 +2625,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
         String status,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String idempotencyKey,
         Instant updatedAt) {
       delegate.updateReleased(
@@ -2632,7 +2633,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
           status,
           releasedBy,
           releasedAt,
-          razorpayxPayoutId,
+          cashfreeTransferId,
           idempotencyKey,
           updatedAt);
     }
@@ -2648,7 +2649,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
         UUID settlementId,
         UUID releasedBy,
         Instant releasedAt,
-        String razorpayxPayoutId,
+        String cashfreeTransferId,
         String idempotencyKey,
         Instant updatedAt) {
       return false;

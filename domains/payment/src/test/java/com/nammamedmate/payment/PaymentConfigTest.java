@@ -7,15 +7,15 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.payment.adapter.out.client.LiveRazorpayGatewayClient;
-import com.nammamedmate.payment.adapter.out.client.LiveRazorpayXPayoutClient;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayGatewayClient;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayXPayoutClient;
+import com.nammamedmate.payment.adapter.out.client.LiveCashfreeGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.LiveCashfreePayoutClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreeGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreePayoutClient;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
 import com.nammamedmate.payment.application.port.out.PharmacySettlementPort;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
 import com.nammamedmate.payment.application.port.out.WalletPort;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -28,8 +28,8 @@ class PaymentConfigTest {
     PaymentConfig config = new PaymentConfig();
     Environment env = mock(Environment.class);
     when(env.getActiveProfiles()).thenReturn(new String[] {"local"});
-    RazorpayGatewayPort port = config.razorpayGatewayPort(new ObjectMapper(), env, "", "", "");
-    assertThat(port).isInstanceOf(StubRazorpayGatewayClient.class);
+    CashfreeGatewayPort port = config.cashfreeGatewayPort(new ObjectMapper(), env, "", "", "");
+    assertThat(port).isInstanceOf(StubCashfreeGatewayClient.class);
 
     WalletPort wallet = config.stubPaymentWalletPort();
     assertThat(wallet.debitForOrder(UUID.randomUUID(), UUID.randomUUID(), 100, "x")).isZero();
@@ -52,8 +52,8 @@ class PaymentConfigTest {
     status.onCaptured(UUID.randomUUID(), "pay");
     status.onFailed(UUID.randomUUID(), "reason");
 
-    assertThat(config.paymentRazorpayXPayoutPort(new ObjectMapper(), env, "", ""))
-        .isInstanceOf(StubRazorpayXPayoutClient.class);
+    assertThat(config.paymentCashfreePayoutPort(new ObjectMapper(), env, "", ""))
+        .isInstanceOf(StubCashfreePayoutClient.class);
     config
         .stubSettlementNotificationPort()
         .settlementReleased(UUID.randomUUID(), UUID.randomUUID(), 1);
@@ -147,7 +147,7 @@ class PaymentConfigTest {
     assertThat(codFloat.hasCodDepositLedgerEntry(UUID.randomUUID())).isFalse();
     var refundStub = config.stubRefundFinancePort();
     assertThat(refundStub.findById(UUID.randomUUID())).isEmpty();
-    assertThat(refundStub.findByRazorpayRefundId("x")).isEmpty();
+    assertThat(refundStub.findByGatewayRefundId("x")).isEmpty();
     assertThat(
             refundStub
                 .list(
@@ -186,56 +186,56 @@ class PaymentConfigTest {
     PaymentConfig config = new PaymentConfig();
     Environment env = mock(Environment.class);
     when(env.getActiveProfiles()).thenReturn(new String[] {"local"});
-    RazorpayGatewayPort port =
-        config.razorpayGatewayPort(new ObjectMapper(), env, "rzp_live", "secret", "whsec");
-    assertThat(port).isInstanceOf(LiveRazorpayGatewayClient.class);
-    assertThat(config.paymentRazorpayXPayoutPort(new ObjectMapper(), env, "rzp_x", "xsecret"))
-        .isInstanceOf(LiveRazorpayXPayoutClient.class);
+    CashfreeGatewayPort port =
+        config.cashfreeGatewayPort(new ObjectMapper(), env, "cf_live", "secret", "whsec");
+    assertThat(port).isInstanceOf(LiveCashfreeGatewayClient.class);
+    assertThat(config.paymentCashfreePayoutPort(new ObjectMapper(), env, "cf_payouts", "xsecret"))
+        .isInstanceOf(LiveCashfreePayoutClient.class);
   }
 
   @Test
   void deployedRejectsBlankAndStubSecrets() {
-    PaymentConfig.validateRazorpaySecretsForDeployedProfile("id", "sec", "wh", false);
+    PaymentConfig.validateCashfreeSecretsForDeployedProfile("id", "sec", "wh", false);
     assertThatThrownBy(
-            () -> PaymentConfig.validateRazorpaySecretsForDeployedProfile("", "s", "w", true))
+            () -> PaymentConfig.validateCashfreeSecretsForDeployedProfile("", "s", "w", true))
         .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(
             () ->
-                PaymentConfig.validateRazorpaySecretsForDeployedProfile(
-                    StubRazorpayGatewayClient.DEFAULT_KEY_ID,
-                    StubRazorpayGatewayClient.DEFAULT_KEY_SECRET,
-                    StubRazorpayGatewayClient.DEFAULT_WEBHOOK_SECRET,
+                PaymentConfig.validateCashfreeSecretsForDeployedProfile(
+                    StubCashfreeGatewayClient.DEFAULT_KEY_ID,
+                    StubCashfreeGatewayClient.DEFAULT_KEY_SECRET,
+                    StubCashfreeGatewayClient.DEFAULT_WEBHOOK_SECRET,
                     true))
         .isInstanceOf(IllegalStateException.class);
 
-    PaymentConfig.validateRazorpayXSecretsForDeployedProfile("id", "sec", false);
+    PaymentConfig.validateCashfreePayoutSecretsForDeployedProfile("id", "sec", false);
     assertThatThrownBy(
-            () -> PaymentConfig.validateRazorpayXSecretsForDeployedProfile("", "s", true))
+            () -> PaymentConfig.validateCashfreePayoutSecretsForDeployedProfile("", "s", true))
         .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(
             () ->
-                PaymentConfig.validateRazorpayXSecretsForDeployedProfile(
-                    StubRazorpayXPayoutClient.DEFAULT_KEY_ID,
-                    StubRazorpayXPayoutClient.DEFAULT_KEY_SECRET,
+                PaymentConfig.validateCashfreePayoutSecretsForDeployedProfile(
+                    StubCashfreePayoutClient.DEFAULT_KEY_ID,
+                    StubCashfreePayoutClient.DEFAULT_KEY_SECRET,
                     true))
         .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(
             () ->
-                PaymentConfig.validateRazorpaySecretsForDeployedProfile(
-                    "rzp_test_replace_me", "replace_me", "wh", true))
+                PaymentConfig.validateCashfreeSecretsForDeployedProfile(
+                    "cf_test_replace_me", "replace_me", "wh", true))
         .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(
             () ->
-                PaymentConfig.validateRazorpayXSecretsForDeployedProfile(
-                    "rzp_test_replace_me", "replace_me", true))
+                PaymentConfig.validateCashfreePayoutSecretsForDeployedProfile(
+                    "cf_test_replace_me", "replace_me", true))
         .isInstanceOf(IllegalStateException.class);
 
     Environment env = mock(Environment.class);
     when(env.getActiveProfiles()).thenReturn(new String[] {"prod"});
     PaymentConfig config = new PaymentConfig();
-    assertThatThrownBy(() -> config.razorpayGatewayPort(new ObjectMapper(), env, "", "", ""))
+    assertThatThrownBy(() -> config.cashfreeGatewayPort(new ObjectMapper(), env, "", "", ""))
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(() -> config.paymentRazorpayXPayoutPort(new ObjectMapper(), env, "", ""))
+    assertThatThrownBy(() -> config.paymentCashfreePayoutPort(new ObjectMapper(), env, "", ""))
         .isInstanceOf(IllegalStateException.class);
   }
 
@@ -243,19 +243,19 @@ class PaymentConfigTest {
   void httpPostHelpers() {
     assertThatThrownBy(
             () ->
-                PaymentConfig.razorpayHttpPost(
-                    new LiveRazorpayGatewayClient.Request(
+                PaymentConfig.cashfreeHttpPost(
+                    new LiveCashfreeGatewayClient.Request(
                         java.net.URI.create("http://127.0.0.1:1"), java.util.Map.of(), "{}")))
         .isInstanceOf(AppException.class)
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_ERROR");
+        .isEqualTo("CASHFREE_ERROR");
     assertThatThrownBy(
             () ->
-                PaymentConfig.razorpayXHttpPost(
-                    new LiveRazorpayXPayoutClient.Request(
+                PaymentConfig.cashfreePayoutHttpPost(
+                    new LiveCashfreePayoutClient.Request(
                         java.net.URI.create("http://127.0.0.1:1"), java.util.Map.of(), "{}")))
         .isInstanceOf(AppException.class)
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
   }
 }

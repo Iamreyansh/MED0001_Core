@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,8 +87,6 @@ public class PharmacyKycService {
   private final OutboxPublisher outbox;
   private final RateLimiter rateLimiter;
   private final Clock clock;
-  private final boolean autoVerificationEnabled;
-  private final AutoKycService autoKyc;
 
   public PharmacyKycService(
       PharmacyRegistrationStore pharmacies,
@@ -99,9 +96,7 @@ public class PharmacyKycService {
       PresignedUrlService presignedUrls,
       OutboxPublisher outbox,
       RateLimiter rateLimiter,
-      Clock clock,
-      @Value("${medmate.kyc.auto-verification-enabled:false}") boolean autoVerificationEnabled,
-      AutoKycService autoKyc) {
+      Clock clock) {
     this.pharmacies = pharmacies;
     this.kycDocs = kycDocs;
     this.kycObjectStore = kycObjectStore;
@@ -110,8 +105,6 @@ public class PharmacyKycService {
     this.outbox = outbox;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
-    this.autoVerificationEnabled = autoVerificationEnabled;
-    this.autoKyc = autoKyc;
   }
 
   // ─── Upload ──────────────────────────────────────────────────────────────────
@@ -375,21 +368,11 @@ public class PharmacyKycService {
             pharmacyId,
             Map.of("pharmacy_id", pharmacyId.toString())));
 
-    if (autoVerificationEnabled) {
-      outbox.publish(
-          DomainEvent.of(
-              "pharmacy.kyc.auto_verify_requested",
-              "pharmacy",
-              pharmacyId,
-              Map.of("pharmacy_id", pharmacyId.toString())));
-      autoKyc.handleAutoVerifyRequested(pharmacyId);
-    }
-
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("pharmacy_id", pharmacyId.toString());
     data.put("status", "KYC_SUBMITTED");
     data.put("submitted_at", now.toString());
-    data.put("auto_kyc_triggered", autoVerificationEnabled);
+    data.put("auto_kyc_triggered", false);
     data.put("estimated_review_hours", ESTIMATED_REVIEW_HOURS);
     data.put(
         "message",
@@ -446,7 +429,6 @@ public class PharmacyKycService {
     data.put(
         "submitted_at",
         pharmacy.kycSubmittedAt() != null ? pharmacy.kycSubmittedAt().toString() : null);
-    data.put("auto_kyc_result", autoKyc.latestAutoKycSummary(pharmacyId));
     data.put("documents", docMaps);
     return data;
   }

@@ -3,7 +3,7 @@ package com.nammamedmate.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nammamedmate.auth.domain.MagicOtp;
-import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
+import com.nammamedmate.order.application.port.out.CashfreePaymentPort;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +37,7 @@ class OrderPlacementIT extends AbstractApiIT {
 
   @Autowired private TestRestTemplate rest;
   @Autowired private JdbcTemplate jdbc;
-  @Autowired private RazorpayPaymentPort razorpay;
+  @Autowired private CashfreePaymentPort cashfree;
 
   private UUID customerId;
   private UUID addressId;
@@ -274,7 +274,7 @@ class OrderPlacementIT extends AbstractApiIT {
     String upiOrderId = String.valueOf(upiOrder.get("order_id"));
     @SuppressWarnings("unchecked")
     Map<String, Object> upiPay = (Map<String, Object>) upiOrder.get("payment");
-    String rzOrderId = String.valueOf(upiPay.get("razorpay_order_id"));
+    String rzOrderId = String.valueOf(upiPay.get("gateway_order_id"));
 
     // AC4 invalid signature
     ResponseEntity<Map> badSig =
@@ -291,7 +291,7 @@ class OrderPlacementIT extends AbstractApiIT {
 
     // AC5 idempotent confirm
     String paymentId = "pay_it_confirm";
-    String sig = razorpay.signPayment(rzOrderId, paymentId);
+    String sig = cashfree.signPayment(rzOrderId, paymentId);
     String idemConfirm = UUID.randomUUID().toString();
     ResponseEntity<Map> confirm1 =
         rest.exchange(

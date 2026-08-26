@@ -1,0 +1,141 @@
+meta {
+  name: webhook
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/integrations/cashfree/webhook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  x-webhook-signature: {{cashfreeWebhookSignature}}
+  x-webhook-timestamp: {{cashfreeWebhookTimestamp}}
+}
+
+body:json {
+  {
+    "entity": "event",
+    "event": "payment.captured",
+    "payload": {
+      "payment": {
+        "entity": {
+          "id": "pay_xyz789",
+          "order_id": "{{gatewayOrderId}}",
+          "amount": 50400,
+          "currency": "INR",
+          "status": "captured",
+          "method": "upi",
+          "captured": true
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("gatewayOrderId")) {
+    bru.setEnvVar("gatewayOrderId", "order_stub_local");
+  }
+  if (!bru.getEnvVar("cashfreeWebhookSignature")) {
+    bru.setEnvVar("cashfreeWebhookSignature", "replace-with-hmac-of-raw-body");
+  }
+}
+
+script:post-response {
+  // no chained vars
+}
+
+tests {
+  test("HTTP 200 or 400", function () {
+    const status = res.getStatus();
+    expect([200, 400]).to.include(status);
+  });
+  test("envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.success).to.equal(true);
+    } else {
+      expect(body.success).to.equal(false);
+      expect(body.error.code).to.equal("INVALID_SIGNATURE");
+    }
+  });
+}
+
+docs {
+  POST /api/v1/integrations/cashfree/webhook — public + HMAC. Errors: INVALID_SIGNATURE.
+}
+
+example {
+  name: 200 OK
+  description: Valid signature acknowledged
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/cashfree/webhook
+    method: post
+    mode: json
+    headers: {
+      x-webhook-signature: valid-hmac-hex
+    }
+    body:json: {
+      {
+        "event": "payment.captured",
+        "payload": {
+          "payment": {
+            "entity": {
+              "id": "pay_xyz789",
+              "order_id": "order_abc123",
+              "amount": 50400
+            }
+          }
+        }
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 400 INVALID_SIGNATURE
+  description: Bad HMAC
+  request: {
+    url: {{baseUrl}}/api/v1/integrations/cashfree/webhook
+    method: post
+    mode: json
+    headers: {
+      x-webhook-signature: deadbeef
+    }
+    body:json: {
+      {
+        "event": "payment.captured"
+      }
+    }
+  }
+  response: {
+    status: { code: 400 text: Bad Request }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "INVALID_SIGNATURE",
+            "message": "x-webhook-signature verification failed"
+          }
+        }
+      '''
+    }
+  }
+}

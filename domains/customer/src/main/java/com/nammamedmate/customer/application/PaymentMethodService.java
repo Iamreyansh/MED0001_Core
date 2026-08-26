@@ -1,10 +1,10 @@
 package com.nammamedmate.customer.application;
 
+import com.nammamedmate.customer.application.port.out.CashfreeVpaPort;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore;
 import com.nammamedmate.customer.application.port.out.PaymentMethodInActiveOrderPort;
 import com.nammamedmate.customer.application.port.out.PaymentMethodStore;
 import com.nammamedmate.customer.application.port.out.PaymentMethodStore.PaymentMethodRecord;
-import com.nammamedmate.customer.application.port.out.RazorpayVpaPort;
 import com.nammamedmate.customer.domain.CardNetwork;
 import com.nammamedmate.customer.domain.CardType;
 import com.nammamedmate.customer.domain.PaymentMethodType;
@@ -43,7 +43,7 @@ public class PaymentMethodService {
   private final PaymentMethodStore methods;
   private final CustomerProfileStore profiles;
   private final PaymentMethodInActiveOrderPort activeOrders;
-  private final RazorpayVpaPort vpaPort;
+  private final CashfreeVpaPort vpaPort;
   private final AesGcmCipher cipher;
   private final RateLimiter rateLimiter;
   private final Clock clock;
@@ -53,7 +53,7 @@ public class PaymentMethodService {
       PaymentMethodStore methods,
       CustomerProfileStore profiles,
       PaymentMethodInActiveOrderPort activeOrders,
-      RazorpayVpaPort vpaPort,
+      CashfreeVpaPort vpaPort,
       @Qualifier("paymentMethodCipher") AesGcmCipher cipher,
       RateLimiter rateLimiter,
       Clock clock,
@@ -157,7 +157,7 @@ public class PaymentMethodService {
     if (cmd == null) {
       throw new AppException("VALIDATION_ERROR", "Request body is required", 400);
     }
-    String tokenId = requireTokenId(cmd.razorpayTokenId());
+    String tokenId = requireTokenId(cmd.gatewayTokenId());
     String last4 = requireLast4(cmd.cardLast4());
     CardNetwork network = CardNetwork.parse(cmd.cardNetwork());
     CardType cardType = CardType.parse(cmd.cardType());
@@ -170,7 +170,7 @@ public class PaymentMethodService {
 
     for (PaymentMethodRecord existing :
         methods.listByCustomerAndType(customerId, PaymentMethodType.CARD.name())) {
-      if (tokenId.equals(cipher.decrypt(existing.razorpayTokenEncrypted()))) {
+      if (tokenId.equals(cipher.decrypt(existing.cashfreeTokenEncrypted()))) {
         throw new AppException("CARD_ALREADY_SAVED", "This card token is already saved", 409);
       }
     }
@@ -322,15 +322,15 @@ public class PaymentMethodService {
 
   private static String requireTokenId(String raw) {
     if (raw == null || raw.isBlank()) {
-      throw new AppException("VALIDATION_ERROR", "razorpay_token_id is required", 400);
+      throw new AppException("VALIDATION_ERROR", "gateway_token_id is required", 400);
     }
     String trimmed = raw.trim();
     if (trimmed.length() > 100) {
-      throw new AppException("VALIDATION_ERROR", "razorpay_token_id max length is 100", 400);
+      throw new AppException("VALIDATION_ERROR", "gateway_token_id max length is 100", 400);
     }
     if (!TOKEN_ID.matcher(trimmed).matches()) {
       throw new AppException(
-          "INVALID_RAZORPAY_TOKEN", "Razorpay token ID format is unrecognised", 422);
+          "INVALID_CASHFREE_TOKEN", "Cashfree token ID format is unrecognised", 422);
     }
     return trimmed;
   }
@@ -373,7 +373,7 @@ public class PaymentMethodService {
   public record UpiCommand(String upiId, String nickname) {}
 
   public record CardCommand(
-      String razorpayTokenId,
+      String gatewayTokenId,
       String cardLast4,
       String cardNetwork,
       String cardType,

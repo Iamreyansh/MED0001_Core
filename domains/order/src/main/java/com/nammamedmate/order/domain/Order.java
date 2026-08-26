@@ -28,8 +28,8 @@ public final class Order {
   private final long totalPayablePaise;
   private final PaymentMethod paymentMethod;
   private PaymentStatus paymentStatus;
-  private String razorpayOrderId;
-  private String razorpayPaymentId;
+  private String gatewayOrderId;
+  private String gatewayPaymentId;
   private final UUID prescriptionId;
   private final UUID deliveryAddressId;
   private final String deliveryInstructions;
@@ -68,8 +68,8 @@ public final class Order {
       long totalPayablePaise,
       PaymentMethod paymentMethod,
       PaymentStatus paymentStatus,
-      String razorpayOrderId,
-      String razorpayPaymentId,
+      String gatewayOrderId,
+      String gatewayPaymentId,
       UUID prescriptionId,
       UUID deliveryAddressId,
       String deliveryInstructions,
@@ -97,8 +97,8 @@ public final class Order {
         totalPayablePaise,
         paymentMethod,
         paymentStatus,
-        razorpayOrderId,
-        razorpayPaymentId,
+        gatewayOrderId,
+        gatewayPaymentId,
         prescriptionId,
         deliveryAddressId,
         deliveryInstructions,
@@ -137,8 +137,8 @@ public final class Order {
       long totalPayablePaise,
       PaymentMethod paymentMethod,
       PaymentStatus paymentStatus,
-      String razorpayOrderId,
-      String razorpayPaymentId,
+      String gatewayOrderId,
+      String gatewayPaymentId,
       UUID prescriptionId,
       UUID deliveryAddressId,
       String deliveryInstructions,
@@ -174,8 +174,8 @@ public final class Order {
     this.totalPayablePaise = totalPayablePaise;
     this.paymentMethod = paymentMethod;
     this.paymentStatus = paymentStatus;
-    this.razorpayOrderId = razorpayOrderId;
-    this.razorpayPaymentId = razorpayPaymentId;
+    this.gatewayOrderId = gatewayOrderId;
+    this.gatewayPaymentId = gatewayPaymentId;
     this.prescriptionId = prescriptionId;
     this.deliveryAddressId = deliveryAddressId;
     this.deliveryInstructions = deliveryInstructions;
@@ -258,12 +258,12 @@ public final class Order {
     return paymentStatus;
   }
 
-  public String razorpayOrderId() {
-    return razorpayOrderId;
+  public String gatewayOrderId() {
+    return gatewayOrderId;
   }
 
-  public String razorpayPaymentId() {
-    return razorpayPaymentId;
+  public String gatewayPaymentId() {
+    return gatewayPaymentId;
   }
 
   public UUID prescriptionId() {
@@ -346,8 +346,8 @@ public final class Order {
     return cancelReason;
   }
 
-  public void markPaymentPending(String razorpayOrderId, Instant now) {
-    this.razorpayOrderId = razorpayOrderId;
+  public void markPaymentPending(String gatewayOrderId, Instant now) {
+    this.gatewayOrderId = gatewayOrderId;
     this.status = OrderStatus.PAYMENT_PENDING;
     this.paymentStatus = PaymentStatus.AWAITING_PAYMENT;
     touch(now);
@@ -361,7 +361,7 @@ public final class Order {
       this.paymentStatus = PaymentStatus.PAID;
     }
     if (paymentId != null) {
-      this.razorpayPaymentId = paymentId;
+      this.gatewayPaymentId = paymentId;
     }
     this.confirmedAt = confirmedAt;
     this.estimatedDeliveryAt = estimatedDeliveryAt;

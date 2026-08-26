@@ -293,8 +293,8 @@ Content-Type: application/json
   "success": true,
   "data": {
     "invoice_id": "inv_uuid_002",
-    "payment_gateway": "Razorpay",
-    "checkout_url": "https://razorpay.com/checkout/pay_uuid_001",
+    "payment_gateway": "Cashfree",
+    "payment_session_id": "session_pay_uuid_001",
     "expires_at": "2026-07-24T10:30:00Z"
   }
 }
@@ -367,7 +367,7 @@ Content-Type: application/json
 | Dependency | Description |
 |---|---|
 | Subscription Management (STORY-002) | Subscription status updates on payment |
-| Payment Gateway | Razorpay / payment checkout initiation |
+| Payment Gateway | Cashfree / payment checkout initiation |
 | Automation Engine | Dunning sequence orchestration |
 | Notification Engine | Email + WhatsApp reminder delivery |
 | PDF Generator | Invoice PDF generation and CDN upload |

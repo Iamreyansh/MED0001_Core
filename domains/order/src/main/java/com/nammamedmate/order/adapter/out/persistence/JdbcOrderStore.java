@@ -43,7 +43,7 @@ public class JdbcOrderStore implements OrderStore {
           id, order_number, customer_id, pharmacy_id, cart_id, items,
           item_total_paise, coupon_code, coupon_discount_paise, delivery_fee_paise,
           handling_fee_paise, wallet_applied_paise, total_payable_paise,
-          payment_method, payment_status, razorpay_order_id, razorpay_payment_id,
+          payment_method, payment_status, gateway_order_id, gateway_payment_id,
           prescription_id, delivery_address_id, delivery_instructions, status,
           rider_id, delivery_otp_hash, placement_idempotency_key, confirmed_at,
           estimated_delivery_at, created_at, updated_at,
@@ -69,8 +69,8 @@ public class JdbcOrderStore implements OrderStore {
         order.totalPayablePaise(),
         order.paymentMethod().name(),
         order.paymentStatus().name(),
-        order.razorpayOrderId(),
-        order.razorpayPaymentId(),
+        order.gatewayOrderId(),
+        order.gatewayPaymentId(),
         order.prescriptionId(),
         order.deliveryAddressId(),
         order.deliveryInstructions(),
@@ -101,8 +101,8 @@ public class JdbcOrderStore implements OrderStore {
             """
             UPDATE orders SET
               payment_status = ?,
-              razorpay_order_id = ?,
-              razorpay_payment_id = ?,
+              gateway_order_id = ?,
+              gateway_payment_id = ?,
               status = ?,
               rider_id = ?,
               delivery_otp_hash = ?,
@@ -121,8 +121,8 @@ public class JdbcOrderStore implements OrderStore {
             WHERE id = ? AND deleted_at IS NULL
             """,
             order.paymentStatus().name(),
-            order.razorpayOrderId(),
-            order.razorpayPaymentId(),
+            order.gatewayOrderId(),
+            order.gatewayPaymentId(),
             order.status().name(),
             order.riderId(),
             order.deliveryOtpHash(),
@@ -198,19 +198,19 @@ public class JdbcOrderStore implements OrderStore {
   }
 
   @Override
-  public Optional<Order> findByRazorpayOrderId(String razorpayOrderId) {
-    if (razorpayOrderId == null || razorpayOrderId.isBlank()) {
+  public Optional<Order> findByGatewayOrderId(String gatewayOrderId) {
+    if (gatewayOrderId == null || gatewayOrderId.isBlank()) {
       return Optional.empty();
     }
     List<Order> rows =
         jdbc.query(
             """
             SELECT * FROM orders
-            WHERE razorpay_order_id = ? AND deleted_at IS NULL
+            WHERE gateway_order_id = ? AND deleted_at IS NULL
             LIMIT 1
             """,
             this::mapOrder,
-            razorpayOrderId);
+            gatewayOrderId);
     return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
   }
 
@@ -467,8 +467,8 @@ public class JdbcOrderStore implements OrderStore {
         rs.getLong("total_payable_paise"),
         PaymentMethod.valueOf(rs.getString("payment_method")),
         PaymentStatus.valueOf(rs.getString("payment_status")),
-        rs.getString("razorpay_order_id"),
-        rs.getString("razorpay_payment_id"),
+        rs.getString("gateway_order_id"),
+        rs.getString("gateway_payment_id"),
         (UUID) rs.getObject("prescription_id"),
         (UUID) rs.getObject("delivery_address_id"),
         rs.getString("delivery_instructions"),

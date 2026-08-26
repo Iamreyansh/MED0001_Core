@@ -14,7 +14,7 @@
 
 ## Overview
 
-This story covers the finance-side view and management of weekly rider earnings payouts. Rider earnings (base pay, incentives, tips, streak bonuses) are computed from the `RiderEarningsLedger` by EPIC-011/STORY-008's cron; this story exposes the admin interfaces for monitoring, reviewing, and releasing those payouts via RazorpayX. It also covers bulk release, the hold/release workflow for riders with unresolved COD float, and the rider-facing payout history endpoint. Payout failures are auto-retried once and then escalated to admin_finance.
+This story covers the finance-side view and management of weekly rider earnings payouts. Rider earnings (base pay, incentives, tips, streak bonuses) are computed from the `RiderEarningsLedger` by EPIC-011/STORY-008's cron; this story exposes the admin interfaces for monitoring, reviewing, and releasing those payouts via Cashfree Payouts. It also covers bulk release, the hold/release workflow for riders with unresolved COD float, and the rider-facing payout history endpoint. Payout failures are auto-retried once and then escalated to admin_finance.
 
 ---
 
@@ -37,8 +37,8 @@ This story covers the finance-side view and management of weekly rider earnings 
 | BR-003 | If a rider's `cod_in_hand > cod_float_limit` at payout computation time, payout status is automatically set to `HELD`; it is released only after admin_finance review and COD resolution. |
 | BR-004 | **Minimum threshold:** `net_payout < Rs 100` ? payout is not released; amount is carried to the next cycle with status `BELOW_THRESHOLD_CARRIED`. |
 | BR-005 | Bulk release applies to all PENDING rider payouts with `net_payout ? Rs 10,000`; payouts above this threshold require individual review. |
-| BR-006 | Payout is disbursed via **Razorpay Route** to the rider's registered UPI ID or bank account; on success, the rider receives an SMS notification. |
-| BR-007 | A failed Razorpay payout is **auto-retried once** after 24 hours; if the retry fails, status is set to `FAILED` and an alert is sent to admin_finance. |
+| BR-006 | Payout is disbursed via **Cashfree Payouts** to the rider's registered UPI ID or bank account; on success, the rider receives an SMS notification. |
+| BR-007 | A failed Cashfree payout is **auto-retried once** after 24 hours; if the retry fails, status is set to `FAILED` and an alert is sent to admin_finance. |
 | BR-008 | `cod_in_hand_deducted` in the payout record represents the net COD cash the rider held at payout time, not yet deposited. This amount reduces the payout since the rider already holds the cash. |
 
 ---
@@ -163,7 +163,7 @@ This story covers the finance-side view and management of weekly rider earnings 
     "rider_id": "rider_uuid",
     "net_payout": 2000.00,
     "status": "RELEASED",
-    "razorpay_payout_id": "pout_XXXXXXXXXXXX",
+    "cashfree_transfer_id": "pout_XXXXXXXXXXXX",
     "released_by": "admin_uuid",
     "released_at": "2026-07-24T10:00:00Z"
   },
@@ -179,7 +179,7 @@ This story covers the finance-side view and management of weekly rider earnings 
 | `PAYOUT_BELOW_THRESHOLD` | 422 | net_payout < Rs 100 |
 | `COD_UNRESOLVED` | 422 | Rider cod_in_hand still > cod_float_limit |
 | `RIDER_NO_PAYMENT_DETAILS` | 422 | Rider has no registered UPI/bank account |
-| `RAZORPAY_PAYOUT_FAILED` | 502 | RazorpayX API error |
+| `CASHFREE_PAYOUT_FAILED` | 502 | Cashfree Payouts API error |
 
 ---
 
@@ -277,7 +277,7 @@ This story covers the finance-side view and management of weekly rider earnings 
 | `net_payout` | DECIMAL(12,2) | No | Final payable amount |
 | `status` | ENUM(`PENDING`,`HELD`,`RELEASED`,`FAILED`,`BELOW_THRESHOLD_CARRIED`) | No | Payout lifecycle |
 | `hold_reason` | TEXT | Yes | COD or compliance hold reason |
-| `razorpay_payout_id` | VARCHAR(100) | Yes | RazorpayX payout reference |
+| `cashfree_transfer_id` | VARCHAR(100) | Yes | Cashfree Payouts transfer reference |
 | `retry_count` | SMALLINT | No | Auto-retry count (0 or 1) |
 | `retry_at` | TIMESTAMPTZ | Yes | Scheduled retry time |
 | `released_by` | UUID | Yes | FK ? AdminUser |
@@ -294,8 +294,8 @@ This story covers the finance-side view and management of weekly rider earnings 
 | AC-001 | Monday morning cron creates a `RiderPayout` record for each rider who had at least one delivery in the cycle. |
 | AC-002 | A rider with `cod_in_hand > Rs 2,000` at computation time has payout auto-set to `HELD`; releasing it via the API without COD resolution returns HTTP 422 `COD_UNRESOLVED`. |
 | AC-003 | A payout with `net_payout < Rs 100` is not released; it gets status `BELOW_THRESHOLD_CARRIED` and the amount is added to the next cycle. |
-| AC-004 | Successful `POST /admin/finance/rider-payouts/:id/release` triggers a RazorpayX payout and the rider receives an SMS with the payout amount. |
-| AC-005 | A failed Razorpay payout is automatically retried once after 24 hours; if the retry fails, status is `FAILED` and admin_finance receives an alert. |
+| AC-004 | Successful `POST /admin/finance/rider-payouts/:id/release` triggers a Cashfree Payouts transfer and the rider receives an SMS with the payout amount. |
+| AC-005 | A failed Cashfree payout is automatically retried once after 24 hours; if the retry fails, status is `FAILED` and admin_finance receives an alert. |
 | AC-006 | Bulk release skips riders with `HELD` status, `net_payout > Rs 10,000`, and `net_payout < Rs 100`; returns a summary with release count and failure reasons. |
 | AC-007 | `GET /rider/payouts/history` returns only the authenticated rider's own payout records. |
 | AC-008 | Each payout release creates a `FinancialLedger` entry with type `PAYOUT_RIDER`. |
@@ -308,7 +308,7 @@ This story covers the finance-side view and management of weekly rider earnings 
 |---|---|---|
 | Rider Incentives (EPIC-011/STORY-008) | Internal | `RiderEarningsLedger` is source for payout computation |
 | COD Reconciliation (EPIC-011/STORY-007) | Internal | `cod_in_hand` used for hold/deduction logic |
-| RazorpayX | External | UPI/bank disbursement |
+| Cashfree Payouts | External | UPI/bank disbursement |
 | Financial Ledger (EPIC-012/STORY-008) | Internal | Ledger entry on payout release |
 | Notification Service (EPIC-013) | Internal | SMS to rider on payout success; alert to admin on failure |
 | Scheduled Job Runner | Internal | Monday cron + auto-retry scheduler |

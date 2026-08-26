@@ -73,8 +73,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
           aws_secretsmanager_secret.db.arn,
           aws_secretsmanager_secret.jwt.arn,
           aws_secretsmanager_secret.mfa.arn,
-          aws_secretsmanager_secret.razorpay.arn,
-          aws_secretsmanager_secret.razorpayx.arn,
+          aws_secretsmanager_secret.cashfree.arn,
           aws_secretsmanager_secret.kyc.arn,
           aws_secretsmanager_secret.comms.arn,
           aws_secretsmanager_secret.internal.arn,
@@ -133,8 +132,7 @@ resource "aws_iam_role_policy" "ecs_task" {
           aws_secretsmanager_secret.db.arn,
           aws_secretsmanager_secret.jwt.arn,
           aws_secretsmanager_secret.mfa.arn,
-          aws_secretsmanager_secret.razorpay.arn,
-          aws_secretsmanager_secret.razorpayx.arn,
+          aws_secretsmanager_secret.cashfree.arn,
           aws_secretsmanager_secret.kyc.arn,
           aws_secretsmanager_secret.comms.arn,
           data.aws_secretsmanager_secret.maps_geocode.arn
@@ -221,8 +219,7 @@ locals {
     { name = "MEDMATE_SECRETS_DB_ARN", value = aws_secretsmanager_secret.db.arn },
     { name = "MEDMATE_SECRETS_JWT_ARN", value = aws_secretsmanager_secret.jwt.arn },
     { name = "MEDMATE_SECRETS_MFA_ARN", value = aws_secretsmanager_secret.mfa.arn },
-    { name = "MEDMATE_SECRETS_RAZORPAY_ARN", value = aws_secretsmanager_secret.razorpay.arn },
-    { name = "MEDMATE_SECRETS_RAZORPAYX_ARN", value = aws_secretsmanager_secret.razorpayx.arn },
+    { name = "MEDMATE_SECRETS_CASHFREE_ARN", value = aws_secretsmanager_secret.cashfree.arn },
     { name = "MEDMATE_SECRETS_KYC_ARN", value = aws_secretsmanager_secret.kyc.arn },
     { name = "MEDMATE_SECRETS_COMMS_ARN", value = aws_secretsmanager_secret.comms.arn },
     { name = "AWS_REGION", value = data.aws_region.current.region },
@@ -238,21 +235,21 @@ locals {
     { name = "MEDMATE_MAPS_GEOCODE_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.maps_geocode.arn}:api_key::" },
     # ponytail: ECS injects these (same as JWT). BootJar relocates EPP META-INF off the app
     # classpath, so AwsSecretsEnvironmentPostProcessor never runs in the fat jar.
-    { name = "MEDMATE_RAZORPAY_KEY_ID", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_id::" },
-    { name = "MEDMATE_RAZORPAY_KEY_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_secret::" },
-    { name = "MEDMATE_RAZORPAY_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:webhook_secret::" },
-    { name = "MEDMATE_RAZORPAYX_KEY_ID", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:key_id::" },
-    { name = "MEDMATE_RAZORPAYX_KEY_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:key_secret::" },
-    { name = "MEDMATE_RAZORPAYX_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:webhook_secret::" },
+    { name = "MEDMATE_CASHFREE_APP_ID", valueFrom = "${aws_secretsmanager_secret.cashfree.arn}:app_id::" },
+    { name = "MEDMATE_CASHFREE_SECRET_KEY", valueFrom = "${aws_secretsmanager_secret.cashfree.arn}:secret_key::" },
+    { name = "MEDMATE_CASHFREE_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.cashfree.arn}:webhook_secret::" },
+    { name = "MEDMATE_CASHFREE_PAYOUTS_CLIENT_ID", valueFrom = "${aws_secretsmanager_secret.cashfree.arn}:payouts_client_id::" },
+    { name = "MEDMATE_CASHFREE_PAYOUTS_CLIENT_SECRET", valueFrom = "${aws_secretsmanager_secret.cashfree.arn}:payouts_client_secret::" },
+    { name = "MEDMATE_CASHFREE_PAYOUTS_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.cashfree.arn}:payouts_webhook_secret::" },
     { name = "MEDMATE_INTERNAL_SERVICE_TOKEN", valueFrom = "${aws_secretsmanager_secret.internal.arn}:service_token::" },
     { name = "MEDMATE_KYC_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.kyc.arn}:webhook_secret::" },
-    { name = "MEDMATE_MSG91_AUTH_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:msg91_auth_key::" },
-    { name = "MEDMATE_FCM_SERVER_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_server_key::" },
-    { name = "MEDMATE_SENDGRID_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sendgrid_api_key::" },
-    { name = "MEDMATE_WHATSAPP_ACCESS_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_token::" },
-    { name = "MEDMATE_WHATSAPP_APP_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_app_secret::" },
-    { name = "MEDMATE_SMS_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sms_webhook_secret::" },
-    { name = "MEDMATE_EMAIL_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:email_webhook_secret::" }
+    { name = "MEDMATE_TWILIO_ACCOUNT_SID", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_account_sid::" },
+    { name = "MEDMATE_TWILIO_AUTH_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_auth_token::" },
+    { name = "MEDMATE_TWILIO_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_api_key::" },
+    { name = "MEDMATE_TWILIO_FROM_NUMBER", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_from_number::" },
+    { name = "MEDMATE_FCM_PROJECT_ID", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_project_id::" },
+    { name = "MEDMATE_FCM_SERVICE_ACCOUNT_JSON", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_service_account_json::" },
+    { name = "MEDMATE_SMS_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sms_webhook_secret::" }
   ]
   worker_env = [
     { name = "SPRING_PROFILES_ACTIVE", value = local.environment },
@@ -266,11 +263,12 @@ locals {
   worker_secrets = [
     { name = "SPRING_DATASOURCE_USERNAME", valueFrom = "${aws_secretsmanager_secret.db.arn}:username::" },
     { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" },
-    { name = "MEDMATE_MSG91_AUTH_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:msg91_auth_key::" },
-    { name = "MEDMATE_FCM_SERVER_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_server_key::" },
-    { name = "MEDMATE_SENDGRID_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sendgrid_api_key::" },
-    { name = "MEDMATE_WHATSAPP_ACCESS_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_token::" },
-    { name = "MEDMATE_WHATSAPP_APP_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_app_secret::" }
+    { name = "MEDMATE_TWILIO_ACCOUNT_SID", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_account_sid::" },
+    { name = "MEDMATE_TWILIO_AUTH_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_auth_token::" },
+    { name = "MEDMATE_TWILIO_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_api_key::" },
+    { name = "MEDMATE_TWILIO_FROM_NUMBER", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_from_number::" },
+    { name = "MEDMATE_FCM_PROJECT_ID", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_project_id::" },
+    { name = "MEDMATE_FCM_SERVICE_ACCOUNT_JSON", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_service_account_json::" }
   ]
 }
 

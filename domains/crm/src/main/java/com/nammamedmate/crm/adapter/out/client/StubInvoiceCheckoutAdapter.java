@@ -20,6 +20,6 @@ public class StubInvoiceCheckoutAdapter implements InvoiceCheckoutPort {
   public CheckoutSession createCheckout(UUID invoiceId, long amountPaise, String paymentMethod) {
     String payId = Ids.newId().toString().replace("-", "");
     Instant expires = clock.instant().plusSeconds(30 * 60);
-    return new CheckoutSession("https://razorpay.com/checkout/pay_" + payId, expires, "Razorpay");
+    return new CheckoutSession("https://cashfree.com/checkout/pay_" + payId, expires, "Cashfree");
   }
 }

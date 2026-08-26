@@ -83,7 +83,6 @@ class PharmacyProfileBranchCoverageTest {
         new AesGcmCipher(AES_KEY, new SecureRandom(new byte[] {1})),
         new OutboxPublisher(new InMemoryOutboxStore(), new ObjectMapper()),
         rateLimiter,
-        mock(AutoKycService.class),
         new BCryptPasswordEncoder(),
         () -> MagicProfileOtp.CODE,
         new SecureRandom(new byte[] {2}),

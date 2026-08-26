@@ -44,7 +44,7 @@ tests {
 }
 
 docs {
-  POST /api/v1/admin/pharmacies/{id}/settlements/{settlement_id}/release — RazorpayX payout (finance/super).
+  POST /api/v1/admin/pharmacies/{id}/settlements/{settlement_id}/release — CashfreePayout payout (finance/super).
   Requires Idempotency-Key header.
 }
 
@@ -63,7 +63,7 @@ example {
             "released_at": "2026-07-24T00:00:00Z",
             "released_by": "admin-finance-uuid",
             "payout_initiated": true,
-            "razorpayx_payout_id": "pout_XXXXXXXXXXXX",
+            "cashfree_transfer_id": "pout_XXXXXXXXXXXX",
             "estimated_credit_hours": 4,
             "message": "Settlement released. Payout initiated to pharmacy bank account."
           },

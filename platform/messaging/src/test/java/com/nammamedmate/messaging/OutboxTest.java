@@ -165,23 +165,23 @@ class OutboxTest {
     JdbcTemplate hookJdbc = mock(JdbcTemplate.class);
     JdbcWebhookInbox hooks = new JdbcWebhookInbox(hookJdbc);
     when(hookJdbc.queryForObject(anyString(), eq(Integer.class), any(), any())).thenReturn(1, 0);
-    assertThat(hooks.alreadyReceived("razorpay", "evt_1")).isTrue();
-    assertThat(hooks.alreadyReceived("razorpay", "evt_2")).isFalse();
+    assertThat(hooks.alreadyReceived("cashfree", "evt_1")).isTrue();
+    assertThat(hooks.alreadyReceived("cashfree", "evt_2")).isFalse();
     assertThat(hooks.alreadyReceived(" ", "evt")).isFalse();
     assertThat(hooks.alreadyReceived(null, "evt")).isFalse();
-    assertThat(hooks.alreadyReceived("razorpay", null)).isFalse();
-    assertThat(hooks.alreadyReceived("razorpay", " ")).isFalse();
+    assertThat(hooks.alreadyReceived("cashfree", null)).isFalse();
+    assertThat(hooks.alreadyReceived("cashfree", " ")).isFalse();
     when(hookJdbc.queryForObject(anyString(), eq(Integer.class), any(), any())).thenReturn(null);
-    assertThat(hooks.alreadyReceived("razorpay", "evt_3")).isFalse();
+    assertThat(hooks.alreadyReceived("cashfree", "evt_3")).isFalse();
     when(hookJdbc.update(anyString(), any(Object[].class)))
         .thenReturn(1)
         .thenThrow(new org.springframework.dao.DuplicateKeyException("dup"));
-    assertThat(hooks.claim("razorpay", "evt_ok", null)).isTrue();
-    assertThat(hooks.claim("razorpay", "evt_dup", "{}")).isFalse();
+    assertThat(hooks.claim("cashfree", "evt_ok", null)).isTrue();
+    assertThat(hooks.claim("cashfree", "evt_dup", "{}")).isFalse();
     assertThat(hooks.claim(" ", "evt", "{}")).isFalse();
     assertThat(hooks.claim(null, "evt", "{}")).isFalse();
-    assertThat(hooks.claim("razorpay", " ", "{}")).isFalse();
-    assertThat(hooks.claim("razorpay", null, "{}")).isFalse();
+    assertThat(hooks.claim("cashfree", " ", "{}")).isFalse();
+    assertThat(hooks.claim("cashfree", null, "{}")).isFalse();
 
     JdbcTemplate jdbc = mock(JdbcTemplate.class);
 
@@ -198,8 +198,8 @@ class OutboxTest {
               return List.of(mapper.mapRow(rs, 0));
             });
     assertThat(ops.find("PAYOUT", "k")).isPresent();
-    assertThat(ops.ensurePending("PAYOUT", "k", "razorpayx").hasProviderRef()).isTrue();
-    assertThat(ops.ensurePending("PAYOUT", "k", "razorpayx").terminalSuccess()).isTrue();
+    assertThat(ops.ensurePending("PAYOUT", "k", "cashfree_payouts").hasProviderRef()).isTrue();
+    assertThat(ops.ensurePending("PAYOUT", "k", "cashfree_payouts").terminalSuccess()).isTrue();
     assertThat(new ProviderOperationStore.Operation("X", "k", " ", "FAILED").hasProviderRef())
         .isFalse();
     assertThat(new ProviderOperationStore.Operation("X", "k", null, "PENDING").hasProviderRef())
@@ -216,13 +216,13 @@ class OutboxTest {
         .thenReturn(List.of())
         .thenReturn(List.of(new ProviderOperationStore.Operation("REFUND", "r1", null, "PENDING")));
     when(jdbc.update(anyString(), any(), any(), any(), any(), any(), any())).thenReturn(1);
-    assertThat(ops.ensurePending("REFUND", "r1", "razorpay").status()).isEqualTo("PENDING");
+    assertThat(ops.ensurePending("REFUND", "r1", "cashfree").status()).isEqualTo("PENDING");
     when(jdbc.update(anyString(), any(), any(), any(), any(), any(), any()))
         .thenThrow(new org.springframework.dao.DuplicateKeyException("dup"));
     when(jdbc.query(anyString(), any(RowMapper.class), any(), any()))
         .thenReturn(List.of())
         .thenReturn(List.of(new ProviderOperationStore.Operation("REFUND", "r1", null, "PENDING")));
-    assertThat(ops.ensurePending("REFUND", "r1", "razorpay").status()).isEqualTo("PENDING");
+    assertThat(ops.ensurePending("REFUND", "r1", "cashfree").status()).isEqualTo("PENDING");
   }
 
   @Test

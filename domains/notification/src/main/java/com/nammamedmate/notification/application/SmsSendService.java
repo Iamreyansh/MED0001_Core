@@ -2,8 +2,6 @@ package com.nammamedmate.notification.application;
 
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.id.Ids;
-import com.nammamedmate.notification.application.port.out.CommunicationChannelLookupPort;
-import com.nammamedmate.notification.application.port.out.Msg91ClientPort;
 import com.nammamedmate.notification.application.port.out.PreferenceGatePort;
 import com.nammamedmate.notification.application.port.out.SmsDeliveryLogStore;
 import com.nammamedmate.notification.application.port.out.SmsTemplateStore;
@@ -36,26 +34,20 @@ public class SmsSendService {
 
   private final SmsTemplateStore templates;
   private final SmsDeliveryLogStore logs;
-  private final Msg91ClientPort msg91;
   private final TwilioClientPort twilio;
   private final PreferenceGatePort preferences;
-  private final CommunicationChannelLookupPort channels;
   private final Clock clock;
 
   public SmsSendService(
       SmsTemplateStore templates,
       SmsDeliveryLogStore logs,
-      Msg91ClientPort msg91,
       TwilioClientPort twilio,
       PreferenceGatePort preferences,
-      CommunicationChannelLookupPort channels,
       Clock clock) {
     this.templates = templates;
     this.logs = logs;
-    this.msg91 = msg91;
     this.twilio = twilio;
     this.preferences = preferences;
-    this.channels = channels;
     this.clock = clock;
   }
 
@@ -97,75 +89,19 @@ public class SmsSendService {
       if (!preferences.allowsSms(phone, SmsCategory.PROMOTIONAL.name())) {
         throw new AppException("PREFERENCE_BLOCKED", "Recipient opted out of promotional SMS", 422);
       }
-      if (msg91.isOnDnd(phone)) {
-        UUID logId = Ids.newId();
-        Instant now = clock.instant();
-        logs.insert(
-            new SmsDeliveryLog(
-                logId,
-                phone,
-                template.templateId(),
-                cmd.variables(),
-                null,
-                null,
-                false,
-                SmsLogStatus.SKIPPED_DND,
-                null,
-                now,
-                null,
-                null));
-        return toResponse(
-            logId, phone, template.templateId(), null, null, SmsLogStatus.SKIPPED_DND, null, now);
-      }
-    }
-
-    if (channels.resolveActiveProvider("SMS").isEmpty()) {
-      throw new AppException("ALL_PROVIDERS_FAILED", "SMS channel unavailable", 503);
     }
 
     String body = render(template.content(), cmd.variables());
     Instant now = clock.instant();
 
-    Msg91ClientPort.SendResult primary =
-        msg91.send(
-            new Msg91ClientPort.SendRequest(
-                phone,
-                template.dltTemplateId(),
-                SENDER_ID,
-                body,
-                cmd.variables(),
-                template.category()));
-    if (primary.success()) {
-      return persistSuccess(
-          phone,
-          template.templateId(),
-          cmd.variables(),
-          SmsProvider.MSG91,
-          primary.messageId(),
-          false,
-          now);
-    }
-
-    TwilioClientPort.SendResult fallback =
+    TwilioClientPort.SendResult result =
         twilio.send(new TwilioClientPort.SendRequest(phone, SENDER_ID, body, cmd.variables()));
-    if (fallback.success()) {
-      return persistSuccess(
-          phone,
-          template.templateId(),
-          cmd.variables(),
-          SmsProvider.TWILIO,
-          fallback.messageId(),
-          true,
-          now);
+    if (result.success()) {
+      return persistSuccess(phone, template.templateId(), cmd.variables(), result.messageId(), now);
     }
 
     UUID failId = Ids.newId();
-    String err = "All providers failed";
-    if (fallback.errorMessage() != null) {
-      err = fallback.errorMessage();
-    } else if (primary.errorMessage() != null) {
-      err = primary.errorMessage();
-    }
+    String err = result.errorMessage() == null ? "Twilio send failed" : result.errorMessage();
     logs.insert(
         new SmsDeliveryLog(
             failId,
@@ -174,13 +110,13 @@ public class SmsSendService {
             cmd.variables(),
             SmsProvider.TWILIO,
             null,
-            true,
+            false,
             SmsLogStatus.FAILED,
             null,
             now,
             null,
             err));
-    throw new AppException("ALL_PROVIDERS_FAILED", "Both MSG91 and Twilio failed", 503);
+    throw new AppException("ALL_PROVIDERS_FAILED", "Twilio SMS send failed", 503);
   }
 
   public Map<String, Object> handleWebhook(String providerMessageId, Instant deliveredAt) {
@@ -222,34 +158,31 @@ public class SmsSendService {
       String phone,
       String templateId,
       Map<String, String> variables,
-      SmsProvider provider,
       String messageId,
-      boolean fallbackUsed,
       Instant now) {
     UUID logId = Ids.newId();
-    BigDecimal cost = provider.costRs();
+    BigDecimal cost = SmsProvider.TWILIO.costRs();
     logs.insert(
         new SmsDeliveryLog(
             logId,
             phone,
             templateId,
             variables,
-            provider,
+            SmsProvider.TWILIO,
             messageId,
-            fallbackUsed,
+            false,
             SmsLogStatus.SENT,
             cost,
             now,
             null,
             null));
-    return toResponse(logId, phone, templateId, provider, messageId, SmsLogStatus.SENT, cost, now);
+    return toResponse(logId, phone, templateId, messageId, SmsLogStatus.SENT, cost, now);
   }
 
   private static Map<String, Object> toResponse(
       UUID logId,
       String phone,
       String templateId,
-      SmsProvider provider,
       String messageId,
       SmsLogStatus status,
       BigDecimal cost,
@@ -258,12 +191,12 @@ public class SmsSendService {
     data.put("log_id", logId.toString());
     data.put("to_phone", phone);
     data.put("template_id", templateId);
-    data.put("provider", provider == null ? null : provider.name());
+    data.put("provider", SmsProvider.TWILIO.name());
     data.put("provider_message_id", messageId);
     data.put("status", status.name());
     data.put("cost_rs", cost);
     data.put("sent_at", sentAt.toString());
-    data.put("fallback_used", provider == SmsProvider.TWILIO);
+    data.put("fallback_used", false);
     return data;
   }
 }

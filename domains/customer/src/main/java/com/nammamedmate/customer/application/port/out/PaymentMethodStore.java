@@ -35,7 +35,7 @@ public interface PaymentMethodStore {
       String nickname,
       String upiIdEncrypted,
       String upiHandle,
-      String razorpayTokenEncrypted,
+      String cashfreeTokenEncrypted,
       String cardLast4,
       String cardNetwork,
       String cardType,

@@ -17,8 +17,8 @@ class StubInvoiceCheckoutAdapterTest {
     StubInvoiceCheckoutAdapter stub =
         new StubInvoiceCheckoutAdapter(Clock.fixed(now, ZoneOffset.UTC));
     InvoiceCheckoutPort.CheckoutSession session = stub.createCheckout(Ids.newId(), 1000, "UPI");
-    assertThat(session.gateway()).isEqualTo("Razorpay");
-    assertThat(session.checkoutUrl()).startsWith("https://razorpay.com/checkout/pay_");
+    assertThat(session.gateway()).isEqualTo("Cashfree");
+    assertThat(session.checkoutUrl()).startsWith("https://cashfree.com/checkout/pay_");
     assertThat(session.expiresAt()).isEqualTo(now.plusSeconds(1800));
   }
 }

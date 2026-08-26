@@ -65,7 +65,7 @@ Namma MedMate is a four-sided platform:
 
 | Epic | Title | Priority | Stories | Status |
 |------|-------|----------|---------|--------|
-| [EPIC-003](./EPIC-003-pharmacy-onboarding-kyc/EPIC.md) | Pharmacy Onboarding & KYC | P0 | 5 | Draft |
+| [EPIC-003](./EPIC-003-pharmacy-onboarding-kyc/EPIC.md) | Pharmacy Onboarding & KYC | P0 | 4 | Draft |
 | [EPIC-004](./EPIC-004-pharmacy-operations-admin/EPIC.md) | Pharmacy Operations (Admin View) | P0 | 5 | Draft |
 | [EPIC-005](./EPIC-005-master-catalogue/EPIC.md) | Master Catalogue | P0 | 5 | Draft |
 | [EPIC-006](./EPIC-006-pharmacy-inventory/EPIC.md) | Pharmacy Inventory | P0 | 6 | Draft |
@@ -120,7 +120,7 @@ Namma MedMate is a four-sided platform:
 
 | Epic | Title | Priority | Stories | Status |
 |------|-------|----------|---------|--------|
-| [EPIC-017](./EPIC-017-notifications-comms/EPIC.md) | Notifications & Communications | P0 | 6 | Draft |
+| [EPIC-017](./EPIC-017-notifications-comms/EPIC.md) | Notifications & Communications | P0 | 4 | Draft |
 
 ### ?? Automation & AI
 
@@ -133,7 +133,7 @@ Namma MedMate is a four-sided platform:
 
 | Epic | Title | Priority | Stories | Status |
 |------|-------|----------|---------|--------|
-| [EPIC-022](./EPIC-022-external-integrations/EPIC.md) | External Integrations | P0 | 6 | Draft |
+| [EPIC-022](./EPIC-022-external-integrations/EPIC.md) | External Integrations | P0 | 2 | Draft |
 
 ---
 

@@ -249,10 +249,10 @@ class SaasBillingServiceCoverageTest {
     when(checkout.createCheckout(any(), anyLong(), anyString()))
         .thenReturn(
             new InvoiceCheckoutPort.CheckoutSession(
-                "https://razorpay.com/checkout/pay_x", NOW.plusSeconds(1800), "Razorpay"));
+                "https://cashfree.com/checkout/pay_x", NOW.plusSeconds(1800), "Cashfree"));
     when(invoices.findByPayIdempotencyKey("pay1")).thenReturn(Optional.empty());
     Map<String, Object> pay = service.pay(owner, due.id(), "UPI", "pay1");
-    assertThat(pay).containsEntry("payment_gateway", "Razorpay");
+    assertThat(pay).containsEntry("payment_gateway", "Cashfree");
 
     when(invoices.findByPayIdempotencyKey("pay1")).thenReturn(Optional.of(due));
     assertThat(service.pay(owner, due.id(), "UPI", "pay1")).containsKey("checkout_url");

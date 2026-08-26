@@ -202,7 +202,7 @@ public class OrderCancellationService {
     data.put("status", refund.status().name());
     data.put("processed_at", refund.processedAt() == null ? null : refund.processedAt().toString());
     data.put("issued_by", principal.subject().toString());
-    data.put("razorpay_refund_id", refund.razorpayRefundId());
+    data.put("gateway_refund_id", refund.gatewayRefundId());
     return data;
   }
 
@@ -380,7 +380,7 @@ public class OrderCancellationService {
     if (to == RefundTo.SOURCE) {
       return "Order was paid via "
           + order.paymentMethod().name()
-          + ". Refund to source recommended (3-5 business days via Razorpay).";
+          + ". Refund to source recommended (3-5 business days via Cashfree).";
     }
     if (order.paymentMethod() == PaymentMethod.COD) {
       return "COD order — any refund credits Namma Money wallet.";

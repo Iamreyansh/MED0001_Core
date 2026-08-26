@@ -86,7 +86,7 @@ public class PharmacyReorderService {
       OutboxPublisher outbox,
       RateLimiter rateLimiter,
       Clock clock,
-      @Value("${medmate.inventory.po-dispatch.whatsapp-enabled:true}") boolean whatsappEnabled,
+      @Value("${medmate.inventory.po-dispatch.whatsapp-enabled:false}") boolean whatsappEnabled,
       @Value("${medmate.inventory.po-dispatch.email-enabled:true}") boolean emailEnabled) {
     this.suggestionStore = suggestionStore;
     this.poStore = poStore;

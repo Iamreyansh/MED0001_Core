@@ -34,8 +34,8 @@ script:pre-request {
 
 script:post-response {
   const body = res.getBody();
-  if (body && body.success && body.data && body.data.razorpay_payout_id) {
-    bru.setEnvVar("razorpayPayoutId", body.data.razorpay_payout_id);
+  if (body && body.success && body.data && body.data.cashfree_transfer_id) {
+    bru.setEnvVar("cashfreeTransferId", body.data.cashfree_transfer_id);
   }
 }
 
@@ -47,12 +47,12 @@ tests {
     const body = res.getBody();
     expect(body.success).to.equal(true);
     expect(body.data.status).to.equal("RELEASED");
-    expect(body.data).to.have.property("razorpay_payout_id");
+    expect(body.data).to.have.property("cashfree_transfer_id");
   });
 }
 
 docs {
-  POST /api/v1/admin/finance/rider-payouts/:rider_id/release — Razorpay Route + ledger PAYOUT_RIDER + SMS outbox.
+  POST /api/v1/admin/finance/rider-payouts/:rider_id/release — Cashfree Route + ledger PAYOUT_RIDER + SMS outbox.
   Requires Idempotency-Key.
 }
 
@@ -84,7 +84,7 @@ example {
             "rider_id": "a0000001-0000-4000-8000-0000000000r1",
             "net_payout": 2000.00,
             "status": "RELEASED",
-            "razorpay_payout_id": "pout_XXXXXXXXXXXX",
+            "cashfree_transfer_id": "pout_XXXXXXXXXXXX",
             "released_by": "admin-uuid",
             "released_at": "2026-07-24T10:00:00Z"
           },

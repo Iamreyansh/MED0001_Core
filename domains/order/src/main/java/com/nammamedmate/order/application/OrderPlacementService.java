@@ -8,6 +8,7 @@ import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
 import com.nammamedmate.order.adapter.out.persistence.StubCodCollectionAdapter;
 import com.nammamedmate.order.application.port.out.CartStore;
+import com.nammamedmate.order.application.port.out.CashfreePaymentPort;
 import com.nammamedmate.order.application.port.out.CodCollectionPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort.AddressRow;
@@ -22,7 +23,6 @@ import com.nammamedmate.order.application.port.out.PharmacyCandidatePort.Pharmac
 import com.nammamedmate.order.application.port.out.PlatformCouponPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.PriceCeilingPort;
-import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
 import com.nammamedmate.order.application.port.out.WalletBalancePort;
 import com.nammamedmate.order.application.port.out.WalletPort;
 import com.nammamedmate.order.application.port.out.ZoneMembershipPort;
@@ -81,7 +81,7 @@ public class OrderPlacementService {
   private final ZoneMembershipPort zones;
   private final DeliveryFeePort deliveryFees;
   private final PriceCeilingPort priceCeiling;
-  private final RazorpayPaymentPort razorpay;
+  private final CashfreePaymentPort cashfree;
   private final RefundService refunds;
   private final CodCollectionPort codCollections;
   private final OutboxPublisher outbox;
@@ -113,7 +113,7 @@ public class OrderPlacementService {
       ZoneMembershipPort zones,
       DeliveryFeePort deliveryFees,
       PriceCeilingPort priceCeiling,
-      RazorpayPaymentPort razorpay,
+      CashfreePaymentPort cashfree,
       RefundService refunds,
       OutboxPublisher outbox,
       ObjectMapper objectMapper,
@@ -133,7 +133,7 @@ public class OrderPlacementService {
         zones,
         deliveryFees,
         priceCeiling,
-        razorpay,
+        cashfree,
         refunds,
         new StubCodCollectionAdapter(),
         outbox,
@@ -157,7 +157,7 @@ public class OrderPlacementService {
       ZoneMembershipPort zones,
       DeliveryFeePort deliveryFees,
       PriceCeilingPort priceCeiling,
-      RazorpayPaymentPort razorpay,
+      CashfreePaymentPort cashfree,
       RefundService refunds,
       CodCollectionPort codCollections,
       OutboxPublisher outbox,
@@ -177,7 +177,7 @@ public class OrderPlacementService {
     this.zones = zones;
     this.deliveryFees = deliveryFees;
     this.priceCeiling = priceCeiling;
-    this.razorpay = razorpay;
+    this.cashfree = cashfree;
     this.refunds = refunds;
     this.codCollections = codCollections == null ? new StubCodCollectionAdapter() : codCollections;
     this.outbox = outbox;
@@ -340,15 +340,15 @@ public class OrderPlacementService {
     boolean needsOnlinePay = method.isOnline() && bill.totalPayablePaise() > 0;
     if (needsOnlinePay) {
       try {
-        var rz = razorpay.createOrder(orderId, bill.totalPayablePaise());
-        order.markPaymentPending(rz.razorpayOrderId(), now);
+        var rz = cashfree.createOrder(orderId, bill.totalPayablePaise());
+        order.markPaymentPending(rz.gatewayOrderId(), now);
       } catch (AppException e) {
         if ("PAYMENT_INITIATION_FAILED".equals(e.code())) {
           throw e;
         }
-        throw new AppException("PAYMENT_INITIATION_FAILED", "Razorpay order creation failed", 502);
+        throw new AppException("PAYMENT_INITIATION_FAILED", "Cashfree order creation failed", 502);
       } catch (RuntimeException e) {
-        throw new AppException("PAYMENT_INITIATION_FAILED", "Razorpay order creation failed", 502);
+        throw new AppException("PAYMENT_INITIATION_FAILED", "Cashfree order creation failed", 502);
       }
     } else {
       Instant eta = estimatedDeliveryAt(now, pharmacy, address);
@@ -440,15 +440,14 @@ public class OrderPlacementService {
             .findByCustomerAndId(principal.subject(), orderId)
             .orElseThrow(() -> new AppException("ORDER_NOT_FOUND", "Order not found", 404));
 
-    if (order.paymentStatus() == PaymentStatus.PAID
-        && paymentId.equals(order.razorpayPaymentId())) {
+    if (order.paymentStatus() == PaymentStatus.PAID && paymentId.equals(order.gatewayPaymentId())) {
       return confirmView(order, true);
     }
     if (order.status() != OrderStatus.PAYMENT_PENDING) {
       throw new AppException("ORDER_NOT_IN_PAYMENT_PENDING", "Order is not awaiting payment", 409);
     }
-    if (order.razorpayOrderId() == null
-        || !razorpay.verifyPaymentSignature(order.razorpayOrderId(), paymentId, paymentSignature)) {
+    if (order.gatewayOrderId() == null
+        || !cashfree.verifyPaymentSignature(order.gatewayOrderId(), paymentId, paymentSignature)) {
       throw new AppException("PAYMENT_SIGNATURE_INVALID", "HMAC verification failed", 422);
     }
 
@@ -498,10 +497,10 @@ public class OrderPlacementService {
   }
 
   @Transactional
-  public Map<String, Object> handleRazorpayWebhook(
+  public Map<String, Object> handleCashfreeWebhook(
       String signatureHeader, byte[] rawBody, String idempotencyKey) {
     // Idempotent on payment_id / refund id in payload; Idempotency-Key unused for webhooks.
-    if (!razorpay.verifyWebhookSignature(
+    if (!cashfree.verifyWebhookSignature(
         signatureHeader, rawBody == null ? new byte[0] : rawBody)) {
       throw new AppException("PAYMENT_SIGNATURE_INVALID", "Webhook signature invalid", 422);
     }
@@ -516,19 +515,19 @@ public class OrderPlacementService {
       }
       JsonNode entity = root.path("payload").path("payment").path("entity");
       String paymentId = text(entity, "id");
-      String razorpayOrderId = text(entity, "order_id");
+      String gatewayOrderId = text(entity, "order_id");
       if (paymentId == null) {
         return Map.of("ignored", true);
       }
-      if (razorpayOrderId == null) {
+      if (gatewayOrderId == null) {
         return Map.of("ignored", true);
       }
       Order order =
           orders
-              .findByRazorpayOrderId(razorpayOrderId)
+              .findByGatewayOrderId(gatewayOrderId)
               .orElseThrow(() -> new AppException("ORDER_NOT_FOUND", "Order not found", 404));
       if (order.paymentStatus() == PaymentStatus.PAID
-          && paymentId.equals(order.razorpayPaymentId())) {
+          && paymentId.equals(order.gatewayPaymentId())) {
         return Map.of(
             "order_id", order.id().toString(),
             "status", order.status().name(),
@@ -569,7 +568,7 @@ public class OrderPlacementService {
    * accepted.
    */
   @Transactional
-  public void applyExternalPaymentCapture(UUID orderId, String razorpayPaymentId) {
+  public void applyExternalPaymentCapture(UUID orderId, String gatewayPaymentId) {
     if (orderId == null) {
       return;
     }
@@ -578,17 +577,17 @@ public class OrderPlacementService {
       return;
     }
     if (order.paymentStatus() == PaymentStatus.PAID) {
-      if (razorpayPaymentId == null) {
+      if (gatewayPaymentId == null) {
         return;
       }
-      if (razorpayPaymentId.equals(order.razorpayPaymentId())) {
+      if (gatewayPaymentId.equals(order.gatewayPaymentId())) {
         return;
       }
     }
     if (order.status() != OrderStatus.PAYMENT_PENDING) {
       return;
     }
-    confirmOnlineOrder(order, razorpayPaymentId);
+    confirmOnlineOrder(order, gatewayPaymentId);
   }
 
   /**
@@ -752,7 +751,7 @@ public class OrderPlacementService {
       Map<String, Object> payment = new LinkedHashMap<>();
       payment.put("method", order.paymentMethod().name());
       payment.put("status", order.paymentStatus().name());
-      payment.put("razorpay_order_id", order.razorpayOrderId());
+      payment.put("gateway_order_id", order.gatewayOrderId());
       payment.put("amount_paise", order.totalPayablePaise());
       data.put("payment", payment);
       data.put("created_at", order.createdAt().toString());
@@ -817,7 +816,7 @@ public class OrderPlacementService {
     Map<String, Object> payment = new LinkedHashMap<>();
     payment.put("method", order.paymentMethod().name());
     payment.put("status", order.paymentStatus().name());
-    payment.put("transaction_id", order.razorpayPaymentId());
+    payment.put("transaction_id", order.gatewayPaymentId());
     data.put("payment", payment);
     data.put("pharmacy_notified", pharmacyNotified);
     data.put("confirmed_at", iso(order.confirmedAt()));
@@ -888,8 +887,8 @@ public class OrderPlacementService {
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("method", order.paymentMethod().name());
     m.put("status", order.paymentStatus().name());
-    m.put("transaction_id", order.razorpayPaymentId());
-    m.put("razorpay_order_id", order.razorpayOrderId());
+    m.put("transaction_id", order.gatewayPaymentId());
+    m.put("gateway_order_id", order.gatewayOrderId());
     return m;
   }
 

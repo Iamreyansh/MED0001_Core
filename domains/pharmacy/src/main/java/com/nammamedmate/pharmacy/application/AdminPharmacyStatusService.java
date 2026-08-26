@@ -86,7 +86,6 @@ public class AdminPharmacyStatusService {
   private final AdminPharmacyStore store;
   private final ZoneStore zones;
   private final AuditLogStore auditLog;
-  private final AutoKycService autoKyc;
   private final PharmacyOrderMetricsPort orderMetrics;
   private final PharmacyCatalogueStatsPort catalogueStats;
   private final RateLimiter rateLimiter;
@@ -101,7 +100,6 @@ public class AdminPharmacyStatusService {
       AdminPharmacyStore store,
       ZoneStore zones,
       AuditLogStore auditLog,
-      AutoKycService autoKyc,
       PharmacyOrderMetricsPort orderMetrics,
       PharmacyCatalogueStatsPort catalogueStats,
       RateLimiter rateLimiter,
@@ -112,7 +110,6 @@ public class AdminPharmacyStatusService {
     this.store = store;
     this.zones = zones;
     this.auditLog = auditLog;
-    this.autoKyc = autoKyc;
     this.orderMetrics = orderMetrics;
     this.catalogueStats = catalogueStats;
     this.rateLimiter = rateLimiter;
@@ -208,10 +205,7 @@ public class AdminPharmacyStatusService {
         store
             .findDetail(pharmacyId)
             .orElseThrow(() -> new AppException("PHARMACY_NOT_FOUND", "Pharmacy not found", 404));
-
-    Map<String, Object> autoSummary = autoKyc.latestAutoKycSummary(pharmacyId);
-    String autoStatus =
-        autoSummary == null ? null : String.valueOf(autoSummary.get("overall_status"));
+    String autoStatus = null;
 
     Map<String, Object> kyc = new LinkedHashMap<>();
     kyc.put("submitted_at", row.kycSubmittedAt() == null ? null : row.kycSubmittedAt().toString());

@@ -92,7 +92,7 @@ The financial ledger is the platform's append-only double-entry-style accounting
         "credit": 0.00,
         "debit": 8.91,
         "running_balance": 248780.69,
-        "description": "Razorpay UPI fee for payment pay_XXXXXXXXXXXX",
+        "description": "Cashfree UPI fee for payment pay_XXXXXXXXXXXX",
         "created_at": "2026-07-24T13:15:00Z"
       },
       {

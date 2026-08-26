@@ -1,0 +1,155 @@
+meta {
+  name: order-payment
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/webhooks/cashfree/order-payment
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+  x-webhook-signature: {{cashfreeWebhookSignature}}
+  x-webhook-timestamp: {{cashfreeWebhookTimestamp}}
+}
+
+body:json {
+  {
+    "event": "payment.captured",
+    "payload": {
+      "payment": {
+        "entity": {
+          "id": "{{gatewayPaymentId}}",
+          "order_id": "{{gatewayOrderId}}"
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  const secret = bru.getEnvVar("cashfreeWebhookSecret") || "test_cashfree_webhook_secret";
+  const paymentId = bru.getEnvVar("gatewayPaymentId") || "pay_BrunoWebhook001";
+  const orderId = bru.getEnvVar("gatewayOrderId");
+  if (!orderId) {
+    throw new Error("gatewayOrderId missing — place a UPI/CARD order first");
+  }
+  bru.setEnvVar("gatewayPaymentId", paymentId);
+  const payload = JSON.stringify({
+    event: "payment.captured",
+    payload: {
+      payment: {
+        entity: {
+          id: paymentId,
+          order_id: orderId
+        }
+      }
+    }
+  });
+  const signature = CryptoJS.HmacSHA256(payload, secret).toString(CryptoJS.enc.Hex);
+  bru.setEnvVar("cashfreeWebhookSignature", signature);
+  req.setHeader("x-webhook-signature", signature);
+  req.setBody(payload);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.success && body.data && body.data.order_id) {
+    bru.setEnvVar("orderId", body.data.order_id);
+  }
+  if (body && body.success && body.data && body.data.status) {
+    bru.setEnvVar("orderStatus", body.data.status);
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("webhook envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data).to.be.an("object");
+  });
+}
+
+docs {
+  POST /api/v1/webhooks/cashfree/order-payment — Cashfree payment.captured / refund.processed.
+  No bearer auth. x-webhook-signature = HMAC-SHA256 hex of raw body with medmate.cashfree.webhook-secret.
+  Idempotent on payment_id / refund id; Idempotency-Key optional unused.
+}
+
+example {
+  name: 200 OK — payment captured
+  description: Confirms PAYMENT_PENDING order to PENDING_ACCEPTANCE.
+
+  request: {
+    url: {{baseUrl}}/api/v1/webhooks/cashfree/order-payment
+    method: post
+    mode: json
+    headers: {
+      x-webhook-signature: a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+    }
+    body:json: {
+      {
+        "event": "payment.captured",
+        "payload": {
+          "payment": {
+            "entity": {
+              "id": "pay_BrunoWebhook001",
+              "order_id": "order_CashfreeBruno01"
+            }
+          }
+        }
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "order_id": "ordddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "status": "PENDING_ACCEPTANCE",
+            "payment_status": "PAID"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 PAYMENT_SIGNATURE_INVALID
+  description: HMAC signature does not match webhook secret.
+
+  response: {
+    status: {
+      code: 422
+    }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "PAYMENT_SIGNATURE_INVALID",
+            "message": "Webhook signature invalid"
+          }
+        }
+      '''
+    }
+  }
+}

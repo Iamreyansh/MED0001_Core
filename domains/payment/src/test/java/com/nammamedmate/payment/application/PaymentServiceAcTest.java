@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.payment.adapter.out.client.StubRazorpayGatewayClient;
+import com.nammamedmate.payment.adapter.out.client.StubCashfreeGatewayClient;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort.OrderSnapshot;
@@ -54,7 +54,7 @@ class PaymentServiceAcTest {
   @Mock private OrderPaymentStatusPort orderStatus;
   @Mock private FinancialLedgerWriterPort ledger;
 
-  private StubRazorpayGatewayClient razorpay;
+  private StubCashfreeGatewayClient cashfree;
   private PaymentService service;
   private final UUID customerId = UUID.randomUUID();
   private final UUID orderId = UUID.randomUUID();
@@ -64,12 +64,12 @@ class PaymentServiceAcTest {
 
   @BeforeEach
   void setUp() {
-    razorpay = new StubRazorpayGatewayClient();
+    cashfree = new StubCashfreeGatewayClient();
     Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     service =
         new PaymentService(
             store,
-            razorpay,
+            cashfree,
             wallet,
             orders,
             orderStatus,
@@ -102,20 +102,20 @@ class PaymentServiceAcTest {
               }
               return Optional.empty();
             });
-    when(store.findByRazorpayOrderId(anyString()))
+    when(store.findByGatewayOrderId(anyString()))
         .thenAnswer(
             inv -> {
               Payment p = saved.get();
-              if (p != null && inv.getArgument(0).equals(p.razorpayOrderId())) {
+              if (p != null && inv.getArgument(0).equals(p.gatewayOrderId())) {
                 return Optional.of(p);
               }
               return Optional.empty();
             });
-    when(store.findByRazorpayPaymentId(anyString()))
+    when(store.findByGatewayPaymentId(anyString()))
         .thenAnswer(
             inv -> {
               Payment p = saved.get();
-              if (p != null && inv.getArgument(0).equals(p.razorpayPaymentId())) {
+              if (p != null && inv.getArgument(0).equals(p.gatewayPaymentId())) {
                 return Optional.of(p);
               }
               return Optional.empty();
@@ -123,14 +123,14 @@ class PaymentServiceAcTest {
   }
 
   @Test
-  void ac001_initiateCreatesRazorpayOrderAndPendingPayment() {
+  void ac001_initiateCreatesCashfreeOrderAndPendingPayment() {
     when(orders.findById(orderId)).thenReturn(Optional.of(snap("UPI", 49500, 0)));
     when(wallet.debitForOrder(eq(customerId), eq(orderId), eq(49500L), anyString())).thenReturn(0L);
 
     Map<String, Object> data = service.initiate(customer, orderId, 49500L, "INR", "UPI");
 
-    assertThat(data.get("razorpay_order_id")).asString().startsWith("order_stub_");
-    assertThat(data.get("razorpay_key_id")).isEqualTo(StubRazorpayGatewayClient.DEFAULT_KEY_ID);
+    assertThat(data.get("gateway_order_id")).asString().startsWith("order_stub_");
+    assertThat(data.get("cashfree_app_id")).isEqualTo(StubCashfreeGatewayClient.DEFAULT_KEY_ID);
     assertThat(saved.get().status()).isEqualTo(PaymentStatus.PENDING);
     assertThat(saved.get().method()).isEqualTo(PaymentMethod.UPI);
   }
@@ -139,9 +139,9 @@ class PaymentServiceAcTest {
   void ac002_verifyValidSignatureCapturesAndAdvancesOrder() {
     seedPendingPayment();
     String payId = "pay_valid_001";
-    String sig = razorpay.signPayment(saved.get().razorpayOrderId(), payId);
+    String sig = cashfree.signPayment(saved.get().gatewayOrderId(), payId);
 
-    Map<String, Object> data = service.verify(customer, payId, saved.get().razorpayOrderId(), sig);
+    Map<String, Object> data = service.verify(customer, payId, saved.get().gatewayOrderId(), sig);
 
     assertThat(data.get("payment_status")).isEqualTo("CAPTURED");
     assertThat(saved.get().status()).isEqualTo(PaymentStatus.CAPTURED);
@@ -160,7 +160,7 @@ class PaymentServiceAcTest {
     seedPendingPayment();
 
     assertThatThrownBy(
-            () -> service.verify(customer, "pay_x", saved.get().razorpayOrderId(), "bad_signature"))
+            () -> service.verify(customer, "pay_x", saved.get().gatewayOrderId(), "bad_signature"))
         .isInstanceOf(AppException.class)
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("PAYMENT_SIGNATURE_INVALID");
@@ -172,16 +172,16 @@ class PaymentServiceAcTest {
   void ac004_duplicateCapturedWebhookIsIdempotentNoOp() {
     seedPendingPayment();
     String payId = "pay_dup_001";
-    String sig = razorpay.signPayment(saved.get().razorpayOrderId(), payId);
-    service.verify(customer, payId, saved.get().razorpayOrderId(), sig);
+    String sig = cashfree.signPayment(saved.get().gatewayOrderId(), payId);
+    service.verify(customer, payId, saved.get().gatewayOrderId(), sig);
 
     String body =
         """
         {"event":"payment.captured","payload":{"payment":{"entity":{"id":"%s","order_id":"%s","fee":100}}}}
         """
-            .formatted(payId, saved.get().razorpayOrderId());
+            .formatted(payId, saved.get().gatewayOrderId());
     String header =
-        StubRazorpayGatewayClient.hmacHex(StubRazorpayGatewayClient.DEFAULT_WEBHOOK_SECRET, body);
+        StubCashfreeGatewayClient.hmacHex(StubCashfreeGatewayClient.DEFAULT_WEBHOOK_SECRET, body);
 
     Map<String, Object> ack = service.handleWebhook(header, body.getBytes(StandardCharsets.UTF_8));
 

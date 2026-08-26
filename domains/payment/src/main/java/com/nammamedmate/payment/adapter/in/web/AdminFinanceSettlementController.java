@@ -61,7 +61,7 @@ public class AdminFinanceSettlementController {
 
   @PostMapping("/{settlementId}/release")
   @RequiresPermission("settlements:process")
-  @Operation(summary = "Admin: release settlement via RazorpayX")
+  @Operation(summary = "Admin: release settlement via CashfreePayout")
   public ApiResponse<Map<String, Object>> release(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @PathVariable UUID settlementId,

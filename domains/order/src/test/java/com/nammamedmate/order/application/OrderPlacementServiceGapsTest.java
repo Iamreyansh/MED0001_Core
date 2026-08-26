@@ -14,12 +14,13 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
-import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.client.StubCashfreePaymentPort;
 import com.nammamedmate.order.adapter.out.persistence.StubDeliveryFeeAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter;
 import com.nammamedmate.order.adapter.out.persistence.StubWalletPort;
 import com.nammamedmate.order.application.OrderPlacementServiceTest.InMemoryCartStore;
 import com.nammamedmate.order.application.OrderPlacementServiceTest.InMemoryOrderStore;
+import com.nammamedmate.order.application.port.out.CashfreePaymentPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort.AddressRow;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
@@ -27,7 +28,6 @@ import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort.Sto
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort.PharmacyRow;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
-import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
 import com.nammamedmate.order.application.port.out.WalletBalancePort;
 import com.nammamedmate.order.application.port.out.WalletPort;
 import com.nammamedmate.order.application.port.out.ZoneMembershipPort;
@@ -81,7 +81,7 @@ class OrderPlacementServiceGapsTest {
 
   private InMemoryCartStore carts;
   private InMemoryOrderStore orders;
-  private StubRazorpayPaymentPort razorpay;
+  private StubCashfreePaymentPort cashfree;
   private OrderPlacementService service;
   private final MedmatePrincipal customer =
       new MedmatePrincipal(CUST, AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
@@ -93,7 +93,7 @@ class OrderPlacementServiceGapsTest {
   void setUp() {
     carts = new InMemoryCartStore();
     orders = new InMemoryOrderStore();
-    razorpay = new StubRazorpayPaymentPort();
+    cashfree = new StubCashfreePaymentPort();
     when(rateLimiter.tryAcquire(
             any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
         .thenReturn(true);
@@ -106,7 +106,7 @@ class OrderPlacementServiceGapsTest {
     when(pharmacies.findById(PH1)).thenReturn(Optional.of(openPharmacy()));
     when(inventory.checkAvailability(eq(PH1), anyList()))
         .thenReturn(List.of(new StockLine(MED, "M", 100, 8500, 9000, true, null)));
-    service = build(razorpay, wallet);
+    service = build(cashfree, wallet);
     StubWalletPort stubWallet = new StubWalletPort();
     assertThat(stubWallet.debitForOrder(CUST, UUID.randomUUID(), 100, "x")).isZero();
     assertThat(stubWallet.creditForRefund(CUST, UUID.randomUUID(), 100, "x", "k")).isNull();
@@ -214,8 +214,8 @@ class OrderPlacementServiceGapsTest {
     Map<String, Object> rxOk = service.placeOrder(customer, rxCart.id(), "COD", null, null, "k13");
     assertThat(rxOk.get("status")).isEqualTo("PENDING_ACCEPTANCE");
 
-    // razorpay AppException non-initiation + RuntimeException
-    RazorpayPaymentPort badApp = mock(RazorpayPaymentPort.class);
+    // cashfree AppException non-initiation + RuntimeException
+    CashfreePaymentPort badApp = mock(CashfreePaymentPort.class);
     when(badApp.createOrder(any(), org.mockito.ArgumentMatchers.anyLong()))
         .thenThrow(new AppException("OTHER", "x", 500));
     OrderPlacementService s1 = build(badApp, wallet);
@@ -223,7 +223,7 @@ class OrderPlacementServiceGapsTest {
             () -> s1.placeOrder(customer, readyInserted().id(), "UPI", null, null, "k14"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("PAYMENT_INITIATION_FAILED");
-    RazorpayPaymentPort badRt = mock(RazorpayPaymentPort.class);
+    CashfreePaymentPort badRt = mock(CashfreePaymentPort.class);
     when(badRt.createOrder(any(), org.mockito.ArgumentMatchers.anyLong()))
         .thenThrow(new RuntimeException("boom"));
     OrderPlacementService s2 = build(badRt, wallet);
@@ -265,9 +265,9 @@ class OrderPlacementServiceGapsTest {
 
     Order upiOrder = orders.findById(upiId).orElseThrow();
     String pay = "pay_gap";
-    String sig = razorpay.signPayment(upiOrder.razorpayOrderId(), pay);
+    String sig = cashfree.signPayment(upiOrder.gatewayOrderId(), pay);
     service.confirmPayment(customer, upiId, pay, sig, "c6");
-    // null razorpay order id branch via fake order — already confirmed path covered
+    // null cashfree order id branch via fake order — already confirmed path covered
     assertThat(service.confirmPayment(customer, upiId, pay, sig, "c7").get("status"))
         .isEqualTo("PENDING_ACCEPTANCE");
 
@@ -312,9 +312,9 @@ class OrderPlacementServiceGapsTest {
     String missingIds =
         "{\"event\":\"payment.captured\",\"payload\":{\"payment\":{\"entity\":{}}}}";
     String whSig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, missingIds);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, missingIds);
     assertThat(
-            service.handleRazorpayWebhook(whSig, missingIds.getBytes(StandardCharsets.UTF_8), "w1"))
+            service.handleCashfreeWebhook(whSig, missingIds.getBytes(StandardCharsets.UTF_8), "w1"))
         .containsEntry("ignored", true);
 
     Cart upi2 = readyInserted();
@@ -323,22 +323,22 @@ class OrderPlacementServiceGapsTest {
     Order o2 = orders.findById((UUID) upiPlaced.get("order_id")).orElseThrow();
     String body =
         "{\"event\":\"payment.captured\",\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_w\",\"order_id\":\"%s\"}}}}"
-            .formatted(o2.razorpayOrderId());
+            .formatted(o2.gatewayOrderId());
     String bodySig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, body);
-    assertThat(service.handleRazorpayWebhook(bodySig, body.getBytes(StandardCharsets.UTF_8), "w2"))
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, body);
+    assertThat(service.handleCashfreeWebhook(bodySig, body.getBytes(StandardCharsets.UTF_8), "w2"))
         .containsEntry("status", "PENDING_ACCEPTANCE");
-    assertThat(service.handleRazorpayWebhook(bodySig, body.getBytes(StandardCharsets.UTF_8), "w3"))
+    assertThat(service.handleCashfreeWebhook(bodySig, body.getBytes(StandardCharsets.UTF_8), "w3"))
         .containsEntry("payment_status", "PAID");
 
     // webhook unknown order
     String unknown =
         "{\"event\":\"payment.captured\",\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_x\",\"order_id\":\"order_missing\"}}}}";
     String unknownSig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, unknown);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, unknown);
     assertThatThrownBy(
             () ->
-                service.handleRazorpayWebhook(
+                service.handleCashfreeWebhook(
                     unknownSig, unknown.getBytes(StandardCharsets.UTF_8), "w4"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("ORDER_NOT_FOUND");
@@ -346,10 +346,10 @@ class OrderPlacementServiceGapsTest {
     // invalid json
     String badJson = "{";
     String badJsonSig =
-        StubRazorpayPaymentPort.hmacHex(StubRazorpayPaymentPort.DEFAULT_WEBHOOK_SECRET, badJson);
+        StubCashfreePaymentPort.hmacHex(StubCashfreePaymentPort.DEFAULT_WEBHOOK_SECRET, badJson);
     assertThatThrownBy(
             () ->
-                service.handleRazorpayWebhook(
+                service.handleCashfreeWebhook(
                     badJsonSig, badJson.getBytes(StandardCharsets.UTF_8), "w5"))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
@@ -368,11 +368,11 @@ class OrderPlacementServiceGapsTest {
     assertThat(upi3p.get("status")).isEqualTo("PAYMENT_PENDING");
     UUID upi3id = UUID.fromString(String.valueOf(upi3p.get("order_id")));
     Order o3 = orders.findById(upi3id).orElseThrow();
-    assertThat(o3.razorpayOrderId()).isNotBlank();
+    assertThat(o3.gatewayOrderId()).isNotBlank();
     when(pharmacies.findById(PH1)).thenReturn(Optional.empty());
     when(addresses.findForCustomer(ADDR, CUST)).thenReturn(Optional.empty());
     String p3 = "pay_eta";
-    String s3 = razorpay.signPayment(o3.razorpayOrderId(), p3);
+    String s3 = cashfree.signPayment(o3.gatewayOrderId(), p3);
     Map<String, Object> confirmedEta = service.confirmPayment(customer, upi3id, p3, s3, "c8");
     assertThat(confirmedEta).containsEntry("pharmacy_notified", true);
 
@@ -464,7 +464,7 @@ class OrderPlacementServiceGapsTest {
         10.0);
   }
 
-  private OrderPlacementService build(RazorpayPaymentPort rz, WalletPort w) {
+  private OrderPlacementService build(CashfreePaymentPort rz, WalletPort w) {
     return new OrderPlacementService(
         cartService,
         carts,

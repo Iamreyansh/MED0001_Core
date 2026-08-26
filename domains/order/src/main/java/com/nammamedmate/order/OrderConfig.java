@@ -3,7 +3,7 @@ package com.nammamedmate.order;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.order.adapter.out.cache.RedisDeliveryOtpCache;
 import com.nammamedmate.order.adapter.out.cache.RedisLiveFeedCache;
-import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.client.StubCashfreePaymentPort;
 import com.nammamedmate.order.adapter.out.persistence.JdbcAdminOrderExportStore;
 import com.nammamedmate.order.adapter.out.persistence.JdbcAdminOrderQueryAdapter;
 import com.nammamedmate.order.adapter.out.persistence.JdbcCartStore;
@@ -30,6 +30,7 @@ import com.nammamedmate.order.adapter.out.persistence.StubZoneMembershipAdapter;
 import com.nammamedmate.order.application.port.out.AdminOrderExportStore;
 import com.nammamedmate.order.application.port.out.AdminOrderQueryPort;
 import com.nammamedmate.order.application.port.out.CartStore;
+import com.nammamedmate.order.application.port.out.CashfreePaymentPort;
 import com.nammamedmate.order.application.port.out.CodCollectionPort;
 import com.nammamedmate.order.application.port.out.CustomerAddressPort;
 import com.nammamedmate.order.application.port.out.DeliveryFeePort;
@@ -46,7 +47,6 @@ import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
 import com.nammamedmate.order.application.port.out.PlatformCouponPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.PriceCeilingPort;
-import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
 import com.nammamedmate.order.application.port.out.RefundStore;
 import com.nammamedmate.order.application.port.out.ReorderAttemptLogStore;
 import com.nammamedmate.order.application.port.out.RiderLookupPort;
@@ -191,12 +191,12 @@ public class OrderConfig {
   }
 
   @Bean
-  @ConditionalOnMissingBean(RazorpayPaymentPort.class)
-  RazorpayPaymentPort razorpayPaymentPort(
-      @Value("${medmate.razorpay.key-secret:test_razorpay_secret}") String keySecret,
-      @Value("${medmate.razorpay.webhook-secret:test_razorpay_webhook_secret}")
+  @ConditionalOnMissingBean(CashfreePaymentPort.class)
+  CashfreePaymentPort cashfreePaymentPort(
+      @Value("${medmate.cashfree.secret-key:test_cashfree_secret}") String keySecret,
+      @Value("${medmate.cashfree.webhook-secret:test_cashfree_webhook_secret}")
           String webhookSecret) {
-    return new StubRazorpayPaymentPort(keySecret, webhookSecret);
+    return new StubCashfreePaymentPort(keySecret, webhookSecret);
   }
 
   @Bean

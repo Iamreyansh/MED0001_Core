@@ -11,9 +11,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort;
+import com.nammamedmate.payment.application.port.out.CashfreePayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort;
-import com.nammamedmate.payment.application.port.out.RazorpayXPayoutPort.PayoutResult;
 import com.nammamedmate.payment.application.port.out.RiderPayoutNotificationPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutPort;
 import com.nammamedmate.payment.application.port.out.RiderPayoutPort.ListResult;
@@ -48,7 +48,7 @@ class RiderPayoutFacadeServiceAcTest {
   private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
   @Mock private RiderPayoutPort payouts;
-  @Mock private RazorpayXPayoutPort razorpayx;
+  @Mock private CashfreePayoutPort cashfree_payouts;
   @Mock private FinancialLedgerWriterPort ledger;
   @Mock private RiderPayoutNotificationPort notifications;
 
@@ -62,7 +62,7 @@ class RiderPayoutFacadeServiceAcTest {
 
   @BeforeEach
   void setUp() {
-    service = new RiderPayoutFacadeService(payouts, razorpayx, ledger, notifications, CLOCK);
+    service = new RiderPayoutFacadeService(payouts, cashfree_payouts, ledger, notifications, CLOCK);
   }
 
   @Test
@@ -79,7 +79,7 @@ class RiderPayoutFacadeServiceAcTest {
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, null, "k"))
         .extracting(ex -> ((AppException) ex).httpStatus())
         .isEqualTo(422);
-    verify(razorpayx, never()).initiatePayout(any());
+    verify(cashfree_payouts, never()).initiatePayout(any());
   }
 
   @Test
@@ -94,7 +94,7 @@ class RiderPayoutFacadeServiceAcTest {
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("PAYOUT_BELOW_THRESHOLD");
     verify(payouts).markBelowThreshold(eq(payoutId), anyString(), eq(NOW));
-    verify(razorpayx, never()).initiatePayout(any());
+    verify(cashfree_payouts, never()).initiatePayout(any());
   }
 
   @Test
@@ -109,7 +109,7 @@ class RiderPayoutFacadeServiceAcTest {
     when(payouts.findPaymentInstrument(riderId))
         .thenReturn(Optional.of(new PaymentInstrument("UPI", "ravi@okaxis")));
     when(payouts.claimForRelease(payoutId, riderId, "idem-1", NOW)).thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout_abc", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout_abc", 4));
     when(payouts.finalizeRelease(
             eq(payoutId),
             eq(finance.subject()),
@@ -122,7 +122,7 @@ class RiderPayoutFacadeServiceAcTest {
 
     Map<String, Object> result = service.release(finance, riderId, payoutId, "ok", "idem-1");
     assertThat(result.get("status")).isEqualTo("RELEASED");
-    assertThat(result.get("razorpay_payout_id")).isEqualTo("pout_x");
+    assertThat(result.get("cashfree_transfer_id")).isEqualTo("pout_x");
 
     ArgumentCaptor<String> type = ArgumentCaptor.forClass(String.class);
     verify(ledger)
@@ -140,7 +140,7 @@ class RiderPayoutFacadeServiceAcTest {
   }
 
   @Test
-  void ac005_razorpayFailure_schedulesRetryThenFails() {
+  void ac005_cashfreeFailure_schedulesRetryThenFails() {
     PayoutRecord pending = pending(200_000L);
     when(payouts.findByIdempotencyKey("k")).thenReturn(Optional.empty());
     when(payouts.findById(payoutId)).thenReturn(Optional.of(pending));
@@ -150,12 +150,12 @@ class RiderPayoutFacadeServiceAcTest {
     when(payouts.findPaymentInstrument(riderId))
         .thenReturn(Optional.of(new PaymentInstrument("UPI", "x")));
     when(payouts.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
-    when(razorpayx.initiatePayout(any()))
-        .thenThrow(new AppException("RAZORPAY_PAYOUT_FAILED", "down", 502));
+    when(cashfree_payouts.initiatePayout(any()))
+        .thenThrow(new AppException("CASHFREE_PAYOUT_FAILED", "down", 502));
 
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, null, "k"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
     verify(payouts)
         .scheduleRetry(
             eq(payoutId),
@@ -195,7 +195,7 @@ class RiderPayoutFacadeServiceAcTest {
     when(payouts.findByIdempotencyKey("k2")).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.release(finance, riderId, payoutId, null, "k2"))
         .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+        .isEqualTo("CASHFREE_PAYOUT_FAILED");
     verify(payouts).markFailed(eq(payoutId), eq("k2"), anyString(), eq(NOW));
     verify(notifications).payoutFailed(eq(riderId), eq(payoutId), anyString());
   }
@@ -218,7 +218,7 @@ class RiderPayoutFacadeServiceAcTest {
         .thenReturn(Optional.of(new PaymentInstrument("UPI", "x")));
     when(payouts.claimForRelease(eq(ok.id()), eq(ok.riderId()), anyString(), eq(NOW)))
         .thenReturn(true);
-    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout_b", 4));
+    when(cashfree_payouts.initiatePayout(any())).thenReturn(new PayoutResult("pout_b", 4));
     when(payouts.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
         .thenReturn(true);
 
@@ -289,8 +289,8 @@ class RiderPayoutFacadeServiceAcTest {
     PayoutRecord released = releasedOf(pending(100_000L));
     when(payouts.findByIdempotencyKey("idem")).thenReturn(Optional.of(released));
     Map<String, Object> result = service.release(finance, riderId, payoutId, null, "idem");
-    assertThat(result.get("razorpay_payout_id")).isEqualTo("pout_x");
-    verify(razorpayx, never()).initiatePayout(any());
+    assertThat(result.get("cashfree_transfer_id")).isEqualTo("pout_x");
+    verify(cashfree_payouts, never()).initiatePayout(any());
   }
 
   private PayoutRecord pending(long net) {

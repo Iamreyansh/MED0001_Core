@@ -1,6 +1,7 @@
 package com.nammamedmate.notification.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nammamedmate.kernel.error.AppException;
@@ -10,20 +11,26 @@ import org.junit.jupiter.api.Test;
 class NotificationWebhookAuthTest {
 
   @Test
-  void smsAndEmailSignaturesRoundTrip() {
-    NotificationWebhookAuth auth = new NotificationWebhookAuth(null, null);
+  void signsAndVerifiesSms() {
+    NotificationWebhookAuth auth = new NotificationWebhookAuth("secret");
+    byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
+    String sig = auth.signSms(body);
+    auth.requireSms(sig, body);
+    assertThatThrownBy(() -> auth.requireSms("bad", body)).hasMessageContaining("SMS webhook");
+  }
+
+  @Test
+  void blankSecretFallsBackToDefault() {
+    NotificationWebhookAuth auth = new NotificationWebhookAuth(null);
+    NotificationWebhookAuth blank = new NotificationWebhookAuth("  ");
     byte[] body = "{\"ok\":true}".getBytes(StandardCharsets.UTF_8);
     auth.requireSms(auth.signSms(body), body);
-    auth.requireEmail(auth.signEmail(body), body);
-
-    NotificationWebhookAuth blank = new NotificationWebhookAuth("  ", "  ");
     blank.requireSms(blank.signSms(body), body);
-    blank.requireEmail(blank.signEmail(body), body);
   }
 
   @Test
   void rejectsMissingOrBadSignatures() {
-    NotificationWebhookAuth auth = new NotificationWebhookAuth("sms-secret", "email-secret");
+    NotificationWebhookAuth auth = new NotificationWebhookAuth("sms-secret");
     byte[] body = "payload".getBytes(StandardCharsets.UTF_8);
     assertThatThrownBy(() -> auth.requireSms(null, body))
         .isInstanceOf(AppException.class)
@@ -31,9 +38,7 @@ class NotificationWebhookAuthTest {
         .isEqualTo("INVALID_SIGNATURE");
     assertThatThrownBy(() -> auth.requireSms("sha256=deadbeef", body))
         .isInstanceOf(AppException.class);
-    assertThatThrownBy(() -> auth.requireEmail("  ", body)).isInstanceOf(AppException.class);
-    assertThatThrownBy(() -> auth.requireEmail("sha256=bad", null))
-        .isInstanceOf(AppException.class);
+    assertThatThrownBy(() -> auth.requireSms("  ", body)).isInstanceOf(AppException.class);
   }
 
   @Test
@@ -46,12 +51,10 @@ class NotificationWebhookAuthTest {
 
   @Test
   void configuredSecretsUsedForSigning() {
-    NotificationWebhookAuth auth = new NotificationWebhookAuth("custom-sms", "custom-email");
+    NotificationWebhookAuth auth = new NotificationWebhookAuth("custom-sms");
     byte[] body = "x".getBytes(StandardCharsets.UTF_8);
     assertThat(auth.signSms(body))
         .isEqualTo("sha256=" + NotificationWebhookAuth.hmacHex("custom-sms", body));
-    assertThat(auth.signEmail(body))
-        .isEqualTo("sha256=" + NotificationWebhookAuth.hmacHex("custom-email", body));
   }
 
   @Test
@@ -64,30 +67,38 @@ class NotificationWebhookAuthTest {
   }
 
   @Test
-  void deployedSecretsRejectDefaults() {
+  void validateSecretsAndVendorKeys() {
+    assertThatThrownBy(() -> NotificationWebhookAuth.validateSecretsForDeployedProfile("", null))
+        .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(
             () ->
                 NotificationWebhookAuth.validateSecretsForDeployedProfile(
-                    NotificationWebhookAuth.DEFAULT_SMS_SECRET, "ok"))
+                    NotificationWebhookAuth.DEFAULT_SMS_SECRET, null))
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(() -> NotificationWebhookAuth.validateSecretsForDeployedProfile("ok", " "))
+    assertThatThrownBy(
+            () -> NotificationWebhookAuth.validateSecretsForDeployedProfile("replace_me", null))
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(() -> NotificationWebhookAuth.validateSecretsForDeployedProfile(null, "ok"))
+    assertThatThrownBy(() -> NotificationWebhookAuth.validateSecretsForDeployedProfile(null, null))
         .isInstanceOf(IllegalStateException.class);
-    NotificationWebhookAuth.validateSecretsForDeployedProfile("live-sms", "live-email");
+    assertThatCode(
+            () ->
+                NotificationWebhookAuth.validateSecretsForDeployedProfile("prod-sms-secret", null))
+        .doesNotThrowAnyException();
+
     assertThatThrownBy(
             () ->
-                NotificationWebhookAuth.validateSecretsForDeployedProfile(
-                    "replace_me", "live-email"))
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "", "tok", "proj", "{\"type\":\"service_account\"}"))
         .isInstanceOf(IllegalStateException.class);
-    NotificationWebhookAuth.validateVendorKeysForDeployedProfile("a", "b", "c", "d");
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "sid", "tok", "proj", ""))
+        .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(
             () ->
                 NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
                     "replace_me", "b", "c", "d"))
-        .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(
-            () -> NotificationWebhookAuth.validateVendorKeysForDeployedProfile("", "b", "c", "d"))
         .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(
             () ->
@@ -104,12 +115,26 @@ class NotificationWebhookAuthTest {
                 NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
                     "a", "b", "c", "replace_me"))
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(
+    assertThatCode(
             () ->
-                NotificationWebhookAuth.validateSecretsForDeployedProfile("live-sms", "replace_me"))
-        .isInstanceOf(IllegalStateException.class);
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "sid",
+                    "tok",
+                    "my-project",
+                    "{\"client_email\":\"x@y.iam.gserviceaccount.com\"}"))
+        .doesNotThrowAnyException();
+
     assertThat(NotificationWebhookAuth.isPlaceholder("changeme")).isTrue();
     assertThat(NotificationWebhookAuth.isPlaceholder("ok")).isFalse();
     assertThat(NotificationWebhookAuth.isPlaceholder(null)).isTrue();
+    assertThat(NotificationWebhookAuth.isPlaceholder(" ")).isTrue();
+  }
+
+  @Test
+  void verifyStaticHelper() {
+    byte[] body = "x".getBytes(StandardCharsets.UTF_8);
+    String sig = "sha256=" + NotificationWebhookAuth.hmacHex("s", body);
+    assertThat(NotificationWebhookAuth.verify("s", sig, body)).isTrue();
+    assertThat(NotificationWebhookAuth.verify("s", null, body)).isFalse();
   }
 }

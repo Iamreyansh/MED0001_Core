@@ -104,9 +104,9 @@ class JdbcPaymentPersistenceTest {
               when(rs.getString("currency")).thenReturn("INR");
               when(rs.getString("method")).thenReturn("UPI");
               when(rs.getString("status")).thenReturn("CAPTURED");
-              when(rs.getString("razorpay_order_id")).thenReturn("order_1");
-              when(rs.getString("razorpay_payment_id")).thenReturn("pay_1");
-              when(rs.getString("razorpay_signature")).thenReturn("sig");
+              when(rs.getString("gateway_order_id")).thenReturn("order_1");
+              when(rs.getString("gateway_payment_id")).thenReturn("pay_1");
+              when(rs.getString("gateway_signature")).thenReturn("sig");
               when(rs.getObject("gateway_fee_paise")).thenReturn(20L);
               when(rs.getObject("gateway_response")).thenReturn("{\"ok\":true}");
               when(rs.getObject("webhook_events")).thenReturn("[\"payment.captured\"]");
@@ -121,8 +121,8 @@ class JdbcPaymentPersistenceTest {
 
     assertThat(store.findById(payment.id())).isPresent();
     assertThat(store.findByOrderId(payment.orderId())).isPresent();
-    assertThat(store.findByRazorpayOrderId("order_1")).isPresent();
-    assertThat(store.findByRazorpayPaymentId("pay_1")).isPresent();
+    assertThat(store.findByGatewayOrderId("order_1")).isPresent();
+    assertThat(store.findByGatewayPaymentId("pay_1")).isPresent();
   }
 
   @Test
@@ -143,9 +143,9 @@ class JdbcPaymentPersistenceTest {
               when(rs.getString("currency")).thenReturn("INR");
               when(rs.getString("method")).thenReturn("CARD");
               when(rs.getString("status")).thenReturn("PENDING");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
-              when(rs.getString("razorpay_signature")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_signature")).thenReturn(null);
               when(rs.getObject("gateway_fee_paise")).thenReturn(null);
               when(rs.getObject("gateway_response")).thenReturn(null);
               when(rs.getObject("webhook_events")).thenReturn("not-json");
@@ -233,9 +233,9 @@ class JdbcPaymentPersistenceTest {
               when(rs.getString("currency")).thenReturn("INR");
               when(rs.getString("method")).thenReturn("UPI");
               when(rs.getString("status")).thenReturn("PENDING");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
-              when(rs.getString("razorpay_signature")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_signature")).thenReturn(null);
               when(rs.getObject("gateway_fee_paise")).thenReturn(null);
               when(rs.getObject("gateway_response")).thenReturn(null);
               when(rs.getObject("webhook_events")).thenReturn("   ");
@@ -262,9 +262,9 @@ class JdbcPaymentPersistenceTest {
               when(rs.getString("currency")).thenReturn("INR");
               when(rs.getString("method")).thenReturn("UPI");
               when(rs.getString("status")).thenReturn("PENDING");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
-              when(rs.getString("razorpay_signature")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_signature")).thenReturn(null);
               when(rs.getObject("gateway_fee_paise")).thenReturn(null);
               when(rs.getObject("gateway_response")).thenReturn(null);
               when(rs.getObject("webhook_events")).thenReturn(null);
@@ -291,9 +291,9 @@ class JdbcPaymentPersistenceTest {
               when(rs.getString("currency")).thenReturn("INR");
               when(rs.getString("method")).thenReturn("UPI");
               when(rs.getString("status")).thenReturn("PENDING");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
-              when(rs.getString("razorpay_signature")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_signature")).thenReturn(null);
               when(rs.getObject("gateway_fee_paise")).thenReturn(null);
               when(rs.getObject("gateway_response")).thenReturn(null);
               when(rs.getObject("webhook_events")).thenReturn("");
@@ -329,9 +329,9 @@ class JdbcPaymentPersistenceTest {
               when(rs.getString("currency")).thenReturn("INR");
               when(rs.getString("method")).thenReturn("UPI");
               when(rs.getString("status")).thenReturn("PENDING");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
-              when(rs.getString("razorpay_signature")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_signature")).thenReturn(null);
               when(rs.getObject("gateway_fee_paise")).thenReturn(null);
               when(rs.getObject("gateway_response")).thenReturn(null);
               when(rs.getObject("webhook_events")).thenReturn(null);

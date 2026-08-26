@@ -45,7 +45,7 @@ class CustomerPaymentMethodIT extends AbstractApiIT {
             bearer(
                 token,
                 Map.of(
-                    "razorpay_token_id",
+                    "gateway_token_id",
                     "token_itcard1",
                     "card_last4",
                     "4242",
@@ -59,7 +59,7 @@ class CustomerPaymentMethodIT extends AbstractApiIT {
     assertThat(card.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     Map<String, Object> cardData = data(card);
     assertThat(cardData.get("card_last4")).isEqualTo("4242");
-    assertThat(cardData).doesNotContainKey("razorpay_token_id");
+    assertThat(cardData).doesNotContainKey("gateway_token_id");
     String cardId = String.valueOf(cardData.get("id"));
 
     ResponseEntity<Map> missingLast4 =
@@ -69,7 +69,7 @@ class CustomerPaymentMethodIT extends AbstractApiIT {
             bearer(
                 token,
                 Map.of(
-                    "razorpay_token_id",
+                    "gateway_token_id",
                     "token_nolast4",
                     "card_network",
                     "VISA",
@@ -93,7 +93,7 @@ class CustomerPaymentMethodIT extends AbstractApiIT {
     List<Map<String, Object>> cards = (List<Map<String, Object>>) listed.get("cards");
     assertThat(upiList).isNotEmpty();
     assertThat(upiList.get(0)).doesNotContainKey("upi_id");
-    assertThat(cards.get(0)).doesNotContainKey("razorpay_token_id");
+    assertThat(cards.get(0)).doesNotContainKey("gateway_token_id");
 
     ResponseEntity<Map> setDefault =
         rest.exchange(

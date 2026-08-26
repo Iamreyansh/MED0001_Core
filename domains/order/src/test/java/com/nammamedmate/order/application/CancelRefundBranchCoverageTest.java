@@ -14,7 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.messaging.InMemoryOutboxStore;
 import com.nammamedmate.messaging.OutboxPublisher;
-import com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort;
+import com.nammamedmate.order.adapter.out.client.StubCashfreePaymentPort;
 import com.nammamedmate.order.application.port.out.OrderCancellationStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
 import com.nammamedmate.order.application.port.out.RefundStore;
@@ -91,7 +91,7 @@ class CancelRefundBranchCoverageTest {
             refundStore,
             cancellations,
             orders,
-            new StubRazorpayPaymentPort(),
+            new StubCashfreePaymentPort(),
             wallet,
             Clock.fixed(T0, ZoneOffset.UTC));
   }
@@ -166,7 +166,7 @@ class CancelRefundBranchCoverageTest {
                     om.readTree("{\"payload\":{\"refund\":{\"entity\":{\"id\":\"\"}}}}"))
                 .get("ignored"))
         .isEqualTo(true);
-    when(refundStore.findByRazorpayRefundId("rfnd_miss")).thenReturn(Optional.empty());
+    when(refundStore.findByGatewayRefundId("rfnd_miss")).thenReturn(Optional.empty());
     assertThat(
             refunds
                 .handleRefundProcessed(
@@ -187,7 +187,7 @@ class CancelRefundBranchCoverageTest {
                 order(PaymentMethod.WALLET, PaymentStatus.PAID, 0, 1, null)))
         .isEqualTo(RefundTo.WALLET);
 
-    assertThatThrownBy(() -> new StubRazorpayPaymentPort().refund("  ", 10))
+    assertThatThrownBy(() -> new StubCashfreePaymentPort().refund("  ", 10))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
 
@@ -210,7 +210,7 @@ class CancelRefundBranchCoverageTest {
             refunds.issueOnAdminCancel(codPaid, 100, RefundTo.WALLET, null, UUID.randomUUID(), T0))
         .isNotNull();
 
-    // blank razorpay payment id
+    // blank cashfree payment id
     Order blankPay = order(PaymentMethod.UPI, PaymentStatus.PAID, 100, 0, "  ");
     assertThatThrownBy(
             () ->

@@ -13,9 +13,9 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.order.application.port.out.CashfreePaymentPort;
 import com.nammamedmate.order.application.port.out.OrderCancellationStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
-import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
 import com.nammamedmate.order.application.port.out.RefundStore;
 import com.nammamedmate.order.application.port.out.WalletPort;
 import com.nammamedmate.order.domain.ActorType;
@@ -46,7 +46,7 @@ class RefundServiceTest {
   private RefundStore refundStore;
   private OrderCancellationStore cancellationStore;
   private OrderStore orderStore;
-  private RazorpayPaymentPort razorpay;
+  private CashfreePaymentPort cashfree;
   private WalletPort wallet;
   private RefundService service;
   private final List<Refund> saved = new ArrayList<>();
@@ -56,14 +56,14 @@ class RefundServiceTest {
     refundStore = mock(RefundStore.class);
     cancellationStore = mock(OrderCancellationStore.class);
     orderStore = mock(OrderStore.class);
-    razorpay = mock(RazorpayPaymentPort.class);
+    cashfree = mock(CashfreePaymentPort.class);
     wallet = mock(WalletPort.class);
     service =
         new RefundService(
             refundStore,
             cancellationStore,
             orderStore,
-            razorpay,
+            cashfree,
             wallet,
             Clock.fixed(T0, ZoneOffset.UTC));
     when(cancellationStore.findByOrderId(any())).thenReturn(Optional.empty());
@@ -100,10 +100,10 @@ class RefundServiceTest {
         .update(any());
     when(wallet.creditForRefund(any(), any(), anyLong(), any(), any()))
         .thenReturn(UUID.randomUUID());
-    when(razorpay.refund(anyString(), anyLong()))
+    when(cashfree.refund(anyString(), anyLong()))
         .thenAnswer(
             inv ->
-                new RazorpayPaymentPort.RefundResult(
+                new CashfreePaymentPort.RefundResult(
                     "rfnd_" + inv.getArgument(0), inv.getArgument(1)));
   }
 
@@ -113,7 +113,7 @@ class RefundServiceTest {
     var plan = service.initiate(cod, "TIMEOUT", ActorType.SYSTEM, null);
     assertThat(plan.initiated()).isFalse();
     verify(cancellationStore).insert(any());
-    verify(razorpay, never()).refund(any(), anyLong());
+    verify(cashfree, never()).refund(any(), anyLong());
   }
 
   @Test
@@ -126,7 +126,7 @@ class RefundServiceTest {
     assertThat(plan.amountPaise()).isEqualTo(22125);
     assertThat(saved).hasSize(1);
     assertThat(saved.getFirst().status()).isEqualTo(RefundStatus.PENDING);
-    verify(razorpay, never()).refund(any(), anyLong());
+    verify(cashfree, never()).refund(any(), anyLong());
   }
 
   @Test
@@ -137,7 +137,7 @@ class RefundServiceTest {
     assertThat(plan.initiated()).isTrue();
     assertThat(saved.getFirst().status()).isEqualTo(RefundStatus.INITIATED);
     assertThat(saved.getFirst().autoProcessed()).isTrue();
-    verify(razorpay).refund("pay_1", 45000L);
+    verify(cashfree).refund("pay_1", 45000L);
   }
 
   @Test
@@ -148,7 +148,7 @@ class RefundServiceTest {
     assertThat(plan.initiated()).isTrue();
     assertThat(saved.getFirst().status()).isEqualTo(RefundStatus.PENDING);
     assertThat(saved.getFirst().autoProcessed()).isFalse();
-    verify(razorpay, never()).refund(any(), anyLong());
+    verify(cashfree, never()).refund(any(), anyLong());
   }
 
   @Test
@@ -301,7 +301,7 @@ class RefundServiceTest {
             null,
             null,
             T0);
-    when(refundStore.findByRazorpayRefundId("rfnd_done")).thenReturn(Optional.of(source));
+    when(refundStore.findByGatewayRefundId("rfnd_done")).thenReturn(Optional.of(source));
     ObjectMapper om = new ObjectMapper();
     var root = om.readTree("{\"payload\":{\"refund\":{\"entity\":{\"id\":\"rfnd_done\"}}}}");
     assertThat(service.handleRefundProcessed(root).get("status")).isEqualTo("PROCESSED");
@@ -312,7 +312,7 @@ class RefundServiceTest {
                 .handleRefundProcessed(om.readTree("{\"payload\":{\"refund\":{\"entity\":{}}}}"))
                 .get("ignored"))
         .isEqualTo(true);
-    when(refundStore.findByRazorpayRefundId("missing")).thenReturn(Optional.empty());
+    when(refundStore.findByGatewayRefundId("missing")).thenReturn(Optional.empty());
     assertThat(
             service
                 .handleRefundProcessed(
@@ -454,9 +454,9 @@ class RefundServiceTest {
             null,
             null,
             T0);
-    setters.setRazorpayRefundId("rfnd_set");
+    setters.setCashfreeRefundId("rfnd_set");
     setters.setWalletTransactionId(UUID.randomUUID());
-    assertThat(setters.razorpayRefundId()).isEqualTo("rfnd_set");
+    assertThat(setters.gatewayRefundId()).isEqualTo("rfnd_set");
     assertThat(setters.walletTransactionId()).isNotNull();
 
     // refresh with sumSuccessful=0 after insert
@@ -520,7 +520,7 @@ class RefundServiceTest {
   }
 
   @Test
-  void razorpayFailureAndTxManagerBranches() {
+  void cashfreeFailureAndTxManagerBranches() {
     org.springframework.transaction.PlatformTransactionManager tm =
         mock(org.springframework.transaction.PlatformTransactionManager.class);
     when(tm.getTransaction(any()))
@@ -530,15 +530,15 @@ class RefundServiceTest {
             refundStore,
             cancellationStore,
             orderStore,
-            razorpay,
+            cashfree,
             wallet,
             Clock.fixed(T0, ZoneOffset.UTC),
             tm);
 
     Order ok = order(PaymentMethod.UPI, PaymentStatus.PAID, 45000, 0, "pay_ok");
     when(orderStore.findById(ok.id())).thenReturn(Optional.of(ok));
-    when(razorpay.refund(anyString(), anyLong()))
-        .thenReturn(new RazorpayPaymentPort.RefundResult("rfnd_ok", 45000L));
+    when(cashfree.refund(anyString(), anyLong()))
+        .thenReturn(new CashfreePaymentPort.RefundResult("rfnd_ok", 45000L));
     assertThat(
             withTx
                 .initiate(ok, "PHARMACY_CANCELLED", ActorType.PHARMACY, UUID.randomUUID())
@@ -547,26 +547,26 @@ class RefundServiceTest {
 
     Order upi = order(PaymentMethod.UPI, PaymentStatus.PAID, 45000, 0, "pay_fail");
     when(orderStore.findById(upi.id())).thenReturn(Optional.of(upi));
-    org.mockito.Mockito.doThrow(new AppException("RAZORPAY_ERROR", "down", 502))
-        .when(razorpay)
+    org.mockito.Mockito.doThrow(new AppException("CASHFREE_ERROR", "down", 502))
+        .when(cashfree)
         .refund(anyString(), anyLong());
     assertThatThrownBy(
             () ->
                 service.initiate(upi, "PHARMACY_CANCELLED", ActorType.PHARMACY, UUID.randomUUID()))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("RAZORPAY_ERROR");
+        .isEqualTo("CASHFREE_ERROR");
     assertThat(saved.getLast().status()).isEqualTo(RefundStatus.FAILED);
 
     Order upi2 = order(PaymentMethod.UPI, PaymentStatus.PAID, 45000, 0, "pay_fail2");
     when(orderStore.findById(upi2.id())).thenReturn(Optional.of(upi2));
     org.mockito.Mockito.doThrow(new RuntimeException())
-        .when(razorpay)
+        .when(cashfree)
         .refund(anyString(), anyLong());
     assertThatThrownBy(
             () ->
                 service.initiate(upi2, "PHARMACY_CANCELLED", ActorType.PHARMACY, UUID.randomUUID()))
         .extracting(e -> ((AppException) e).code())
-        .isEqualTo("RAZORPAY_REFUND_FAILED");
+        .isEqualTo("CASHFREE_REFUND_FAILED");
 
     ObjectMapper om = new ObjectMapper();
     assertThat(RefundService.text(om.createObjectNode(), "id")).isNull();
@@ -589,7 +589,7 @@ class RefundServiceTest {
             refundStore,
             cancellationStore,
             orderStore,
-            razorpay,
+            cashfree,
             wallet,
             Clock.fixed(T0, ZoneOffset.UTC),
             null,
@@ -597,14 +597,14 @@ class RefundServiceTest {
     Order upi = order(PaymentMethod.UPI, PaymentStatus.PAID, 45000, 0, "pay_ops");
     when(orderStore.findById(upi.id())).thenReturn(Optional.of(upi));
     when(ops.find(eq("REFUND"), anyString())).thenReturn(Optional.empty());
-    when(razorpay.refund(anyString(), anyLong()))
-        .thenReturn(new RazorpayPaymentPort.RefundResult("rfnd_ops", 45000L));
+    when(cashfree.refund(anyString(), anyLong()))
+        .thenReturn(new CashfreePaymentPort.RefundResult("rfnd_ops", 45000L));
     assertThat(
             withOps
                 .initiate(upi, "PHARMACY_CANCELLED", ActorType.PHARMACY, UUID.randomUUID())
                 .initiated())
         .isTrue();
-    verify(ops).ensurePending(eq("REFUND"), anyString(), eq("razorpay"));
+    verify(ops).ensurePending(eq("REFUND"), anyString(), eq("cashfree"));
     verify(ops).markSent(eq("REFUND"), anyString(), eq("rfnd_ops"));
 
     Order replay = order(PaymentMethod.UPI, PaymentStatus.PAID, 45000, 0, "pay_replay");

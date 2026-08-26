@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.messaging.ProviderOperationStore;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort;
+import com.nammamedmate.payment.application.port.out.CashfreeGatewayPort.RefundResult;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
-import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort.RefundResult;
 import com.nammamedmate.payment.application.port.out.RefundFinancePort;
 import com.nammamedmate.payment.application.port.out.RefundFinancePort.KpiSnapshot;
 import com.nammamedmate.payment.application.port.out.RefundFinancePort.ListFilter;
@@ -38,7 +38,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** EPIC-012 STORY-005 finance façade over shared refund rows + Razorpay + wallet + ledger. */
+/** EPIC-012 STORY-005 finance façade over shared refund rows + Cashfree + wallet + ledger. */
 @Service
 public class RefundFacadeService {
 
@@ -47,7 +47,7 @@ public class RefundFacadeService {
   private static final int MAX_LIMIT = 100;
 
   private final RefundFinancePort refunds;
-  private final RazorpayGatewayPort razorpay;
+  private final CashfreeGatewayPort cashfree;
   private final CustomerWalletPort wallets;
   private final FinancialLedgerWriterPort ledger;
   private final RefundNotificationPort notifications;
@@ -57,29 +57,29 @@ public class RefundFacadeService {
 
   public RefundFacadeService(
       RefundFinancePort refunds,
-      RazorpayGatewayPort razorpay,
+      CashfreeGatewayPort cashfree,
       CustomerWalletPort wallets,
       FinancialLedgerWriterPort ledger,
       RefundNotificationPort notifications,
       Clock clock) {
-    this(refunds, razorpay, wallets, ledger, notifications, clock, null, null);
+    this(refunds, cashfree, wallets, ledger, notifications, clock, null, null);
   }
 
   public RefundFacadeService(
       RefundFinancePort refunds,
-      RazorpayGatewayPort razorpay,
+      CashfreeGatewayPort cashfree,
       CustomerWalletPort wallets,
       FinancialLedgerWriterPort ledger,
       RefundNotificationPort notifications,
       Clock clock,
       @Nullable PlatformTransactionManager transactionManager) {
-    this(refunds, razorpay, wallets, ledger, notifications, clock, transactionManager, null);
+    this(refunds, cashfree, wallets, ledger, notifications, clock, transactionManager, null);
   }
 
   @Autowired
   public RefundFacadeService(
       RefundFinancePort refunds,
-      RazorpayGatewayPort razorpay,
+      CashfreeGatewayPort cashfree,
       CustomerWalletPort wallets,
       FinancialLedgerWriterPort ledger,
       RefundNotificationPort notifications,
@@ -87,7 +87,7 @@ public class RefundFacadeService {
       @Nullable PlatformTransactionManager transactionManager,
       @Nullable ProviderOperationStore providerOps) {
     this.refunds = refunds;
-    this.razorpay = razorpay;
+    this.cashfree = cashfree;
     this.wallets = wallets;
     this.ledger = ledger;
     this.notifications = notifications;
@@ -167,7 +167,7 @@ public class RefundFacadeService {
   }
 
   /**
-   * Process PENDING refund: claim → Razorpay/wallet (outside TX) → finalize. Matches settlement TX
+   * Process PENDING refund: claim → Cashfree/wallet (outside TX) → finalize. Matches settlement TX
    * pattern so a provider accept is not rolled back with an uncommitted claim.
    */
   public Map<String, Object> process(MedmatePrincipal principal, UUID refundId, String notes) {
@@ -220,11 +220,11 @@ public class RefundFacadeService {
       return processResponse(requireRefund(refundId), principal.subject());
     }
 
-    String paymentId = refund.razorpayPaymentId();
+    String paymentId = refund.gatewayPaymentId();
     if (paymentId == null || paymentId.isBlank()) {
-      inTx(() -> refunds.markProcessFailed(refundId, "missing razorpay payment id", now));
+      inTx(() -> refunds.markProcessFailed(refundId, "missing cashfree payment id", now));
       throw new AppException(
-          "RAZORPAY_REFUND_FAILED", "Order has no Razorpay payment for SOURCE refund", 502);
+          "CASHFREE_REFUND_FAILED", "Order has no Cashfree payment for SOURCE refund", 502);
     }
 
     try {
@@ -232,11 +232,11 @@ public class RefundFacadeService {
       RefundResult rz = replayRefund(opKey, refund.amountPaise());
       if (rz == null) {
         if (providerOps != null) {
-          providerOps.ensurePending("REFUND", opKey, "razorpay");
+          providerOps.ensurePending("REFUND", opKey, "cashfree");
         }
-        rz = razorpay.refund(paymentId, refund.amountPaise());
+        rz = cashfree.refund(paymentId, refund.amountPaise());
         if (providerOps != null) {
-          providerOps.markSent("REFUND", opKey, rz.razorpayRefundId());
+          providerOps.markSent("REFUND", opKey, rz.gatewayRefundId());
         }
       }
       final RefundResult gateway = rz;
@@ -247,14 +247,14 @@ public class RefundFacadeService {
         inTx(
             () -> {
               if (!refunds.finalizeGatewayProcess(
-                  refundId, gateway.razorpayRefundId(), expectedBy, now)) {
+                  refundId, gateway.gatewayRefundId(), expectedBy, now)) {
                 throw new AppException(
                     "REFUND_ALREADY_PROCESSED", "Could not finalize refund process", 409);
               }
             });
       } catch (RuntimeException ex) {
-        // Provider accepted — keep INITIATED + razorpay id for webhook reconcile (no FAILED)
-        inTx(() -> refunds.attachGatewayRefundId(refundId, gateway.razorpayRefundId(), now));
+        // Provider accepted — keep INITIATED + cashfree id for webhook reconcile (no FAILED)
+        inTx(() -> refunds.attachGatewayRefundId(refundId, gateway.gatewayRefundId(), now));
         throw ex;
       }
     } catch (AppException ex) {
@@ -262,13 +262,13 @@ public class RefundFacadeService {
         throw ex;
       }
       inTx(() -> refunds.markProcessFailed(refundId, ex.getMessage(), now));
-      if ("RAZORPAY_REFUND_FAILED".equals(ex.code()) || "RAZORPAY_ERROR".equals(ex.code())) {
-        throw new AppException("RAZORPAY_REFUND_FAILED", ex.getMessage(), 502);
+      if ("CASHFREE_REFUND_FAILED".equals(ex.code()) || "CASHFREE_ERROR".equals(ex.code())) {
+        throw new AppException("CASHFREE_REFUND_FAILED", ex.getMessage(), 502);
       }
       throw ex;
     } catch (RuntimeException ex) {
-      inTx(() -> refunds.markProcessFailed(refundId, "razorpay refund failed", now));
-      throw new AppException("RAZORPAY_REFUND_FAILED", "Failed to initiate Razorpay refund", 502);
+      inTx(() -> refunds.markProcessFailed(refundId, "cashfree refund failed", now));
+      throw new AppException("CASHFREE_REFUND_FAILED", "Failed to initiate Cashfree refund", 502);
     }
 
     return processResponse(requireRefund(refundId), principal.subject());
@@ -293,20 +293,20 @@ public class RefundFacadeService {
   /** Called from payment webhook {@code refund.processed}. */
   public Map<String, Object> completeFromWebhook(JsonNode root) {
     JsonNode entity = root.path("payload").path("refund").path("entity");
-    String razorpayRefundId = text(entity, "id");
-    if (razorpayRefundId == null) {
+    String gatewayRefundId = text(entity, "id");
+    if (gatewayRefundId == null) {
       Map<String, Object> ack = new LinkedHashMap<>();
       ack.put("event", "refund.processed");
-      ack.put("razorpay_payment_id", text(entity, "payment_id"));
+      ack.put("gateway_payment_id", text(entity, "payment_id"));
       ack.put("processed", true);
       return ack;
     }
     Instant now = clock.instant();
-    RefundRecord refund = refunds.findByRazorpayRefundId(razorpayRefundId).orElse(null);
+    RefundRecord refund = refunds.findByGatewayRefundId(gatewayRefundId).orElse(null);
     if (refund == null) {
       Map<String, Object> ack = new LinkedHashMap<>();
       ack.put("event", "refund.processed");
-      ack.put("razorpay_payment_id", text(entity, "payment_id"));
+      ack.put("gateway_payment_id", text(entity, "payment_id"));
       ack.put("processed", true);
       return ack;
     }
@@ -358,7 +358,7 @@ public class RefundFacadeService {
     data.put("refund_amount", MoneyFormats.paiseToRupees(row.amountPaise()));
     data.put("refund_to", RefundStatuses.toApiRefundTo(row.refundTo()));
     data.put("status", RefundStatuses.toApiStatus(row.status()));
-    data.put("razorpay_refund_id", row.razorpayRefundId());
+    data.put("gateway_refund_id", row.gatewayRefundId());
     data.put("expected_by", row.expectedBy() == null ? null : row.expectedBy().toString());
     data.put(
         "processed_by",
@@ -416,8 +416,8 @@ public class RefundFacadeService {
     data.put("refund_to", RefundStatuses.toApiRefundTo(row.refundTo()));
     data.put("status", RefundStatuses.toApiStatus(row.status()));
     data.put("cancellation_reason", row.reason());
-    data.put("razorpay_refund_id", row.razorpayRefundId());
-    data.put("razorpay_payment_id", row.razorpayPaymentId());
+    data.put("gateway_refund_id", row.gatewayRefundId());
+    data.put("gateway_payment_id", row.gatewayPaymentId());
     data.put("expected_by", row.expectedBy() == null ? null : row.expectedBy().toString());
     Map<String, Object> customer = new LinkedHashMap<>();
     customer.put("name", row.customerName() == null ? "" : row.customerName());

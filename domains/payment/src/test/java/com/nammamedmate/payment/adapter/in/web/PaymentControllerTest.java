@@ -80,10 +80,10 @@ class PaymentControllerTest {
     MockHttpServletRequest request = new MockHttpServletRequest();
     byte[] body = "{\"event\":\"payment.captured\"}".getBytes();
     request.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, body);
-    when(payments.handleWebhook(anyString(), any())).thenReturn(Map.of("processed", true));
-    ApiResponse<Map<String, Object>> res = webhook.razorpay("sig", request);
+    when(payments.handleWebhook(anyString(), any(), any())).thenReturn(Map.of("processed", true));
+    ApiResponse<Map<String, Object>> res = webhook.cashfree("sig", "ts", request);
     assertThat(res.data().get("processed")).isEqualTo(true);
-    verify(payments).handleWebhook(eq("sig"), eq(body));
+    verify(payments).handleWebhook(eq("sig"), eq("ts"), eq(body));
   }
 
   @Test
@@ -91,29 +91,52 @@ class PaymentControllerTest {
     WebhookInbox box = mock(WebhookInbox.class);
     ObjectProvider<WebhookInbox> provider = mock(ObjectProvider.class);
     when(provider.getIfAvailable()).thenReturn(box);
-    when(box.alreadyReceived("razorpay", "evt_1")).thenReturn(true);
+    when(box.alreadyReceived("cashfree", "evt_1")).thenReturn(true);
     PaymentWebhookController gated =
         new PaymentWebhookController(payments, provider, new ObjectMapper());
     MockHttpServletRequest request = new MockHttpServletRequest();
     byte[] body = "{\"id\":\"evt_1\",\"event\":\"payment.captured\"}".getBytes();
     request.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, body);
-    assertThat(gated.razorpay("sig", request).data().get("event")).isEqualTo("duplicate");
-    verify(payments, never()).handleWebhook(anyString(), any());
+    assertThat(gated.cashfree("sig", "ts", request).data().get("event")).isEqualTo("duplicate");
+    verify(payments, never()).handleWebhook(anyString(), any(), any());
 
-    when(box.alreadyReceived("razorpay", "evt_1")).thenReturn(false);
-    when(payments.handleWebhook(anyString(), any())).thenReturn(Map.of("processed", true));
-    assertThat(gated.razorpay("sig", request).data().get("processed")).isEqualTo(true);
-    verify(box).claim(eq("razorpay"), eq("evt_1"), anyString());
-    gated.razorpay("sig", new MockHttpServletRequest());
+    when(box.alreadyReceived("cashfree", "evt_1")).thenReturn(false);
+    when(payments.handleWebhook(anyString(), any(), any())).thenReturn(Map.of("processed", true));
+    assertThat(gated.cashfree("sig", "ts", request).data().get("processed")).isEqualTo(true);
+    verify(box).claim(eq("cashfree"), eq("evt_1"), anyString());
+    gated.cashfree("sig", "ts", new MockHttpServletRequest());
 
     PaymentWebhookController nullMapper = new PaymentWebhookController(payments, provider, null);
     MockHttpServletRequest invalid = new MockHttpServletRequest();
     invalid.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "not-json".getBytes());
-    when(payments.handleWebhook(anyString(), any())).thenReturn(Map.of("processed", true));
-    assertThat(nullMapper.razorpay("sig", invalid).data().get("processed")).isEqualTo(true);
+    when(payments.handleWebhook(anyString(), any(), any())).thenReturn(Map.of("processed", true));
+    assertThat(nullMapper.cashfree("sig", "ts", invalid).data().get("processed")).isEqualTo(true);
 
     MockHttpServletRequest nullId = new MockHttpServletRequest();
     nullId.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "{\"id\":null}".getBytes());
-    assertThat(nullMapper.razorpay("sig", nullId).data().get("processed")).isEqualTo(true);
+    assertThat(nullMapper.cashfree("sig", "ts", nullId).data().get("processed")).isEqualTo(true);
+
+    MockHttpServletRequest blankId = new MockHttpServletRequest();
+    blankId.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "{\"id\":\"  \"}".getBytes());
+    assertThat(nullMapper.cashfree("sig", "ts", blankId).data().get("processed")).isEqualTo(true);
+
+    when(box.alreadyReceived("cashfree", "cfpay_99")).thenReturn(true);
+    MockHttpServletRequest cfPay = new MockHttpServletRequest();
+    cfPay.setAttribute(
+        WebhookRawBodyFilter.CACHED_BODY_ATTR,
+        "{\"data\":{\"payment\":{\"cf_payment_id\":\"cfpay_99\"}}}".getBytes());
+    assertThat(gated.cashfree("sig", "ts", cfPay).data().get("event")).isEqualTo("duplicate");
+
+    MockHttpServletRequest blankCf = new MockHttpServletRequest();
+    blankCf.setAttribute(
+        WebhookRawBodyFilter.CACHED_BODY_ATTR,
+        "{\"data\":{\"payment\":{\"cf_payment_id\":\"  \"}}}".getBytes());
+    when(payments.handleWebhook(anyString(), any(), any())).thenReturn(Map.of("processed", true));
+    assertThat(gated.cashfree("sig", "ts", blankCf).data().get("processed")).isEqualTo(true);
+
+    MockHttpServletRequest missingCf = new MockHttpServletRequest();
+    missingCf.setAttribute(
+        WebhookRawBodyFilter.CACHED_BODY_ATTR, "{\"data\":{\"payment\":{}}}".getBytes());
+    assertThat(gated.cashfree("sig", "ts", missingCf).data().get("processed")).isEqualTo(true);
   }
 }

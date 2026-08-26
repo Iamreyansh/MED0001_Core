@@ -25,7 +25,7 @@ public interface SettlementStore {
       UUID releasedBy,
       Instant releasedAt,
       Instant paidAt,
-      String razorpayxPayoutId,
+      String cashfreeTransferId,
       String utrNumber,
       String receiptUrl,
       String releaseIdempotencyKey,
@@ -46,7 +46,7 @@ public interface SettlementStore {
 
   Optional<SettlementRow> findByIdempotencyKey(String idempotencyKey);
 
-  Optional<SettlementRow> findByRazorpayxPayoutId(String razorpayxPayoutId);
+  Optional<SettlementRow> findByCashfreexPayoutId(String cashfreeTransferId);
 
   Optional<SettlementRow> findForPeriod(
       UUID pharmacyId, LocalDate periodStart, LocalDate periodEnd);
@@ -60,7 +60,7 @@ public interface SettlementStore {
       String status,
       UUID releasedBy,
       Instant releasedAt,
-      String razorpayxPayoutId,
+      String cashfreeTransferId,
       String idempotencyKey,
       Instant updatedAt);
 
@@ -73,7 +73,7 @@ public interface SettlementStore {
       UUID settlementId,
       UUID releasedBy,
       Instant releasedAt,
-      String razorpayxPayoutId,
+      String cashfreeTransferId,
       String idempotencyKey,
       Instant updatedAt);
 

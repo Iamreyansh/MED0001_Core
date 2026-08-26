@@ -1,20 +1,20 @@
 package com.nammamedmate.customer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nammamedmate.customer.adapter.out.cashfree.CashfreeVpaClient;
+import com.nammamedmate.customer.adapter.out.cashfree.StubCashfreeVpaClient;
 import com.nammamedmate.customer.adapter.out.geocode.CachingGeocodePort;
 import com.nammamedmate.customer.adapter.out.geocode.GoogleMapsGeocodeClient;
 import com.nammamedmate.customer.adapter.out.geocode.StubGeocodeClient;
-import com.nammamedmate.customer.adapter.out.razorpay.RazorpayVpaClient;
-import com.nammamedmate.customer.adapter.out.razorpay.StubRazorpayVpaClient;
 import com.nammamedmate.customer.application.port.out.ActiveOrdersPort;
 import com.nammamedmate.customer.application.port.out.AddressInActiveOrderPort;
+import com.nammamedmate.customer.application.port.out.CashfreeVpaPort;
 import com.nammamedmate.customer.application.port.out.CustomerOrderHistoryPort;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore;
 import com.nammamedmate.customer.application.port.out.CustomerProfileStore.CustomerProfileRecord;
 import com.nammamedmate.customer.application.port.out.GeocodePort;
 import com.nammamedmate.customer.application.port.out.LoyaltyCartPort;
 import com.nammamedmate.customer.application.port.out.PaymentMethodInActiveOrderPort;
-import com.nammamedmate.customer.application.port.out.RazorpayVpaPort;
 import com.nammamedmate.customer.application.port.out.WalletCreditLimitPort;
 import com.nammamedmate.kernel.error.AppException;
 import java.io.IOException;
@@ -93,15 +93,15 @@ public class CustomerConfig {
   }
 
   @Bean
-  @ConditionalOnMissingBean(RazorpayVpaPort.class)
-  RazorpayVpaPort razorpayVpaPort(
+  @ConditionalOnMissingBean(CashfreeVpaPort.class)
+  CashfreeVpaPort cashfreeVpaPort(
       ObjectMapper objectMapper,
-      @Value("${medmate.razorpay.key-id:}") String keyId,
-      @Value("${medmate.razorpay.key-secret:}") String keySecret) {
+      @Value("${medmate.cashfree.app-id:}") String keyId,
+      @Value("${medmate.cashfree.secret-key:}") String keySecret) {
     if (keyId == null || keyId.isBlank() || keySecret == null || keySecret.isBlank()) {
-      return new StubRazorpayVpaClient();
+      return new StubCashfreeVpaClient();
     }
-    return new RazorpayVpaClient(keyId, keySecret, objectMapper, CustomerConfig::razorpayHttpGet);
+    return new CashfreeVpaClient(keyId, keySecret, objectMapper, CustomerConfig::cashfreeHttpGet);
   }
 
   /**
@@ -125,8 +125,8 @@ public class CustomerConfig {
     }
   }
 
-  /** Razorpay VPA HTTP — 5s timeout per story; JaCoCo excludes Config. */
-  static String razorpayHttpGet(RazorpayVpaClient.Request request) {
+  /** Cashfree VPA HTTP — 5s timeout per story; JaCoCo excludes Config. */
+  static String cashfreeHttpGet(CashfreeVpaClient.Request request) {
     try {
       HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
       HttpRequest.Builder builder =
@@ -137,7 +137,7 @@ public class CustomerConfig {
       HttpResponse<String> response =
           client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() >= 400) {
-        throw new AppException("VPA_VALIDATION_FAILED", "Razorpay VPA validation unavailable", 503);
+        throw new AppException("VPA_VALIDATION_FAILED", "Cashfree VPA validation unavailable", 503);
       }
       return response.body();
     } catch (AppException ex) {
@@ -146,7 +146,7 @@ public class CustomerConfig {
       if (ex instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      throw new AppException("VPA_VALIDATION_TIMEOUT", "Razorpay VPA validation timed out", 503);
+      throw new AppException("VPA_VALIDATION_TIMEOUT", "Cashfree VPA validation timed out", 503);
     }
   }
 }

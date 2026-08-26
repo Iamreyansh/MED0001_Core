@@ -9,12 +9,12 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nammamedmate.integration.adapter.out.client.StubRazorpayClient;
-import com.nammamedmate.integration.application.port.out.RazorpayClientPort;
-import com.nammamedmate.integration.application.port.out.RazorpayXClientPort;
+import com.nammamedmate.integration.adapter.out.client.StubCashfreeClient;
+import com.nammamedmate.integration.application.port.out.CashfreeClientPort;
+import com.nammamedmate.integration.application.port.out.CashfreePayoutClientPort;
+import com.nammamedmate.integration.domain.CashfreeBeneficiary;
+import com.nammamedmate.integration.domain.CashfreePaymentRecord;
 import com.nammamedmate.integration.domain.PaymentStatuses;
-import com.nammamedmate.integration.domain.RazorpayPaymentRecord;
-import com.nammamedmate.integration.domain.RazorpayXFundAccount;
 import com.nammamedmate.integration.support.InMemoryStores;
 import com.nammamedmate.kernel.error.AppException;
 import java.nio.charset.StandardCharsets;
@@ -28,29 +28,29 @@ import org.junit.jupiter.api.Test;
 
 class RemainingBranchCoverageTest {
 
-  private static final String WHSEC = StubRazorpayClient.DEFAULT_WEBHOOK_SECRET;
+  private static final String WHSEC = StubCashfreeClient.DEFAULT_WEBHOOK_SECRET;
   private static final Instant NOW = Instant.parse("2026-07-24T13:00:00Z");
 
   private InMemoryStores.Payments payments;
   private InMemoryStores.FundAccounts fundAccounts;
   private InMemoryStores.Payouts payouts;
-  private RazorpayClientPort razorpay;
-  private RazorpayXClientPort razorpayX;
-  private RazorpayIntegrationService service;
+  private CashfreeClientPort cashfree;
+  private CashfreePayoutClientPort cashfreeX;
+  private CashfreeIntegrationService service;
 
   @BeforeEach
   void setUp() {
     payments = new InMemoryStores.Payments();
     fundAccounts = new InMemoryStores.FundAccounts();
     payouts = new InMemoryStores.Payouts();
-    razorpay = mock(RazorpayClientPort.class);
-    razorpayX = mock(RazorpayXClientPort.class);
-    doReturn(true).when(razorpay).verifyWebhookSignature(any(), any());
-    doReturn("TEST").when(razorpay).mode();
+    cashfree = mock(CashfreeClientPort.class);
+    cashfreeX = mock(CashfreePayoutClientPort.class);
+    doReturn(true).when(cashfree).verifyWebhookSignature(any(), any(), any());
+    doReturn("TEST").when(cashfree).mode();
     service =
-        new RazorpayIntegrationService(
-            razorpay,
-            razorpayX,
+        new CashfreeIntegrationService(
+            cashfree,
+            cashfreeX,
             payments,
             fundAccounts,
             payouts,
@@ -61,19 +61,19 @@ class RemainingBranchCoverageTest {
 
   @Test
   void nullAndBlankGuards() {
-    doReturn(new RazorpayClientPort.CreateOrderResult("o", 100, "INR", null, "created"))
-        .when(razorpay)
+    doReturn(new CashfreeClientPort.CreateOrderResult("o", 100, "INR", null, "created"))
+        .when(cashfree)
         .createOrder(anyLong(), anyString(), anyString(), anyMap());
     assertThat(service.createOrder(100, "INR", "rcpt", Map.of()).get("receipt")).isEqualTo("rcpt");
 
     try {
       service.initiatePayout(null, 1, " ", null, " ", Map.of("entity_id", " ", "entity_type", " "));
     } catch (AppException e) {
-      assertThat(e.code()).isEqualTo("FUND_ACCOUNT_NOT_FOUND");
+      assertThat(e.code()).isEqualTo("BENEFICIARY_NOT_FOUND");
     }
 
-    RazorpayXFundAccount fa =
-        new RazorpayXFundAccount(
+    CashfreeBeneficiary fa =
+        new CashfreeBeneficiary(
             UUID.randomUUID(),
             "PHARMACY",
             UUID.randomUUID(),
@@ -86,8 +86,8 @@ class RemainingBranchCoverageTest {
             true,
             NOW);
     fundAccounts.insert(fa);
-    doReturn(new RazorpayXClientPort.PayoutResult("p", "processing"))
-        .when(razorpayX)
+    doReturn(new CashfreePayoutClientPort.PayoutResult("p", "processing"))
+        .when(cashfreeX)
         .createPayout(any());
     service.initiatePayout("fa_z", 100, " ", "payout", " ", null);
 
@@ -99,7 +99,7 @@ class RemainingBranchCoverageTest {
   void authorizedPresentNotCapturedAndFailedLookupByOrder() {
     UUID id = UUID.randomUUID();
     payments.insert(
-        new RazorpayPaymentRecord(
+        new CashfreePaymentRecord(
             id,
             UUID.randomUUID(),
             "ord_auth",
@@ -110,14 +110,14 @@ class RemainingBranchCoverageTest {
             PaymentStatuses.AUTHORIZED,
             NOW,
             null));
-    doReturn(new RazorpayClientPort.CaptureResult("pay_auth", "captured"))
-        .when(razorpay)
+    doReturn(new CashfreeClientPort.CaptureResult("pay_auth", "captured"))
+        .when(cashfree)
         .capturePayment(anyString(), anyLong());
     webhook(
         "{\"event\":\"payment.authorized\",\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_auth\",\"order_id\":\"ord_auth\",\"amount\":20}}}}");
 
     payments.insert(
-        new RazorpayPaymentRecord(
+        new CashfreePaymentRecord(
             UUID.randomUUID(),
             UUID.randomUUID(),
             "ord_miss",
@@ -130,7 +130,7 @@ class RemainingBranchCoverageTest {
             null));
     webhook(
         "{\"event\":\"payment.failed\",\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_unknown\",\"order_id\":\"ord_miss\"}}}}");
-    assertThat(payments.findByRazorpayOrderId("ord_miss").get().status())
+    assertThat(payments.findByGatewayOrderId("ord_miss").get().status())
         .isEqualTo(PaymentStatuses.FAILED);
   }
 
@@ -138,7 +138,7 @@ class RemainingBranchCoverageTest {
   void capturedWithExistingAuthorizedNoMethodAndTextEdges() {
     UUID id = UUID.randomUUID();
     payments.insert(
-        new RazorpayPaymentRecord(
+        new CashfreePaymentRecord(
             id,
             UUID.randomUUID(),
             "ord_m",
@@ -161,14 +161,14 @@ class RemainingBranchCoverageTest {
 
   @Test
   void fundAccountBlankNamesAndVerifySigned() {
-    doReturn(new RazorpayXClientPort.FundAccountResult("c", "fa_new"))
-        .when(razorpayX)
-        .createFundAccount(any());
+    doReturn(new CashfreePayoutClientPort.BeneficiaryResult("c", "fa_new"))
+        .when(cashfreeX)
+        .createBeneficiary(any());
     Map<String, Object> data =
-        service.createFundAccount(
+        service.createBeneficiary(
             "PHARMACY", UUID.randomUUID(), " ", "50100123456789", "hdfc0001234", " ");
     assertThat(data.get("bank_name")).isEqualTo("");
-    doReturn(false).when(razorpay).verifyWebhookSignature(any(), any());
+    doReturn(false).when(cashfree).verifyWebhookSignature(any(), any(), any());
     try {
       service.handleWebhook("bad", "{}".getBytes(StandardCharsets.UTF_8));
     } catch (AppException e) {
@@ -191,8 +191,8 @@ class RemainingBranchCoverageTest {
     webhook(
         "{\"event\":\"payment.failed\",\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_ghost\"}}}}");
 
-    RazorpayXFundAccount fa =
-        new RazorpayXFundAccount(
+    CashfreeBeneficiary fa =
+        new CashfreeBeneficiary(
             UUID.randomUUID(),
             "PHARMACY",
             UUID.randomUUID(),
@@ -207,11 +207,11 @@ class RemainingBranchCoverageTest {
     fundAccounts.insert(fa);
     UUID id = UUID.randomUUID();
     payouts.insert(
-        new com.nammamedmate.integration.domain.RazorpayXPayoutRecord(
+        new com.nammamedmate.integration.domain.CashfreePayoutRecord(
             id,
             "PHARMACY",
             fa.entityId(),
-            fa.fundAccountId(),
+            fa.beneficiaryId(),
             "pout_r",
             "RR",
             1L,
@@ -221,16 +221,28 @@ class RemainingBranchCoverageTest {
             NOW.minusSeconds(4000),
             NOW.minusSeconds(4000),
             "x"));
-    org.mockito.Mockito.doThrow(new RuntimeException()).when(razorpayX).createPayout(any());
+    org.mockito.Mockito.doThrow(new RuntimeException()).when(cashfreeX).createPayout(any());
     assertThat(service.retryFailedPayouts()).isEqualTo(1);
 
     // same IFSC, different last4 → replace
-    doReturn(new RazorpayXClientPort.FundAccountResult("c2", "fa_2"))
-        .when(razorpayX)
-        .createFundAccount(any());
+    doReturn(new CashfreePayoutClientPort.BeneficiaryResult("c2", "fa_2"))
+        .when(cashfreeX)
+        .createBeneficiary(any());
     UUID entity = UUID.randomUUID();
-    service.createFundAccount("PHARMACY", entity, "HDFC", "50100123456789", "HDFC0001234", "A");
-    service.createFundAccount("PHARMACY", entity, "HDFC", "50100111111111", "HDFC0001234", "A");
+    service.createBeneficiary("PHARMACY", entity, "HDFC", "50100123456789", "HDFC0001234", "A");
+    service.createBeneficiary("PHARMACY", entity, "HDFC", "50100111111111", "HDFC0001234", "A");
+  }
+
+  @Test
+  void cashfreeNormalizedWebhookEventAliases() {
+    webhook("{\"type\":\"PAYMENT_AUTHORIZED\"}");
+    webhook("{\"type\":\"PAYMENT_SUCCESS_WEBHOOK\"}");
+    webhook("{\"type\":\"PAYMENT_SUCCESS\"}");
+    webhook("{\"type\":\"PAYMENT_FAILED_WEBHOOK\"}");
+    webhook("{\"type\":\"REFUND_STATUS_WEBHOOK\"}");
+    webhook("{\"type\":\"TRANSFER_SUCCESS\"}");
+    webhook("{\"type\":\"TRANSFER_ACKNOWLEDGED\"}");
+    webhook("{\"type\":\"TRANSFER_FAILED\"}");
   }
 
   private void webhook(String json) {

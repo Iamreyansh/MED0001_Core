@@ -5,8 +5,6 @@ import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.notification.application.port.out.CustomerPreferenceStore;
 import com.nammamedmate.notification.application.port.out.PharmacyPreferenceStore;
 import com.nammamedmate.notification.application.port.out.PreferenceAuditStore;
-import com.nammamedmate.notification.application.port.out.RecipientIdentityPort;
-import com.nammamedmate.notification.application.port.out.WhatsAppOptoutStore;
 import com.nammamedmate.notification.domain.CustomerNotificationPreferences;
 import com.nammamedmate.notification.domain.PharmacyNotificationPreferences;
 import com.nammamedmate.notification.domain.PreferenceAuditEntry;
@@ -35,34 +33,26 @@ public class PreferenceService {
   private final CustomerPreferenceStore customers;
   private final PharmacyPreferenceStore pharmacies;
   private final PreferenceAuditStore audits;
-  private final WhatsAppOptoutStore optouts;
-  private final RecipientIdentityPort identities;
   private final Clock clock;
 
   public PreferenceService(
       CustomerPreferenceStore customers,
       PharmacyPreferenceStore pharmacies,
       PreferenceAuditStore audits,
-      WhatsAppOptoutStore optouts,
-      RecipientIdentityPort identities,
       Clock clock) {
     this.customers = customers;
     this.pharmacies = pharmacies;
     this.audits = audits;
-    this.optouts = optouts;
-    this.identities = identities;
     this.clock = clock;
   }
 
   public Map<String, Object> getCustomerPreferences(UUID customerId) {
     CustomerNotificationPreferences prefs = ensureCustomer(customerId);
-    boolean waOptout =
-        identities.findPhoneByCustomerId(customerId).map(optouts::isActivelyOptedOut).orElse(false);
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("customer_id", customerId.toString());
     data.put("channels", channelViews(prefs));
     data.put("categories", customerCategoryViews(prefs));
-    data.put("whatsapp_optout_active", waOptout);
+    data.put("whatsapp_optout_active", false);
     data.put("updated_at", prefs.updatedAt().toString());
     return data;
   }
@@ -107,11 +97,6 @@ public class PreferenceService {
         old.snapshot(),
         updated.snapshot(),
         now);
-
-    // BR-8: re-enabling WhatsApp clears WA-native STOP opt-out.
-    if (!old.whatsappEnabled() && whatsapp) {
-      identities.findPhoneByCustomerId(customerId).ifPresent(optouts::deactivateByPhone);
-    }
 
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("updated", true);
@@ -289,8 +274,8 @@ public class PreferenceService {
     Map<String, Object> out = new LinkedHashMap<>();
     out.put("push", enabledCanDisable(prefs.pushEnabled(), true));
     out.put("sms", enabledCanDisable(prefs.smsEnabled(), true));
-    out.put("whatsapp", enabledCanDisable(prefs.whatsappEnabled(), true));
-    out.put("email", enabledCanDisable(prefs.emailEnabled(), true));
+    out.put("whatsapp", unavailableChannel());
+    out.put("email", unavailableChannel());
     return out;
   }
 
@@ -308,8 +293,8 @@ public class PreferenceService {
     Map<String, Object> out = new LinkedHashMap<>();
     out.put("push", enabledCanDisable(prefs.pushEnabled(), true));
     out.put("sms", enabledCanDisable(prefs.smsEnabled(), true));
-    out.put("whatsapp", enabledCanDisable(prefs.whatsappEnabled(), true));
-    out.put("email", enabledCanDisable(prefs.emailEnabled(), true));
+    out.put("whatsapp", unavailableChannel());
+    out.put("email", unavailableChannel());
     return out;
   }
 
@@ -327,6 +312,14 @@ public class PreferenceService {
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("enabled", enabled);
     m.put("can_disable", canDisable);
+    return m;
+  }
+
+  private static Map<String, Object> unavailableChannel() {
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("enabled", false);
+    m.put("can_disable", false);
+    m.put("status", "CHANNEL_UNAVAILABLE");
     return m;
   }
 }

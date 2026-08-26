@@ -29,12 +29,12 @@ RTO ≤60 min.
 |----|----------|--------|
 | D1 | Transactional outbox → SQS → dedicated workers, with DLQs and idempotent consumers | Architecture |
 | D2 | Tracker `production-ready` means prod-deployed; `staging-deployed` is the staging gate | Product |
-| D3 | `domains/payment` is the canonical Razorpay/RazorpayX owner | Architecture |
+| D3 | `domains/payment` is the canonical Cashfree/CashfreePayout owner | Architecture |
 | D4 | Hybrid inventory: reserve sellable qty at placement; consume FEFO batches/on-hand at accept; release on cancel | Commerce (2026-08-22) |
 | D5 | `UPLOADED` Rx may place an order; pharmacy must verify before fulfilment | Compliance |
 | D6 | TCS = 1% of settlement GMV for all pharmacies; ₹5L threshold applies only to TDS 194-O | Finance |
 | D7 | KYC uploads stay quarantined; signed GET and submit denied until clean scan | Security |
-| D8 | Auto-KYC never activates a pharmacy; `admin_compliance` (super override) verifies documents | Compliance (reconfirmed) |
+| D8 | KYC document verification never activates a pharmacy; only explicit admin approve does (`admin_compliance` cannot approve) | Compliance (reconfirmed) |
 | D9 | EPIC-013 loyalty supersedes EPIC-002: points expire and may be redeemed | Product |
 | D10 | No rider after 30 minutes → automatic cancel + canonical refund | Marketplace |
 | D11 | Medicine supply: TAKEN decrements immediately; nightly decrements only unrecorded scheduled doses | Product (2026-08-22) |
@@ -72,7 +72,7 @@ Status values: `open` · `in_progress` · `resolved` · `accepted ceiling` · `d
 | X2 | Reliability | blocker | D1 fail-closed + DLQ | DomainEventRouter throws on empty/unknown; DLQ after max receive | **resolved** | defect | Schema-validate; throw unless explicitly ignorable | Invalid payload stays visible; DLQ after max receive |
 | X3 | Reliability | blocker | D1 scheduler safety | API sole `@Scheduled` owner; owner-checked lease release | **resolved** | defect | One scheduler owner; lease per invocation with release | Second instance skips when lease held |
 | X4 | Reliability | blocker | D1 idempotent consumers | Durable `consumer_inbox` + DomainEventRouter claim | **resolved** | defect | Durable `(consumer, event_id[, channel])` inbox | Duplicate SQS delivery is a no-op |
-| X5 | EPIC-022 / 012 | blocker | D3 single Razorpay | Dual webhook URLs both hit payment (good); integration webhook updates parallel tables | **accepted ceiling** | intentional | Dashboard points only at payment URL | One webhook updates payment + ledger + order |
+| X5 | EPIC-022 / 012 | blocker | D3 single Cashfree | Dual webhook URLs both hit payment (good); integration webhook updates parallel tables | **accepted ceiling** | intentional | Dashboard points only at payment URL | One webhook updates payment + ledger + order |
 | X6 | EPIC-010 / 006 | blocker | D4 live stock | FEFO fail-closed + conditional deduct; cancel uses `RELEASE` | **resolved** | defect | Fail accept if FEFO incomplete; use `RELEASE` | Concurrent qty=1; accept consumes FEFO; cancel restores |
 | X7 | EPIC-010 | high | Rx quote checkout-ready | Quote select requires `product_id` (wired) | **resolved** | D4 | — | Quote select → place uses real product IDs |
 | X8 | EPIC-003 / 008 | blocker | Presigned PUT + D7 | KYC/Rx/rider still proxy multipart through API; Rx has no GuardDuty | **open** | defect | Presigned PUT + quarantine before OCR/GET/use | Staging GET is `https://*.amazonaws.com`; dirty object denied |
@@ -95,7 +95,7 @@ Status values: `open` · `in_progress` · `resolved` · `accepted ceiling` · `d
 | X25 | Tests | blocker | AC + Bruno gates | `acceptance-ac-gate.py` + `bruno-run` + Trivy; verified still false until staging | **resolved** | defect | Execute Bruno + AC evidence mapping | Bruno + matrix fail CI when unverified launch ACs exist |
 | X26 | EPIC-001 | high | OTP SMS | `Msg91OtpSmsSender` HTTP on deployed profiles | **accepted ceiling** | deploy-stage | Live handset proof | Deployed profile requires MSG91 key |
 | X27 | EPIC-003 | high | D8 never activate | `activateAfterAutoKyc` is no-op (D8) | **resolved** | D8 | Delete dead activation helpers | All-PASS verify leaves pharmacy PENDING_KYC |
-| X28 | EPIC-014 | blocker | SaaS checkout live | FailClosedSubscriptionPaymentAdapter on prod/staging | **deferred** | defect / deferred | Disable live CRM charging until webhook + `SubscriptionPaymentPort` | Invoice pay creates Razorpay order **and** marks PAID |
+| X28 | EPIC-014 | blocker | SaaS checkout live | FailClosedSubscriptionPaymentAdapter on prod/staging | **deferred** | defect / deferred | Disable live CRM charging until webhook + `SubscriptionPaymentPort` | Invoice pay creates Cashfree order **and** marks PAID |
 | X29 | EPIC-018 | high | Supply decrement | Nightly `slots − TAKEN` | **resolved** | D11 | — | TAKEN then nightly: only unrecorded slots decrement |
 | X30 | Infra | blocker | Comms secrets in ECS | `comms` secret injected with `replace_me` placeholders | **open** | defect | OOB replace + boot reject | Prod task includes required secrets; boot fails on placeholders |
 | R1 | Infra | blocker | Internal service token | SM + ECS injection + InternalServiceTokenFilter | **resolved** | defect | SM secret + ECS injection | Deployed API boots |
@@ -148,7 +148,7 @@ Status values: `open` · `in_progress` · `resolved` · `accepted ceiling` · `d
 | EPIC-019 Automation | 8 | deferred | Consumer + dedup; seeds stay INACTIVE |
 | EPIC-020 Observability | 3 | blocker | Fake P99; stub remediation; paging broken |
 | EPIC-021 Settings | 5 | high | Invite consume; config unused; reset consume missing |
-| EPIC-022 Integrations | 6 | deferred | Payment owns Razorpay; other vendors deferred / unwired |
+| EPIC-022 Integrations | 6 | deferred | Payment owns Cashfree; other vendors deferred / unwired |
 
 ---
 

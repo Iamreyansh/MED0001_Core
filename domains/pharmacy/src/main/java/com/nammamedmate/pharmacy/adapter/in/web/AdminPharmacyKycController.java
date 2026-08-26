@@ -4,24 +4,19 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.pharmacy.application.AutoKycService;
 import com.nammamedmate.pharmacy.application.PharmacyKycService;
 import com.nammamedmate.security.MedmatePrincipal;
 import com.nammamedmate.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -30,11 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPharmacyKycController {
 
   private final PharmacyKycService service;
-  private final AutoKycService autoKyc;
 
-  public AdminPharmacyKycController(PharmacyKycService service, AutoKycService autoKyc) {
+  public AdminPharmacyKycController(PharmacyKycService service) {
     this.service = service;
-    this.autoKyc = autoKyc;
   }
 
   @GetMapping("/{id}/kyc")
@@ -60,35 +53,6 @@ public class AdminPharmacyKycController {
         service.adminVerifyDocument(principal, id, docId, body.verified(), body.rejectionReason()));
   }
 
-  @PostMapping("/{id}/kyc/auto-verify")
-  @RequiresPermission("pharmacies:update")
-  @ResponseStatus(HttpStatus.ACCEPTED)
-  @Operation(summary = "Admin: trigger auto-KYC verification")
-  public ApiResponse<Map<String, Object>> triggerAutoVerify(
-      @AuthenticationPrincipal MedmatePrincipal principal,
-      @PathVariable UUID id,
-      @RequestBody(required = false) AutoVerifyRequest body) {
-    List<String> checks = body == null ? null : body.checks();
-    return ApiResponse.ok(autoKyc.adminTriggerAutoVerify(principal, id, checks));
-  }
-
-  @GetMapping("/{id}/kyc/auto-verify-result")
-  @RequiresPermission("pharmacies:read")
-  @Operation(summary = "Admin: get auto-KYC verification results")
-  public ApiResponse<Map<String, Object>> getAutoVerifyResult(
-      @AuthenticationPrincipal MedmatePrincipal principal,
-      @PathVariable UUID id,
-      @RequestParam(name = "job_id", required = false) UUID jobId) {
-    return ApiResponse.ok(autoKyc.adminGetAutoVerifyResult(principal, id, jobId));
-  }
-
   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
   public record VerifyRequest(Boolean verified, String rejectionReason) {}
-
-  @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-  public record AutoVerifyRequest(List<String> checks) {
-    public AutoVerifyRequest {
-      checks = checks == null ? null : List.copyOf(checks);
-    }
-  }
 }

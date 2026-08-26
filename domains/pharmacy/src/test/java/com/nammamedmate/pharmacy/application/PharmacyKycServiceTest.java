@@ -2,10 +2,6 @@ package com.nammamedmate.pharmacy.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.error.AppException;
@@ -58,7 +54,6 @@ class PharmacyKycServiceTest {
   private InMemoryOutboxStore outboxStore;
   private Clock clock;
   private PharmacyKycService service;
-  private AutoKycService autoKyc;
 
   static byte[] pdfSample() {
     return "%PDF-1.4 sample".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
@@ -90,9 +85,6 @@ class PharmacyKycServiceTest {
     presignedUrls = new FakePresignedUrls();
     outboxStore = new InMemoryOutboxStore();
     outbox = new OutboxPublisher(outboxStore, new ObjectMapper());
-    autoKyc = mock(AutoKycService.class);
-    when(autoKyc.latestAutoKycSummary(any())).thenReturn(null);
-    doNothing().when(autoKyc).handleAutoVerifyRequested(any());
     service =
         new PharmacyKycService(
             pharmacyStore,
@@ -102,9 +94,7 @@ class PharmacyKycServiceTest {
             presignedUrls,
             outbox,
             rateLimiter,
-            clock,
-            false,
-            autoKyc);
+            clock);
 
     pharmacyStore.save(pendingKycPharmacy(PHARMACY_ID));
   }
@@ -218,9 +208,7 @@ class PharmacyKycServiceTest {
             presignedUrls,
             outbox,
             limiter,
-            clock,
-            false,
-            autoKyc);
+            clock);
     for (int i = 0; i < PharmacyKycService.UPLOAD_LIMIT; i++) {
       limited.uploadDocument(
           ownerPrincipal(), "PAN_CARD", pdfSample(), "p.pdf", "application/pdf", null);
@@ -521,25 +509,6 @@ class PharmacyKycServiceTest {
     assertThat(kycStore.setUnderReviewCalledFor).contains(PHARMACY_ID);
     // Outbox event published
     assertThat(outboxStore.all()).isNotEmpty();
-  }
-
-  @Test
-  void submitKycWithAutoVerificationEnabled() {
-    PharmacyKycService autoService =
-        new PharmacyKycService(
-            pharmacyStore,
-            kycStore,
-            objectStore,
-            virusScanner,
-            presignedUrls,
-            outbox,
-            rateLimiter,
-            clock,
-            true,
-            autoKyc);
-    addAllRequiredDocs();
-    Map<String, Object> data = autoService.submitKyc(ownerPrincipal());
-    assertThat(data.get("auto_kyc_triggered")).isEqualTo(true);
   }
 
   // ─── Submit: error paths ─────────────────────────────────────────────────────
@@ -1419,9 +1388,7 @@ class PharmacyKycServiceTest {
             presignedUrls,
             outbox,
             rateLimiter,
-            clock,
-            false,
-            autoKyc);
+            clock);
     // Upload DRUG_LICENCE far in future — both T-60 and T-30 would be future, but existsAlert=true
     svc.uploadDocument(
         ownerPrincipal(),

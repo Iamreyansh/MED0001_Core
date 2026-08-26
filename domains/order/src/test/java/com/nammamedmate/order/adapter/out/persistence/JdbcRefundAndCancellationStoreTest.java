@@ -112,7 +112,7 @@ class JdbcRefundAndCancellationStoreTest {
               when(rs.getString("status")).thenReturn("PROCESSED");
               when(rs.getObject("issued_by")).thenReturn(refund.issuedBy());
               when(rs.getString("issued_by_type")).thenReturn("ADMIN");
-              when(rs.getString("razorpay_refund_id")).thenReturn("rfnd_1");
+              when(rs.getString("gateway_refund_id")).thenReturn("rfnd_1");
               when(rs.getObject("wallet_transaction_id")).thenReturn(null);
               when(rs.getTimestamp("processed_at")).thenReturn(Timestamp.from(T0));
               when(rs.getString("failed_reason")).thenReturn(null);
@@ -142,7 +142,7 @@ class JdbcRefundAndCancellationStoreTest {
               when(rs.getString("status")).thenReturn("PROCESSED");
               when(rs.getObject("issued_by")).thenReturn(null);
               when(rs.getString("issued_by_type")).thenReturn("SYSTEM");
-              when(rs.getString("razorpay_refund_id")).thenReturn(null);
+              when(rs.getString("gateway_refund_id")).thenReturn(null);
               when(rs.getObject("wallet_transaction_id")).thenReturn(UUID.randomUUID());
               when(rs.getTimestamp("processed_at")).thenReturn(null);
               when(rs.getString("failed_reason")).thenReturn(null);
@@ -170,9 +170,9 @@ class JdbcRefundAndCancellationStoreTest {
     assertThat(store.findByIdempotencyKey(null)).isEmpty();
 
     when(jdbc.query(anyString(), any(RowMapper.class), eq("rfnd_1"))).thenReturn(List.of(refund));
-    assertThat(store.findByRazorpayRefundId("rfnd_1")).isPresent();
-    assertThat(store.findByRazorpayRefundId(null)).isEmpty();
-    assertThat(store.findByRazorpayRefundId(" ")).isEmpty();
+    assertThat(store.findByGatewayRefundId("rfnd_1")).isPresent();
+    assertThat(store.findByGatewayRefundId(null)).isEmpty();
+    assertThat(store.findByGatewayRefundId(" ")).isEmpty();
 
     refund.markFailed("x", T0);
     store.update(refund);

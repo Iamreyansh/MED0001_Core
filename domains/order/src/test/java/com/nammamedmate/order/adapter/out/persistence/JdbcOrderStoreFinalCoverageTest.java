@@ -128,8 +128,8 @@ class JdbcOrderStoreFinalCoverageTest {
               when(rs.getLong("total_payable_paise")).thenReturn(0L);
               when(rs.getString("payment_method")).thenReturn("COD");
               when(rs.getString("payment_status")).thenReturn("PAID");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
               when(rs.getObject("prescription_id")).thenReturn(null);
               when(rs.getObject("delivery_address_id")).thenReturn(id);
               when(rs.getString("delivery_instructions")).thenReturn(null);
@@ -167,8 +167,8 @@ class JdbcOrderStoreFinalCoverageTest {
               when(rs.getLong("total_payable_paise")).thenReturn(1L);
               when(rs.getString("payment_method")).thenReturn("COD");
               when(rs.getString("payment_status")).thenReturn("PAID");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
               when(rs.getObject("prescription_id")).thenReturn(null);
               when(rs.getObject("delivery_address_id")).thenReturn(id);
               when(rs.getString("delivery_instructions")).thenReturn(null);
@@ -185,7 +185,7 @@ class JdbcOrderStoreFinalCoverageTest {
     assertThat(realStore.findById(id).orElseThrow().items().getFirst().productId()).isNull();
 
     assertThat(realStore.findByPlacementIdempotencyKey(null)).isEmpty();
-    assertThat(realStore.findByRazorpayOrderId(null)).isEmpty();
+    assertThat(realStore.findByGatewayOrderId(null)).isEmpty();
 
     when(jdbc.query(anyString(), any(ResultSetExtractor.class), any(UUID.class)))
         .thenAnswer(
@@ -245,8 +245,8 @@ class JdbcOrderStoreFinalCoverageTest {
               when(rs.getLong("total_payable_paise")).thenReturn(1L);
               when(rs.getString("payment_method")).thenReturn("COD");
               when(rs.getString("payment_status")).thenReturn("PAID");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
               when(rs.getObject("prescription_id")).thenReturn(null);
               when(rs.getObject("delivery_address_id")).thenReturn(id);
               when(rs.getString("delivery_instructions")).thenReturn(null);
@@ -284,8 +284,8 @@ class JdbcOrderStoreFinalCoverageTest {
               when(rs.getLong("total_payable_paise")).thenReturn(0L);
               when(rs.getString("payment_method")).thenReturn("COD");
               when(rs.getString("payment_status")).thenReturn("PAID");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
               when(rs.getObject("prescription_id")).thenReturn(null);
               when(rs.getObject("delivery_address_id")).thenReturn(id);
               when(rs.getString("delivery_instructions")).thenReturn(null);
@@ -321,8 +321,8 @@ class JdbcOrderStoreFinalCoverageTest {
               when(rs.getLong("total_payable_paise")).thenReturn(0L);
               when(rs.getString("payment_method")).thenReturn("COD");
               when(rs.getString("payment_status")).thenReturn("PAID");
-              when(rs.getString("razorpay_order_id")).thenReturn(null);
-              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("gateway_order_id")).thenReturn(null);
+              when(rs.getString("gateway_payment_id")).thenReturn(null);
               when(rs.getObject("prescription_id")).thenReturn(null);
               when(rs.getObject("delivery_address_id")).thenReturn(id);
               when(rs.getString("delivery_instructions")).thenReturn(null);

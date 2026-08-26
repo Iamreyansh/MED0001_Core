@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.rider.adapter.in.web.AdminRiderPayoutController;
 import com.nammamedmate.rider.adapter.in.web.RiderEarningsController;
-import com.nammamedmate.rider.adapter.out.client.StubRazorpayRouteAdapter;
+import com.nammamedmate.rider.adapter.out.client.StubCashfreeRouteAdapter;
 import com.nammamedmate.rider.adapter.out.persistence.JdbcRiderAssignmentStatsAdapter;
 import com.nammamedmate.rider.adapter.out.persistence.JdbcRiderBadgeStore;
 import com.nammamedmate.rider.adapter.out.persistence.JdbcRiderPayoutStore;
@@ -287,10 +287,10 @@ class IncentivesAdapterCoverageTest {
             });
     assertThat(stats.statsForRider(riderId).avgPickupMinutes()).isNull();
 
-    StubRazorpayRouteAdapter razorpay = new StubRazorpayRouteAdapter();
-    assertThat(razorpay.disburse(riderId, 10000, id).success()).isTrue();
-    razorpay.failNext(true);
-    assertThat(razorpay.disburse(riderId, 10000, id).success()).isFalse();
+    StubCashfreeRouteAdapter cashfree = new StubCashfreeRouteAdapter();
+    assertThat(cashfree.disburse(riderId, 10000, id).success()).isTrue();
+    cashfree.failNext(true);
+    assertThat(cashfree.disburse(riderId, 10000, id).success()).isFalse();
 
     JdbcRiderStore riders = new JdbcRiderStore(jdbc);
     when(jdbc.update(anyString(), any(), any(), any(), any(), any())).thenReturn(1);
@@ -397,7 +397,7 @@ class IncentivesAdapterCoverageTest {
     when(rs.getLong(anyString())).thenReturn(10000L);
     when(rs.getString("status")).thenReturn(row.status());
     when(rs.getString("hold_reason")).thenReturn(null);
-    when(rs.getString("razorpay_payout_id")).thenReturn(null);
+    when(rs.getString("cashfree_transfer_id")).thenReturn(null);
     when(rs.getString("payout_reference")).thenReturn(null);
     when(rs.getString("release_notes")).thenReturn(null);
     when(rs.getObject("released_by")).thenReturn(null);

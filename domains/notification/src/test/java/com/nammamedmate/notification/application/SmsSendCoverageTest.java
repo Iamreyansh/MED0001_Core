@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nammamedmate.kernel.error.AppException;
-import com.nammamedmate.notification.adapter.out.client.StubMsg91Client;
 import com.nammamedmate.notification.adapter.out.client.StubTwilioClient;
-import com.nammamedmate.notification.application.port.out.Msg91ClientPort;
 import com.nammamedmate.notification.application.port.out.SmsDeliveryLogStore;
 import com.nammamedmate.notification.application.port.out.TwilioClientPort;
 import com.nammamedmate.notification.domain.SmsCategory;
@@ -15,7 +13,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +25,6 @@ class SmsSendCoverageTest {
 
   private SmsServiceAcTest.FakeSmsTemplateStore templates;
   private SmsServiceAcTest.FakeSmsDeliveryLogStore logs;
-  private StubMsg91Client msg91;
   private StubTwilioClient twilio;
   private SmsSendService send;
   private SmsAdminService admin;
@@ -38,7 +34,6 @@ class SmsSendCoverageTest {
     Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     templates = new SmsServiceAcTest.FakeSmsTemplateStore();
     logs = new SmsServiceAcTest.FakeSmsDeliveryLogStore();
-    msg91 = new StubMsg91Client();
     twilio = new StubTwilioClient();
     templates.insert(
         new SmsTemplate(
@@ -68,20 +63,12 @@ class SmsSendCoverageTest {
             true,
             ADMIN,
             NOW));
-    send =
-        new SmsSendService(
-            templates,
-            logs,
-            msg91,
-            twilio,
-            AllowAllPreferenceGate.INSTANCE,
-            channel -> Optional.of("MSG91"),
-            clock);
+    send = new SmsSendService(templates, logs, twilio, AllowAllPreferenceGate.INSTANCE, clock);
     admin = new SmsAdminService(templates, logs, clock);
   }
 
   @Test
-  void templateErrorsAndHappyMsg91() {
+  void templateErrorsAndHappyTwilio() {
     assertThatThrownBy(
             () -> send.send(new SmsSendService.SendCommand(PHONE, "MISSING", Map.of(), null)))
         .extracting(ex -> ((AppException) ex).code())
@@ -103,14 +90,13 @@ class SmsSendCoverageTest {
         send.send(
             new SmsSendService.SendCommand(
                 PHONE, "OTP_VERIFICATION", Map.of("1", "111111", "2", "10"), "OTP"));
-    assertThat(ok.get("provider")).isEqualTo("MSG91");
+    assertThat(ok.get("provider")).isEqualTo("TWILIO");
     assertThat(ok.get("fallback_used")).isEqualTo(false);
-    assertThat(ok.get("cost_rs")).isEqualTo(new java.math.BigDecimal("0.12"));
+    assertThat(ok.get("cost_rs")).isEqualTo(new java.math.BigDecimal("0.20"));
   }
 
   @Test
-  void bothProvidersFailAndChannelUnavailable() {
-    msg91.setFail(true);
+  void twilioFailAndPreferenceBlocked() {
     twilio.setFail(true);
     assertThatThrownBy(
             () ->
@@ -122,33 +108,10 @@ class SmsSendCoverageTest {
     assertThat(logs.all()).hasSize(1);
     assertThat(logs.all().get(0).status().name()).isEqualTo("FAILED");
 
-    SmsSendService noChannel =
-        new SmsSendService(
-            templates,
-            logs,
-            msg91,
-            twilio,
-            AllowAllPreferenceGate.INSTANCE,
-            channel -> Optional.empty(),
-            Clock.fixed(NOW, ZoneOffset.UTC));
-    msg91.reset();
-    twilio.reset();
-    assertThatThrownBy(
-            () ->
-                noChannel.send(
-                    new SmsSendService.SendCommand(
-                        PHONE, "OTP_VERIFICATION", Map.of("1", "1", "2", "10"), "OTP")))
-        .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("ALL_PROVIDERS_FAILED");
-  }
-
-  @Test
-  void preferenceBlockedAndWebhook() {
     SmsSendService gated =
         new SmsSendService(
             templates,
             logs,
-            msg91,
             twilio,
             new com.nammamedmate.notification.application.port.out.PreferenceGatePort() {
               @Override
@@ -166,23 +129,26 @@ class SmsSendCoverageTest {
 
               @Override
               public boolean allowsWhatsApp(String toPhone) {
-                return true;
+                return false;
               }
 
               @Override
               public boolean allowsEmail(UUID customerId, String toEmail, String category) {
-                return true;
+                return false;
               }
             },
-            channel -> Optional.of("MSG91"),
             Clock.fixed(NOW, ZoneOffset.UTC));
+    twilio.reset();
     assertThatThrownBy(
             () ->
                 gated.send(
                     new SmsSendService.SendCommand(PHONE, "PROMO_OFFER", Map.of("1", "x"), null)))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("PREFERENCE_BLOCKED");
+  }
 
+  @Test
+  void webhookPromoWindowAndAdmin() {
     Map<String, Object> sent =
         send.send(
             new SmsSendService.SendCommand(
@@ -200,10 +166,30 @@ class SmsSendCoverageTest {
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("LOG_NOT_FOUND");
     assertThat(send.handleWebhook(msgId, null).get("updated")).isEqualTo(true);
-  }
 
-  @Test
-  void adminCreateListAndRenderHelpers() {
+    assertThatThrownBy(
+            () ->
+                new SmsSendService(
+                        templates,
+                        logs,
+                        twilio,
+                        AllowAllPreferenceGate.INSTANCE,
+                        Clock.fixed(Instant.parse("2026-07-24T15:30:00Z"), ZoneOffset.UTC))
+                    .send(
+                        new SmsSendService.SendCommand(
+                            PHONE, "PROMO_OFFER", Map.of("1", "x"), null)))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("PROMOTIONAL_TIME_RESTRICTED");
+
+    Clock daytime = Clock.fixed(Instant.parse("2026-07-24T03:30:00Z"), ZoneOffset.UTC);
+    SmsSendService daySend =
+        new SmsSendService(templates, logs, twilio, AllowAllPreferenceGate.INSTANCE, daytime);
+    assertThat(
+            daySend
+                .send(new SmsSendService.SendCommand(PHONE, "PROMO_OFFER", Map.of("1", "x"), null))
+                .get("provider"))
+        .isEqualTo("TWILIO");
+
     Map<String, Object> created =
         admin.createTemplate(
             ADMIN, "REFUND_PROCESSED", "Refund {{1}}", "TRANSACTIONAL", "1007164875432115", null);
@@ -218,6 +204,10 @@ class SmsSendCoverageTest {
     assertThatThrownBy(() -> admin.createTemplate(ADMIN, "X", "c", "BAD", "1", "NMMATE"))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("INVALID_CATEGORY");
+    assertThatThrownBy(
+            () -> admin.createTemplate(ADMIN, "REFUND_PROCESSED", "c", "OTP", "1", "NMMATE"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("TEMPLATE_ALREADY_EXISTS");
     assertThatThrownBy(() -> admin.listLogs(null, null, "BAD", null, null, 0, 0))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("INVALID_STATUS");
@@ -233,13 +223,13 @@ class SmsSendCoverageTest {
     assertThat(SmsSendService.render("Hi {{1}}", nullVal)).isEqualTo("Hi ");
     assertThat(SmsSendService.render("Hi", null)).isEqualTo("Hi");
     assertThat(SmsSendService.isPromotionalRestricted(Instant.parse("2026-07-24T15:30:00Z")))
-        .isTrue(); // 21:00 IST
+        .isTrue();
     assertThat(SmsSendService.isPromotionalRestricted(Instant.parse("2026-07-24T02:30:00Z")))
-        .isTrue(); // 08:00 IST
+        .isTrue();
     assertThat(SmsSendService.isPromotionalRestricted(Instant.parse("2026-07-24T03:30:00Z")))
-        .isFalse(); // 09:00 IST allowed
+        .isFalse();
     assertThat(send.monthlyCost(NOW.minusSeconds(1), NOW.plusSeconds(1)))
-        .isEqualByComparingTo(java.math.BigDecimal.ZERO);
+        .isGreaterThanOrEqualTo(java.math.BigDecimal.ZERO);
 
     logs.insert(
         new com.nammamedmate.notification.domain.SmsDeliveryLog(
@@ -247,11 +237,11 @@ class SmsSendCoverageTest {
             PHONE,
             "GONE",
             Map.of(),
-            com.nammamedmate.notification.domain.SmsProvider.MSG91,
+            com.nammamedmate.notification.domain.SmsProvider.TWILIO,
             "m",
             false,
             com.nammamedmate.notification.domain.SmsLogStatus.SENT,
-            new java.math.BigDecimal("0.12"),
+            new java.math.BigDecimal("0.20"),
             NOW,
             null,
             null));
@@ -261,10 +251,6 @@ class SmsSendCoverageTest {
         (java.util.List<Map<String, Object>>) orphan.data().get("logs");
     assertThat(orphanRows.get(0).get("category")).isNull();
 
-    assertThat(
-            new Msg91ClientPort.SendRequest(PHONE, "d", "NMMATE", "b", null, SmsCategory.OTP)
-                .variables())
-        .isEmpty();
     assertThat(new TwilioClientPort.SendRequest(PHONE, "NMMATE", "b", null).variables()).isEmpty();
   }
 
@@ -282,31 +268,17 @@ class SmsSendCoverageTest {
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("TEMPLATE_NOT_FOUND");
 
-    Msg91ClientPort silentFail =
-        new Msg91ClientPort() {
-          @Override
-          public boolean isOnDnd(String toPhone) {
-            return false;
-          }
-
-          @Override
-          public SendResult send(SendRequest request) {
-            return new SendResult(false, false, null, null);
-          }
-        };
     TwilioClientPort silentTwilio = request -> new TwilioClientPort.SendResult(false, null, null);
-    SmsSendService bothNull =
+    SmsSendService silent =
         new SmsSendService(
             templates,
             logs,
-            silentFail,
             silentTwilio,
             AllowAllPreferenceGate.INSTANCE,
-            channel -> Optional.of("MSG91"),
             Clock.fixed(NOW, ZoneOffset.UTC));
     assertThatThrownBy(
             () ->
-                bothNull.send(
+                silent.send(
                     new SmsSendService.SendCommand(
                         PHONE, "OTP_VERIFICATION", Map.of("1", "1", "2", "10"), "OTP")))
         .extracting(ex -> ((AppException) ex).code())
@@ -323,10 +295,8 @@ class SmsSendCoverageTest {
         new SmsSendService(
             templates,
             nullSum,
-            msg91,
             twilio,
             AllowAllPreferenceGate.INSTANCE,
-            channel -> Optional.of("MSG91"),
             Clock.fixed(NOW, ZoneOffset.UTC));
     assertThat(nullCost.monthlyCost(NOW, NOW.plusSeconds(1)))
         .isEqualByComparingTo(java.math.BigDecimal.ZERO);
@@ -350,45 +320,17 @@ class SmsSendCoverageTest {
                 .get("template_id"))
         .isEqualTo("NEW_TPL3");
 
-    Msg91ClientPort primaryErr =
-        new Msg91ClientPort() {
-          @Override
-          public boolean isOnDnd(String toPhone) {
-            return false;
-          }
-
-          @Override
-          public SendResult send(SendRequest request) {
-            return new SendResult(false, false, null, "MSG91 down");
-          }
-        };
-    assertThatThrownBy(
-            () ->
-                new SmsSendService(
-                        templates,
-                        logs,
-                        primaryErr,
-                        silentTwilio,
-                        AllowAllPreferenceGate.INSTANCE,
-                        channel -> Optional.of("MSG91"),
-                        Clock.fixed(NOW, ZoneOffset.UTC))
-                    .send(
-                        new SmsSendService.SendCommand(
-                            PHONE, "OTP_VERIFICATION", Map.of("1", "1", "2", "10"), "OTP")))
-        .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("ALL_PROVIDERS_FAILED");
-
     logs.insert(
         new com.nammamedmate.notification.domain.SmsDeliveryLog(
             java.util.UUID.randomUUID(),
             PHONE,
             "OTP_VERIFICATION",
             Map.of(),
-            com.nammamedmate.notification.domain.SmsProvider.MSG91,
+            com.nammamedmate.notification.domain.SmsProvider.TWILIO,
             "delivered-1",
             false,
             com.nammamedmate.notification.domain.SmsLogStatus.DELIVERED,
-            new java.math.BigDecimal("0.12"),
+            new java.math.BigDecimal("0.20"),
             NOW,
             NOW,
             null));
@@ -426,5 +368,7 @@ class SmsSendCoverageTest {
             null));
     SmsAdminService.LogPage weird = admin.listLogs("  ", "  ", null, null, null, 1, 100);
     assertThat(weird.data().get("logs")).asList().isNotEmpty();
+
+    assertThat(new SmsSendService.SendCommand(PHONE, "T", null, null).variables()).isEmpty();
   }
 }
