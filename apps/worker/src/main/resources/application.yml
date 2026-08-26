@@ -16,6 +16,18 @@ medmate:
   sqs:
     queue-url: ${MEDMATE_SQS_DOMAIN_EVENTS_URL:}
     # kyc-malware-queue-url: set only via MEDMATE_SQS_KYC_MALWARE_URL in ECS (staging/prod)
+  mfa:
+    encryption-key-base64: ${MEDMATE_MFA_ENCRYPTION_KEY_BASE64:}
+  payment:
+    encryption-key-base64: ${MEDMATE_PAYMENT_ENCRYPTION_KEY_BASE64:}
+  fcm:
+    project-id: ${MEDMATE_FCM_PROJECT_ID:}
+    service-account-json: ${MEDMATE_FCM_SERVICE_ACCOUNT_JSON:}
+  twilio:
+    account-sid: ${MEDMATE_TWILIO_ACCOUNT_SID:}
+    auth-token: ${MEDMATE_TWILIO_AUTH_TOKEN:}
+    api-key: ${MEDMATE_TWILIO_API_KEY:}
+    from-number: ${MEDMATE_TWILIO_FROM_NUMBER:}
 
 logging:
   pattern:

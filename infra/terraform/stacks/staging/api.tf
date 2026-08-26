@@ -263,6 +263,8 @@ locals {
   worker_secrets = [
     { name = "SPRING_DATASOURCE_USERNAME", valueFrom = "${aws_secretsmanager_secret.db.arn}:username::" },
     { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" },
+    { name = "MEDMATE_MFA_ENCRYPTION_KEY_BASE64", valueFrom = "${aws_secretsmanager_secret.mfa.arn}:encryption_key_base64::" },
+    { name = "MEDMATE_PAYMENT_ENCRYPTION_KEY_BASE64", valueFrom = "${aws_secretsmanager_secret.mfa.arn}:payment_encryption_key_base64::" },
     { name = "MEDMATE_TWILIO_ACCOUNT_SID", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_account_sid::" },
     { name = "MEDMATE_TWILIO_AUTH_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_auth_token::" },
     { name = "MEDMATE_TWILIO_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:twilio_api_key::" },

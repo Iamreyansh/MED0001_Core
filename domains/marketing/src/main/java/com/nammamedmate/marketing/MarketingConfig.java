@@ -3,10 +3,12 @@ package com.nammamedmate.marketing;
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.marketing.adapter.out.client.StubBannerImageValidator;
 import com.nammamedmate.marketing.adapter.out.client.StubCampaignDispatch;
+import com.nammamedmate.marketing.adapter.out.client.StubCampaignTemplateValidator;
 import com.nammamedmate.marketing.adapter.out.messaging.StubMarketingNotificationDispatch;
 import com.nammamedmate.marketing.application.port.out.BannerImageValidatorPort;
 import com.nammamedmate.marketing.application.port.out.CampaignDispatchPort;
 import com.nammamedmate.marketing.application.port.out.CampaignStore;
+import com.nammamedmate.marketing.application.port.out.CampaignTemplatePort;
 import com.nammamedmate.marketing.application.port.out.CouponStore;
 import com.nammamedmate.marketing.application.port.out.CustomerGeoPort;
 import com.nammamedmate.marketing.application.port.out.LoyaltyAdminPort;
@@ -69,6 +71,12 @@ public class MarketingConfig {
   @ConditionalOnMissingBean(CampaignDispatchPort.class)
   CampaignDispatchPort stubCampaignDispatch() {
     return new StubCampaignDispatch();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(CampaignTemplatePort.class)
+  CampaignTemplatePort stubCampaignTemplatePort() {
+    return new StubCampaignTemplateValidator();
   }
 
   @Bean
