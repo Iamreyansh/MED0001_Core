@@ -73,7 +73,31 @@ public class PaymentService {
   @Transactional
   public Map<String, Object> initiate(
       MedmatePrincipal principal, UUID orderId, Long amountPaise, String currency, String method) {
+    return initiate(principal, orderId, amountPaise, currency, method, null);
+  }
+
+  @Transactional
+  public Map<String, Object> initiate(
+      MedmatePrincipal principal,
+      UUID orderId,
+      Long amountPaise,
+      String currency,
+      String method,
+      String idempotencyKey) {
     requireCustomer(principal);
+    String idem =
+        idempotencyKey == null || idempotencyKey.isBlank()
+            ? Ids.newId().toString()
+            : idempotencyKey.trim();
+    var replay = payments.findByIdempotencyKey(idem);
+    if (replay.isPresent()) {
+      Payment existingKey = replay.get();
+      if (orderId != null && !existingKey.orderId().equals(orderId)) {
+        throw new AppException(
+            "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key already used for another payment", 409);
+      }
+      return initiateView(existingKey, razorpay.keyId());
+    }
     if (orderId == null) {
       throw new AppException("VALIDATION_ERROR", "order_id is required", 400);
     }
@@ -183,7 +207,7 @@ public class PaymentService {
               gatewayPortion <= 0 ? now : null,
               null,
               null,
-              null,
+              idem,
               failed.createdAt(),
               now);
       payments.update(payment);
@@ -214,7 +238,7 @@ public class PaymentService {
               gatewayPortion <= 0 ? now : null,
               null,
               null,
-              null,
+              idem,
               now,
               now);
       payments.insert(payment);
@@ -224,18 +248,22 @@ public class PaymentService {
       }
     }
 
+    return initiateView(payment, keyId);
+  }
+
+  private Map<String, Object> initiateView(Payment payment, String keyId) {
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("payment_id", payment.id());
-    data.put("order_id", orderId);
-    data.put("razorpay_order_id", razorpayOrderId);
+    data.put("order_id", payment.orderId());
+    data.put("razorpay_order_id", payment.razorpayOrderId());
     data.put("razorpay_key_id", keyId);
-    data.put("amount_paise", amountPaise);
-    data.put("amount_rupees", MoneyFormats.paiseToRupees(amountPaise));
+    data.put("amount_paise", payment.amountPaise());
+    data.put("amount_rupees", MoneyFormats.paiseToRupees(payment.amountPaise()));
     data.put("currency", payment.currency());
     data.put("method", payment.method().name());
-    data.put("wallet_deducted", MoneyFormats.paiseToRupees(walletPortion));
-    data.put("gateway_amount_paise", gatewayPortion);
-    data.put("expires_at", now.plus(RAZORPAY_ORDER_TTL));
+    data.put("wallet_deducted", MoneyFormats.paiseToRupees(payment.walletPortionPaise()));
+    data.put("gateway_amount_paise", payment.gatewayPortionPaise());
+    data.put("expires_at", payment.createdAt().plus(RAZORPAY_ORDER_TTL));
     return data;
   }
 

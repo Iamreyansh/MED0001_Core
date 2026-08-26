@@ -61,7 +61,8 @@ public final class AnalyticsMath {
   }
 
   public static long netRevenuePaise(long gmvPaise, long refundsPaise, long cancellationsPaise) {
-    return Math.max(0L, gmvPaise - refundsPaise - cancellationsPaise);
+    // Live GMV already excludes CANCELLED; do not subtract cancellation GMV again.
+    return Math.max(0L, gmvPaise - refundsPaise);
   }
 
   /** Indian financial year start (Apr 1) containing {@code onDate} in IST calendar. */

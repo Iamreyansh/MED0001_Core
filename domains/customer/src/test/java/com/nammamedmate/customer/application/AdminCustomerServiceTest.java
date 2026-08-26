@@ -48,7 +48,8 @@ class AdminCustomerServiceTest {
     wallets = new FakeWalletStore();
     rateLimiter = new InMemoryRateLimiter(CLOCK);
     outboxStore = new InMemoryOutboxStore();
-    WalletService walletService = new WalletService(wallets, store, rateLimiter, CLOCK, 100_000L);
+    WalletService walletService =
+        new WalletService(wallets, store, rateLimiter, CLOCK, () -> 100_000L);
     LoyaltyService loyaltyService =
         new LoyaltyService(
             new FakeLoyaltyStore(),
@@ -122,7 +123,8 @@ class AdminCustomerServiceTest {
 
   @Test
   void list_exportTrue_returnsStubExportUrl() {
-    WalletService walletService = new WalletService(wallets, store, rateLimiter, CLOCK, 100_000L);
+    WalletService walletService =
+        new WalletService(wallets, store, rateLimiter, CLOCK, () -> 100_000L);
     LoyaltyService loyaltyService =
         new LoyaltyService(
             new FakeLoyaltyStore(),

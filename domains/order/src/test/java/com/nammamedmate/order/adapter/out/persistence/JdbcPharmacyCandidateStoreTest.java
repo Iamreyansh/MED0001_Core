@@ -98,14 +98,9 @@ class JdbcPharmacyCandidateStoreTest {
     when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(id))).thenReturn(null);
     assertThat(store.visibleItemsCount(id)).isEqualTo(0);
 
-    when(jdbc.queryForObject(
-            eq("SELECT COUNT(*) FROM pharmacy_directory_metrics"), eq(Integer.class)))
-        .thenReturn(4);
-    assertThat(store.refreshFillRatesFromDirectoryMetrics()).isEqualTo(4);
-    when(jdbc.queryForObject(
-            eq("SELECT COUNT(*) FROM pharmacy_directory_metrics"), eq(Integer.class)))
-        .thenReturn(null);
-    assertThat(store.refreshFillRatesFromDirectoryMetrics()).isEqualTo(0);
+    when(jdbc.update(anyString(), any(java.sql.Timestamp.class), any(java.sql.Timestamp.class)))
+        .thenReturn(12);
+    assertThat(store.refreshFillRatesFromDirectoryMetrics()).isEqualTo(12);
   }
 
   @Test

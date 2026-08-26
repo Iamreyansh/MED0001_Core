@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -175,10 +176,62 @@ public class JdbcPharmacyCandidateStore implements PharmacyCandidatePort {
 
   @Override
   public int refreshFillRatesFromDirectoryMetrics() {
-    // ponytail: metrics table is source of truth; hot path JOINs it — no denormalised copy.
-    Integer n =
-        jdbc.queryForObject("SELECT COUNT(*) FROM pharmacy_directory_metrics", Integer.class);
-    return n == null ? 0 : n;
+    Instant asOf = Instant.now();
+    return jdbc.update(
+        """
+        INSERT INTO pharmacy_directory_metrics (
+          pharmacy_id, orders_today, gmv_today_paise, fill_rate_pct, metrics_as_of, updated_at
+        )
+        SELECT
+          p.id,
+          COALESCE(d.orders_today, 0),
+          COALESCE(d.gmv_today_paise, 0),
+          COALESCE(d.fill_rate_pct, 0.00),
+          ?,
+          ?
+        FROM pharmacies p
+        LEFT JOIN (
+          SELECT
+            pharmacy_id,
+            COUNT(*) FILTER (
+              WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata')
+                AT TIME ZONE 'Asia/Kolkata'
+            ) AS orders_today,
+            COALESCE(SUM(total_payable_paise) FILTER (
+              WHERE status = 'DELIVERED'
+                AND delivered_at >= date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata')
+                  AT TIME ZONE 'Asia/Kolkata'
+            ), 0) AS gmv_today_paise,
+            CASE
+              WHEN COUNT(*) FILTER (
+                WHERE created_at >= NOW() - INTERVAL '30 days'
+              ) = 0 THEN 0.00
+              ELSE ROUND(
+                100.0 * COUNT(*) FILTER (
+                  WHERE created_at >= NOW() - INTERVAL '30 days'
+                    AND status IN ('DELIVERED', 'OUT_FOR_DELIVERY', 'READY_FOR_PICKUP', 'PACKING', 'ACCEPTED')
+                )
+                / NULLIF(COUNT(*) FILTER (
+                  WHERE created_at >= NOW() - INTERVAL '30 days'
+                    AND status NOT IN ('PAYMENT_PENDING')
+                ), 0),
+                2
+              )
+            END AS fill_rate_pct
+          FROM orders
+          WHERE deleted_at IS NULL
+          GROUP BY pharmacy_id
+        ) d ON d.pharmacy_id = p.id
+        WHERE p.deleted_at IS NULL
+        ON CONFLICT (pharmacy_id) DO UPDATE SET
+          orders_today = EXCLUDED.orders_today,
+          gmv_today_paise = EXCLUDED.gmv_today_paise,
+          fill_rate_pct = EXCLUDED.fill_rate_pct,
+          metrics_as_of = EXCLUDED.metrics_as_of,
+          updated_at = EXCLUDED.updated_at
+        """,
+        java.sql.Timestamp.from(asOf),
+        java.sql.Timestamp.from(asOf));
   }
 
   private PharmacyRow mapRow(ResultSet rs, int rowNum) throws SQLException {

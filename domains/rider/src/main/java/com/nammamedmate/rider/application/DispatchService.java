@@ -180,6 +180,24 @@ public class DispatchService {
     return data;
   }
 
+  /** Idempotent automation hook: assign best rider to one READY_FOR_PICKUP order. */
+  @Transactional
+  public void autoAssignOrder(UUID orderId) {
+    if (orderId == null || !autoAssignEnabled) {
+      return;
+    }
+    if (assignments.hasActiveForOrder(orderId)) {
+      return;
+    }
+    OrderDetails order = orders.findOrder(orderId).orElse(null);
+    if (order == null || !"READY_FOR_PICKUP".equals(order.status()) || order.riderId() != null) {
+      return;
+    }
+    pickBestRider(order)
+        .ifPresent(
+            s -> createAssignment(order, s.rider(), "AUTO", null, s.score(), clock.instant()));
+  }
+
   @Transactional
   public Map<String, Object> reassign(
       MedmatePrincipal principal, UUID orderId, UUID riderId, String reason) {
@@ -361,7 +379,10 @@ public class DispatchService {
     push.put("order_id", order.orderId().toString());
     push.put("assignment_id", id.toString());
     push.put("template", "RIDER_ORDER_ASSIGNED");
-    push.put("channels", List.of("PUSH"));
+    push.put("title", "New delivery assigned");
+    push.put("body", "Order " + order.orderNumber() + " — accept within 5 minutes");
+    push.put("recipient_type", "RIDER");
+    push.put("recipient_ids", List.of(rider.id().toString()));
     push.put("accept_deadline", deadline.toString());
     outbox.publish(DomainEvent.of("rider.notification.order_assigned", "rider", rider.id(), push));
     return row;

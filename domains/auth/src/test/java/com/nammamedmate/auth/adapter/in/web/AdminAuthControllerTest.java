@@ -13,9 +13,11 @@ import com.nammamedmate.auth.adapter.in.web.dto.AdminLoginResponse;
 import com.nammamedmate.auth.adapter.in.web.dto.AdminSetupMfaResponse;
 import com.nammamedmate.auth.adapter.in.web.dto.AdminVerifyMfaRequest;
 import com.nammamedmate.auth.adapter.in.web.dto.AdminVerifyMfaResponse;
+import com.nammamedmate.auth.application.AdminInviteCompleteService;
 import com.nammamedmate.auth.application.AdminLoginResult;
 import com.nammamedmate.auth.application.AdminLoginService;
 import com.nammamedmate.auth.application.AdminMfaVerifyResult;
+import com.nammamedmate.auth.application.AdminPasswordResetCompleteService;
 import com.nammamedmate.auth.application.AdminSetupMfaResult;
 import com.nammamedmate.auth.application.AdminSetupMfaService;
 import com.nammamedmate.auth.application.AdminVerifyMfaService;
@@ -40,8 +42,17 @@ class AdminAuthControllerTest {
   private final AdminLoginService loginService = mock(AdminLoginService.class);
   private final AdminVerifyMfaService verifyMfaService = mock(AdminVerifyMfaService.class);
   private final AdminSetupMfaService setupMfaService = mock(AdminSetupMfaService.class);
+  private final AdminInviteCompleteService inviteCompleteService =
+      mock(AdminInviteCompleteService.class);
+  private final AdminPasswordResetCompleteService resetCompleteService =
+      mock(AdminPasswordResetCompleteService.class);
   private final AdminAuthController controller =
-      new AdminAuthController(loginService, verifyMfaService, setupMfaService);
+      new AdminAuthController(
+          loginService,
+          verifyMfaService,
+          setupMfaService,
+          inviteCompleteService,
+          resetCompleteService);
 
   @Test
   void loginMapsRequestAndUsesForwardedFor() {
@@ -278,5 +289,27 @@ class AdminAuthControllerTest {
         null,
         now,
         now);
+  }
+
+  @Test
+  void completeInviteDelegates() {
+    when(inviteCompleteService.complete(eq("tok"), eq("Passw0rd!")))
+        .thenReturn(Map.of("status", "ACTIVE"));
+    when(inviteCompleteService.complete(null, null)).thenReturn(Map.of("status", "ACTIVE"));
+    assertThat(controller.completeInvite(Map.of("invite_token", "tok", "password", "Passw0rd!")))
+        .extracting(ApiResponse::success)
+        .isEqualTo(true);
+    assertThat(controller.completeInvite(null).success()).isTrue();
+  }
+
+  @Test
+  void completeResetDelegates() {
+    when(resetCompleteService.complete(eq("tok"), eq("Passw0rd!")))
+        .thenReturn(Map.of("status", "ACTIVE"));
+    when(resetCompleteService.complete(null, null)).thenReturn(Map.of("status", "ACTIVE"));
+    assertThat(controller.completeReset(Map.of("reset_token", "tok", "password", "Passw0rd!")))
+        .extracting(ApiResponse::success)
+        .isEqualTo(true);
+    assertThat(controller.completeReset(null).success()).isTrue();
   }
 }

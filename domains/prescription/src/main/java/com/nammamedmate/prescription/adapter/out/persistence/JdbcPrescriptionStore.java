@@ -165,6 +165,19 @@ public class JdbcPrescriptionStore implements PrescriptionStore {
   }
 
   @Override
+  public void updateStatus(UUID id, String status, Instant updatedAt) {
+    jdbc.update(
+        """
+        UPDATE prescription
+        SET status = ?, updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL
+        """,
+        status,
+        Timestamp.from(updatedAt),
+        id);
+  }
+
+  @Override
   public int markExpiredDue(Instant now, Instant updatedAt) {
     return jdbc.update(
         """

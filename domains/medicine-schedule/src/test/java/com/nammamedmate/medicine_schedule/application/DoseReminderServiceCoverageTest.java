@@ -2,7 +2,11 @@ package com.nammamedmate.medicine_schedule.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.error.AppException;
@@ -14,6 +18,7 @@ import com.nammamedmate.medicine_schedule.application.port.out.DoseLogStore.Dose
 import com.nammamedmate.medicine_schedule.application.port.out.DoseLogStore.TodayCounts;
 import com.nammamedmate.medicine_schedule.application.port.out.NotificationDispatchPort;
 import com.nammamedmate.medicine_schedule.application.port.out.ReminderScheduleStore;
+import com.nammamedmate.medicine_schedule.application.port.out.ReminderScheduleStore.ReminderRecord;
 import com.nammamedmate.medicine_schedule.application.port.out.ScheduleMedicineStore;
 import com.nammamedmate.medicine_schedule.application.port.out.ScheduleMedicineStore.ScheduleMedicineRecord;
 import com.nammamedmate.medicine_schedule.domain.DoseSlot;
@@ -65,6 +70,31 @@ class DoseReminderServiceCoverageTest {
     customerId = Ids.newId();
     memberId = Ids.newId();
     customer = new MedmatePrincipal(customerId, AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
+  }
+
+  @Test
+  void dispatchDoesNotMarkSentWhenNotifyFails() {
+    ReminderRecord due =
+        new ReminderRecord(
+            Ids.newId(),
+            Ids.newId(),
+            customerId,
+            Ids.newId(),
+            NOW.minusSeconds(1),
+            "PUSH",
+            "SCHEDULED",
+            null,
+            null,
+            null,
+            null,
+            NOW);
+    when(reminders.findDueScheduled(NOW, 10)).thenReturn(List.of(due));
+    doThrow(new IllegalStateException("dispatch failed"))
+        .when(notifications)
+        .notifyDoseReminderDue(any(), any(), any(), any());
+    assertThatThrownBy(() -> service.dispatchDueReminders(10))
+        .isInstanceOf(IllegalStateException.class);
+    verify(reminders, never()).markSent(any(), any(), any());
   }
 
   @Test

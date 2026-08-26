@@ -790,6 +790,37 @@ class PrescriptionServiceTest {
     }
 
     @Override
+    public void updateStatus(UUID id, String status, Instant updatedAt) {
+      PrescriptionRecord r = byId.get(id);
+      if (r == null) {
+        return;
+      }
+      byId.put(
+          id,
+          new PrescriptionRecord(
+              r.id(),
+              r.customerId(),
+              r.type(),
+              status,
+              r.s3Key(),
+              r.fileSizeBytes(),
+              r.mimeType(),
+              r.patientName(),
+              r.notes(),
+              r.doctorName(),
+              r.prescriptionDate(),
+              r.source(),
+              r.medicinesExtracted(),
+              r.associatedOrderId(),
+              r.teleconsultId(),
+              r.expiresAt(),
+              r.rejectionReason(),
+              r.createdAt(),
+              updatedAt,
+              r.deletedAt()));
+    }
+
+    @Override
     public int markExpiredDue(Instant now, Instant updatedAt) {
       int n = 0;
       for (PrescriptionRecord r : List.copyOf(byId.values())) {

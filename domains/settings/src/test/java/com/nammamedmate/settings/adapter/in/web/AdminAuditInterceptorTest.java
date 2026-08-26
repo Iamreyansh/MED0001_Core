@@ -8,12 +8,14 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
 import com.nammamedmate.security.TokenScope;
 import com.nammamedmate.settings.application.AuditLogService;
+import com.nammamedmate.settings.application.port.out.AdminStaffStore;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
@@ -33,8 +35,10 @@ class AdminAuditInterceptorTest {
   @BeforeEach
   void setUp() {
     service = mock(AuditLogService.class);
+    AdminStaffStore staff = mock(AdminStaffStore.class);
+    when(staff.findById(any())).thenReturn(java.util.Optional.empty());
     Executor sync = Runnable::run;
-    interceptor = new AdminAuditInterceptor(service, sync);
+    interceptor = new AdminAuditInterceptor(service, staff, sync);
     SecurityContextHolder.clearContext();
   }
 
@@ -49,6 +53,109 @@ class AdminAuditInterceptorTest {
         new MockHttpServletRequest("POST", "/api/v1/admin/audit-log/x"), res, new Object(), null);
     verify(service, never())
         .appendMiddleware(any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void logsMutatingAdminRequestWithStaffDisplayName() {
+    UUID staffId = Ids.newId();
+    AdminStaffStore named = mock(AdminStaffStore.class);
+    when(named.findById(staffId))
+        .thenReturn(
+            java.util.Optional.of(
+                new AdminStaffStore.AdminStaffRow(
+                    staffId,
+                    "Priya Ops",
+                    "priya@test.in",
+                    "admin_operations",
+                    "ACTIVE",
+                    true,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
+    AdminAuditInterceptor namedInterceptor =
+        new AdminAuditInterceptor(service, named, Runnable::run);
+    MedmatePrincipal principal =
+        new MedmatePrincipal(staffId, AuthRole.ADMIN_OPERATIONS, null, TokenScope.FULL, "j");
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(principal, null));
+
+    MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/admin/staff");
+    MockHttpServletResponse res = new MockHttpServletResponse();
+    assertThat(namedInterceptor.preHandle(req, res, new Object())).isTrue();
+    namedInterceptor.afterCompletion(req, res, new Object(), null);
+
+    verify(service)
+        .appendMiddleware(
+            eq(staffId),
+            eq("Priya Ops"),
+            eq("admin_operations"),
+            eq("staff.create"),
+            eq("staff"),
+            isNull(),
+            any(),
+            any(),
+            isNull());
+
+    when(named.findById(staffId))
+        .thenReturn(
+            java.util.Optional.of(
+                new AdminStaffStore.AdminStaffRow(
+                    staffId,
+                    "  ",
+                    "blank@test.in",
+                    "admin_operations",
+                    "ACTIVE",
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
+    namedInterceptor.afterCompletion(req, res, new Object(), null);
+    verify(service)
+        .appendMiddleware(
+            eq(staffId),
+            eq("admin_operations"),
+            eq("admin_operations"),
+            eq("staff.create"),
+            eq("staff"),
+            isNull(),
+            any(),
+            any(),
+            isNull());
+
+    when(named.findById(staffId))
+        .thenReturn(
+            java.util.Optional.of(
+                new AdminStaffStore.AdminStaffRow(
+                    staffId,
+                    null,
+                    "nullname@test.in",
+                    "admin_operations",
+                    "ACTIVE",
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
+    namedInterceptor.afterCompletion(req, res, new Object(), null);
+    verify(service, org.mockito.Mockito.atLeastOnce())
+        .appendMiddleware(
+            eq(staffId),
+            eq("admin_operations"),
+            eq("admin_operations"),
+            eq("staff.create"),
+            eq("staff"),
+            isNull(),
+            any(),
+            any(),
+            isNull());
   }
 
   @Test

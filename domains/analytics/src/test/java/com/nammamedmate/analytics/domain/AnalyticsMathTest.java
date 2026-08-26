@@ -23,7 +23,7 @@ class AnalyticsMathTest {
     assertThat(AnalyticsMath.netMarginPct(0, 10)).isEqualByComparingTo("0.0");
     assertThat(AnalyticsMath.aovPaise(1000, 0)).isZero();
     assertThat(AnalyticsMath.aovPaise(1000, 4)).isEqualTo(250);
-    assertThat(AnalyticsMath.netRevenuePaise(1000, 100, 50)).isEqualTo(850);
+    assertThat(AnalyticsMath.netRevenuePaise(1000, 100, 50)).isEqualTo(900);
     assertThat(AnalyticsMath.netRevenuePaise(10, 20, 0)).isZero();
   }
 

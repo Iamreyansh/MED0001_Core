@@ -17,4 +17,6 @@ public interface PaymentStore {
   Optional<Payment> findByRazorpayOrderId(String razorpayOrderId);
 
   Optional<Payment> findByRazorpayPaymentId(String razorpayPaymentId);
+
+  Optional<Payment> findByIdempotencyKey(String idempotencyKey);
 }

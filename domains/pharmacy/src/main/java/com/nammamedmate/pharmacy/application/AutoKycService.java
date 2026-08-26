@@ -488,10 +488,9 @@ public class AutoKycService {
     Instant completedAt = RESOLVED_JOB_STATUSES.contains(overall) ? now : null;
     jobs.updateOverallStatus(jobId, overall, completedAt);
 
-    if ("PASS".equals(overall)) {
+    if ("PASS".equals(overall) || "FAIL".equals(overall) || "ERROR".equals(overall)) {
+      // D8: never auto-activate; keep verification results and queue for admin_compliance.
       autoActivate(job.pharmacyId(), jobId);
-    } else if ("FAIL".equals(overall) || "ERROR".equals(overall)) {
-      routeToManualQueue(job.pharmacyId(), jobId);
     }
   }
 
@@ -500,35 +499,8 @@ public class AutoKycService {
         pharmacies
             .findById(pharmacyId)
             .orElseThrow(() -> new AppException("PHARMACY_NOT_FOUND", "Pharmacy not found", 404));
-
-    String pincode = extractPincode(pharmacy.address());
-    UUID zoneId =
-        pincodeZones
-            .findZoneIdByPincode(pincode)
-            .orElse(UUID.fromString("a0000001-0000-4000-8000-000000000001"));
-
-    Instant now = clock.instant();
-    pharmacies.activateAfterAutoKyc(pharmacyId, zoneId, now);
-    jobs.markAutoActivated(jobId, now);
-
-    outbox.publish(
-        DomainEvent.of(
-            "pharmacy.kyc.auto_activated",
-            "pharmacy",
-            pharmacyId,
-            Map.of(
-                "pharmacy_id", pharmacyId.toString(),
-                "job_id", jobId.toString(),
-                "zone_id", zoneId.toString())));
-
-    outbox.publish(
-        DomainEvent.of(
-            "pharmacy.notification.welcome",
-            "pharmacy",
-            pharmacyId,
-            Map.of(
-                "pharmacy_id", pharmacyId.toString(),
-                "channels", List.of("WHATSAPP", "EMAIL"))));
+    pincodeZones.findZoneIdByPincode(extractPincode(pharmacy.address()));
+    routeToManualQueue(pharmacyId, jobId);
   }
 
   private void routeToManualQueue(UUID pharmacyId, UUID jobId) {

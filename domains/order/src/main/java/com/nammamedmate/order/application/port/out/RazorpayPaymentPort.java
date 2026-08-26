@@ -1,5 +1,6 @@
 package com.nammamedmate.order.application.port.out;
 
+import java.util.Map;
 import java.util.UUID;
 
 /** Razorpay Orders + payment signature verify (stub until live keys). */
@@ -20,4 +21,9 @@ public interface RazorpayPaymentPort {
 
   /** Server-side refund against a captured payment. */
   RefundResult refund(String razorpayPaymentId, long amountPaise);
+
+  /** Canonical webhook handling — payment domain owns capture/ledger. */
+  default Map<String, Object> handleWebhook(String signatureHeader, byte[] rawBody) {
+    return Map.of("processed", false);
+  }
 }

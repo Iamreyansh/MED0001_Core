@@ -43,14 +43,32 @@ public interface InventoryAvailabilityPort {
       String imageUrl,
       boolean banned) {}
 
-  boolean stocksMedicine(UUID pharmacyId, UUID medicineId);
+  default boolean stocksMedicine(UUID pharmacyId, UUID medicineId) {
+    return false;
+  }
 
-  Optional<MedicineDetails> findMedicine(UUID medicineId);
+  default Optional<MedicineDetails> findMedicine(UUID medicineId) {
+    return Optional.empty();
+  }
 
-  List<StockLine> checkAvailability(UUID pharmacyId, List<UUID> medicineIds);
+  default List<StockLine> checkAvailability(UUID pharmacyId, List<UUID> medicineIds) {
+    return List.of();
+  }
 
-  ProductPage listVisibleProducts(
-      UUID pharmacyId, String category, String search, int page, int limit);
+  default ProductPage listVisibleProducts(
+      UUID pharmacyId, String category, String search, int page, int limit) {
+    return new ProductPage(List.of(), 0, page, limit);
+  }
 
-  Optional<String> medicineName(UUID medicineId);
+  default Optional<String> medicineName(UUID medicineId) {
+    return Optional.empty();
+  }
+
+  record ReserveLine(UUID medicineId, int quantity) {}
+
+  default void reserveForOrder(UUID pharmacyId, UUID orderId, List<ReserveLine> lines) {}
+
+  default void deductForOrder(UUID orderId) {}
+
+  default void releaseForOrder(UUID orderId) {}
 }

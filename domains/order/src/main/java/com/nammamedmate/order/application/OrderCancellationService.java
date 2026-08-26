@@ -4,6 +4,7 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import com.nammamedmate.order.application.port.out.OrderStatusEventStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort.RefundPlan;
@@ -39,6 +40,7 @@ public class OrderCancellationService {
   private final OutboxPublisher outbox;
   private final RateLimiter rateLimiter;
   private final Clock clock;
+  private InventoryAvailabilityPort inventory = new InventoryAvailabilityPort() {};
 
   public OrderCancellationService(
       OrderStore orders,
@@ -53,6 +55,11 @@ public class OrderCancellationService {
     this.outbox = outbox;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  public void setInventory(InventoryAvailabilityPort inventory) {
+    this.inventory = inventory == null ? new InventoryAvailabilityPort() {} : inventory;
   }
 
   @Transactional
@@ -74,6 +81,7 @@ public class OrderCancellationService {
     OrderStatus from = order.status();
     order.cancel(reason.name(), now);
     orders.update(order);
+    inventory.releaseForOrder(order.id());
     appendEvent(order.id(), from, ActorType.CUSTOMER, principal.subject(), reason.name(), now);
     // initiate persists cancellation + auto refund; skip double-cancel record path via actor
     RefundPlan plan =
@@ -121,6 +129,7 @@ public class OrderCancellationService {
     OrderStatus from = order.status();
     order.cancel(trimmedReason, now);
     orders.update(order);
+    inventory.releaseForOrder(order.id());
     appendEvent(order.id(), from, ActorType.ADMIN, principal.subject(), trimmedReason, now);
     refunds.persistCancellation(
         order, trimmedReason, CancelledByType.ADMIN, principal.subject(), now);

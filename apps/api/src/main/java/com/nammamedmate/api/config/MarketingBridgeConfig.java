@@ -168,16 +168,39 @@ public class MarketingBridgeConfig {
   @Bean
   @Primary
   PlatformCouponPort marketingPlatformCouponPort(CouponService coupons) {
-    return (couponCode, itemTotalPaise) -> {
-      CouponService.CartQuote q = coupons.applyForCart(couponCode, itemTotalPaise);
-      CouponType type =
-          switch (q.discountType()) {
-            case "PERCENT" -> CouponType.PERCENT;
-            case "FLAT" -> CouponType.FLAT;
-            default -> CouponType.FREE_DELIVERY;
-          };
-      return new PlatformCouponPort.Quote(
-          q.code(), type, q.discountPaise(), q.freeDelivery(), q.message());
+    return new PlatformCouponPort() {
+      @Override
+      public Quote apply(String couponCode, long itemTotalPaise) {
+        return apply(couponCode, itemTotalPaise, null, null, null);
+      }
+
+      @Override
+      public Quote apply(
+          String couponCode,
+          long itemTotalPaise,
+          java.util.UUID customerId,
+          Boolean firstOrder,
+          Boolean hasRxItems) {
+        CouponService.CartQuote q =
+            coupons.applyForCart(couponCode, itemTotalPaise, customerId, firstOrder, hasRxItems);
+        CouponType type =
+            switch (q.discountType()) {
+              case "PERCENT" -> CouponType.PERCENT;
+              case "FLAT" -> CouponType.FLAT;
+              default -> CouponType.FREE_DELIVERY;
+            };
+        return new Quote(q.code(), type, q.discountPaise(), q.freeDelivery(), q.message());
+      }
+
+      @Override
+      public void record(
+          String couponCode,
+          java.util.UUID orderId,
+          java.util.UUID customerId,
+          long discountPaise,
+          long orderTotalPaise) {
+        coupons.recordRedemption(couponCode, orderId, customerId, discountPaise, orderTotalPaise);
+      }
     };
   }
 

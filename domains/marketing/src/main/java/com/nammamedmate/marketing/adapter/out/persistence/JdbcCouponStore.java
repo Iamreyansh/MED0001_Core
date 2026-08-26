@@ -83,6 +83,14 @@ public class JdbcCouponStore implements CouponStore {
   }
 
   @Override
+  public Optional<Coupon> findByCodeForUpdate(String code) {
+    List<Coupon> rows =
+        jdbc.query(
+            SELECT + " WHERE UPPER(code) = UPPER(?) FOR UPDATE", (rs, i) -> mapCoupon(rs), code);
+    return rows.stream().findFirst();
+  }
+
+  @Override
   public Optional<Coupon> findById(UUID id) {
     List<Coupon> rows = jdbc.query(SELECT + " WHERE id = ?", (rs, i) -> mapCoupon(rs), id);
     return rows.stream().findFirst();

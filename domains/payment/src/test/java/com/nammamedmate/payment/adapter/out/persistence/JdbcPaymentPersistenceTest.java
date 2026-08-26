@@ -307,4 +307,42 @@ class JdbcPaymentPersistenceTest {
             });
     assertThat(reader.findById(payment.id()).orElseThrow().webhookEvents()).isEmpty();
   }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void findByIdempotencyKeySkipsBlankAndMapsRow() throws Exception {
+    JdbcPaymentStore store = new JdbcPaymentStore(jdbc, om);
+    assertThat(store.findByIdempotencyKey(null)).isEmpty();
+    assertThat(store.findByIdempotencyKey("  ")).isEmpty();
+    when(jdbc.query(anyString(), any(RowMapper.class), any())).thenReturn(List.of());
+    assertThat(store.findByIdempotencyKey("missing")).isEmpty();
+    when(jdbc.query(anyString(), any(RowMapper.class), any()))
+        .thenAnswer(
+            inv -> {
+              RowMapper<Payment> mapper = inv.getArgument(1);
+              when(rs.getObject("id")).thenReturn(UUID.randomUUID());
+              when(rs.getObject("order_id")).thenReturn(UUID.randomUUID());
+              when(rs.getObject("customer_id")).thenReturn(UUID.randomUUID());
+              when(rs.getLong("amount_paise")).thenReturn(1L);
+              when(rs.getLong("wallet_portion_paise")).thenReturn(0L);
+              when(rs.getLong("gateway_portion_paise")).thenReturn(1L);
+              when(rs.getString("currency")).thenReturn("INR");
+              when(rs.getString("method")).thenReturn("UPI");
+              when(rs.getString("status")).thenReturn("PENDING");
+              when(rs.getString("razorpay_order_id")).thenReturn(null);
+              when(rs.getString("razorpay_payment_id")).thenReturn(null);
+              when(rs.getString("razorpay_signature")).thenReturn(null);
+              when(rs.getObject("gateway_fee_paise")).thenReturn(null);
+              when(rs.getObject("gateway_response")).thenReturn(null);
+              when(rs.getObject("webhook_events")).thenReturn(null);
+              when(rs.getTimestamp("captured_at")).thenReturn(null);
+              when(rs.getTimestamp("failed_at")).thenReturn(null);
+              when(rs.getString("failure_reason")).thenReturn(null);
+              when(rs.getString("idempotency_key")).thenReturn("idem-1");
+              when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(now));
+              when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(now));
+              return List.of(mapper.mapRow(rs, 0));
+            });
+    assertThat(store.findByIdempotencyKey("idem-1")).isPresent();
+  }
 }

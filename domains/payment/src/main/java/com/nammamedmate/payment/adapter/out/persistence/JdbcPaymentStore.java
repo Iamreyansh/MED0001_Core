@@ -121,6 +121,17 @@ public class JdbcPaymentStore implements PaymentStore {
   }
 
   @Override
+  public Optional<Payment> findByIdempotencyKey(String idempotencyKey) {
+    if (idempotencyKey == null || idempotencyKey.isBlank()) {
+      return Optional.empty();
+    }
+    List<Payment> rows =
+        jdbc.query(
+            "SELECT * FROM payment WHERE idempotency_key = ?", mapper, idempotencyKey.trim());
+    return rows.stream().findFirst();
+  }
+
+  @Override
   public Optional<Payment> findByRazorpayPaymentId(String razorpayPaymentId) {
     List<Payment> rows =
         jdbc.query(

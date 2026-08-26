@@ -262,6 +262,10 @@ class JdbcCustomerProfileStoreTest {
     verify(jdbc)
         .update(
             anyString(), eq("del_abc"), eq(Timestamp.from(NOW)), eq(Timestamp.from(NOW)), eq(id));
+    verify(jdbc, org.mockito.Mockito.atLeastOnce()).update(anyString(), eq(id));
+    verify(jdbc).update(anyString(), eq(Timestamp.from(NOW)), eq(Timestamp.from(NOW)), eq(id));
+    verify(jdbc, org.mockito.Mockito.atLeastOnce())
+        .update(anyString(), eq(Timestamp.from(NOW)), eq(id));
   }
 
   @Test

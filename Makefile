@@ -121,9 +121,22 @@ integration-test: ## Integration tests (Testcontainers; apps with integrationTes
 check: ## Full quality gates (unit + IT, JaCoCo 100%, Spotless, SpotBugs, ArchUnit)
 	$(GRADLE) check -x dependencyCheckAnalyze $(GRADLE_FLAGS)
 
+.PHONY: bruno-check
+bruno-check: ## Validate Bruno collection + launch-scope acceptance matrix
+	@test -f $(ROOT)/bruno/payments/initiate.bru
+	@grep -q 'Idempotency-Key' $(ROOT)/bruno/payments/initiate.bru
+	@grep -q 'paymentIdempotencyKey' $(ROOT)/bruno/payments/initiate.bru
+	@test -f $(ROOT)/docs/requirements/acceptance-matrix.json
+	@python3 $(ROOT)/scripts/acceptance-ac-gate.py
+	@echo "Bruno + acceptance-matrix OK"
+
+.PHONY: bruno-run
+bruno-run: ## Execute Bruno against HEALTH_URL (set BRUNO_REQUIRED=1 to fail closed)
+	@$(ROOT)/scripts/bruno-run.sh
+
 .PHONY: check-all
-check-all: ## check + OWASP dependencyCheckAnalyze
-	$(GRADLE) check $(GRADLE_FLAGS)
+check-all: bruno-check ## check + OWASP dependencyCheckAnalyze
+	$(GRADLE) check dependencyCheckAnalyze $(GRADLE_FLAGS)
 
 .PHONY: dependency-check
 dependency-check: ## OWASP dependencyCheckAnalyze only

@@ -55,7 +55,7 @@ class ReferralServiceTest {
     wallets = new FakeWalletStore();
     hasOrdered = new AtomicBoolean(false);
     WalletService walletService =
-        new WalletService(wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, 100_000L);
+        new WalletService(wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, () -> 100_000L);
     service =
         new ReferralService(
             referrals,
@@ -68,8 +68,8 @@ class ReferralServiceTest {
 
     referrerId = Ids.newId();
     refereeId = Ids.newId();
-    profiles.saveProfile(CustomerTestFixtures.customerWithName(referrerId, "Ramesh"));
-    profiles.saveProfile(CustomerTestFixtures.customer(refereeId));
+    profiles.saveProfile(freshSignup(CustomerTestFixtures.customerWithName(referrerId, "Ramesh")));
+    profiles.saveProfile(freshSignup(CustomerTestFixtures.customer(refereeId)));
     referrals.insert(new ReferralRecord(Ids.newId(), referrerId, "MEDRAM7", 0, 0, 0L, NOW));
     referrals.insert(new ReferralRecord(Ids.newId(), refereeId, "MEDREF1", 0, 0, 0L, NOW));
     wallets.insertWallet(new WalletRecord(Ids.newId(), referrerId, 0L, 0L, 0L, 0L, NOW, NOW));
@@ -301,7 +301,7 @@ class ReferralServiceTest {
     service.adminOverview(adminOps, "CONVERTED", 1, 20);
 
     UUID pendingCancel = Ids.newId();
-    profiles.saveProfile(CustomerTestFixtures.customer(pendingCancel));
+    profiles.saveProfile(freshSignup(CustomerTestFixtures.customer(pendingCancel)));
     referrals.insert(new ReferralRecord(Ids.newId(), pendingCancel, "MEDPEND2", 0, 0, 0L, NOW));
     service.applyCode(
         new MedmatePrincipal(pendingCancel, AuthRole.CUSTOMER, null, TokenScope.FULL, "j"),
@@ -358,7 +358,8 @@ class ReferralServiceTest {
             referrals,
             profiles,
             id -> false,
-            new WalletService(wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, 100_000L),
+            new WalletService(
+                wallets, profiles, new InMemoryRateLimiter(CLOCK), CLOCK, () -> 100_000L),
             new InMemoryRateLimiter(CLOCK),
             CLOCK,
             "https://nammamedmate.com/join/");
@@ -385,7 +386,7 @@ class ReferralServiceTest {
     assertThat(applied.get("message").toString()).contains("your referrer");
 
     UUID blankNameReferee = Ids.newId();
-    profiles.saveProfile(CustomerTestFixtures.customer(blankNameReferee));
+    profiles.saveProfile(freshSignup(CustomerTestFixtures.customer(blankNameReferee)));
     referrals.insert(new ReferralRecord(Ids.newId(), blankNameReferee, "MEDBLNK", 0, 0, 0L, NOW));
     profiles.saveProfile(CustomerTestFixtures.customerWithName(referrerId, "   "));
     Map<String, Object> blankApplied =
@@ -396,7 +397,7 @@ class ReferralServiceTest {
 
     referrals.failNextInsertEvent = true;
     UUID other = Ids.newId();
-    profiles.saveProfile(CustomerTestFixtures.customer(other));
+    profiles.saveProfile(freshSignup(CustomerTestFixtures.customer(other)));
     referrals.insert(new ReferralRecord(Ids.newId(), other, "MEDOTH1", 0, 0, 0L, NOW));
     assertThatThrownBy(
             () ->
@@ -432,7 +433,7 @@ class ReferralServiceTest {
         .isEqualTo(ReferralEventStatus.REWARDED);
 
     UUID pendingCancel = Ids.newId();
-    profiles.saveProfile(CustomerTestFixtures.customer(pendingCancel));
+    profiles.saveProfile(freshSignup(CustomerTestFixtures.customer(pendingCancel)));
     referrals.insert(new ReferralRecord(Ids.newId(), pendingCancel, "MEDPEND", 0, 0, 0L, NOW));
     service.applyCode(
         new MedmatePrincipal(pendingCancel, AuthRole.CUSTOMER, null, TokenScope.FULL, "j"),
@@ -511,5 +512,105 @@ class ReferralServiceTest {
     assertThatThrownBy(() -> service.getMyReferral(refP))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("RATE_LIMITED");
+  }
+
+  @Test
+  void applyCode_rejectsAfterSignupWindow() {
+    UUID stale = Ids.newId();
+    profiles.saveProfile(CustomerTestFixtures.customer(stale));
+    referrals.insert(new ReferralRecord(Ids.newId(), stale, "MEDSTALE", 0, 0, 0L, NOW));
+    assertThatThrownBy(
+            () ->
+                service.applyCode(
+                    new MedmatePrincipal(stale, AuthRole.CUSTOMER, null, TokenScope.FULL, "j"),
+                    new ApplyCommand("MEDRAM7")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("REFERRAL_SIGNUP_ONLY");
+  }
+
+  @Test
+  void applyCode_rejectsMissingCustomerAndNullCreatedAt() {
+    UUID ghost = Ids.newId();
+    assertThatThrownBy(
+            () ->
+                service.applyCode(
+                    new MedmatePrincipal(ghost, AuthRole.CUSTOMER, null, TokenScope.FULL, "j"),
+                    new ApplyCommand("MEDRAM7")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("CUSTOMER_NOT_FOUND");
+
+    UUID noCreated = Ids.newId();
+    var base = CustomerTestFixtures.customer(noCreated);
+    profiles.saveProfile(
+        new com.nammamedmate.customer.application.port.out.CustomerProfileStore
+            .CustomerProfileRecord(
+            base.id(),
+            base.phone(),
+            base.name(),
+            base.avatarUrl(),
+            base.dateOfBirth(),
+            base.gender(),
+            base.preferredLanguage(),
+            base.segment(),
+            base.city(),
+            base.isFlagged(),
+            base.flagReason(),
+            base.flagNote(),
+            base.flaggedBy(),
+            base.flaggedAt(),
+            base.walletBalancePaise(),
+            base.loyaltyPoints(),
+            base.totalOrders(),
+            base.totalLtvPaise(),
+            base.cancelRate(),
+            base.disputeCount(),
+            base.lastOrderAt(),
+            base.deletionRequestedAt(),
+            base.deletionReason(),
+            null,
+            base.updatedAt(),
+            base.deletedAt()));
+    assertThatThrownBy(
+            () ->
+                service.applyCode(
+                    new MedmatePrincipal(noCreated, AuthRole.CUSTOMER, null, TokenScope.FULL, "j"),
+                    new ApplyCommand("MEDRAM7")))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("REFERRAL_SIGNUP_ONLY");
+  }
+
+  private static com.nammamedmate.customer.application.port.out.CustomerProfileStore
+          .CustomerProfileRecord
+      freshSignup(
+          com.nammamedmate.customer.application.port.out.CustomerProfileStore.CustomerProfileRecord
+              base) {
+    return new com.nammamedmate.customer.application.port.out.CustomerProfileStore
+        .CustomerProfileRecord(
+        base.id(),
+        base.phone(),
+        base.name(),
+        base.avatarUrl(),
+        base.dateOfBirth(),
+        base.gender(),
+        base.preferredLanguage(),
+        base.segment(),
+        base.city(),
+        base.isFlagged(),
+        base.flagReason(),
+        base.flagNote(),
+        base.flaggedBy(),
+        base.flaggedAt(),
+        base.walletBalancePaise(),
+        base.loyaltyPoints(),
+        base.totalOrders(),
+        base.totalLtvPaise(),
+        base.cancelRate(),
+        base.disputeCount(),
+        base.lastOrderAt(),
+        base.deletionRequestedAt(),
+        base.deletionReason(),
+        NOW,
+        base.updatedAt(),
+        base.deletedAt());
   }
 }

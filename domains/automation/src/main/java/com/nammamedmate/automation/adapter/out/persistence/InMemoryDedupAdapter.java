@@ -7,9 +7,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import org.springframework.stereotype.Component;
 
-@Component
+/** In-process fallback. Production uses {@link JdbcDedupAdapter}. */
 public class InMemoryDedupAdapter implements DedupPort {
 
   private final Map<String, Instant> lastFire = new ConcurrentHashMap<>();

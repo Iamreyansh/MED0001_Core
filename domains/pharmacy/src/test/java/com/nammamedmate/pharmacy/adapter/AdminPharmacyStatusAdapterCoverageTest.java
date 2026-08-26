@@ -356,6 +356,31 @@ class AdminPharmacyStatusAdapterCoverageTest {
     ZoneRecord z = zones.findById(ZONE).orElseThrow();
     assertThat(z.name()).isEqualTo("Koramangala Zone");
 
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("pharmacy_staff"), any(RowMapper.class), any()))
+        .thenReturn(List.of());
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("admin_staff"), any(RowMapper.class), any()))
+        .thenReturn(List.of());
+    when(jdbc.update(
+            anyString(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()))
+        .thenReturn(1);
+
     JdbcAuditLogStore audit = new JdbcAuditLogStore(jdbc, mapper);
     audit.append(
         new AuditLogRecord(
@@ -404,24 +429,107 @@ class AdminPharmacyStatusAdapterCoverageTest {
             Map.of("after", Map.of("status", "SUSPENDED")),
             "1.1.1.1",
             NOW));
-    verify(jdbc, org.mockito.Mockito.atLeast(2))
-        .update(
-            anyString(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any());
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(),
+            "PHARMACY",
+            PID,
+            "X",
+            Ids.newId(),
+            "admin_super",
+            Map.of(),
+            "1.1.1.1",
+            NOW));
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(), "PHARMACY", PID, "X", Ids.newId(), null, Map.of(), "1.1.1.1", NOW));
+
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("pharmacy_staff"), any(RowMapper.class), any()))
+        .thenAnswer(
+            inv -> {
+              RowMapper<String> nameMapper = inv.getArgument(1);
+              ResultSet rs = mock(ResultSet.class);
+              when(rs.getString("label")).thenReturn("Pharmacist");
+              return java.util.Collections.singletonList(nameMapper.mapRow(rs, 0));
+            });
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(),
+            "PHARMACY",
+            PID,
+            "X",
+            Ids.newId(),
+            "PHARMACY_OWNER",
+            Map.of(),
+            "1.1.1.1",
+            NOW));
+
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("pharmacy_staff"), any(RowMapper.class), any()))
+        .thenReturn(java.util.Collections.singletonList("  "));
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("admin_staff"), any(RowMapper.class), any()))
+        .thenAnswer(
+            inv -> {
+              RowMapper<String> nameMapper = inv.getArgument(1);
+              ResultSet rs = mock(ResultSet.class);
+              when(rs.getString("label")).thenReturn("Ops");
+              return java.util.Collections.singletonList(nameMapper.mapRow(rs, 0));
+            });
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(), "PHARMACY", PID, "X", Ids.newId(), "ADMIN_OPS", Map.of(), "1.1.1.1", NOW));
+
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("pharmacy_staff"), any(RowMapper.class), any()))
+        .thenReturn(null);
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(), "PHARMACY", PID, "X", Ids.newId(), "R", Map.of(), "1.1.1.1", NOW));
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("pharmacy_staff"), any(RowMapper.class), any()))
+        .thenReturn(List.of());
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("admin_staff"), any(RowMapper.class), any()))
+        .thenReturn(null);
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(),
+            "PHARMACY",
+            PID,
+            "X",
+            Ids.newId(),
+            "ADMIN_FINANCE",
+            Map.of(),
+            "1.1.1.1",
+            NOW));
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("pharmacy_staff"), any(RowMapper.class), any()))
+        .thenReturn(java.util.Collections.singletonList((String) null));
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("admin_staff"), any(RowMapper.class), any()))
+        .thenReturn(java.util.Collections.singletonList("  "));
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(), "PHARMACY", PID, "X", Ids.newId(), "ADMIN_OPS", Map.of(), "1.1.1.1", NOW));
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("pharmacy_staff"), any(RowMapper.class), any()))
+        .thenReturn(List.of());
+    when(jdbc.query(
+            org.mockito.ArgumentMatchers.contains("admin_staff"), any(RowMapper.class), any()))
+        .thenReturn(java.util.Collections.singletonList((String) null));
+    audit.append(
+        new AuditLogRecord(
+            Ids.newId(),
+            "PHARMACY",
+            PID,
+            "X",
+            Ids.newId(),
+            "ADMIN_SUPER",
+            Map.of(),
+            "1.1.1.1",
+            NOW));
   }
 
   @Test

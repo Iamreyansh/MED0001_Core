@@ -100,6 +100,7 @@ class PaymentConfigTest {
     settlementStub.markReleaseFailed(UUID.randomUUID(), "k", java.time.Instant.now());
     settlementStub.markHeld(
         UUID.randomUUID(), UUID.randomUUID(), "r", null, java.time.Instant.now());
+    settlementStub.markUnheld(UUID.randomUUID(), UUID.randomUUID(), "n", java.time.Instant.now());
     settlementStub.markBelowThreshold(UUID.randomUUID(), "n", java.time.Instant.now());
     assertThat(settlementStub.listPendingForBulk(1, 10)).isEmpty();
 
@@ -217,6 +218,16 @@ class PaymentConfigTest {
                     StubRazorpayXPayoutClient.DEFAULT_KEY_ID,
                     StubRazorpayXPayoutClient.DEFAULT_KEY_SECRET,
                     true))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                PaymentConfig.validateRazorpaySecretsForDeployedProfile(
+                    "rzp_test_replace_me", "replace_me", "wh", true))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                PaymentConfig.validateRazorpayXSecretsForDeployedProfile(
+                    "rzp_test_replace_me", "replace_me", true))
         .isInstanceOf(IllegalStateException.class);
 
     Environment env = mock(Environment.class);

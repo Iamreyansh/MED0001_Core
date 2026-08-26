@@ -1,0 +1,7 @@
+# Staging fail-closed defaults. Vendor keys come from ECS secrets.
+medmate:
+  observability:
+    auto-remediate: false
+  marketing:
+    banner:
+      image-validation: http

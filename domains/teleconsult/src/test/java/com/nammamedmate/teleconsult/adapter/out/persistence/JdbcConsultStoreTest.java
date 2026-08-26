@@ -121,6 +121,7 @@ class JdbcConsultStoreTest {
     when(jdbc.query(anyString(), any(RowMapper.class), any(Timestamp.class)))
         .thenAnswer(inv -> List.of(mapFrom(inv.getArgument(1), c)));
     assertThat(store.findDueForAutoCancel(now)).hasSize(1);
+    assertThat(store.findDueForScheduledAssign(now)).hasSize(1);
 
     when(jdbc.update(anyString(), ArgumentMatchers.<Object>any())).thenReturn(1);
     store.insertStatusEvent(
@@ -135,6 +136,7 @@ class JdbcConsultStoreTest {
               when(rs.getObject("id")).thenReturn(c.id());
               when(rs.getString("status")).thenReturn("IN_CALL");
               when(rs.getString("patient_name")).thenReturn("Ravi");
+              when(rs.getString("patient_phone")).thenReturn("+91-9");
               when(rs.getString("doctor_name")).thenReturn("Dr");
               when(rs.getString("medicines_needing_rx"))
                   .thenReturn("[{\"name\":\"M\",\"reason\":\"REFILL\"}]");
@@ -144,6 +146,7 @@ class JdbcConsultStoreTest {
               return List.of(mapper.mapRow(rs, 0));
             });
     assertThat(store.listActiveQueue()).hasSize(1);
+    assertThat(store.findQueuedNowUnassigned()).hasSize(1);
 
     when(jdbc.query(anyString(), any(ResultSetExtractor.class)))
         .thenAnswer(
@@ -328,6 +331,7 @@ class JdbcConsultStoreTest {
               when(rs.getObject("id")).thenReturn(c.id());
               when(rs.getString("status")).thenReturn("REQUESTED");
               when(rs.getString("patient_name")).thenReturn("Ravi");
+              when(rs.getString("patient_phone")).thenReturn("+91-9");
               when(rs.getString("doctor_name")).thenReturn(null);
               when(rs.getString("medicines_needing_rx"))
                   .thenReturn(

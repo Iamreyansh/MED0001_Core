@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.nammamedmate.automation.application.port.out.ActionExecutorPort;
 import com.nammamedmate.automation.application.port.out.ActivityLogPort;
 import com.nammamedmate.automation.domain.ConditionEvaluator;
+import com.nammamedmate.messaging.OutboxPublisher;
 import java.time.Clock;
 import java.util.Map;
 import java.util.UUID;
@@ -29,5 +30,8 @@ class AutomationConfigTest {
     when(log.append(anyString(), anyString(), anyString(), any())).thenReturn(UUID.randomUUID());
     ActionExecutorPort exec = cfg.stubActionExecutorPort(log);
     assertThat(exec.execute("auto_assign_rider", Map.of(), Map.of())).isNotNull();
+    OutboxPublisher outbox = mock(OutboxPublisher.class);
+    ActionExecutorPort live = cfg.outboxActionExecutorPort(log, outbox);
+    assertThat(live.execute("send_notification", Map.of(), Map.of())).isNotNull();
   }
 }

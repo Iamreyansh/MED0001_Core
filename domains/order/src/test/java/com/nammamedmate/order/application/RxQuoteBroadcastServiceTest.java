@@ -59,6 +59,7 @@ class RxQuoteBroadcastServiceTest {
   private static final UUID RX = UUID.fromString("33333333-3333-4333-8333-333333333333");
   private static final UUID PH1 = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1");
   private static final UUID PH2 = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2");
+  private static final UUID PROD = UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
   private static final Instant T0 = Instant.parse("2026-08-08T10:00:00Z");
 
   @Mock private RxBroadcastStore store;
@@ -163,9 +164,9 @@ class RxQuoteBroadcastServiceTest {
 
     // A lower price / higher ETA; B higher price / lower ETA
     RxBroadcastPharmacy q1 =
-        quoted(bc, PH1, 22, 27_500, List.of(new QuotedMedicine("A", 60, 25_000)));
+        quoted(bc, PH1, 22, 27_500, List.of(new QuotedMedicine("A", 60, 25_000, PROD)));
     RxBroadcastPharmacy q2 =
-        quoted(bc, PH2, 18, 37_050, List.of(new QuotedMedicine("A", 60, 34_550)));
+        quoted(bc, PH2, 18, 37_050, List.of(new QuotedMedicine("A", 60, 34_550, PROD)));
     when(store.listPharmacies(bc)).thenReturn(List.of(q1, q2));
     when(pharmacies.findById(PH1)).thenReturn(Optional.of(pharmacy(PH1, "Sai", 12.9, 77.6)));
     when(pharmacies.findById(PH2)).thenReturn(Optional.of(pharmacy(PH2, "Med", 12.9, 77.6)));
@@ -192,6 +193,19 @@ class RxQuoteBroadcastServiceTest {
     assertThat(selected.get("status")).isEqualTo("SELECTED");
     assertThat(selected.get("cart_id")).isEqualTo(cart.id());
     verify(store).markSelected(bc, PH1, cart.id());
+  }
+
+  @Test
+  void selectQuoteRequiresProductId() {
+    UUID bc = UUID.randomUUID();
+    when(store.findByIdForCustomer(bc, CUST)).thenReturn(Optional.of(activeBroadcast(bc)));
+    RxBroadcastPharmacy missingPid =
+        quoted(bc, PH1, 22, 27_500, List.of(new QuotedMedicine("A", 60, 25_000)));
+    when(store.findPharmacySlot(bc, PH1)).thenReturn(Optional.of(missingPid));
+    when(pharmacies.findById(PH1)).thenReturn(Optional.of(pharmacy(PH1, "Sai", 12.9, 77.6)));
+    assertThatThrownBy(() -> service.selectQuote(customer, bc, PH1))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
   }
 
   @Test

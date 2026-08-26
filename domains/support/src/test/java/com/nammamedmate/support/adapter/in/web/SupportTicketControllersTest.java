@@ -75,6 +75,15 @@ class SupportTicketControllersTest {
                 .success())
         .isTrue();
 
+    when(tickets.submitCsat(any(), eq(id), eq(5), eq("great"))).thenReturn(Map.of("csat_score", 5));
+    assertThat(
+            support
+                .submitCsat(principal, id, new SupportTicketController.CsatRequest(5, "great"))
+                .success())
+        .isTrue();
+    when(tickets.submitCsat(any(), eq(id), isNull(), isNull())).thenReturn(Map.of("csat_score", 0));
+    assertThat(support.submitCsat(principal, id, null).success()).isTrue();
+
     when(tickets.reopen(any(), eq(id), isNull())).thenReturn(Map.of("status", "IN_PROGRESS"));
     assertThat(support.reopen(principal, id, null).success()).isTrue();
     when(tickets.reopen(any(), eq(id), eq("r"))).thenReturn(Map.of("status", "IN_PROGRESS"));

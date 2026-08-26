@@ -62,4 +62,54 @@ class NotificationWebhookAuthTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("HMAC failed");
   }
+
+  @Test
+  void deployedSecretsRejectDefaults() {
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateSecretsForDeployedProfile(
+                    NotificationWebhookAuth.DEFAULT_SMS_SECRET, "ok"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> NotificationWebhookAuth.validateSecretsForDeployedProfile("ok", " "))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> NotificationWebhookAuth.validateSecretsForDeployedProfile(null, "ok"))
+        .isInstanceOf(IllegalStateException.class);
+    NotificationWebhookAuth.validateSecretsForDeployedProfile("live-sms", "live-email");
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateSecretsForDeployedProfile(
+                    "replace_me", "live-email"))
+        .isInstanceOf(IllegalStateException.class);
+    NotificationWebhookAuth.validateVendorKeysForDeployedProfile("a", "b", "c", "d");
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "replace_me", "b", "c", "d"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () -> NotificationWebhookAuth.validateVendorKeysForDeployedProfile("", "b", "c", "d"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "a", "replace_me", "c", "d"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "a", "b", "replace_me", "d"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateVendorKeysForDeployedProfile(
+                    "a", "b", "c", "replace_me"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(
+            () ->
+                NotificationWebhookAuth.validateSecretsForDeployedProfile("live-sms", "replace_me"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(NotificationWebhookAuth.isPlaceholder("changeme")).isTrue();
+    assertThat(NotificationWebhookAuth.isPlaceholder("ok")).isFalse();
+    assertThat(NotificationWebhookAuth.isPlaceholder(null)).isTrue();
+  }
 }

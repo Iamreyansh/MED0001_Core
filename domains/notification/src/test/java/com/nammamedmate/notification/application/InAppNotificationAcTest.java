@@ -231,13 +231,57 @@ class InAppNotificationAcTest {
         new CustomerNotificationRequestedHandler(service, new ObjectMapper());
     handler.handleMessage(null);
     handler.handleMessage(" ");
-    handler.handleMessage("{not-json");
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> handler.handleMessage("{not-json"))
+        .isInstanceOf(IllegalStateException.class);
+    com.fasterxml.jackson.databind.ObjectMapper broken =
+        org.mockito.Mockito.mock(com.fasterxml.jackson.databind.ObjectMapper.class);
+    try {
+      org.mockito.Mockito.when(
+              broken.readValue(
+                  org.mockito.ArgumentMatchers.anyString(),
+                  org.mockito.ArgumentMatchers.any(
+                      com.fasterxml.jackson.core.type.TypeReference.class)))
+          .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("boom") {});
+    } catch (Exception e) {
+      throw new AssertionError(e);
+    }
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> new CustomerNotificationRequestedHandler(service, broken).handleMessage("{}"))
+        .isInstanceOf(IllegalStateException.class);
+    com.fasterxml.jackson.databind.ObjectMapper runtimeBroken =
+        org.mockito.Mockito.mock(com.fasterxml.jackson.databind.ObjectMapper.class);
+    try {
+      org.mockito.Mockito.when(
+              runtimeBroken.readValue(
+                  org.mockito.ArgumentMatchers.anyString(),
+                  org.mockito.ArgumentMatchers.any(
+                      com.fasterxml.jackson.core.type.TypeReference.class)))
+          .thenThrow(new IllegalArgumentException("rt"));
+    } catch (Exception e) {
+      throw new AssertionError(e);
+    }
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                new CustomerNotificationRequestedHandler(service, runtimeBroken)
+                    .handleMessage("{}"))
+        .isInstanceOf(IllegalArgumentException.class);
     handler.handleMessage("{\"type\":\"other.event\",\"payload\":{}}");
     handler.handlePayload(null);
     handler.handlePayload(Map.of());
     handler.handlePayload(Map.of("title", "t", "body", "b"));
-    handler.handlePayload(
-        Map.of("customer_id", CUST.toString(), "channel", "SMS", "title", "t", "body", "b"));
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                handler.handlePayload(
+                    Map.of(
+                        "customer_id",
+                        CUST.toString(),
+                        "channel",
+                        "SMS",
+                        "title",
+                        "t",
+                        "body",
+                        "b")))
+        .isInstanceOf(IllegalStateException.class);
     handler.handlePayload(
         Map.of("customer_id", "bad", "channel", "PUSH", "title", "t", "body", "b"));
     handler.handleMessage(

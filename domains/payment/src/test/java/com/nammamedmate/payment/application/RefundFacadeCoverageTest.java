@@ -854,4 +854,39 @@ class RefundFacadeCoverageTest {
 
     assertThat(RefundStatuses.toStorageStatusFilter(null)).isNull();
   }
+
+  @Test
+  void process_withProviderOps_replaysAndMarksSent() {
+    com.nammamedmate.messaging.ProviderOperationStore ops =
+        org.mockito.Mockito.mock(com.nammamedmate.messaging.ProviderOperationStore.class);
+    RazorpayGatewayPort gateway = org.mockito.Mockito.mock(RazorpayGatewayPort.class);
+    RefundFacadeService withOps =
+        new RefundFacadeService(
+            refunds,
+            gateway,
+            wallets,
+            ledger,
+            notifications,
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            null,
+            ops);
+    when(refunds.findById(refundId)).thenReturn(Optional.of(row("PENDING", "SOURCE")));
+    when(refunds.claimForProcess(any(), any(), any(), any())).thenReturn(true);
+    when(refunds.finalizeGatewayProcess(any(), any(), any(), any())).thenReturn(true);
+    when(ops.find(eq("REFUND"), anyString())).thenReturn(Optional.empty());
+    when(gateway.refund(anyString(), anyLong()))
+        .thenReturn(new RazorpayGatewayPort.RefundResult("rfnd_new", 1000L));
+
+    assertThat(withOps.process(finance, refundId, "go")).isNotNull();
+    verify(ops).ensurePending(eq("REFUND"), anyString(), eq("razorpay"));
+    verify(ops).markSent(eq("REFUND"), anyString(), eq("rfnd_new"));
+
+    when(ops.find(eq("REFUND"), anyString()))
+        .thenReturn(
+            Optional.of(
+                new com.nammamedmate.messaging.ProviderOperationStore.Operation(
+                    "REFUND", "refund:" + refundId, "rfnd_replay", "SENT")));
+    assertThat(withOps.process(finance, refundId, "go")).isNotNull();
+    verify(gateway, org.mockito.Mockito.times(1)).refund(anyString(), anyLong());
+  }
 }

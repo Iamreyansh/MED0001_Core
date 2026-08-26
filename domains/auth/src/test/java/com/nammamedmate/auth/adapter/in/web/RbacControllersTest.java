@@ -67,11 +67,11 @@ class RbacControllersTest {
     when(adminRolesService.listPermissions(admin, "orders"))
         .thenReturn(List.of(Map.of("permission", "orders:read")));
     when(adminRolesService.getRolePermissions(admin, "admin_finance"))
-        .thenReturn(Map.of("role", "admin_finance", "permission_count", 13));
+        .thenReturn(Map.of("role", "admin_finance", "permission_count", 14));
     assertThat(adminRolesController.listRoles(admin).data()).hasSize(1);
     assertThat(adminRolesController.listPermissions(admin, "orders").data()).hasSize(1);
     assertThat(adminRolesController.getRolePermissions(admin, "admin_finance").data())
-        .containsEntry("permission_count", 13);
+        .containsEntry("permission_count", 14);
   }
 
   @Test

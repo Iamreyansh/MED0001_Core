@@ -240,6 +240,21 @@ class JdbcPreferenceStoresTest {
         .thenReturn(List.of());
     assertThat(identities.findCustomerIdByPhone("+99")).isEmpty();
 
+    UUID riderId = UUID.fromString("d1000001-0000-4000-8000-00000000000d");
+    assertThat(identities.findPhoneByRiderId(null)).isEmpty();
+    when(jdbc.query(contains("SELECT phone FROM riders"), any(RowMapper.class), any()))
+        .thenAnswer(
+            inv -> {
+              RowMapper<String> mapper = inv.getArgument(1);
+              ResultSet rs = mock(ResultSet.class);
+              when(rs.getString("phone")).thenReturn("+919800011122");
+              return List.of(mapper.mapRow(rs, 0));
+            });
+    assertThat(identities.findPhoneByRiderId(riderId)).contains("+919800011122");
+    when(jdbc.query(contains("SELECT phone FROM riders"), any(RowMapper.class), any()))
+        .thenReturn(List.of());
+    assertThat(identities.findPhoneByRiderId(riderId)).isEmpty();
+
     when(jdbc.update(
             contains("notification_preference_audit"),
             any(),

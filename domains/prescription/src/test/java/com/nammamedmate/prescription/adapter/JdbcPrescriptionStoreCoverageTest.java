@@ -111,6 +111,7 @@ class JdbcPrescriptionStoreCoverageTest {
             null));
     store.updateOcr(id, "D", null, null, now);
     store.updateOcr(id, "D", LocalDate.of(2026, 1, 2), List.of(), now);
+    store.updateStatus(id, "VERIFIED", now);
     store.softDelete(id, now, now);
     assertThat(store.markExpiredDue(now, now)).isEqualTo(1);
   }

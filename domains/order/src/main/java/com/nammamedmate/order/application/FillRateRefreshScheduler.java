@@ -5,10 +5,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * Nightly fill-rate refresh. ponytail: directory metrics already hold fill_rate_pct; job is a no-op
- * touch so the schedule exists until denormalisation is needed.
- */
+/** Nightly pharmacy directory metrics refresh from live orders (EPIC-004). */
 @Component
 @ConditionalOnProperty(
     name = "medmate.order.jobs.enabled",

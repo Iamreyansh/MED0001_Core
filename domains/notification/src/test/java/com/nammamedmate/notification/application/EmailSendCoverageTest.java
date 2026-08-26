@@ -279,7 +279,24 @@ class EmailSendCoverageTest {
     send.handleWebhook(List.of(Map.of("event", "spam", "email", "spam@b.com")));
 
     assertThat(send.trackOpen(logId).get("opened")).isEqualTo(true);
-    assertThat(send.trackClick(logId, "https://x").get("redirect_url")).isEqualTo("https://x");
+    assertThat(send.trackClick(logId, "https://nammamedmate.com/orders").get("redirect_url"))
+        .isEqualTo("https://nammamedmate.com/orders");
+    assertThatThrownBy(() -> send.trackClick(logId, "https://evil.example"))
+        .isInstanceOf(com.nammamedmate.kernel.error.AppException.class);
+    assertThat(EmailSendService.safeRedirectUrl("nmmedmate://order/1"))
+        .isEqualTo("nmmedmate://order/1");
+    assertThatThrownBy(() -> EmailSendService.safeRedirectUrl(" "))
+        .isInstanceOf(AppException.class);
+    assertThatThrownBy(() -> EmailSendService.safeRedirectUrl(null))
+        .isInstanceOf(AppException.class);
+    assertThatThrownBy(() -> EmailSendService.safeRedirectUrl("not a url"))
+        .isInstanceOf(AppException.class);
+    assertThatThrownBy(() -> EmailSendService.safeRedirectUrl("http://["))
+        .isInstanceOf(AppException.class);
+    assertThat(EmailSendService.safeRedirectUrl("https://app.nammamedmate.com/x"))
+        .isEqualTo("https://app.nammamedmate.com/x");
+    assertThatThrownBy(() -> EmailSendService.safeRedirectUrl("nammamedmate.com/orders"))
+        .isInstanceOf(AppException.class);
   }
 
   @Test

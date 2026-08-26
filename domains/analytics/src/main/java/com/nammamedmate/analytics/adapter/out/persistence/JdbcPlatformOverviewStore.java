@@ -59,7 +59,11 @@ public class JdbcPlatformOverviewStore implements PlatformOverviewStore {
                   GROUP BY customer_id HAVING COUNT(1) >= 2
                 )
               ) AS repeat_customers,
-              0 AS new_customers
+              COALESCE((
+                SELECT COUNT(*) FROM customers c
+                WHERE c.deleted_at IS NULL
+                  AND c.created_at >= ? AND c.created_at < ?
+              ), 0) AS new_customers
             FROM orders o
             WHERE o.deleted_at IS NULL
               AND o.created_at >= ? AND o.created_at < ?
@@ -77,6 +81,8 @@ public class JdbcPlatformOverviewStore implements PlatformOverviewStore {
                     rs.getLong("active_customers"),
                     rs.getLong("repeat_customers"),
                     rs.getLong("new_customers")),
+            Timestamp.from(fromInclusive),
+            Timestamp.from(toExclusive),
             Timestamp.from(fromInclusive),
             Timestamp.from(toExclusive),
             Timestamp.from(fromInclusive),
@@ -126,7 +132,22 @@ public class JdbcPlatformOverviewStore implements PlatformOverviewStore {
                     rs.getLong("new_customers")),
             Date.valueOf(fromInclusive),
             Date.valueOf(toInclusive));
-    return emptyOrFirst(rows);
+    KpiTotals snap = emptyOrFirst(rows);
+    Instant from = fromInclusive.atStartOfDay(PeriodResolver.IST).toInstant();
+    Instant to = toInclusive.plusDays(1).atStartOfDay(PeriodResolver.IST).toInstant();
+    KpiTotals live = liveKpis(from, to);
+    return new KpiTotals(
+        snap.gmvPaise(),
+        snap.ordersCount(),
+        snap.deliveredCount(),
+        snap.cancelledCount(),
+        snap.refundsPaise(),
+        snap.cancellationsPaise(),
+        snap.commissionPaise(),
+        snap.cogsEstimatePaise(),
+        live.activeCustomers(),
+        live.repeatCustomers(),
+        live.newCustomers());
   }
 
   @Override

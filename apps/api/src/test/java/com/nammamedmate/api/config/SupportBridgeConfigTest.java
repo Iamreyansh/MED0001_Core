@@ -8,7 +8,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nammamedmate.order.application.RefundService;
 import com.nammamedmate.order.application.port.out.ExternalDisputeBannerPort;
+import com.nammamedmate.order.application.port.out.OrderStore;
+import com.nammamedmate.order.domain.Order;
+import com.nammamedmate.order.domain.Refund;
+import com.nammamedmate.order.domain.RefundTo;
 import com.nammamedmate.support.application.port.out.CustomerLookupPort;
 import com.nammamedmate.support.application.port.out.OrderContextPort;
 import com.nammamedmate.support.application.port.out.RefundPort;
@@ -76,11 +81,27 @@ class SupportBridgeConfigTest {
     assertThat(ext.findBanner(orderId)).isPresent();
     assertThat(ext.findBanner(orderId).orElseThrow().get("dispute_id")).isEqualTo("DSP-1");
 
-    RefundPort refunds = new SupportBridgeConfig().stubSupportRefundPort();
-    assertThat(
-            refunds
-                .processRefund(orderId, customerId, 9600, "SOURCE", UUID.randomUUID())
-                .transactionId())
-        .startsWith("txn_");
+    RefundService refunds = mock(RefundService.class);
+    OrderStore orderStore = mock(OrderStore.class);
+    Order order = mock(Order.class);
+    when(orderStore.findById(orderId)).thenReturn(Optional.of(order));
+    UUID refundId = UUID.randomUUID();
+    UUID disputeId = UUID.randomUUID();
+    Refund issued = mock(Refund.class);
+    when(issued.id()).thenReturn(refundId);
+    when(refunds.issueManual(eq(order), eq(100L), eq(RefundTo.SOURCE), any(), any(), any(), any()))
+        .thenReturn(issued);
+    RefundPort port = new SupportBridgeConfig().supportRefundPort(refunds, orderStore);
+    assertThat(port.processRefund(orderId, customerId, 100, "SOURCE", disputeId).transactionId())
+        .isEqualTo(refundId.toString());
+    org.mockito.Mockito.verify(refunds)
+        .issueManual(
+            eq(order),
+            eq(100L),
+            eq(RefundTo.SOURCE),
+            eq("SUPPORT_DISPUTE"),
+            any(),
+            any(),
+            eq(disputeId.toString()));
   }
 }

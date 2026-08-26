@@ -1,13 +1,13 @@
 resource "aws_ecr_repository" "api" {
   name                 = "${local.name}-api"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = true
   image_scanning_configuration { scan_on_push = true }
 }
 
 resource "aws_ecr_repository" "worker" {
   name                 = "${local.name}-worker"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = true
   image_scanning_configuration { scan_on_push = true }
 }
@@ -76,6 +76,8 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
           aws_secretsmanager_secret.razorpay.arn,
           aws_secretsmanager_secret.razorpayx.arn,
           aws_secretsmanager_secret.kyc.arn,
+          aws_secretsmanager_secret.comms.arn,
+          aws_secretsmanager_secret.internal.arn,
           data.aws_secretsmanager_secret.maps_geocode.arn
         ]
       },
@@ -134,6 +136,7 @@ resource "aws_iam_role_policy" "ecs_task" {
           aws_secretsmanager_secret.razorpay.arn,
           aws_secretsmanager_secret.razorpayx.arn,
           aws_secretsmanager_secret.kyc.arn,
+          aws_secretsmanager_secret.comms.arn,
           data.aws_secretsmanager_secret.maps_geocode.arn
         ]
       },
@@ -146,6 +149,41 @@ resource "aws_iam_role_policy" "ecs_task" {
   })
 }
 
+resource "aws_s3_bucket" "alb_logs" {
+  bucket = "${local.name}-alb-logs-105927215604"
+}
+
+resource "aws_s3_bucket_public_access_block" "alb_logs" {
+  bucket                  = aws_s3_bucket.alb_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowELBLogDelivery"
+      Effect    = "Allow"
+      Principal = { Service = "logdelivery.elasticloadbalancing.amazonaws.com" }
+      Action    = "s3:PutObject"
+      Resource  = "${aws_s3_bucket.alb_logs.arn}/*"
+    }]
+  })
+}
+
 resource "aws_lb" "this" {
   name               = "${local.name}-alb"
   internal           = false
@@ -153,6 +191,48 @@ resource "aws_lb" "this" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
   idle_timeout       = 300
+  access_logs {
+    bucket  = aws_s3_bucket.alb_logs.bucket
+    prefix  = "alb"
+    enabled = true
+  }
+  depends_on = [aws_s3_bucket_policy.alb_logs]
+}
+
+resource "aws_wafv2_web_acl" "alb" {
+  name  = "${local.name}-alb"
+  scope = "REGIONAL"
+  default_action {
+    allow {}
+  }
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${local.name}-alb-waf"
+    sampled_requests_enabled   = true
+  }
+  rule {
+    name     = "AWS-AWSManagedRulesCommonRuleSet"
+    priority = 1
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.name}-waf-common"
+      sampled_requests_enabled   = true
+    }
+  }
+}
+
+resource "aws_wafv2_web_acl_association" "alb" {
+  resource_arn = aws_lb.this.arn
+  web_acl_arn  = aws_wafv2_web_acl.alb.arn
 }
 
 resource "aws_lb_target_group" "api" {
@@ -201,7 +281,7 @@ resource "aws_ecs_cluster" "this" {
   name = local.name
   setting {
     name  = "containerInsights"
-    value = "disabled"
+    value = "enabled"
   }
 }
 
@@ -211,6 +291,8 @@ locals {
     { name = "SPRING_DATASOURCE_URL", value = "jdbc:postgresql://${aws_db_instance.this.address}:5432/medmate" },
     { name = "SPRING_DATA_REDIS_HOST", value = aws_elasticache_replication_group.redis.primary_endpoint_address },
     { name = "SPRING_DATA_REDIS_PORT", value = "6379" },
+    { name = "SPRING_DATA_REDIS_SSL_ENABLED", value = "true" },
+    { name = "SPRING_DATA_REDIS_PASSWORD", value = random_password.redis.result },
     { name = "MEDMATE_S3_BUCKET", value = aws_s3_bucket.uploads.bucket },
     { name = "MEDMATE_CDN_BASE_URL", value = local.cdn_base_url },
     { name = "MEDMATE_REFERRAL_JOIN_BASE_URL", value = "https://nammamedmate.com/join" },
@@ -221,6 +303,7 @@ locals {
     { name = "MEDMATE_SECRETS_RAZORPAY_ARN", value = aws_secretsmanager_secret.razorpay.arn },
     { name = "MEDMATE_SECRETS_RAZORPAYX_ARN", value = aws_secretsmanager_secret.razorpayx.arn },
     { name = "MEDMATE_SECRETS_KYC_ARN", value = aws_secretsmanager_secret.kyc.arn },
+    { name = "MEDMATE_SECRETS_COMMS_ARN", value = aws_secretsmanager_secret.comms.arn },
     { name = "AWS_REGION", value = data.aws_region.current.region },
     { name = "JAVA_TOOL_OPTIONS", value = "-XX:MaxRAMPercentage=75.0" }
   ]
@@ -237,8 +320,18 @@ locals {
     { name = "MEDMATE_RAZORPAY_KEY_ID", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_id::" },
     { name = "MEDMATE_RAZORPAY_KEY_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:key_secret::" },
     { name = "MEDMATE_RAZORPAY_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpay.arn}:webhook_secret::" },
+    { name = "MEDMATE_RAZORPAYX_KEY_ID", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:key_id::" },
+    { name = "MEDMATE_RAZORPAYX_KEY_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:key_secret::" },
     { name = "MEDMATE_RAZORPAYX_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.razorpayx.arn}:webhook_secret::" },
-    { name = "MEDMATE_KYC_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.kyc.arn}:webhook_secret::" }
+    { name = "MEDMATE_INTERNAL_SERVICE_TOKEN", valueFrom = "${aws_secretsmanager_secret.internal.arn}:service_token::" },
+    { name = "MEDMATE_KYC_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.kyc.arn}:webhook_secret::" },
+    { name = "MEDMATE_MSG91_AUTH_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:msg91_auth_key::" },
+    { name = "MEDMATE_FCM_SERVER_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_server_key::" },
+    { name = "MEDMATE_SENDGRID_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sendgrid_api_key::" },
+    { name = "MEDMATE_WHATSAPP_ACCESS_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_token::" },
+    { name = "MEDMATE_WHATSAPP_APP_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_app_secret::" },
+    { name = "MEDMATE_SMS_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sms_webhook_secret::" },
+    { name = "MEDMATE_EMAIL_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:email_webhook_secret::" }
   ]
   worker_env = [
     { name = "SPRING_PROFILES_ACTIVE", value = local.environment },
@@ -251,7 +344,12 @@ locals {
   ]
   worker_secrets = [
     { name = "SPRING_DATASOURCE_USERNAME", valueFrom = "${aws_secretsmanager_secret.db.arn}:username::" },
-    { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" }
+    { name = "SPRING_DATASOURCE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.db.arn}:password::" },
+    { name = "MEDMATE_MSG91_AUTH_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:msg91_auth_key::" },
+    { name = "MEDMATE_FCM_SERVER_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:fcm_server_key::" },
+    { name = "MEDMATE_SENDGRID_API_KEY", valueFrom = "${aws_secretsmanager_secret.comms.arn}:sendgrid_api_key::" },
+    { name = "MEDMATE_WHATSAPP_ACCESS_TOKEN", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_token::" },
+    { name = "MEDMATE_WHATSAPP_APP_SECRET", valueFrom = "${aws_secretsmanager_secret.comms.arn}:whatsapp_app_secret::" }
   ]
 }
 
@@ -318,7 +416,7 @@ resource "aws_ecs_service" "api" {
   name                               = "${local.name}-api"
   cluster                            = aws_ecs_cluster.this.id
   task_definition                    = aws_ecs_task_definition.api.arn
-  desired_count                      = 1
+  desired_count                      = 2
   launch_type                        = "FARGATE"
   health_check_grace_period_seconds  = 120
   deployment_maximum_percent         = 200
@@ -338,14 +436,39 @@ resource "aws_ecs_service" "api" {
     enable   = true
     rollback = true
   }
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
   depends_on = [aws_lb_listener.https]
+}
+
+resource "aws_appautoscaling_target" "api" {
+  max_capacity       = 8
+  min_capacity       = 2
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.api.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "api_cpu" {
+  name               = "${local.name}-api-cpu"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.api.resource_id
+  scalable_dimension = aws_appautoscaling_target.api.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.api.service_namespace
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value = 70
+  }
 }
 
 resource "aws_ecs_service" "worker" {
   name                               = "${local.name}-worker"
   cluster                            = aws_ecs_cluster.this.id
   task_definition                    = aws_ecs_task_definition.worker.arn
-  desired_count                      = 1
+  desired_count                      = 2
   launch_type                        = "FARGATE"
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 100
@@ -357,6 +480,40 @@ resource "aws_ecs_service" "worker" {
   deployment_circuit_breaker {
     enable   = true
     rollback = true
+  }
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+}
+
+resource "aws_appautoscaling_target" "worker" {
+  max_capacity       = 6
+  min_capacity       = 2
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.worker.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "worker_queue_depth" {
+  name               = "${local.name}-worker-sqs"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.worker.resource_id
+  scalable_dimension = aws_appautoscaling_target.worker.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.worker.service_namespace
+  target_tracking_scaling_policy_configuration {
+    customized_metric_specification {
+      metric_name = "ApproximateNumberOfMessagesVisible"
+      namespace   = "AWS/SQS"
+      statistic   = "Average"
+      unit        = "Count"
+      dimensions {
+        name  = "QueueName"
+        value = aws_sqs_queue.domain_events.name
+      }
+    }
+    target_value       = 20
+    scale_in_cooldown  = 120
+    scale_out_cooldown = 60
   }
 }
 

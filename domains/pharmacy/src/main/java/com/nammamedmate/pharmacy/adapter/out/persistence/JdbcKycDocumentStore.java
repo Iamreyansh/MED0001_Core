@@ -114,7 +114,7 @@ public class JdbcKycDocumentStore implements KycDocumentStore {
         """
         UPDATE kyc_documents
         SET status = 'UNDER_REVIEW', updated_at = ?
-        WHERE pharmacy_id = ? AND status = 'UPLOADED' AND deleted_at IS NULL
+        WHERE pharmacy_id = ? AND status IN ('UPLOADED', 'SCAN_CLEAN') AND deleted_at IS NULL
         """,
         Timestamp.from(updatedAt),
         pharmacyId);

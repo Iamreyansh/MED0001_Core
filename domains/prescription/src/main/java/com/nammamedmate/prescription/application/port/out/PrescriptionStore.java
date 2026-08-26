@@ -33,5 +33,7 @@ public interface PrescriptionStore {
       List<PrescriptionRecord.MedicineExtracted> medicines,
       Instant updatedAt);
 
+  void updateStatus(UUID id, String status, Instant updatedAt);
+
   int markExpiredDue(Instant now, Instant updatedAt);
 }

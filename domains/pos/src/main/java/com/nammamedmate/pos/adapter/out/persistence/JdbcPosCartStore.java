@@ -242,6 +242,48 @@ public class JdbcPosCartStore implements PosCartStore {
   }
 
   @Override
+  public Optional<UUID> findInvoiceByCheckoutIdempotency(UUID pharmacyId, String idempotencyKey) {
+    if (pharmacyId == null || idempotencyKey == null || idempotencyKey.isBlank()) {
+      return Optional.empty();
+    }
+    List<UUID> rows =
+        jdbc.query(
+            """
+            SELECT invoice_id FROM pos_checkout_idempotency
+            WHERE pharmacy_id = ? AND idempotency_key = ?
+            LIMIT 1
+            """,
+            (rs, i) -> (UUID) rs.getObject("invoice_id"),
+            pharmacyId,
+            idempotencyKey.trim());
+    return rows.stream().findFirst();
+  }
+
+  @Override
+  public void saveCheckoutIdempotency(
+      UUID pharmacyId, String idempotencyKey, UUID cartId, UUID invoiceId, Instant createdAt) {
+    if (pharmacyId == null
+        || idempotencyKey == null
+        || idempotencyKey.isBlank()
+        || cartId == null
+        || invoiceId == null) {
+      return;
+    }
+    jdbc.update(
+        """
+        INSERT INTO pos_checkout_idempotency (
+          pharmacy_id, idempotency_key, cart_id, invoice_id, created_at
+        ) VALUES (?,?,?,?,?)
+        ON CONFLICT (pharmacy_id, idempotency_key) DO NOTHING
+        """,
+        pharmacyId,
+        idempotencyKey.trim(),
+        cartId,
+        invoiceId,
+        Timestamp.from(createdAt));
+  }
+
+  @Override
   public int abandonExpired(Instant now) {
     return jdbc.update(
         """

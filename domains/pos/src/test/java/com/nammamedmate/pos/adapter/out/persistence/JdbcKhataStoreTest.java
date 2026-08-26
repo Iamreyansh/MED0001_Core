@@ -191,7 +191,7 @@ class JdbcKhataStoreTest {
               when(rs.getString("reference_number")).thenReturn("INV-1");
               when(rs.getLong("amount_paise")).thenReturn(10_000L);
               when(rs.getTimestamp("invoice_at"))
-                  .thenReturn(Timestamp.from(Instant.parse("2026-07-20T00:00:00Z")));
+                  .thenReturn(Timestamp.from(Instant.now().minus(java.time.Duration.ofDays(5))));
               return List.of(mapper.mapRow(rs, 0));
             });
     when(jdbc.queryForObject(anyString(), eq(Long.class), eq(pharmacy), eq(customer)))

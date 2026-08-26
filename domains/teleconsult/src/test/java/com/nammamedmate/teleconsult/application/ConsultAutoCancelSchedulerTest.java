@@ -11,14 +11,17 @@ class ConsultAutoCancelSchedulerTest {
   @Test
   void logsWhenCancelled() {
     ConsultService service = mock(ConsultService.class);
+    when(service.assignDueScheduled()).thenReturn(1);
     when(service.autoCancelOverdue()).thenReturn(2);
     new ConsultAutoCancelScheduler(service).autoCancelOverdue();
+    verify(service).assignDueScheduled();
     verify(service).autoCancelOverdue();
   }
 
   @Test
   void silentWhenZero() {
     ConsultService service = mock(ConsultService.class);
+    when(service.assignDueScheduled()).thenReturn(0);
     when(service.autoCancelOverdue()).thenReturn(0);
     new ConsultAutoCancelScheduler(service).autoCancelOverdue();
     verify(service).autoCancelOverdue();

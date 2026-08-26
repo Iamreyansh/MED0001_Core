@@ -19,7 +19,19 @@ public interface PrescriptionPort {
     }
   }
 
-  Optional<PrescriptionRef> findVerified(UUID prescriptionId, UUID customerId);
+  default Optional<PrescriptionRef> findVerified(UUID prescriptionId, UUID customerId) {
+    return Optional.empty();
+  }
 
-  Optional<PrescriptionDetail> findForBroadcast(UUID prescriptionId, UUID customerId);
+  default Optional<PrescriptionDetail> findForBroadcast(UUID prescriptionId, UUID customerId) {
+    return Optional.empty();
+  }
+
+  /** Lands an Rx order on the pharmacy review queue (no-op until bridged). */
+  default void enqueueForPharmacy(UUID prescriptionId, UUID pharmacyId, UUID orderId) {}
+
+  /** Pharmacy Rx queue status for fulfilment (PENDING_REVIEW / APPROVED / VERIFIED). */
+  default Optional<String> pharmacyQueueStatus(UUID prescriptionId, UUID pharmacyId) {
+    return Optional.empty();
+  }
 }

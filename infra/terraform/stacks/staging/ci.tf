@@ -6,6 +6,62 @@ data "aws_iam_role" "gha" {
   name = local.deploy_role
 }
 
+# CI-only OIDC role: S3 cache/reports + ECR pull. Deploy stays on med0001-gha-deploy.
+resource "aws_iam_role" "gha_ci" {
+  name = "med0001-gha-ci"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = data.aws_iam_openid_connect_provider.github.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = "repo:${local.github_org}/${local.github_repo}:*"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "gha_ci" {
+  name = "${local.name}-gha-ci"
+  role = aws_iam_role.gha_ci.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.gha_ci.arn,
+          "${aws_s3_bucket.gha_ci.arn}/*"
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage", "ecr:DescribeRepositories"
+        ]
+        Resource = [aws_ecr_repository.api.arn, aws_ecr_repository.worker.arn]
+      }
+    ]
+  })
+}
+
 # Shared GitHub Actions CI storage (Gradle cache, boot jars, reports, tf plans).
 # Account-scoped; not the app uploads bucket.
 resource "aws_s3_bucket" "gha_ci" {

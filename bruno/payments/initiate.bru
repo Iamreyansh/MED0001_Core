@@ -16,6 +16,7 @@ auth:bearer {
 
 headers {
   Content-Type: application/json
+  Idempotency-Key: {{paymentIdempotencyKey}}
 }
 
 body:json {
@@ -36,6 +37,9 @@ script:pre-request {
   }
   if (!bru.getEnvVar("orderAmountPaise")) {
     bru.setEnvVar("orderAmountPaise", "49500");
+  }
+  if (!bru.getEnvVar("paymentIdempotencyKey")) {
+    bru.setEnvVar("paymentIdempotencyKey", crypto.randomUUID());
   }
 }
 

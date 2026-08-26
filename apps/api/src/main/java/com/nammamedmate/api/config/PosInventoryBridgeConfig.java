@@ -59,15 +59,10 @@ public class PosInventoryBridgeConfig {
   @Primary
   StockDeductionPort posStockDeductionPort(ProductBatchStore batches) {
     return (pharmacyId, productId, batchId, quantity, staffId, now) -> {
-      ProductBatch batch =
+      ProductBatch after =
           batches
-              .findById(pharmacyId, productId, batchId)
-              .orElseThrow(() -> new AppException("INSUFFICIENT_STOCK", "Batch not found", 400));
-      if (!batch.isActive() || batch.quantityCurrent() < quantity) {
-        throw new AppException("INSUFFICIENT_STOCK", "Stock depleted", 400);
-      }
-      int after = batch.quantityCurrent() - quantity;
-      batches.updateQuantities(batch.id(), batch.quantityReceived(), after, after > 0, now);
+              .tryDeductQuantity(batchId, quantity, now)
+              .orElseThrow(() -> new AppException("INSUFFICIENT_STOCK", "Stock depleted", 400));
       batches.insertStockMovement(
           UUID.randomUUID(),
           pharmacyId,
@@ -79,6 +74,9 @@ public class PosInventoryBridgeConfig {
           staffId,
           now);
       batches.refreshProductDenorm(pharmacyId, productId, now);
+      if (after.quantityCurrent() < 0) {
+        throw new AppException("INSUFFICIENT_STOCK", "Stock depleted", 400);
+      }
     };
   }
 

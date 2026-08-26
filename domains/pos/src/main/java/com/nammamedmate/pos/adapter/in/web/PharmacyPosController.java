@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -137,6 +138,7 @@ public class PharmacyPosController {
   public ResponseEntity<ApiResponse<Map<String, Object>>> checkout(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @PathVariable UUID cartId,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
       @RequestBody CheckoutRequest body) {
     CheckoutRequest req = body == null ? new CheckoutRequest(null, null, null, null) : body;
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -148,7 +150,8 @@ public class PharmacyPosController {
                     req.paymentMethod(),
                     req.amountPaid(),
                     req.upiReference(),
-                    req.prescribingDoctor())));
+                    req.prescribingDoctor(),
+                    idempotencyKey)));
   }
 
   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

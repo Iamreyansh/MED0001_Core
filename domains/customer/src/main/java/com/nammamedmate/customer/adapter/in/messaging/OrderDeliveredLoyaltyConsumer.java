@@ -26,6 +26,10 @@ public class OrderDeliveredLoyaltyConsumer implements Consumer<OutboxMessage> {
     if (message == null) {
       return;
     }
+    if ("order.cancelled".equals(message.type())) {
+      reverseCancelled(message);
+      return;
+    }
     if (!"order.delivered".equals(message.type())) {
       return;
     }
@@ -51,6 +55,23 @@ public class OrderDeliveredLoyaltyConsumer implements Consumer<OutboxMessage> {
     }
     String display = asString(payload.get("order_number"));
     loyalty.awardForDeliveredOrder(customerId, orderId, display, itemTotalPaise);
+  }
+
+  private void reverseCancelled(OutboxMessage message) {
+    DomainEvent event = parseEvent(message);
+    if (event == null) {
+      return;
+    }
+    Map<String, Object> payload = event.payload();
+    UUID customerId = asUuid(payload.get("customer_id"));
+    UUID orderId = asUuid(payload.get("order_id"));
+    if (orderId == null) {
+      orderId = event.aggregateId();
+    }
+    if (customerId == null || orderId == null) {
+      return;
+    }
+    loyalty.reverseForRefundedOrder(customerId, orderId, asString(payload.get("order_number")));
   }
 
   private DomainEvent parseEvent(OutboxMessage message) {

@@ -80,6 +80,7 @@ class PosBridgeConfigTest {
     when(fefo.selectFefoBatch(pharmacy, product)).thenReturn(Optional.of(batch));
     when(fefo.listPosEligibleBatches(pharmacy, product)).thenReturn(List.of(batch));
     when(batches.findById(pharmacy, product, batchId)).thenReturn(Optional.of(batch));
+    when(batches.tryDeductQuantity(eq(batchId), anyInt(), any())).thenReturn(Optional.of(batch));
 
     PosFefoPort posFefo = cfg.posFefoPort(fefo, batches);
     assertThat(posFefo.selectFefoBatch(pharmacy, product)).isPresent();
@@ -122,6 +123,7 @@ class PosBridgeConfigTest {
                     null,
                     now,
                     now)));
+    when(batches.tryDeductQuantity(eq(batchId), anyInt(), any())).thenReturn(Optional.empty());
     assertThatThrownBy(
             () -> stock.deductSale(pharmacy, product, batchId, 1, UUID.randomUUID(), now))
         .isInstanceOf(AppException.class);

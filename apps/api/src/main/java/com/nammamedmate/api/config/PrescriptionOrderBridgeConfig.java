@@ -8,6 +8,7 @@ import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort.MedicineLine;
 import com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail;
 import com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef;
+import com.nammamedmate.prescription.application.PharmacyRxQueueService;
 import com.nammamedmate.prescription.application.port.out.OrderLinkPort;
 import com.nammamedmate.prescription.application.port.out.PrescriptionInUsePort;
 import java.sql.Timestamp;
@@ -32,8 +33,9 @@ public class PrescriptionOrderBridgeConfig {
 
   @Bean
   @Primary
-  PrescriptionPort jdbcPrescriptionPort(JdbcTemplate jdbc, ObjectMapper objectMapper, Clock clock) {
-    return new JdbcPrescriptionPortBridge(jdbc, objectMapper, clock);
+  PrescriptionPort jdbcPrescriptionPort(
+      JdbcTemplate jdbc, ObjectMapper objectMapper, Clock clock, PharmacyRxQueueService rxQueue) {
+    return new JdbcPrescriptionPortBridge(jdbc, objectMapper, clock, rxQueue);
   }
 
   @Bean
@@ -55,11 +57,14 @@ public class PrescriptionOrderBridgeConfig {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final PharmacyRxQueueService rxQueue;
 
-    JdbcPrescriptionPortBridge(JdbcTemplate jdbc, ObjectMapper objectMapper, Clock clock) {
+    JdbcPrescriptionPortBridge(
+        JdbcTemplate jdbc, ObjectMapper objectMapper, Clock clock, PharmacyRxQueueService rxQueue) {
       this.jdbc = jdbc;
       this.objectMapper = objectMapper;
       this.clock = clock;
+      this.rxQueue = rxQueue;
     }
 
     @Override
@@ -101,6 +106,31 @@ public class PrescriptionOrderBridgeConfig {
               },
               prescriptionId,
               customerId);
+      return rows.stream().findFirst();
+    }
+
+    @Override
+    public void enqueueForPharmacy(UUID prescriptionId, UUID pharmacyId, UUID orderId) {
+      if (prescriptionId == null || pharmacyId == null || rxQueue == null) {
+        return;
+      }
+      rxQueue.enqueue(prescriptionId, pharmacyId, orderId);
+    }
+
+    @Override
+    public Optional<String> pharmacyQueueStatus(UUID prescriptionId, UUID pharmacyId) {
+      if (prescriptionId == null || pharmacyId == null) {
+        return Optional.empty();
+      }
+      List<String> rows =
+          jdbc.query(
+              """
+              SELECT status FROM pharmacy_rx_queue
+              WHERE rx_id = ? AND pharmacy_id = ? AND deleted_at IS NULL
+              """,
+              (rs, i) -> rs.getString(1),
+              prescriptionId,
+              pharmacyId);
       return rows.stream().findFirst();
     }
 

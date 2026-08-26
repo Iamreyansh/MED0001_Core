@@ -24,6 +24,10 @@ class FinanceOverviewIT extends AbstractApiIT {
 
   private static final UUID FINANCE_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0091");
   private static final UUID SUPPORT_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0092");
+  private static final UUID FINANCE_CUST = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0f01");
+  private static final UUID FINANCE_PH = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0f02");
+  private static final UUID FINANCE_ADDR = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0f03");
+  private static final UUID FINANCE_CART = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0f04");
   private static final String ADMIN_PASSWORD = "OverviewAdmin1!";
 
   @Autowired private TestRestTemplate rest;
@@ -40,13 +44,19 @@ class FinanceOverviewIT extends AbstractApiIT {
     jdbc.execute("ALTER TABLE financial_ledger DISABLE TRIGGER USER");
     jdbc.update("DELETE FROM financial_ledger");
     jdbc.execute("ALTER TABLE financial_ledger ENABLE TRIGGER USER");
-    jdbc.update("DELETE FROM payment WHERE customer_id = ?", FINANCE_ID);
+    jdbc.update("DELETE FROM payment WHERE customer_id = ?", FINANCE_CUST);
+    jdbc.update("DELETE FROM orders WHERE customer_id = ?", FINANCE_CUST);
+    jdbc.update("DELETE FROM carts WHERE customer_id = ?", FINANCE_CUST);
+    jdbc.update("DELETE FROM customer_addresses WHERE customer_id = ?", FINANCE_CUST);
+    jdbc.update("DELETE FROM customers WHERE id = ?", FINANCE_CUST);
+    jdbc.update("DELETE FROM pharmacies WHERE code = 'PHM-F1' OR id = ?", FINANCE_PH);
   }
 
   @Test
   void ac001_ac006_ac007_ac008_kpiPnlCacheAndAuth() {
     UUID paymentId = UUID.randomUUID();
     UUID orderId = UUID.randomUUID();
+    seedFinanceOrder(orderId);
     jdbc.update(
         """
         INSERT INTO payment (
@@ -56,7 +66,7 @@ class FinanceOverviewIT extends AbstractApiIT {
         """,
         paymentId,
         orderId,
-        FINANCE_ID);
+        FINANCE_CUST);
     jdbc.update(
         """
         INSERT INTO financial_ledger (
@@ -156,6 +166,52 @@ class FinanceOverviewIT extends AbstractApiIT {
         email,
         hash,
         role);
+  }
+
+  private void seedFinanceOrder(UUID orderId) {
+    jdbc.update(
+        "INSERT INTO customers (id, phone, name, created_at, updated_at) VALUES (?, '+919999900091', 'Fin', NOW(), NOW())",
+        FINANCE_CUST);
+    jdbc.update(
+        "INSERT INTO pharmacies (id, name, business_name, city, subscription_plan, code, status,"
+            + " is_online, admin_forced_offline, latitude, longitude, address, tagline, phone,"
+            + " created_at, updated_at) VALUES (?, 'Fin Ph', 'Fin Ph', 'Bengaluru', 'GROWTH', 'PHM-F1',"
+            + " 'ACTIVE', true, false, 12.93, 77.61,"
+            + " '{\"flat\":\"1\",\"area\":\"Koramangala\",\"city\":\"Bengaluru\",\"pincode\":\"560034\"}'::jsonb,"
+            + " 'tag', '+91-8022330091', NOW(), NOW())",
+        FINANCE_PH);
+    jdbc.update(
+        """
+        INSERT INTO customer_addresses (
+          id, customer_id, label, flat_building, area_locality, city, state, pincode,
+          latitude, longitude, is_default, created_at, updated_at)
+        VALUES (?, ?, 'Home', '1', 'Koramangala', 'Bengaluru', 'KA', '560034',
+          12.93, 77.61, true, NOW(), NOW())
+        """,
+        FINANCE_ADDR,
+        FINANCE_CUST);
+    jdbc.update(
+        "INSERT INTO carts (id, customer_id, pharmacy_id, items, status, created_at, updated_at)"
+            + " VALUES (?, ?, ?, '[]'::jsonb, 'CHECKED_OUT', NOW(), NOW())",
+        FINANCE_CART,
+        FINANCE_CUST,
+        FINANCE_PH);
+    jdbc.update(
+        """
+        INSERT INTO orders (
+          id, order_number, customer_id, pharmacy_id, cart_id, items,
+          item_total_paise, coupon_discount_paise, delivery_fee_paise, handling_fee_paise,
+          wallet_applied_paise, total_payable_paise, payment_method, payment_status,
+          delivery_address_id, status, created_at, updated_at)
+        VALUES (?, 'ORD-FIN-0001', ?, ?, ?, '[]'::jsonb,
+          18500000, 0, 0, 0, 0, 18500000, 'UPI', 'PAID',
+          ?, 'DELIVERED', NOW(), NOW())
+        """,
+        orderId,
+        FINANCE_CUST,
+        FINANCE_PH,
+        FINANCE_CART,
+        FINANCE_ADDR);
   }
 
   private void flushRedis(String pattern) {

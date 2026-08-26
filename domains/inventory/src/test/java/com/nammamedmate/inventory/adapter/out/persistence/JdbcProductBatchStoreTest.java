@@ -266,4 +266,25 @@ class JdbcProductBatchStoreTest {
     when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.from(now));
     return rs;
   }
+
+  @Test
+  void tryDeductQuantityReturnsEmptyWhenNoRowUpdated() {
+    when(jdbc.update(anyString(), any(), any(), any(), any(), any())).thenReturn(0);
+    assertThat(store.tryDeductQuantity(batch, 1, now)).isEmpty();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void tryDeductQuantityReturnsBatchWhenUpdated() throws Exception {
+    when(jdbc.update(anyString(), any(), any(), any(), any(), any())).thenReturn(1);
+    when(jdbc.query(anyString(), any(RowMapper.class), eq(batch)))
+        .thenAnswer(
+            inv -> {
+              RowMapper<ProductBatch> mapper = inv.getArgument(1);
+              ResultSet rs = mockBatchRs();
+              when(rs.getInt("quantity_current")).thenReturn(9);
+              return List.of(mapper.mapRow(rs, 0));
+            });
+    assertThat(store.tryDeductQuantity(batch, 1, now)).isPresent();
+  }
 }

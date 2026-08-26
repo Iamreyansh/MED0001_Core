@@ -59,7 +59,11 @@ resource "aws_iam_role_policy" "guardduty_malware_s3" {
           "s3:PutObjectVersionTagging",
           "s3:GetObjectVersionTagging"
         ]
-        Resource = ["${aws_s3_bucket.uploads.arn}/kyc/*"]
+        Resource = [
+          "${aws_s3_bucket.uploads.arn}/kyc/*",
+          "${aws_s3_bucket.uploads.arn}/prescriptions/*",
+          "${aws_s3_bucket.uploads.arn}/rx/*"
+        ]
       },
       {
         Sid    = "AllowEnableS3EventBridgeEvents"
@@ -91,7 +95,11 @@ resource "aws_iam_role_policy" "guardduty_malware_s3" {
           "s3:GetObject",
           "s3:GetObjectVersion"
         ]
-        Resource = ["${aws_s3_bucket.uploads.arn}/kyc/*"]
+        Resource = [
+          "${aws_s3_bucket.uploads.arn}/kyc/*",
+          "${aws_s3_bucket.uploads.arn}/prescriptions/*",
+          "${aws_s3_bucket.uploads.arn}/rx/*"
+        ]
       },
       {
         Sid    = "AllowDecryptForMalwareScan"
@@ -117,7 +125,7 @@ resource "aws_guardduty_malware_protection_plan" "uploads_kyc" {
   protected_resource {
     s3_bucket {
       bucket_name     = aws_s3_bucket.uploads.id
-      object_prefixes = ["kyc/"]
+      object_prefixes = ["kyc/", "prescriptions/", "rx/"]
     }
   }
 

@@ -706,4 +706,75 @@ class SettlementFacadeCoverageTest {
     verify(tm, org.mockito.Mockito.atLeastOnce()).getTransaction(any());
     verify(tm, org.mockito.Mockito.atLeastOnce()).commit(status);
   }
+
+  @Test
+  void release_withProviderOps_replaysMarksAndAmbiguous() {
+    com.nammamedmate.messaging.ProviderOperationStore ops =
+        org.mockito.Mockito.mock(com.nammamedmate.messaging.ProviderOperationStore.class);
+    SettlementFacadeService withOps =
+        new SettlementFacadeService(
+            settlements,
+            razorpayx,
+            ledger,
+            notifications,
+            tcsRegister,
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            null,
+            ops);
+    SettlementRecord row =
+        new SettlementRecord(
+            settlementId,
+            pharmacyId,
+            "P",
+            LocalDate.of(2026, 7, 14),
+            LocalDate.of(2026, 7, 20),
+            100_000L,
+            new BigDecimal("8"),
+            8000L,
+            0L,
+            0L,
+            92_000L,
+            1,
+            "PENDING_RELEASE",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    when(settlements.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
+    when(settlements.findById(settlementId)).thenReturn(Optional.of(row));
+    when(settlements.findVerifiedBank(pharmacyId))
+        .thenReturn(Optional.of(new BankSnapshot("XXXX4521", "B", "IFSC", "VERIFIED")));
+    when(settlements.claimForRelease(any(), any(), anyString(), any())).thenReturn(true);
+    when(settlements.finalizeRelease(any(), any(), any(), anyString(), any(), anyString(), any()))
+        .thenReturn(true);
+    when(ops.find(eq("PAYOUT"), anyString())).thenReturn(Optional.empty());
+    when(razorpayx.initiatePayout(any())).thenReturn(new PayoutResult("pout_new", 4));
+
+    assertThat(withOps.release(finance, settlementId, "n", "ops-new").get("status"))
+        .isEqualTo("PENDING");
+    verify(ops).ensurePending(eq("PAYOUT"), anyString(), eq("razorpayx"));
+    verify(ops).markSent(eq("PAYOUT"), anyString(), eq("pout_new"));
+    verify(ops).markSucceeded(eq("PAYOUT"), anyString(), eq("pout_new"));
+
+    when(ops.find(eq("PAYOUT"), anyString()))
+        .thenReturn(
+            Optional.of(
+                new com.nammamedmate.messaging.ProviderOperationStore.Operation(
+                    "PAYOUT", "settlement:" + settlementId, "pout_replay", "SENT")));
+    assertThat(withOps.release(finance, settlementId, "n", "ops-replay").get("status"))
+        .isEqualTo("PENDING");
+
+    when(ops.find(eq("PAYOUT"), anyString())).thenReturn(Optional.empty());
+    when(razorpayx.initiatePayout(any())).thenThrow(new RuntimeException("gw down"));
+    assertThatThrownBy(() -> withOps.release(finance, settlementId, "n", "ops-fail"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("RAZORPAY_PAYOUT_FAILED");
+    verify(ops)
+        .markAmbiguous(
+            eq("PAYOUT"), anyString(), org.mockito.ArgumentMatchers.isNull(), anyString());
+  }
 }

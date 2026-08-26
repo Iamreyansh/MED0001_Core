@@ -86,10 +86,8 @@ jobs:
             | crane auth login "$REGISTRY" -u AWS --password-stdin
 
           crane copy "${STAGING_API}:${FULL_SHA}" "${PROD_API}:${TAG}"
-          crane copy "${STAGING_API}:${FULL_SHA}" "${PROD_API}:prod"
           crane copy "${STAGING_WORKER}:${FULL_SHA}" "${PROD_WORKER}:${TAG}"
-          crane copy "${STAGING_WORKER}:${FULL_SHA}" "${PROD_WORKER}:prod"
-          echo "Promoted ${FULL_SHA} → ${TAG} (and :prod)"
+          echo "Promoted ${FULL_SHA} → immutable ${TAG}"
       - name: Terraform apply prod
         env:
           TF_VAR_image_tag: ${{ needs.guard.outputs.tag }}

@@ -301,6 +301,19 @@ class SettlementFacadeServiceAcTest {
   }
 
   @Test
+  void unhold_clearsHoldForRelease() {
+    when(settlements.findById(settlementId))
+        .thenReturn(Optional.of(record("HELD", 100_000L, 1, 0, 100_000L)))
+        .thenReturn(Optional.of(pending(100_000L, 1, 0, 100_000L)));
+    Map<String, Object> result = service.unhold(finance, settlementId, "cleared");
+    assertThat(result.get("status")).isEqualTo("PENDING");
+    verify(settlements).markUnheld(eq(settlementId), eq(finance.subject()), eq("cleared"), eq(NOW));
+    assertThatThrownBy(() -> service.unhold(finance, settlementId, "again"))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("SETTLEMENT_NOT_HELD");
+  }
+
+  @Test
   void alreadyReleased_409() {
     when(settlements.findByIdempotencyKey("k")).thenReturn(Optional.empty());
     when(settlements.findById(settlementId))

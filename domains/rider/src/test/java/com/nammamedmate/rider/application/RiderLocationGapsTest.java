@@ -675,6 +675,21 @@ class RiderLocationGapsTest {
     e4.complete();
     SseEmitter e5 = push2.subscribe(id);
     e5.completeWithError(new RuntimeException("boom"));
+    SseEmitter life = push2.subscribe(id);
+    Class<?> emitterType =
+        org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter.class;
+    java.lang.reflect.Field timeoutField = emitterType.getDeclaredField("timeoutCallback");
+    timeoutField.setAccessible(true);
+    ((Runnable) timeoutField.get(life)).run();
+    java.lang.reflect.Field completionField = emitterType.getDeclaredField("completionCallback");
+    completionField.setAccessible(true);
+    ((Runnable) completionField.get(life)).run();
+    java.lang.reflect.Field errorField = emitterType.getDeclaredField("errorCallback");
+    errorField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    java.util.function.Consumer<Throwable> errorCb =
+        (java.util.function.Consumer<Throwable>) errorField.get(life);
+    errorCb.accept(new RuntimeException("sse"));
     SseEmitter e6 = push2.subscribe(id);
     // force timeout callback path used by SSE lifecycle
     e6.onTimeout(() -> push2.removeEmitter(id, e6));

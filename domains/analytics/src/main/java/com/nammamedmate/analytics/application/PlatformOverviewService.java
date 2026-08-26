@@ -350,7 +350,9 @@ public class PlatformOverviewService {
       throw new AppException("FORBIDDEN", "Overview analytics access required", 403);
     }
     AuthRole role = principal.role();
-    if (role != AuthRole.ADMIN_SUPER && role != AuthRole.ADMIN_OPERATIONS) {
+    if (role != AuthRole.ADMIN_SUPER
+        && role != AuthRole.ADMIN_OPERATIONS
+        && role != AuthRole.ADMIN_FINANCE) {
       throw new AppException("FORBIDDEN", "Overview analytics access required", 403);
     }
   }

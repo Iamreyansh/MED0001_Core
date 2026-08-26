@@ -82,9 +82,10 @@ public final class AdminRoleDefinitions {
                   "taxes:read",
                   "taxes:export",
                   "analytics:finance",
+                  "analytics:read",
                   "customers:read",
                   "wallet:credit"),
-              13,
+              14,
               null),
           new AdminRole(
               "admin_support",

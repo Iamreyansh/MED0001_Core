@@ -1,22 +1,22 @@
 package com.nammamedmate.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.nammamedmate.notification.adapter.in.messaging.CustomerNotificationRequestedHandler;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
@@ -29,10 +29,8 @@ class SqsMessagePollerTest {
   @Mock private SqsClient sqsClient;
 
   private static SqsNoOpHandler noOpHandler() {
-    @SuppressWarnings("unchecked")
-    ObjectProvider<CustomerNotificationRequestedHandler> provider = mock(ObjectProvider.class);
-    lenient().when(provider.getIfAvailable()).thenReturn(null);
-    return new SqsNoOpHandler(provider);
+    DomainEventRouter router = mock(DomainEventRouter.class);
+    return new SqsNoOpHandler(router);
   }
 
   @Test
@@ -71,6 +69,17 @@ class SqsMessagePollerTest {
     Message message = Message.builder().body("x").receiptHandle("rh").build();
     poller.process(message);
     verify(sqsClient).deleteMessage(any(DeleteMessageRequest.class));
+  }
+
+  @Test
+  void processDoesNotDeleteWhenHandlerFails() {
+    DomainEventRouter router = mock(DomainEventRouter.class);
+    doThrow(new IllegalStateException("boom")).when(router).handle("x");
+    SqsMessagePoller poller =
+        new SqsMessagePoller(sqsClient, new SqsNoOpHandler(router), "https://sqs.example/q");
+    Message message = Message.builder().body("x").receiptHandle("rh").build();
+    assertThatThrownBy(() -> poller.process(message)).isInstanceOf(IllegalStateException.class);
+    verify(sqsClient, never()).deleteMessage(any(DeleteMessageRequest.class));
   }
 
   @Test

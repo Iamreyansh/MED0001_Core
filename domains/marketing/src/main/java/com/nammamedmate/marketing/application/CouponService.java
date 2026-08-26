@@ -418,6 +418,11 @@ public class CouponService {
     if (c.budgetTotalPaise() > 0 && c.budgetUsedPaise() >= c.budgetTotalPaise()) {
       return invalid(null, null, 0L, "COUPON_BUDGET_EXHAUSTED");
     }
+    if (c.maxRedemptionsTotal() != null
+        && c.maxRedemptionsTotal() > 0
+        && store.countRedemptions(c.id()) >= c.maxRedemptionsTotal()) {
+      return invalid(null, null, 0L, "COUPON_MAX_REDEMPTIONS");
+    }
     if (store.countRedemptionsForCustomer(c.id(), customerId) >= c.maxPerUser()) {
       return invalid(null, null, 0L, "COUPON_PER_USER_LIMIT");
     }
@@ -493,6 +498,16 @@ public class CouponService {
   /** Cart apply bridge — maps eligibility failures to order cart error codes. */
   @Transactional(readOnly = true)
   public CartQuote applyForCart(String couponCode, long itemTotalPaise) {
+    return applyForCart(couponCode, itemTotalPaise, null, null, null);
+  }
+
+  @Transactional(readOnly = true)
+  public CartQuote applyForCart(
+      String couponCode,
+      long itemTotalPaise,
+      UUID customerId,
+      Boolean firstOrder,
+      Boolean hasRxItems) {
     String code = normalizeCode(couponCode);
     if (code == null) {
       throw new AppException("INVALID_COUPON", "Coupon code not found or expired", 422);
@@ -508,6 +523,18 @@ public class CouponService {
         || now.isBefore(c.validFrom())) {
       throw new AppException("INVALID_COUPON", "Coupon code not found or expired", 422);
     }
+    if (c.budgetTotalPaise() > 0 && c.budgetUsedPaise() >= c.budgetTotalPaise()) {
+      throw new AppException("COUPON_BUDGET_EXHAUSTED", "Coupon budget is exhausted", 422);
+    }
+    if (c.maxRedemptionsTotal() != null
+        && c.maxRedemptionsTotal() > 0
+        && store.countRedemptions(c.id()) >= c.maxRedemptionsTotal()) {
+      throw new AppException("COUPON_MAX_REDEMPTIONS", "Coupon redemption cap reached", 422);
+    }
+    if (customerId != null
+        && store.countRedemptionsForCustomer(c.id(), customerId) >= c.maxPerUser()) {
+      throw new AppException("COUPON_PER_USER_LIMIT", "Coupon already used the maximum times", 422);
+    }
     if (itemTotalPaise < c.minOrderValuePaise()) {
       throw new AppException(
           "COUPON_MIN_NOT_MET",
@@ -515,6 +542,26 @@ public class CouponService {
               + " requires minimum cart of Rs "
               + MoneyFormats.paiseToRupees(c.minOrderValuePaise()),
           422);
+    }
+    if (customerId != null && !c.openToAllSegments()) {
+      boolean member = false;
+      for (UUID seg : c.segmentIds()) {
+        if (segments.isMember(seg, customerId)) {
+          member = true;
+          break;
+        }
+      }
+      if (!member) {
+        throw new AppException(
+            "COUPON_SEGMENT_MISMATCH", "Coupon is not available for this customer", 422);
+      }
+    }
+    if (c.firstOrderOnly() && firstOrder != null && !Boolean.TRUE.equals(firstOrder)) {
+      throw new AppException(
+          "COUPON_FIRST_ORDER_ONLY", "Coupon is valid on the first order only", 422);
+    }
+    if (c.rxOrdersOnly() && hasRxItems != null && !Boolean.TRUE.equals(hasRxItems)) {
+      throw new AppException("COUPON_RX_ONLY", "Coupon is valid on prescription orders only", 422);
     }
     long discount = CouponDiscount.discountPaise(c, itemTotalPaise);
     boolean freeDel = c.type() == CouponType.FREE_DELIVERY;
@@ -545,7 +592,16 @@ public class CouponService {
       UUID customerId,
       long discountAppliedPaise,
       long orderTotalPaise) {
-    Coupon c = requireCoupon(couponCode);
+    String normalized = normalizeCode(couponCode);
+    Coupon c =
+        store
+            .findByCodeForUpdate(normalized)
+            .orElseThrow(() -> new AppException("COUPON_NOT_FOUND", "Coupon not found", 404));
+    if (c.maxRedemptionsTotal() != null
+        && c.maxRedemptionsTotal() > 0
+        && c.redemptionsCount() >= c.maxRedemptionsTotal()) {
+      throw new AppException("COUPON_MAX_REDEMPTIONS", "Coupon redemption cap reached", 422);
+    }
     Instant now = clock.instant();
     store.insertRedemption(
         Ids.newId(), c.id(), orderId, customerId, discountAppliedPaise, orderTotalPaise, now);

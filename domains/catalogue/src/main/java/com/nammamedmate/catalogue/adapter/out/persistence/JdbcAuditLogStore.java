@@ -50,7 +50,7 @@ public class JdbcAuditLogStore implements AuditLogStore {
           user_agent, "timestamp"
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?::jsonb, CAST(? AS inet), ?,
-          ?, 'ADMIN', ?, ?, ?::jsonb, ?::jsonb, NULL, NULL, ?
+          ?, ?, ?, ?, ?::jsonb, ?::jsonb, NULL, NULL, ?
         )
         """,
         record.id(),
@@ -62,7 +62,8 @@ public class JdbcAuditLogStore implements AuditLogStore {
         payloadJson,
         blankToDefaultIp(record.ipAddress()),
         Timestamp.from(record.createdAt()),
-        "unknown",
+        resolveActorName(record.actorId(), record.actorRole()),
+        actorTypeForRole(record.actorRole()),
         resourceType,
         record.entityId(),
         beforeJson,
@@ -75,5 +76,53 @@ public class JdbcAuditLogStore implements AuditLogStore {
       return "0.0.0.0";
     }
     return value.trim();
+  }
+
+  private String resolveActorName(java.util.UUID actorId, String actorRole) {
+    if (actorId == null) {
+      return "unknown";
+    }
+    var staff =
+        jdbc.query(
+            """
+            SELECT COALESCE(NULLIF(TRIM(name), ''), email) AS label
+            FROM pharmacy_staff
+            WHERE id = ? AND deleted_at IS NULL
+            LIMIT 1
+            """,
+            (rs, i) -> rs.getString("label"),
+            actorId);
+    if (staff != null
+        && !staff.isEmpty()
+        && staff.getFirst() != null
+        && !staff.getFirst().isBlank()) {
+      return staff.getFirst();
+    }
+    if (actorRole != null && actorRole.startsWith("ADMIN")) {
+      var admin =
+          jdbc.query(
+              """
+              SELECT COALESCE(NULLIF(TRIM(name), ''), email) AS label
+              FROM admin_staff
+              WHERE id = ? AND deleted_at IS NULL
+              LIMIT 1
+              """,
+              (rs, i) -> rs.getString("label"),
+              actorId);
+      if (admin != null
+          && !admin.isEmpty()
+          && admin.getFirst() != null
+          && !admin.getFirst().isBlank()) {
+        return admin.getFirst();
+      }
+    }
+    return "unknown";
+  }
+
+  private static String actorTypeForRole(String actorRole) {
+    if (actorRole != null && actorRole.toUpperCase(Locale.ROOT).startsWith("ADMIN")) {
+      return "ADMIN";
+    }
+    return "ADMIN";
   }
 }

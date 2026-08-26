@@ -4,9 +4,12 @@ import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.order.application.port.out.DeliveryInvoicePort;
 import com.nammamedmate.order.application.port.out.DeliveryOtpCachePort;
+import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import com.nammamedmate.order.application.port.out.OrderStatusEventStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
+import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort;
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort.RefundPlan;
 import com.nammamedmate.order.application.port.out.RiderLookupPort;
@@ -51,6 +54,9 @@ public class OrderLifecycleService {
   private final DeliveryOtpCachePort deliveryOtpCache;
   private final PasswordEncoder otpEncoder;
   private final SecureRandom random;
+  private InventoryAvailabilityPort inventory = new InventoryAvailabilityPort() {};
+  private PrescriptionPort prescriptions = new PrescriptionPort() {};
+  private DeliveryInvoicePort deliveryInvoice = new DeliveryInvoicePort() {};
 
   @Autowired
   public OrderLifecycleService(
@@ -98,6 +104,21 @@ public class OrderLifecycleService {
     this.random = random;
   }
 
+  @Autowired(required = false)
+  public void setInventory(InventoryAvailabilityPort inventory) {
+    this.inventory = inventory == null ? new InventoryAvailabilityPort() {} : inventory;
+  }
+
+  @Autowired(required = false)
+  public void setPrescriptions(PrescriptionPort prescriptions) {
+    this.prescriptions = prescriptions == null ? new PrescriptionPort() {} : prescriptions;
+  }
+
+  @Autowired(required = false)
+  public void setDeliveryInvoice(DeliveryInvoicePort deliveryInvoice) {
+    this.deliveryInvoice = deliveryInvoice == null ? new DeliveryInvoicePort() {} : deliveryInvoice;
+  }
+
   @Transactional
   public Map<String, Object> accept(MedmatePrincipal principal, UUID orderId) {
     requirePharmacy(principal);
@@ -111,9 +132,20 @@ public class OrderLifecycleService {
       throw new AppException(
           "ORDER_ACCEPTANCE_TIMEOUT", "10-minute acceptance window elapsed", 409);
     }
+    if (order.prescriptionId() != null) {
+      String rxStatus =
+          prescriptions
+              .pharmacyQueueStatus(order.prescriptionId(), order.pharmacyId())
+              .orElse("PENDING_REVIEW");
+      if (!"APPROVED".equalsIgnoreCase(rxStatus) && !"VERIFIED".equalsIgnoreCase(rxStatus)) {
+        throw new AppException(
+            "RX_NOT_VERIFIED", "Prescription must be approved before fulfilment", 422);
+      }
+    }
     OrderStatus from = order.status();
     order.accept(now);
     orders.update(order);
+    inventory.deductForOrder(order.id());
     appendEvent(
         order.id(), from, OrderStatus.ACCEPTED, ActorType.PHARMACY, principal.subject(), null, now);
     Map<String, Object> data = new LinkedHashMap<>();
@@ -208,6 +240,31 @@ public class OrderLifecycleService {
     data.put("rider_vehicle_plate", rider.vehiclePlate());
     data.put("assigned_at", now.toString());
     return data;
+  }
+
+  /** Canonical rider delivery — invoice (D12), order.delivered outbox, side effects once. */
+  @Transactional
+  public void confirmRiderDelivery(UUID orderId, UUID riderId, Instant now) {
+    if (orderId == null) {
+      throw new AppException("ORDER_NOT_FOUND", "Order not found", 404);
+    }
+    if (riderId == null) {
+      throw new AppException("VALIDATION_ERROR", "rider_id is required", 400);
+    }
+    Order order =
+        orders
+            .findById(orderId)
+            .orElseThrow(() -> new AppException("ORDER_NOT_FOUND", "Order not found", 404));
+    if (order.status() != OrderStatus.OUT_FOR_DELIVERY) {
+      throw new AppException(
+          "ORDER_NOT_OUT_FOR_DELIVERY", "Order not in OUT_FOR_DELIVERY state", 409);
+    }
+    if (order.riderId() != null && !order.riderId().equals(riderId)) {
+      throw new AppException("RIDER_MISMATCH", "Order assigned to another rider", 409);
+    }
+    OrderStatus from = order.status();
+    applyTransition(
+        order, from, OrderStatus.DELIVERED, ActorType.RIDER, riderId, "delivery_otp", now);
   }
 
   @Transactional
@@ -307,15 +364,14 @@ public class OrderLifecycleService {
     int count = 0;
     for (Order order : orders.findReadyWithoutRiderEscalation(cutoff, JOB_BATCH)) {
       Instant now = now();
-      order.markRiderEscalation(now);
-      orders.update(order);
+      cancelWithRefund(
+          order, "NO_RIDER_AVAILABLE", "NO_RIDER_AVAILABLE", ActorType.SYSTEM, null, now);
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("order_id", order.id().toString());
       payload.put("order_number", order.orderNumber());
       payload.put("pharmacy_id", order.pharmacyId().toString());
       payload.put("alert", "NO_RIDER_ASSIGNED");
       payload.put("audience", "admin_operations");
-      payload.put("ready_for_pickup_at", order.readyForPickupAt().toString());
       outbox.publish(DomainEvent.of("order.rider.escalation", "order", order.id(), payload));
       count++;
     }
@@ -351,6 +407,7 @@ public class OrderLifecycleService {
     orders.update(order);
     appendEvent(order.id(), from, to, actorType, actorId, notes, now);
     if (to == OrderStatus.DELIVERED) {
+      deliveryInvoice.onDelivered(order);
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("order_id", order.id().toString());
       payload.put("customer_id", order.customerId().toString());
@@ -372,6 +429,7 @@ public class OrderLifecycleService {
     OrderStatus from = order.status();
     order.cancel(cancelReason, now);
     orders.update(order);
+    inventory.releaseForOrder(order.id());
     appendEvent(order.id(), from, OrderStatus.CANCELLED, actorType, actorId, notes, now);
     RefundPlan plan = refunds.initiate(order, cancelReason, actorType, actorId);
     publishCancelNotifications(order, cancelReason, plan);

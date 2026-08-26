@@ -521,6 +521,31 @@ class RulesEngineServiceAcTest {
         .isEqualTo("PENDING_APPROVAL");
   }
 
+  @Test
+  void evaluateMatchingFiresActiveRulesAndSkipsEmpty() {
+    when(killSwitch.status()).thenReturn(KillSwitchStatus.ACTIVE);
+    when(rules.listActive())
+        .thenReturn(
+            List.of(
+                new RuleSnapshot(
+                    ruleId,
+                    "order_placed",
+                    List.of(),
+                    List.of(new ActionSpec("send_notification", Map.of(), false)),
+                    300)));
+    when(dedup.isDuplicate(any(), any(), any())).thenReturn(false);
+    when(actions.execute(anyString(), anyMap(), anyMap())).thenReturn(UUID.randomUUID());
+    when(activityLog.append(anyString(), anyString(), anyString(), anyMap()))
+        .thenReturn(UUID.randomUUID());
+    List<Map<String, Object>> fired = service.evaluateMatching(event("order_placed"));
+    assertThat(fired).hasSize(1);
+    assertThat(fired.getFirst().get("outcome")).isEqualTo("RULE_FIRED");
+    assertThat(service.evaluateMatching(null)).isEmpty();
+    assertThat(service.evaluateMatching(new EventPayload(null, "ORDER", entityId, Map.of(), NOW)))
+        .isEmpty();
+    assertThat(service.evaluateMatching(event("order_delivered"))).isEmpty();
+  }
+
   private EventPayload event(String triggerId) {
     return new EventPayload(
         triggerId,

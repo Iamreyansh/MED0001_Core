@@ -67,6 +67,7 @@ class JdbcCouponStoreTest {
             });
 
     assertThat(store.findByCode("NAMMA25")).isPresent();
+    assertThat(store.findByCodeForUpdate("NAMMA25")).isPresent();
     when(rs.getArray("segment_ids")).thenReturn(null);
     assertThat(store.findById(c.id())).isPresent();
     Array bad = mock(Array.class);

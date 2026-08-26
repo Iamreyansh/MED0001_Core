@@ -5,11 +5,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.kernel.webhook.WebhookRawBodyFilter;
+import com.nammamedmate.messaging.WebhookInbox;
 import com.nammamedmate.payment.application.PaymentService;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -43,16 +48,16 @@ class PaymentControllerTest {
   @Test
   void initiateVerifyGet() {
     UUID orderId = UUID.randomUUID();
-    when(payments.initiate(eq(principal), eq(orderId), eq(100L), eq("INR"), eq("UPI")))
+    when(payments.initiate(eq(principal), eq(orderId), eq(100L), eq("INR"), eq("UPI"), isNull()))
         .thenReturn(Map.of("payment_id", "p1"));
     ResponseEntity<ApiResponse<Map<String, Object>>> created =
         controller.initiate(
-            principal, new PaymentController.InitiateRequest(orderId, 100L, "INR", "UPI"));
+            principal, null, new PaymentController.InitiateRequest(orderId, 100L, "INR", "UPI"));
     assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     assertThat(created.getBody().data().get("payment_id")).isEqualTo("p1");
 
-    controller.initiate(principal, null);
-    verify(payments).initiate(eq(principal), isNull(), isNull(), isNull(), isNull());
+    controller.initiate(principal, "idem-1", null);
+    verify(payments).initiate(eq(principal), isNull(), isNull(), isNull(), isNull(), eq("idem-1"));
 
     when(payments.verify(eq(principal), eq("pay"), eq("ord"), eq("sig")))
         .thenReturn(Map.of("payment_status", "CAPTURED"));
@@ -79,5 +84,36 @@ class PaymentControllerTest {
     ApiResponse<Map<String, Object>> res = webhook.razorpay("sig", request);
     assertThat(res.data().get("processed")).isEqualTo(true);
     verify(payments).handleWebhook(eq("sig"), eq(body));
+  }
+
+  @Test
+  void webhookInboxDedupsAndClaims() {
+    WebhookInbox box = mock(WebhookInbox.class);
+    ObjectProvider<WebhookInbox> provider = mock(ObjectProvider.class);
+    when(provider.getIfAvailable()).thenReturn(box);
+    when(box.alreadyReceived("razorpay", "evt_1")).thenReturn(true);
+    PaymentWebhookController gated =
+        new PaymentWebhookController(payments, provider, new ObjectMapper());
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    byte[] body = "{\"id\":\"evt_1\",\"event\":\"payment.captured\"}".getBytes();
+    request.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, body);
+    assertThat(gated.razorpay("sig", request).data().get("event")).isEqualTo("duplicate");
+    verify(payments, never()).handleWebhook(anyString(), any());
+
+    when(box.alreadyReceived("razorpay", "evt_1")).thenReturn(false);
+    when(payments.handleWebhook(anyString(), any())).thenReturn(Map.of("processed", true));
+    assertThat(gated.razorpay("sig", request).data().get("processed")).isEqualTo(true);
+    verify(box).claim(eq("razorpay"), eq("evt_1"), anyString());
+    gated.razorpay("sig", new MockHttpServletRequest());
+
+    PaymentWebhookController nullMapper = new PaymentWebhookController(payments, provider, null);
+    MockHttpServletRequest invalid = new MockHttpServletRequest();
+    invalid.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "not-json".getBytes());
+    when(payments.handleWebhook(anyString(), any())).thenReturn(Map.of("processed", true));
+    assertThat(nullMapper.razorpay("sig", invalid).data().get("processed")).isEqualTo(true);
+
+    MockHttpServletRequest nullId = new MockHttpServletRequest();
+    nullId.setAttribute(WebhookRawBodyFilter.CACHED_BODY_ATTR, "{\"id\":null}".getBytes());
+    assertThat(nullMapper.razorpay("sig", nullId).data().get("processed")).isEqualTo(true);
   }
 }

@@ -244,6 +244,109 @@ public class JdbcCustomerProfileStore implements CustomerProfileStore {
         Timestamp.from(deletedAt),
         Timestamp.from(deletedAt),
         id);
+    jdbc.update("UPDATE customers SET default_address_id = NULL WHERE id = ?", id);
+    jdbc.update(
+        """
+        UPDATE customer_addresses SET
+          flat_building = 'REDACTED',
+          area_locality = 'REDACTED',
+          city = 'REDACTED',
+          state = 'REDACTED',
+          pincode = '000000',
+          latitude = 0,
+          longitude = 0,
+          is_default = FALSE,
+          deleted_at = COALESCE(deleted_at, ?),
+          updated_at = ?
+        WHERE customer_id = ?
+        """,
+        Timestamp.from(deletedAt),
+        Timestamp.from(deletedAt),
+        id);
+    jdbc.update(
+        """
+        UPDATE saved_payment_methods SET
+          nickname = NULL,
+          upi_id = CASE WHEN type = 'UPI' THEN 'REDACTED' ELSE NULL END,
+          upi_handle = CASE WHEN type = 'UPI' THEN 'REDACTED' ELSE NULL END,
+          razorpay_token_id = CASE WHEN type = 'CARD' THEN 'REDACTED' ELSE NULL END,
+          card_last4 = CASE WHEN type = 'CARD' THEN '0000' ELSE NULL END,
+          is_default = FALSE,
+          deleted_at = COALESCE(deleted_at, ?)
+        WHERE customer_id = ?
+        """,
+        Timestamp.from(deletedAt),
+        id);
+    jdbc.update(
+        """
+        UPDATE prescription SET
+          patient_name = 'REDACTED',
+          doctor_name = 'REDACTED',
+          notes = NULL,
+          medicines_extracted = NULL,
+          updated_at = ?
+        WHERE customer_id = ? AND deleted_at IS NULL
+        """,
+        Timestamp.from(deletedAt),
+        id);
+    jdbc.update(
+        """
+        UPDATE consults SET
+          patient_name = 'REDACTED',
+          patient_phone = '0000000000',
+          symptoms = NULL,
+          feedback_text = NULL,
+          updated_at = ?
+        WHERE customer_id = ? AND deleted_at IS NULL
+        """,
+        Timestamp.from(deletedAt),
+        id);
+    jdbc.update(
+        """
+        UPDATE support_tickets SET
+          subject = 'REDACTED',
+          resolution_summary = NULL,
+          csat_feedback = NULL
+        WHERE customer_id = ? AND deleted_at IS NULL
+        """,
+        id);
+    jdbc.update(
+        """
+        UPDATE schedule_medicine SET
+          medicine_name = 'REDACTED',
+          prescribed_by = NULL,
+          notes = NULL,
+          condition_name = NULL,
+          is_active = FALSE,
+          updated_at = ?
+        WHERE customer_id = ?
+        """,
+        Timestamp.from(deletedAt),
+        id);
+    jdbc.update(
+        """
+        UPDATE customers SET
+          preferred_language = 'en',
+          segment = NULL,
+          wallet_balance_paise = 0,
+          loyalty_points = 0,
+          total_orders = 0,
+          total_ltv_paise = 0,
+          cancel_rate = 0,
+          dispute_count = 0,
+          last_order_at = NULL
+        WHERE id = ?
+        """,
+        id);
+    jdbc.update(
+        """
+        UPDATE wallet_transaction SET
+          description = 'REDACTED',
+          reference_id = NULL
+        WHERE customer_id = ?
+        """,
+        id);
+    jdbc.update("DELETE FROM referral_events WHERE referee_id = ? OR referrer_id = ?", id, id);
   }
 
   static String escapeIlike(String raw) {

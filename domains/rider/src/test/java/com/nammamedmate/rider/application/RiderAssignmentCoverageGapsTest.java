@@ -120,6 +120,9 @@ class RiderAssignmentCoverageGapsTest {
     assertThat(local.remainingPickupAttempts(orderId)).isEqualTo(5);
     local.consumePickupAttempt(orderId);
     assertThat(local.remainingPickupAttempts(orderId)).isEqualTo(4);
+    local.decrConcurrent(riderId);
+    local.decrConcurrent(riderId);
+    assertThat(local.getConcurrent(riderId)).isZero();
   }
 
   @Test

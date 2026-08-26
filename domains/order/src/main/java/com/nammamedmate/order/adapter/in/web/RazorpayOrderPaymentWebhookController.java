@@ -2,7 +2,7 @@ package com.nammamedmate.order.adapter.in.web;
 
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.kernel.webhook.WebhookRawBodyFilter;
-import com.nammamedmate.order.application.OrderPlacementService;
+import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,10 +19,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Razorpay order payment webhooks")
 public class RazorpayOrderPaymentWebhookController {
 
-  private final OrderPlacementService orders;
+  private final RazorpayPaymentPort razorpay;
 
-  public RazorpayOrderPaymentWebhookController(OrderPlacementService orders) {
-    this.orders = orders;
+  public RazorpayOrderPaymentWebhookController(RazorpayPaymentPort razorpay) {
+    this.razorpay = razorpay;
   }
 
   @PostMapping("/order-payment")
@@ -34,9 +34,8 @@ public class RazorpayOrderPaymentWebhookController {
               + " Idempotency-Key is optional and unused.")
   public ApiResponse<Map<String, Object>> orderPayment(
       @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature,
-      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
       HttpServletRequest request) {
     byte[] rawBody = WebhookRawBodyFilter.rawBody(request);
-    return ApiResponse.ok(orders.handleRazorpayWebhook(signature, rawBody, idempotencyKey));
+    return ApiResponse.ok(razorpay.handleWebhook(signature, rawBody));
   }
 }

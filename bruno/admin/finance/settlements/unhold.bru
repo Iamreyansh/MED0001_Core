@@ -1,0 +1,82 @@
+meta {
+  name: unhold
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/finance/settlements/{{financeSettlementId}}/unhold
+  auth: inherit
+}
+
+body:json {
+  {
+    "notes": "Compliance case closed. Cleared for release."
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("accessToken")) {
+    throw new Error("accessToken missing — run auth/admin/login first");
+  }
+  if (!bru.getEnvVar("financeSettlementId")) {
+    throw new Error("financeSettlementId missing — run list first");
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("unhold envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("PENDING");
+    expect(body.data).to.have.property("unheld_by");
+  });
+}
+
+docs {
+  POST /api/v1/admin/finance/settlements/:id/unhold — clear HOLD so finance can release (D14).
+}
+
+example {
+  name: 200 OK
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "settlement_id": "a0000001-0000-4000-8000-0000000000s1",
+            "status": "PENDING",
+            "unheld_by": "admin-uuid",
+            "unheld_at": "2026-08-22T10:05:00Z"
+          },
+          "meta": {}
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 SETTLEMENT_NOT_HELD
+  response: {
+    status: { code: 422 text: Unprocessable Entity }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": false,
+          "error": {
+            "code": "SETTLEMENT_NOT_HELD",
+            "message": "Settlement is not on HOLD"
+          }
+        }
+      '''
+    }
+  }
+}

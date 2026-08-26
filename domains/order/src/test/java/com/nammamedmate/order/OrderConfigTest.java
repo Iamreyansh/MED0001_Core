@@ -49,9 +49,41 @@ class OrderConfigTest {
             com.nammamedmate.order.adapter.out.persistence.JdbcOrderCancellationStore.class);
     assertThat(config.walletPort())
         .isInstanceOf(com.nammamedmate.order.adapter.out.persistence.StubWalletPort.class);
-    assertThat(config.priceCeilingPort())
-        .isInstanceOf(com.nammamedmate.order.adapter.out.persistence.StubPriceCeilingAdapter.class);
+    assertThat(config.priceCeilingPort(jdbc))
+        .isInstanceOf(com.nammamedmate.order.adapter.out.persistence.JdbcPriceCeilingAdapter.class);
     assertThat(config.razorpayPaymentPort("sec", "wh"))
         .isInstanceOf(com.nammamedmate.order.adapter.out.client.StubRazorpayPaymentPort.class);
+
+    java.util.UUID id = java.util.UUID.randomUUID();
+    config.platformCouponPort().record("NAMMA25", id, id, 100, 1000);
+    config.prescriptionPort().enqueueForPharmacy(id, id, id);
+    com.nammamedmate.order.application.port.out.PlatformCouponPort coupons =
+        (code, total) ->
+            new com.nammamedmate.order.application.port.out.PlatformCouponPort.Quote(
+                code, com.nammamedmate.order.domain.CartPricing.CouponType.FLAT, 0, false, "");
+    coupons.record("X", id, id, 1, 2);
+    com.nammamedmate.order.application.port.out.PrescriptionPort rx =
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(java.util.UUID prescriptionId, java.util.UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(java.util.UUID prescriptionId, java.util.UUID customerId) {
+            return java.util.Optional.empty();
+          }
+        };
+    rx.enqueueForPharmacy(id, id, id);
+    com.nammamedmate.order.application.port.out.PrescriptionPort defaults =
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {};
+    defaults.findVerified(id, id);
+    defaults.findForBroadcast(id, id);
+    defaults.pharmacyQueueStatus(id, id);
+    defaults.enqueueForPharmacy(id, id, id);
   }
 }

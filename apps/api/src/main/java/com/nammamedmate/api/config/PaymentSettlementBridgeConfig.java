@@ -377,6 +377,24 @@ public class PaymentSettlementBridgeConfig {
     }
 
     @Override
+    public void markUnheld(UUID settlementId, UUID unheldBy, String notes, Instant unheldAt) {
+      jdbc.update(
+          """
+          UPDATE settlement SET
+            status = 'PENDING_RELEASE',
+            hold_reason = NULL,
+            held_by = NULL,
+            held_at = NULL,
+            notes = COALESCE(?, notes),
+            updated_at = ?
+          WHERE id = ? AND status = 'HELD' AND deleted_at IS NULL
+          """,
+          notes,
+          Timestamp.from(unheldAt),
+          settlementId);
+    }
+
+    @Override
     public void markBelowThreshold(UUID settlementId, String notes, Instant now) {
       jdbc.update(
           """

@@ -34,7 +34,7 @@ class PaymentOrderBridgeConfigTest {
     WalletService wallets = mock(WalletService.class);
     when(wallets.debitForOrder(any(), any(), anyLong(), anyString()))
         .thenReturn(Map.of("amount_debited", new BigDecimal("12.50")));
-    WalletPort wallet = config.paymentWalletPort(wallets);
+    WalletPort wallet = config.paymentWalletPort(wallets, null);
     assertThat(wallet.debitForOrder(UUID.randomUUID(), UUID.randomUUID(), 1000, "x"))
         .isEqualTo(1250L);
 
@@ -67,6 +67,35 @@ class PaymentOrderBridgeConfigTest {
   }
 
   @Test
+  void bridgesPaymentDomainRazorpayAsPrimaryOrderClient() {
+    PaymentOrderBridgeConfig config = new PaymentOrderBridgeConfig();
+    com.nammamedmate.payment.application.port.out.RazorpayGatewayPort gateway =
+        mock(com.nammamedmate.payment.application.port.out.RazorpayGatewayPort.class);
+    com.nammamedmate.payment.application.PaymentService payments =
+        mock(com.nammamedmate.payment.application.PaymentService.class);
+    UUID orderId = UUID.randomUUID();
+    when(gateway.createOrder(eq(orderId), eq(500L)))
+        .thenReturn(
+            new com.nammamedmate.payment.application.port.out.RazorpayGatewayPort.CreateOrderResult(
+                "order_live", 500L, "rzp_k"));
+    when(gateway.verifyPaymentSignature("o", "p", "s")).thenReturn(true);
+    when(gateway.signPayment("o", "p")).thenReturn("sig");
+    when(gateway.verifyWebhookSignature("h", new byte[] {1})).thenReturn(true);
+    when(gateway.refund("pay", 100L))
+        .thenReturn(
+            new com.nammamedmate.payment.application.port.out.RazorpayGatewayPort.RefundResult(
+                "rfnd", 100L));
+    when(payments.handleWebhook(eq("h"), any())).thenReturn(Map.of("processed", true));
+    var port = config.orderRazorpayFromPaymentDomain(gateway, payments);
+    assertThat(port.createOrder(orderId, 500L).razorpayOrderId()).isEqualTo("order_live");
+    assertThat(port.verifyPaymentSignature("o", "p", "s")).isTrue();
+    assertThat(port.signPayment("o", "p")).isEqualTo("sig");
+    assertThat(port.verifyWebhookSignature("h", new byte[] {1})).isTrue();
+    assertThat(port.refund("pay", 100L).razorpayRefundId()).isEqualTo("rfnd");
+    assertThat(port.handleWebhook("h", new byte[] {1})).containsEntry("processed", true);
+  }
+
+  @Test
   void bridgesCustomerWalletPort() {
     PaymentOrderBridgeConfig config = new PaymentOrderBridgeConfig();
     WalletService wallets = mock(WalletService.class);
@@ -84,7 +113,7 @@ class PaymentOrderBridgeConfigTest {
     when(wallets.listTransactionsForCustomer(customerId, 1, 20, null))
         .thenReturn(new TxPage(List.of(), PaginationMeta.of(1, 20, 0)));
 
-    CustomerWalletPort port = config.customerWalletPort(wallets);
+    CustomerWalletPort port = config.customerWalletPort(wallets, null);
     assertThat(port.debit(customerId, orderId, 100L, "k", "n"))
         .containsEntry("already_processed", false);
     assertThat(port.systemCredit(customerId, 200L, "REFUND", "ref", "note", "idem"))

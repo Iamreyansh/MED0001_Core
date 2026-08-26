@@ -124,5 +124,10 @@ final class PreferenceTestFakes {
     public Optional<String> findPhoneByCustomerId(UUID customerId) {
       return Optional.ofNullable(customerToPhone.get(customerId));
     }
+
+    @Override
+    public Optional<String> findPhoneByRiderId(UUID riderId) {
+      return Optional.empty();
+    }
   }
 }

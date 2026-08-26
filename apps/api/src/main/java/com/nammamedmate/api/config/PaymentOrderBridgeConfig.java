@@ -5,9 +5,13 @@ import com.nammamedmate.customer.application.WalletService.AdminCreditCommand;
 import com.nammamedmate.customer.application.WalletService.TxPage;
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.order.application.OrderPlacementService;
+import com.nammamedmate.order.application.port.out.RazorpayPaymentPort;
+import com.nammamedmate.payment.application.PaymentService;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
+import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.OrderLookupPort;
 import com.nammamedmate.payment.application.port.out.OrderPaymentStatusPort;
+import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
 import com.nammamedmate.payment.application.port.out.WalletPort;
 import com.nammamedmate.security.AuthRole;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -19,6 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -30,24 +35,86 @@ public class PaymentOrderBridgeConfig {
 
   @Bean
   @Primary
-  WalletPort paymentWalletPort(WalletService walletService) {
-    return (customerId, orderId, amountPaise, description) -> {
-      Map<String, Object> result =
-          walletService.debitForOrder(customerId, orderId, amountPaise, description);
-      Object debited = result.get("amount_debited");
-      if (debited instanceof BigDecimal bd) {
-        return bd.movePointRight(2).longValueExact();
+  RazorpayPaymentPort orderRazorpayFromPaymentDomain(
+      RazorpayGatewayPort gateway, @Lazy PaymentService payments) {
+    return new RazorpayPaymentPort() {
+      @Override
+      public CreateOrderResult createOrder(UUID orderId, long amountPaise) {
+        var created = gateway.createOrder(orderId, amountPaise);
+        return new CreateOrderResult(created.razorpayOrderId(), created.amountPaise());
       }
-      if (debited instanceof Number n) {
-        return BigDecimal.valueOf(n.doubleValue()).movePointRight(2).longValue();
+
+      @Override
+      public boolean verifyPaymentSignature(
+          String razorpayOrderId, String paymentId, String signature) {
+        return gateway.verifyPaymentSignature(razorpayOrderId, paymentId, signature);
       }
-      return 0L;
+
+      @Override
+      public String signPayment(String razorpayOrderId, String paymentId) {
+        return gateway.signPayment(razorpayOrderId, paymentId);
+      }
+
+      @Override
+      public boolean verifyWebhookSignature(String signatureHeader, byte[] rawBody) {
+        return gateway.verifyWebhookSignature(signatureHeader, rawBody);
+      }
+
+      @Override
+      public RefundResult refund(String razorpayPaymentId, long amountPaise) {
+        var refunded = gateway.refund(razorpayPaymentId, amountPaise);
+        return new RefundResult(refunded.razorpayRefundId(), refunded.amountPaise());
+      }
+
+      @Override
+      public Map<String, Object> handleWebhook(String signatureHeader, byte[] rawBody) {
+        return payments.handleWebhook(signatureHeader, rawBody);
+      }
     };
   }
 
   @Bean
   @Primary
-  CustomerWalletPort customerWalletPort(WalletService walletService) {
+  WalletPort paymentWalletPort(WalletService walletService, FinancialLedgerWriterPort ledger) {
+    return (customerId, orderId, amountPaise, description) -> {
+      Map<String, Object> result =
+          walletService.debitForOrder(customerId, orderId, amountPaise, description);
+      long debitPaise = 0L;
+      Object debited = result.get("amount_debited");
+      if (debited instanceof BigDecimal bd) {
+        debitPaise = bd.movePointRight(2).longValueExact();
+      } else if (debited instanceof Number n) {
+        debitPaise = BigDecimal.valueOf(n.doubleValue()).movePointRight(2).longValue();
+      }
+      if (debitPaise > 0
+          && ledger != null
+          && !Boolean.TRUE.equals(result.get("already_processed"))) {
+        Object tx = result.get("transaction_id");
+        UUID txId =
+            tx instanceof UUID u
+                ? u
+                : tx != null ? UUID.fromString(tx.toString()) : UUID.randomUUID();
+        ledger.append(
+            "WALLET_DEBIT",
+            txId,
+            "WALLET",
+            0L,
+            debitPaise,
+            description == null || description.isBlank() ? "Payment wallet debit" : description,
+            Map.of(
+                "customer_id",
+                customerId == null ? "" : customerId.toString(),
+                "order_id",
+                orderId == null ? "" : orderId.toString()));
+      }
+      return debitPaise;
+    };
+  }
+
+  @Bean
+  @Primary
+  CustomerWalletPort customerWalletPort(
+      WalletService walletService, FinancialLedgerWriterPort ledger) {
     return new CustomerWalletPort() {
       @Override
       public Map<String, Object> debit(
@@ -63,8 +130,11 @@ public class PaymentOrderBridgeConfig {
           String referenceId,
           String note,
           String idempotencyKey) {
-        return walletService.systemCredit(
-            customerId, amountPaise, note, referenceId, idempotencyKey, reason);
+        Map<String, Object> result =
+            walletService.systemCredit(
+                customerId, amountPaise, note, referenceId, idempotencyKey, reason);
+        appendWalletCreditLedger(ledger, customerId, amountPaise, reason, referenceId, result);
+        return result;
       }
 
       @Override
@@ -101,6 +171,35 @@ public class PaymentOrderBridgeConfig {
     };
   }
 
+  private static void appendWalletCreditLedger(
+      FinancialLedgerWriterPort ledger,
+      UUID customerId,
+      long amountPaise,
+      String reason,
+      String referenceId,
+      Map<String, Object> result) {
+    if (ledger == null
+        || amountPaise <= 0
+        || Boolean.TRUE.equals(result.get("already_processed"))) {
+      return;
+    }
+    Object tx = result.get("transaction_id");
+    UUID txId =
+        tx instanceof UUID u ? u : tx != null ? UUID.fromString(tx.toString()) : UUID.randomUUID();
+    ledger.append(
+        "WALLET_CREDIT",
+        txId,
+        "WALLET",
+        amountPaise,
+        0L,
+        reason == null || reason.isBlank() ? "Wallet credit" : reason,
+        Map.of(
+            "customer_id",
+            customerId == null ? "" : customerId.toString(),
+            "reference_id",
+            referenceId == null ? "" : referenceId));
+  }
+
   @Bean
   @Primary
   OrderLookupPort jdbcOrderLookupPort(JdbcTemplate jdbc) {
@@ -129,7 +228,7 @@ public class PaymentOrderBridgeConfig {
 
   @Bean
   @Primary
-  OrderPaymentStatusPort orderPaymentStatusPort(OrderPlacementService orderPlacement) {
+  OrderPaymentStatusPort orderPaymentStatusPort(@Lazy OrderPlacementService orderPlacement) {
     return new OrderPaymentStatusPort() {
       @Override
       public void onCaptured(UUID orderId, String razorpayPaymentId) {

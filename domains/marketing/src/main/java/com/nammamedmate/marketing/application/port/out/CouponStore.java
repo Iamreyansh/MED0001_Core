@@ -32,6 +32,10 @@ public interface CouponStore {
 
   Optional<Coupon> findByCode(String code);
 
+  default Optional<Coupon> findByCodeForUpdate(String code) {
+    return findByCode(code);
+  }
+
   Optional<Coupon> findById(UUID id);
 
   List<Coupon> list(

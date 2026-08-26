@@ -124,16 +124,16 @@ class RbacServicesTest {
   }
 
   @Test
-  void ac3FinanceRolePermissionsExactlyThirteen() {
+  void ac3FinanceRolePermissionsExactlyFourteen() {
     MedmatePrincipal principal =
         new MedmatePrincipal(Ids.newId(), AuthRole.ADMIN_FINANCE, null, TokenScope.FULL, "j");
     Map<String, Object> data = adminRoles.getRolePermissions(principal, "admin_finance");
     @SuppressWarnings("unchecked")
     List<Map<String, Object>> perms = (List<Map<String, Object>>) data.get("permissions");
-    assertThat(perms).hasSize(13);
-    assertThat(data.get("permission_count")).isEqualTo(13);
+    assertThat(perms).hasSize(14);
+    assertThat(data.get("permission_count")).isEqualTo(14);
     assertThat(perms.stream().map(m -> m.get("permission")).toList())
-        .contains("finance:release-payout", "wallet:credit");
+        .contains("finance:release-payout", "wallet:credit", "analytics:read");
   }
 
   @Test
@@ -327,6 +327,7 @@ class RbacServicesTest {
             "taxes:read",
             "taxes:export",
             "analytics:finance",
+            "analytics:read",
             "customers:read",
             "wallet:credit");
     assertThat(AdminRoleDefinitions.permissionsFor("admin_support"))

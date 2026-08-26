@@ -157,6 +157,83 @@ class ConsultServiceTest {
   }
 
   @Test
+  void assignDueScheduledAssignsLruDoctor() {
+    doctorStore.insert(availableDoctor("Dr A", null));
+    UUID id =
+        insert(
+            new Consult(
+                Ids.newId(),
+                CUSTOMER,
+                null,
+                "Ravi",
+                "+91-9",
+                Consult.SLOT_SCHEDULED,
+                NOW.minusSeconds(60),
+                List.of(),
+                List.of(),
+                null,
+                false,
+                "GENERAL",
+                Consult.STATUS_REQUESTED,
+                null,
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                NOW.minusSeconds(3600),
+                NOW.minusSeconds(3600),
+                null));
+    assertThat(service.assignDueScheduled()).isEqualTo(1);
+    assertThat(consultStore.byId.get(id).doctorId()).isNotNull();
+    assertThat(consultStore.byId.get(id).status()).isEqualTo(Consult.STATUS_DOCTOR_REVIEWING);
+    assertThat(service.assignDueScheduled()).isZero();
+  }
+
+  @Test
+  void assignDueScheduledSkipsWhenNoDoctorAvailable() {
+    UUID id =
+        insert(
+            new Consult(
+                Ids.newId(),
+                CUSTOMER,
+                null,
+                "Ravi",
+                "+91-9",
+                Consult.SLOT_SCHEDULED,
+                NOW.minusSeconds(60),
+                List.of(),
+                List.of(),
+                null,
+                false,
+                "GENERAL",
+                Consult.STATUS_REQUESTED,
+                null,
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                NOW.minusSeconds(3600),
+                NOW.minusSeconds(3600),
+                null));
+    assertThat(service.assignDueScheduled()).isZero();
+    assertThat(consultStore.byId.get(id).doctorId()).isNull();
+    ConsultStore defaults = org.mockito.Mockito.mock(ConsultStore.class);
+    org.mockito.Mockito.when(defaults.findDueForScheduledAssign(org.mockito.ArgumentMatchers.any()))
+        .thenCallRealMethod();
+    assertThat(defaults.findDueForScheduledAssign(NOW)).isEmpty();
+  }
+
+  @Test
   void ac007_cartAlreadyHasConsult() {
     UUID cartId = Ids.newId();
     when(cartPort.isActiveCartOwnedBy(cartId, CUSTOMER)).thenReturn(true);
@@ -552,6 +629,19 @@ class ConsultServiceTest {
                           || Consult.STATUS_DOCTOR_REVIEWING.equals(c.status()))
                       && c.scheduledAt() != null
                       && c.scheduledAt().plusSeconds(30 * 60).isBefore(deadlineBefore))
+          .toList();
+    }
+
+    @Override
+    public List<Consult> findDueForScheduledAssign(Instant now) {
+      return byId.values().stream()
+          .filter(
+              c ->
+                  Consult.SLOT_SCHEDULED.equals(c.slotType())
+                      && Consult.STATUS_REQUESTED.equals(c.status())
+                      && c.doctorId() == null
+                      && c.scheduledAt() != null
+                      && !c.scheduledAt().isAfter(now))
           .toList();
     }
 

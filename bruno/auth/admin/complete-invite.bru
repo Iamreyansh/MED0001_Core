@@ -1,0 +1,80 @@
+meta {
+  name: complete-invite
+  type: http
+  seq: 0
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/admin/complete-invite
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "invite_token": "{{adminInviteToken}}",
+    "password": "Passw0rd!"
+  }
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("adminInviteToken")) {
+    throw new Error("adminInviteToken missing");
+  }
+}
+
+script:post-response {
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("invite complete envelope", function () {
+    const body = res.getBody();
+    expect(body.success).to.equal(true);
+    expect(body.data.status).to.equal("ACTIVE");
+  });
+}
+
+docs {
+  POST /api/v1/auth/admin/complete-invite — public consume of invite token + first password.
+}
+
+example {
+  name: 200 OK
+  request: {
+    url: {{baseUrl}}/api/v1/auth/admin/complete-invite
+    method: post
+    headers: {
+      Content-Type: application/json
+    }
+    body:json: {
+      {
+        "invite_token": "opaque-invite",
+        "password": "Passw0rd!"
+      }
+    }
+  }
+  response: {
+    status: { code: 200 text: OK }
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "data": {
+            "admin_id": "a0000001-0000-4000-8000-000000000001",
+            "email": "ops@nammamedmate.com",
+            "status": "ACTIVE",
+            "mfa_setup_required": true
+          }
+        }
+      '''
+    }
+  }
+}

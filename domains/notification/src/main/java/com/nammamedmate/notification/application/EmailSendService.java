@@ -357,8 +357,31 @@ public class EmailSendService {
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("clicked", true);
     data.put("log_id", logId.toString());
-    data.put("redirect_url", targetUrl);
+    data.put("redirect_url", safeRedirectUrl(targetUrl));
     return data;
+  }
+
+  static String safeRedirectUrl(String targetUrl) {
+    if (targetUrl == null || targetUrl.isBlank()) {
+      throw new AppException("INVALID_REDIRECT", "Redirect URL is required", 400);
+    }
+    java.net.URI uri;
+    try {
+      uri = java.net.URI.create(targetUrl.trim());
+    } catch (IllegalArgumentException e) {
+      throw new AppException("INVALID_REDIRECT", "Redirect URL is invalid", 400);
+    }
+    String scheme =
+        uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+    String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(java.util.Locale.ROOT);
+    boolean httpsAllow =
+        "https".equals(scheme)
+            && (host.equals("nammamedmate.com") || host.endsWith(".nammamedmate.com"));
+    boolean appAllow = "nmmedmate".equals(scheme);
+    if (!httpsAllow && !appAllow) {
+      throw new AppException("INVALID_REDIRECT", "Redirect host is not allow-listed", 400);
+    }
+    return uri.toString();
   }
 
   private List<SendGridClientPort.Attachment> fetchAttachments(List<AttachmentRef> refs) {

@@ -99,6 +99,16 @@ public class SupportTicketController {
     return ApiResponse.ok(tickets.resolve(principal, id, req.resolutionSummary()));
   }
 
+  @PostMapping("/{id}/csat")
+  @Operation(summary = "Submit CSAT score for a resolved ticket")
+  public ApiResponse<Map<String, Object>> submitCsat(
+      @AuthenticationPrincipal MedmatePrincipal principal,
+      @PathVariable("id") UUID id,
+      @RequestBody(required = false) CsatRequest body) {
+    CsatRequest req = body == null ? new CsatRequest(null, null) : body;
+    return ApiResponse.ok(tickets.submitCsat(principal, id, req.score(), req.feedback()));
+  }
+
   @PostMapping("/{id}/reopen")
   @Operation(summary = "Reopen ticket")
   public ApiResponse<Map<String, Object>> reopen(
@@ -157,6 +167,9 @@ public class SupportTicketController {
 
   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
   public record ResolveRequest(String resolutionSummary) {}
+
+  @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+  public record CsatRequest(Integer score, String feedback) {}
 
   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
   public record ReopenRequest(String reason) {}

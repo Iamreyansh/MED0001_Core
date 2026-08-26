@@ -126,8 +126,9 @@ class PharmacyKycServiceTest {
     assertThat(data.get("document_type")).isEqualTo("DRUG_LICENCE");
     assertThat(data.get("file_size_bytes")).isEqualTo((long) bytes.length);
     assertThat(data.get("expiry_date")).isEqualTo("2027-06-30");
-    assertThat(data.get("signed_url")).asString().isNotBlank();
-    assertThat(data.get("signed_url_expires_at")).isNotNull();
+    assertThat(data.get("signed_url")).isNull();
+    assertThat(data.get("signed_url_expires_at")).isNull();
+    assertThat(data.get("scan_status")).isEqualTo("PENDING");
     assertThat(kycStore.docs).hasSize(1);
     assertThat(objectStore.stored).hasSize(1);
     // Expiry alerts scheduled for T-60 and T-30
@@ -494,6 +495,19 @@ class PharmacyKycServiceTest {
   }
 
   // ─── AC-004: Submit happy path ───────────────────────────────────────────────
+
+  @Test
+  void submitKycRejectsUnscannedDocuments() {
+    kycStore.docs.add(docRecord(PHARMACY_ID, "GSTIN_CERTIFICATE", "UPLOADED"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "DRUG_LICENCE", "UPLOADED"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "FSSAI_CERTIFICATE", "UPLOADED"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "PAN_CARD", "UPLOADED"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "BANK_STATEMENT", "UPLOADED"));
+    assertThatThrownBy(() -> service.submitKyc(ownerPrincipal()))
+        .isInstanceOf(AppException.class)
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("DOCUMENTS_QUARANTINED");
+  }
 
   @Test
   void submitKycWithAllRequiredDocuments() {
@@ -882,11 +896,11 @@ class PharmacyKycServiceTest {
   }
 
   private void addAllRequiredDocs() {
-    kycStore.docs.add(docRecord(PHARMACY_ID, "GSTIN_CERTIFICATE", "UPLOADED"));
-    kycStore.docs.add(docRecord(PHARMACY_ID, "DRUG_LICENCE", "UPLOADED"));
-    kycStore.docs.add(docRecord(PHARMACY_ID, "FSSAI_CERTIFICATE", "UPLOADED"));
-    kycStore.docs.add(docRecord(PHARMACY_ID, "PAN_CARD", "UPLOADED"));
-    kycStore.docs.add(docRecord(PHARMACY_ID, "BANK_STATEMENT", "UPLOADED"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "GSTIN_CERTIFICATE", "SCAN_CLEAN"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "DRUG_LICENCE", "SCAN_CLEAN"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "FSSAI_CERTIFICATE", "SCAN_CLEAN"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "PAN_CARD", "SCAN_CLEAN"));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "BANK_STATEMENT", "SCAN_CLEAN"));
   }
 
   // ─── Fake implementations ────────────────────────────────────────────────────
@@ -1649,5 +1663,58 @@ class PharmacyKycServiceTest {
         new MedmatePrincipal(ADMIN_ID, AuthRole.ADMIN_COMPLIANCE, null, TokenScope.FULL, "j");
     Map<String, Object> data = service.adminGetKyc(complianceAdmin, PHARMACY_ID);
     assertThat(data.get("pharmacy_id")).isEqualTo(PHARMACY_ID.toString());
+  }
+
+  @Test
+  void listDocumentsNotReadyWhenRequiredDocStillUnscanned() {
+    addAllRequiredDocs();
+    kycStore.docs.removeIf(d -> "PAN_CARD".equals(d.documentType()));
+    kycStore.docs.add(docRecord(PHARMACY_ID, "PAN_CARD", "UPLOADED"));
+    Map<String, Object> data = service.listDocuments(ownerPrincipal());
+    assertThat(data.get("ready_to_submit")).isEqualTo(false);
+  }
+
+  @Test
+  void listDocumentsReadyWhenScanCleanAndIgnoresRejected() {
+    addAllRequiredDocs();
+    kycStore.docs.add(docRecord(PHARMACY_ID, "PROPRIETOR_ID", "REJECTED"));
+    Map<String, Object> data = service.listDocuments(ownerPrincipal());
+    assertThat(data.get("ready_to_submit")).isEqualTo(true);
+  }
+
+  @Test
+  void submitKycIgnoresRejectedExtraDocument() {
+    addAllRequiredDocs();
+    kycStore.docs.add(docRecord(PHARMACY_ID, "PROPRIETOR_ID", "REJECTED"));
+    Map<String, Object> data = service.submitKyc(ownerPrincipal());
+    assertThat(data.get("status")).isEqualTo("KYC_SUBMITTED");
+  }
+
+  @Test
+  void adminGetKycHidesUnscannedDocuments() {
+    UUID uploadedId = Ids.newId();
+    kycStore.docs.add(docRecordWithId(uploadedId, PHARMACY_ID, "GSTIN_CERTIFICATE", "UPLOADED"));
+    kycStore.docs.add(
+        new KycDocumentRecord(
+            Ids.newId(),
+            PHARMACY_ID,
+            "PAN_CARD",
+            "kyc/pan.pdf",
+            "pan.pdf",
+            1024L,
+            "application/pdf",
+            "UPLOADED",
+            null,
+            null,
+            ADMIN_ID,
+            NOW,
+            NOW,
+            NOW));
+    Map<String, Object> data = service.adminGetKyc(adminPrincipal(), PHARMACY_ID);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> docs = (List<Map<String, Object>>) data.get("documents");
+    assertThat(docs).hasSize(2);
+    assertThat(docs.get(0).get("signed_url")).isNull();
+    assertThat(docs.get(1).get("verified_by")).isEqualTo(ADMIN_ID.toString());
   }
 }

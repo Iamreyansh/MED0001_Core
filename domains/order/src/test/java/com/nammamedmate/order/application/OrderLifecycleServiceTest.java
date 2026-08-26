@@ -91,6 +91,121 @@ class OrderLifecycleServiceTest {
         rnd);
   }
 
+  @Test
+  void setInventoryAcceptsNullAndOverride() {
+    service.setInventory(null);
+    service.setInventory(
+        new com.nammamedmate.order.application.port.out.InventoryAvailabilityPort() {});
+    service.setPrescriptions(null);
+    service.setDeliveryInvoice(null);
+    service.setDeliveryInvoice(
+        new com.nammamedmate.order.application.port.out.DeliveryInvoicePort() {});
+  }
+
+  @Test
+  void acceptBlocksUnverifiedRx() {
+    UUID rxId = UUID.randomUUID();
+    Order order = pendingOrder(PaymentMethod.COD, rxId);
+    orders.insert(order);
+    service.setPrescriptions(
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<String> pharmacyQueueStatus(
+              UUID prescriptionId, UUID pharmacyId) {
+            return java.util.Optional.of("PENDING_REVIEW");
+          }
+        });
+    assertThatThrownBy(() -> service.accept(pharmacy, order.id()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("RX_NOT_VERIFIED");
+
+    service.setPrescriptions(
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<String> pharmacyQueueStatus(
+              UUID prescriptionId, UUID pharmacyId) {
+            return java.util.Optional.of("APPROVED");
+          }
+        });
+    assertThat(service.accept(pharmacy, order.id()).get("status")).isEqualTo("ACCEPTED");
+
+    Order verified = pendingOrder(PaymentMethod.COD, rxId);
+    orders.insert(verified);
+    service.setPrescriptions(
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<String> pharmacyQueueStatus(
+              UUID prescriptionId, UUID pharmacyId) {
+            return java.util.Optional.of("VERIFIED");
+          }
+        });
+    assertThat(service.accept(pharmacy, verified.id()).get("status")).isEqualTo("ACCEPTED");
+
+    Order missingQueue = pendingOrder(PaymentMethod.COD, rxId);
+    orders.insert(missingQueue);
+    service.setPrescriptions(
+        new com.nammamedmate.order.application.port.out.PrescriptionPort() {
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionRef>
+              findVerified(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+
+          @Override
+          public java.util.Optional<
+                  com.nammamedmate.order.application.port.out.PrescriptionPort.PrescriptionDetail>
+              findForBroadcast(UUID prescriptionId, UUID customerId) {
+            return java.util.Optional.empty();
+          }
+        });
+    assertThatThrownBy(() -> service.accept(pharmacy, missingQueue.id()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("RX_NOT_VERIFIED");
+  }
+
   private static PasswordEncoder hashEncoder() {
     return new PasswordEncoder() {
       @Override
@@ -254,7 +369,61 @@ class OrderLifecycleServiceTest {
   }
 
   @Test
-  void ac8_noRiderWithin30Min_escalatesAlertOnly() {
+  void confirmRiderDelivery_publishesOrderDelivered() {
+    Order order = pendingOrder(PaymentMethod.COD);
+    order.accept(T0);
+    order.advanceTo(OrderStatus.READY_FOR_PICKUP, T0);
+    order.advanceTo(OrderStatus.OUT_FOR_DELIVERY, T0);
+    order.assignRider(RIDER, T0);
+    orders.insert(order);
+    service.confirmRiderDelivery(order.id(), RIDER, T0.plusSeconds(60));
+    Order updated = orders.findById(order.id()).orElseThrow();
+    assertThat(updated.status()).isEqualTo(OrderStatus.DELIVERED);
+    assertThat(outboxStore.all().stream().anyMatch(m -> "order.delivered".equals(m.type())))
+        .isTrue();
+  }
+
+  @Test
+  void confirmRiderDelivery_rejectsInvalidState() {
+    assertThatThrownBy(() -> service.confirmRiderDelivery(null, RIDER, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+    assertThatThrownBy(() -> service.confirmRiderDelivery(UUID.randomUUID(), null, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.confirmRiderDelivery(UUID.randomUUID(), RIDER, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+
+    Order pending = pendingOrder(PaymentMethod.COD);
+    orders.insert(pending);
+    assertThatThrownBy(() -> service.confirmRiderDelivery(pending.id(), RIDER, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_OUT_FOR_DELIVERY");
+
+    Order out = pendingOrder(PaymentMethod.COD);
+    out.accept(T0);
+    out.advanceTo(OrderStatus.READY_FOR_PICKUP, T0);
+    out.advanceTo(OrderStatus.OUT_FOR_DELIVERY, T0);
+    out.assignRider(RIDER, T0);
+    orders.insert(out);
+    UUID other = UUID.fromString("dddddddd-0002-4000-8000-000000000002");
+    assertThatThrownBy(() -> service.confirmRiderDelivery(out.id(), other, T0))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("RIDER_MISMATCH");
+
+    Order unassigned = pendingOrder(PaymentMethod.COD);
+    unassigned.accept(T0);
+    unassigned.advanceTo(OrderStatus.READY_FOR_PICKUP, T0);
+    unassigned.advanceTo(OrderStatus.OUT_FOR_DELIVERY, T0);
+    orders.insert(unassigned);
+    service.confirmRiderDelivery(unassigned.id(), RIDER, T0);
+    assertThat(orders.findById(unassigned.id()).orElseThrow().status())
+        .isEqualTo(OrderStatus.DELIVERED);
+  }
+
+  @Test
+  void ac8_noRiderWithin30Min_cancelsAndRefunds() {
     Order order = pendingOrder(PaymentMethod.COD);
     order.accept(T0);
     order.advanceTo(OrderStatus.PACKING, T0);
@@ -264,8 +433,7 @@ class OrderLifecycleServiceTest {
     service = buildService(clock, outboxStore, fixedOtp(1));
     assertThat(service.escalateMissingRiders()).isEqualTo(1);
     Order updated = orders.findById(order.id()).orElseThrow();
-    assertThat(updated.status()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
-    assertThat(updated.riderEscalationAt()).isNotNull();
+    assertThat(updated.status()).isEqualTo(OrderStatus.CANCELLED);
     assertThat(outboxStore.all().stream().anyMatch(m -> "order.rider.escalation".equals(m.type())))
         .isTrue();
   }
@@ -310,6 +478,10 @@ class OrderLifecycleServiceTest {
   }
 
   private Order pendingOrder(PaymentMethod method) {
+    return pendingOrder(method, null);
+  }
+
+  private Order pendingOrder(PaymentMethod method, UUID prescriptionId) {
     Order order =
         new Order(
             UUID.randomUUID(),
@@ -329,7 +501,7 @@ class OrderLifecycleServiceTest {
             method == PaymentMethod.COD ? PaymentStatus.PENDING_COLLECTION : PaymentStatus.PAID,
             null,
             null,
-            null,
+            prescriptionId,
             UUID.randomUUID(),
             null,
             OrderStatus.PAYMENT_PENDING,

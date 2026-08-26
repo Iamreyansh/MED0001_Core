@@ -3,6 +3,7 @@ package com.nammamedmate.payment.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.kernel.error.AppException;
+import com.nammamedmate.messaging.ProviderOperationStore;
 import com.nammamedmate.payment.application.port.out.CustomerWalletPort;
 import com.nammamedmate.payment.application.port.out.FinancialLedgerWriterPort;
 import com.nammamedmate.payment.application.port.out.RazorpayGatewayPort;
@@ -52,6 +53,7 @@ public class RefundFacadeService {
   private final RefundNotificationPort notifications;
   private final Clock clock;
   private final TransactionTemplate tx;
+  private final ProviderOperationStore providerOps;
 
   public RefundFacadeService(
       RefundFinancePort refunds,
@@ -60,7 +62,18 @@ public class RefundFacadeService {
       FinancialLedgerWriterPort ledger,
       RefundNotificationPort notifications,
       Clock clock) {
-    this(refunds, razorpay, wallets, ledger, notifications, clock, null);
+    this(refunds, razorpay, wallets, ledger, notifications, clock, null, null);
+  }
+
+  public RefundFacadeService(
+      RefundFinancePort refunds,
+      RazorpayGatewayPort razorpay,
+      CustomerWalletPort wallets,
+      FinancialLedgerWriterPort ledger,
+      RefundNotificationPort notifications,
+      Clock clock,
+      @Nullable PlatformTransactionManager transactionManager) {
+    this(refunds, razorpay, wallets, ledger, notifications, clock, transactionManager, null);
   }
 
   @Autowired
@@ -71,13 +84,15 @@ public class RefundFacadeService {
       FinancialLedgerWriterPort ledger,
       RefundNotificationPort notifications,
       Clock clock,
-      @Nullable PlatformTransactionManager transactionManager) {
+      @Nullable PlatformTransactionManager transactionManager,
+      @Nullable ProviderOperationStore providerOps) {
     this.refunds = refunds;
     this.razorpay = razorpay;
     this.wallets = wallets;
     this.ledger = ledger;
     this.notifications = notifications;
     this.clock = clock;
+    this.providerOps = providerOps;
     this.tx = transactionManager == null ? null : new TransactionTemplate(transactionManager);
   }
 
@@ -213,7 +228,18 @@ public class RefundFacadeService {
     }
 
     try {
-      RefundResult rz = razorpay.refund(paymentId, refund.amountPaise());
+      String opKey = "refund:" + refundId;
+      RefundResult rz = replayRefund(opKey, refund.amountPaise());
+      if (rz == null) {
+        if (providerOps != null) {
+          providerOps.ensurePending("REFUND", opKey, "razorpay");
+        }
+        rz = razorpay.refund(paymentId, refund.amountPaise());
+        if (providerOps != null) {
+          providerOps.markSent("REFUND", opKey, rz.razorpayRefundId());
+        }
+      }
+      final RefundResult gateway = rz;
       LocalDate expectedBy =
           addBusinessDays(
               LocalDate.now(clock.withZone(IST)), RefundStatuses.EXPECTED_BUSINESS_DAYS);
@@ -221,14 +247,14 @@ public class RefundFacadeService {
         inTx(
             () -> {
               if (!refunds.finalizeGatewayProcess(
-                  refundId, rz.razorpayRefundId(), expectedBy, now)) {
+                  refundId, gateway.razorpayRefundId(), expectedBy, now)) {
                 throw new AppException(
                     "REFUND_ALREADY_PROCESSED", "Could not finalize refund process", 409);
               }
             });
       } catch (RuntimeException ex) {
         // Provider accepted — keep INITIATED + razorpay id for webhook reconcile (no FAILED)
-        inTx(() -> refunds.attachGatewayRefundId(refundId, rz.razorpayRefundId(), now));
+        inTx(() -> refunds.attachGatewayRefundId(refundId, gateway.razorpayRefundId(), now));
         throw ex;
       }
     } catch (AppException ex) {
@@ -510,6 +536,17 @@ public class RefundFacadeService {
       }
     }
     return d;
+  }
+
+  private RefundResult replayRefund(String opKey, long amountPaise) {
+    if (providerOps == null) {
+      return null;
+    }
+    return providerOps
+        .find("REFUND", opKey)
+        .filter(ProviderOperationStore.Operation::hasProviderRef)
+        .map(op -> new RefundResult(op.providerRef(), amountPaise))
+        .orElse(null);
   }
 
   private static UUID extractUuid(Object raw) {

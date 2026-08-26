@@ -26,6 +26,21 @@ public class OrderDeliveredReferralConsumer implements Consumer<OutboxMessage> {
     if (message == null) {
       return;
     }
+    if ("order.cancelled".equals(message.type())) {
+      DomainEvent cancelled = parseEvent(message);
+      if (cancelled == null) {
+        return;
+      }
+      UUID customerId = asUuid(cancelled.payload().get("customer_id"));
+      UUID orderId = asUuid(cancelled.payload().get("order_id"));
+      if (orderId == null) {
+        orderId = cancelled.aggregateId();
+      }
+      if (customerId != null && orderId != null) {
+        referrals.onRefereeFirstOrderCancelled(customerId, orderId);
+      }
+      return;
+    }
     if (!"order.delivered".equals(message.type())) {
       return;
     }

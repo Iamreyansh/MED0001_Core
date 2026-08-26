@@ -373,7 +373,8 @@ class ConsultSessionServiceTest {
     assertThat(new ConsultStore.DoctorPeriodStats(0, null, 0, 0, null, null).consultsByDay())
         .isEmpty();
     assertThat(
-            new ConsultStore.QueueItem(Ids.newId(), "REQUESTED", "P", null, null, null, NOW, false)
+            new ConsultStore.QueueItem(
+                    Ids.newId(), "REQUESTED", "P", null, null, null, null, NOW, false)
                 .medicinesRequested())
         .isEmpty();
     assertThat(new ConsultSessionService.AdminListResult(null, PaginationMeta.of(1, 20, 0)).data())
@@ -636,6 +637,7 @@ class ConsultSessionServiceTest {
                       c.id(),
                       c.status(),
                       c.patientName(),
+                      c.patientPhone(),
                       null,
                       c.medicinesNeedingRx().stream().map(Consult.MedicineNeed::name).toList(),
                       c.callStartedAt(),

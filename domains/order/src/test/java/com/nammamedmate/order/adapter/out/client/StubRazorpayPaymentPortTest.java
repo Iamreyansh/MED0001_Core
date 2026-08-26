@@ -51,5 +51,7 @@ class StubRazorpayPaymentPortTest {
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
     assertThat(stub.refund("short", 10).razorpayRefundId()).contains("short");
+    assertThat(stub.handleWebhook("sig", "{}".getBytes(StandardCharsets.UTF_8)))
+        .containsEntry("processed", false);
   }
 }

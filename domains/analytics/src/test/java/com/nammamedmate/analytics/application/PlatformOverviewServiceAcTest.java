@@ -290,12 +290,13 @@ class PlatformOverviewServiceAcTest {
   }
 
   @Test
-  void financeRoleForbidden() {
+  void financeRoleCanReadOverview() {
     MedmatePrincipal finance =
         new MedmatePrincipal(UUID.randomUUID(), AuthRole.ADMIN_FINANCE, null, TokenScope.FULL, "j");
-    assertThatThrownBy(() -> service.overview(finance, "7D", null, null))
-        .extracting(e -> ((AppException) e).code())
-        .isEqualTo("FORBIDDEN");
+    when(store.liveKpis(any(), any()))
+        .thenReturn(new KpiTotals(1000, 2, 1, 0, 0, 0, 100, 500, 2, 0, 1));
+    Map<String, Object> data = service.overview(finance, "7D", null, null);
+    assertThat(data.get("period")).isEqualTo("7D");
   }
 
   @Test

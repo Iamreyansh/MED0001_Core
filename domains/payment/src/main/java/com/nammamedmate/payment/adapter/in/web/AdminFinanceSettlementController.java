@@ -83,6 +83,17 @@ public class AdminFinanceSettlementController {
     return ApiResponse.ok(settlements.hold(principal, settlementId, req.reason(), req.notes()));
   }
 
+  @PostMapping("/{settlementId}/unhold")
+  @RequiresPermission("settlements:process")
+  @Operation(summary = "Admin: release hold so settlement can be paid")
+  public ApiResponse<Map<String, Object>> unhold(
+      @AuthenticationPrincipal MedmatePrincipal principal,
+      @PathVariable UUID settlementId,
+      @RequestBody(required = false) HoldRequest body) {
+    HoldRequest req = body == null ? new HoldRequest(null, null) : body;
+    return ApiResponse.ok(settlements.unhold(principal, settlementId, req.notes()));
+  }
+
   @PostMapping("/release-all")
   @RequiresPermission("settlements:process")
   @Operation(summary = "Admin: bulk-release PENDING settlements ≤ threshold")

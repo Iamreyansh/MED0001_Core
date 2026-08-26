@@ -264,6 +264,22 @@ public class RulesEngineService {
         rule.ruleId(), true, cond.evaluated(), dispatched, false, outcome, millis(started));
   }
 
+  /** Evaluate every ACTIVE cached rule matching the event trigger. */
+  public List<Map<String, Object>> evaluateMatching(EventPayload event) {
+    if (event == null || event.triggerId() == null) {
+      return List.of();
+    }
+    List<RuleSnapshot> matching = cache.forTrigger(event.triggerId());
+    if (matching.isEmpty()) {
+      return List.of();
+    }
+    List<Map<String, Object>> out = new ArrayList<>();
+    for (RuleSnapshot rule : matching) {
+      out.add(evaluate(new EvaluateCommand(rule.ruleId(), event, false, null, null, null)));
+    }
+    return out;
+  }
+
   private RuleSnapshot resolveRule(EvaluateCommand cmd) {
     if (cmd.ruleId() != null) {
       var cached = cache.findById(cmd.ruleId());

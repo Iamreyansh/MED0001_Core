@@ -556,11 +556,14 @@ public class RxQuoteBroadcastService {
   private static List<CartItem> toCartItems(List<QuotedMedicine> meds) {
     List<CartItem> items = new ArrayList<>();
     for (QuotedMedicine m : meds) {
+      if (m.productId() == null) {
+        throw new AppException("VALIDATION_ERROR", "Each quoted medicine needs product_id", 400);
+      }
       long unit = m.pricePaise() / m.quantity();
       items.add(
           new CartItem(
               UUID.randomUUID(),
-              UUID.randomUUID(),
+              m.productId(),
               m.quantity(),
               unit,
               true,
@@ -581,12 +584,21 @@ public class RxQuoteBroadcastService {
       Object nameObj = m.get("name");
       Object qtyObj = m.containsKey("qty") ? m.get("qty") : m.get("quantity");
       Object priceObj = m.get("price");
+      Object productObj = m.containsKey("product_id") ? m.get("product_id") : m.get("medicine_id");
       if (nameObj == null || qtyObj == null || priceObj == null) {
         throw new AppException("VALIDATION_ERROR", "Each medicine needs name, qty, and price", 400);
       }
       int qty = ((Number) qtyObj).intValue();
       long paise = RxQuotePricing.rupeesToPaise(priceObj);
-      out.add(new QuotedMedicine(String.valueOf(nameObj), qty, paise));
+      UUID productId = null;
+      if (productObj != null && !String.valueOf(productObj).isBlank()) {
+        try {
+          productId = UUID.fromString(String.valueOf(productObj));
+        } catch (IllegalArgumentException e) {
+          throw new AppException("VALIDATION_ERROR", "product_id must be a UUID", 400);
+        }
+      }
+      out.add(new QuotedMedicine(String.valueOf(nameObj), qty, paise, productId));
     }
     if (out.isEmpty()) {
       throw new AppException("VALIDATION_ERROR", "medicines_available is required", 400);

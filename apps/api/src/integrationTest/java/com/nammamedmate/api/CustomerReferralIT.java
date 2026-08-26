@@ -17,21 +17,44 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 class CustomerReferralIT extends AbstractApiIT {
 
-  private static final String REFERRER_PHONE = "+919999900051";
-  private static final String REFEREE_PHONE = "+919999900052";
-  private static final String SELF_PHONE = "+919999900053";
-  private static final String UNKNOWN_PHONE = "+919999900054";
+  private static final String REFERRER_PHONE = "+919999900071";
+  private static final String REFEREE_PHONE = "+919999900072";
+  private static final String SELF_PHONE = "+919999900073";
+  private static final String UNKNOWN_PHONE = "+919999900074";
 
   @Autowired private TestRestTemplate rest;
   @Autowired private StringRedisTemplate redis;
+  @Autowired private JdbcTemplate jdbc;
 
   @BeforeEach
   void resetRateLimits() {
     flushRedis("otp:*");
     flushRedis("customer:referral:*");
+    jdbc.update(
+        """
+        DELETE FROM referral_events WHERE referee_customer_id IN (
+          SELECT id FROM customers WHERE phone IN (?, ?, ?, ?))
+          OR referrer_customer_id IN (
+          SELECT id FROM customers WHERE phone IN (?, ?, ?, ?))
+        """,
+        REFERRER_PHONE,
+        REFEREE_PHONE,
+        SELF_PHONE,
+        UNKNOWN_PHONE,
+        REFERRER_PHONE,
+        REFEREE_PHONE,
+        SELF_PHONE,
+        UNKNOWN_PHONE);
+    jdbc.update(
+        "DELETE FROM customer_referrals WHERE customer_id IN (SELECT id FROM customers WHERE phone IN (?, ?, ?, ?))",
+        REFERRER_PHONE,
+        REFEREE_PHONE,
+        SELF_PHONE,
+        UNKNOWN_PHONE);
   }
 
   @Test
@@ -70,6 +93,13 @@ class CustomerReferralIT extends AbstractApiIT {
     ResponseEntity<Map> notFound = apply(unknownToken, "ZZZ9999");
     assertThat(notFound.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     assertThat(errorCode(notFound)).isEqualTo("REFERRAL_CODE_NOT_FOUND");
+
+    jdbc.update(
+        "UPDATE customers SET created_at = created_at - interval '2 hours' WHERE phone = ?",
+        UNKNOWN_PHONE);
+    ResponseEntity<Map> stale = apply(unknownToken, referrerCode);
+    assertThat(stale.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(errorCode(stale)).isEqualTo("REFERRAL_SIGNUP_ONLY");
 
     ResponseEntity<Map> unauthorized =
         rest.exchange(

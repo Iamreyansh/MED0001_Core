@@ -109,3 +109,56 @@ resource "aws_secretsmanager_secret_version" "kyc" {
     ignore_changes = [secret_string]
   }
 }
+
+resource "random_password" "sms_webhook" {
+  length  = 48
+  special = false
+}
+
+resource "random_password" "email_webhook" {
+  length  = 48
+  special = false
+}
+
+resource "random_password" "internal_token" {
+  length  = 64
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "internal" {
+  name       = "${local.name}/internal"
+  kms_key_id = aws_kms_key.this.arn
+}
+
+resource "aws_secretsmanager_secret_version" "internal" {
+  secret_id = aws_secretsmanager_secret.internal.id
+  secret_string = jsonencode({
+    service_token = random_password.internal_token.result
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+resource "aws_secretsmanager_secret" "comms" {
+  name       = "${local.name}/comms"
+  kms_key_id = aws_kms_key.this.arn
+}
+
+resource "aws_secretsmanager_secret_version" "comms" {
+  secret_id = aws_secretsmanager_secret.comms.id
+  secret_string = jsonencode({
+    msg91_auth_key       = "replace_me"
+    fcm_server_key       = "replace_me"
+    sendgrid_api_key     = "replace_me"
+    whatsapp_token       = "replace_me"
+    whatsapp_app_secret  = "replace_me"
+    sms_webhook_secret   = random_password.sms_webhook.result
+    email_webhook_secret = random_password.email_webhook.result
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}

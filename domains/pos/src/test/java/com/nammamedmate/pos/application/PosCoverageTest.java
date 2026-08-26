@@ -20,6 +20,11 @@ import com.nammamedmate.pos.application.port.out.PosPlanPort;
 import com.nammamedmate.pos.application.port.out.ProductLookupPort;
 import com.nammamedmate.pos.application.port.out.StockDeductionPort;
 import com.nammamedmate.pos.domain.DiscountType;
+import com.nammamedmate.pos.domain.Invoice;
+import com.nammamedmate.pos.domain.InvoiceChannel;
+import com.nammamedmate.pos.domain.InvoiceStatus;
+import com.nammamedmate.pos.domain.PaymentMethod;
+import com.nammamedmate.pos.domain.PaymentStatus;
 import com.nammamedmate.pos.domain.PosCart;
 import com.nammamedmate.pos.domain.PosCartItem;
 import com.nammamedmate.pos.domain.PosCartStatus;
@@ -241,6 +246,167 @@ class PosCoverageTest {
     assertThatThrownBy(() -> cartService.createCart(principal, staff))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("RATE_LIMIT_EXCEEDED");
+  }
+
+  @Test
+  void checkoutIdempotencyReplayAndSave() {
+    UUID cartId = UUID.randomUUID();
+    UUID cust = UUID.randomUUID();
+    UUID invoiceId = UUID.randomUUID();
+    Invoice invoice =
+        new Invoice(
+            invoiceId,
+            pharmacy,
+            "INV-1",
+            cartId,
+            InvoiceChannel.COUNTER,
+            cust,
+            "A",
+            "+91",
+            null,
+            1000,
+            0,
+            120,
+            1120,
+            PaymentMethod.CASH,
+            PaymentStatus.PAID,
+            null,
+            1120,
+            0,
+            0,
+            InvoiceStatus.ACTIVE,
+            "https://cdn.example/x.pdf",
+            NOW);
+    when(invoiceStore.findById(pharmacy, invoiceId)).thenReturn(Optional.of(invoice));
+    when(invoiceStore.listItems(invoiceId)).thenReturn(List.of());
+
+    when(cartStore.findInvoiceByCheckoutIdempotency(pharmacy, "idem-prior"))
+        .thenReturn(Optional.of(invoiceId));
+    when(cartStore.findById(pharmacy, cartId)).thenReturn(Optional.of(activeCart(cartId, cust)));
+    Map<String, Object> prior =
+        checkoutService.checkout(
+            principal, cartId, "CASH", BigDecimal.TEN, null, null, "idem-prior");
+    assertThat(prior.get("idempotent_replay")).isEqualTo(true);
+    assertThat(prior.get("invoice_id")).isEqualTo(invoiceId.toString());
+
+    PosCart completed =
+        new PosCart(
+            cartId,
+            pharmacy,
+            staff,
+            cust,
+            "A",
+            "+91",
+            null,
+            null,
+            BigDecimal.ZERO,
+            0,
+            0,
+            0,
+            0,
+            PosCartStatus.COMPLETED,
+            NOW.plusSeconds(100),
+            invoiceId,
+            null,
+            NOW,
+            NOW);
+    when(cartStore.findInvoiceByCheckoutIdempotency(pharmacy, "idem-completed"))
+        .thenReturn(Optional.empty());
+    when(cartStore.findById(pharmacy, cartId)).thenReturn(Optional.of(completed));
+    Map<String, Object> replayed =
+        checkoutService.checkout(
+            principal, cartId, "CASH", BigDecimal.TEN, null, null, "idem-completed");
+    assertThat(replayed.get("idempotent_replay")).isEqualTo(true);
+
+    assertThatThrownBy(
+            () ->
+                checkoutService.checkout(
+                    principal, cartId, "CASH", BigDecimal.TEN, null, null, "  "))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("CART_ALREADY_COMPLETED");
+    assertThatThrownBy(
+            () ->
+                checkoutService.checkout(principal, cartId, "CASH", BigDecimal.TEN, null, null, ""))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("CART_ALREADY_COMPLETED");
+
+    PosCart completedNoInvoice =
+        new PosCart(
+            cartId,
+            pharmacy,
+            staff,
+            cust,
+            "A",
+            "+91",
+            null,
+            null,
+            BigDecimal.ZERO,
+            0,
+            0,
+            0,
+            0,
+            PosCartStatus.COMPLETED,
+            NOW.plusSeconds(100),
+            null,
+            null,
+            NOW,
+            NOW);
+    when(cartStore.findById(pharmacy, cartId)).thenReturn(Optional.of(completedNoInvoice));
+    assertThatThrownBy(
+            () ->
+                checkoutService.checkout(
+                    principal, cartId, "CASH", BigDecimal.TEN, null, null, "idem-no-inv"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("CART_ALREADY_COMPLETED");
+
+    when(cartStore.findInvoiceByCheckoutIdempotency(pharmacy, "idem-missing"))
+        .thenReturn(Optional.of(invoiceId));
+    when(invoiceStore.findById(pharmacy, invoiceId)).thenReturn(Optional.empty());
+    when(cartStore.findById(pharmacy, cartId)).thenReturn(Optional.of(activeCart(cartId, cust)));
+    assertThatThrownBy(
+            () ->
+                checkoutService.checkout(
+                    principal, cartId, "CASH", BigDecimal.TEN, null, null, "idem-missing"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("INVOICE_NOT_FOUND");
+
+    UUID productId = UUID.randomUUID();
+    UUID batchId = UUID.randomUUID();
+    PosCart cart = activeCart(cartId, cust);
+    when(cartStore.findInvoiceByCheckoutIdempotency(pharmacy, "idem-new"))
+        .thenReturn(Optional.empty());
+    when(cartStore.findById(pharmacy, cartId)).thenReturn(Optional.of(cart));
+    when(cartStore.listItems(cartId))
+        .thenReturn(
+            List.of(
+                PosCartItem.compute(
+                    UUID.randomUUID(),
+                    cartId,
+                    productId,
+                    "X",
+                    batchId,
+                    "BN",
+                    LocalDate.of(2027, 1, 1),
+                    1,
+                    false,
+                    1000L,
+                    12,
+                    false,
+                    1,
+                    "HSN",
+                    NOW)));
+    when(invoiceStore.getOrCreateSettings(pharmacy))
+        .thenReturn(new InvoiceStore.InvoiceSettingsRow("INV"));
+    when(invoiceStore.nextSequence(any(), anyInt(), anyInt())).thenReturn(7);
+    when(invoiceStore.insert(any())).thenAnswer(inv -> inv.getArgument(0));
+    Map<String, Object> blankKey =
+        checkoutService.checkout(principal, cartId, "CASH", BigDecimal.TEN, null, null, "  ");
+    assertThat(blankKey.get("invoice_number")).isNotNull();
+    Map<String, Object> created =
+        checkoutService.checkout(principal, cartId, "CASH", BigDecimal.TEN, null, null, "idem-new");
+    assertThat(created.get("invoice_number")).isNotNull();
+    verify(cartStore)
+        .saveCheckoutIdempotency(eq(pharmacy), eq("idem-new"), eq(cartId), any(), eq(NOW));
   }
 
   @Test

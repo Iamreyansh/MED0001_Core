@@ -4,9 +4,11 @@ import com.nammamedmate.auth.application.port.out.SmsSender;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("!prod & !staging")
 public class LoggingSmsSender implements SmsSender {
 
   private static final Logger log = LoggerFactory.getLogger(LoggingSmsSender.class);

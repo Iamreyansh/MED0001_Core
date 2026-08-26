@@ -29,14 +29,45 @@ public class AdminAuthController {
   private final AdminLoginService loginService;
   private final AdminVerifyMfaService verifyMfaService;
   private final AdminSetupMfaService setupMfaService;
+  private final com.nammamedmate.auth.application.AdminInviteCompleteService inviteCompleteService;
+  private final com.nammamedmate.auth.application.AdminPasswordResetCompleteService
+      resetCompleteService;
 
   public AdminAuthController(
       AdminLoginService loginService,
       AdminVerifyMfaService verifyMfaService,
-      AdminSetupMfaService setupMfaService) {
+      AdminSetupMfaService setupMfaService,
+      com.nammamedmate.auth.application.AdminInviteCompleteService inviteCompleteService,
+      com.nammamedmate.auth.application.AdminPasswordResetCompleteService resetCompleteService) {
     this.loginService = loginService;
     this.verifyMfaService = verifyMfaService;
     this.setupMfaService = setupMfaService;
+    this.inviteCompleteService = inviteCompleteService;
+    this.resetCompleteService = resetCompleteService;
+  }
+
+  @PostMapping("/complete-invite")
+  public ApiResponse<Map<String, Object>> completeInvite(
+      @RequestBody(required = false) Map<String, Object> body) {
+    Map<String, Object> req = body == null ? Map.of() : body;
+    Object token = req.get("invite_token");
+    Object password = req.get("password");
+    return ApiResponse.ok(
+        inviteCompleteService.complete(
+            token == null ? null : String.valueOf(token),
+            password == null ? null : String.valueOf(password)));
+  }
+
+  @PostMapping("/complete-reset")
+  public ApiResponse<Map<String, Object>> completeReset(
+      @RequestBody(required = false) Map<String, Object> body) {
+    Map<String, Object> req = body == null ? Map.of() : body;
+    Object token = req.get("reset_token");
+    Object password = req.get("password");
+    return ApiResponse.ok(
+        resetCompleteService.complete(
+            token == null ? null : String.valueOf(token),
+            password == null ? null : String.valueOf(password)));
   }
 
   @PostMapping("/login")

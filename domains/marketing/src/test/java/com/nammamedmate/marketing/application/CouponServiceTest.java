@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,6 +61,9 @@ class CouponServiceTest {
   @BeforeEach
   void setUp() {
     service = new CouponService(store, segments, notifications, Clock.fixed(NOW, ZoneOffset.UTC));
+    lenient()
+        .when(store.findByCodeForUpdate(anyString()))
+        .thenAnswer(inv -> store.findByCode(inv.getArgument(0)));
   }
 
   @Test
@@ -339,6 +344,137 @@ class CouponServiceTest {
 
     when(store.highBurnCouponsForDay(any())).thenReturn(List.of());
     service.sendDailyBudgetBurnDigest();
+
+    Coupon capped =
+        new Coupon(
+            flat50().id(),
+            "FLAT50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            39900,
+            5000L,
+            2500000000L,
+            0,
+            1,
+            1,
+            100,
+            List.of(),
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "flat",
+            "terms",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("FLAT50")).thenReturn(Optional.of(capped));
+    when(store.countRedemptions(capped.id())).thenReturn(1L);
+    assertThat(
+            service
+                .validate(
+                    customer,
+                    new CouponService.ValidateCommand("FLAT50", 500, CUST, true, true, null))
+                .get("error_code"))
+        .isEqualTo("COUPON_MAX_REDEMPTIONS");
+    assertThatThrownBy(() -> service.applyForCart("FLAT50", 40_000, CUST, true, false))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_MAX_REDEMPTIONS");
+    assertThatThrownBy(
+            () -> service.recordRedemption("FLAT50", UUID.randomUUID(), CUST, 5_000, 40_000))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_MAX_REDEMPTIONS");
+
+    Coupon underCap =
+        new Coupon(
+            flat50().id(),
+            "FLAT50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            39900,
+            5000L,
+            2500000000L,
+            0,
+            0,
+            5,
+            100,
+            List.of(),
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "flat",
+            "terms",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("FLAT50")).thenReturn(Optional.of(underCap));
+    when(store.countRedemptions(underCap.id())).thenReturn(1L);
+    assertThat(
+            service
+                .validate(
+                    customer,
+                    new CouponService.ValidateCommand("FLAT50", 500, CUST, true, true, null))
+                .get("valid"))
+        .isEqualTo(true);
+    assertThat(service.applyForCart("FLAT50", 40_000, CUST, true, false).code())
+        .isEqualTo("FLAT50");
+    service.recordRedemption("FLAT50", UUID.randomUUID(), CUST, 5_000, 40_000);
+
+    when(store.findByCode("GONE")).thenReturn(Optional.empty());
+    assertThatThrownBy(
+            () -> service.recordRedemption("GONE", UUID.randomUUID(), CUST, 5_000, 40_000))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_NOT_FOUND");
+
+    Coupon zeroCap =
+        new Coupon(
+            flat50().id(),
+            "FLAT50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            39900,
+            5000L,
+            2500000000L,
+            0,
+            0,
+            0,
+            100,
+            List.of(),
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "flat",
+            "terms",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("FLAT50")).thenReturn(Optional.of(zeroCap));
+    assertThat(
+            service
+                .validate(
+                    customer,
+                    new CouponService.ValidateCommand("FLAT50", 500, CUST, true, true, null))
+                .get("valid"))
+        .isEqualTo(true);
+    assertThat(service.applyForCart("FLAT50", 40_000, CUST, true, false).code())
+        .isEqualTo("FLAT50");
+    service.recordRedemption("FLAT50", UUID.randomUUID(), CUST, 5_000, 40_000);
+  }
+
+  @Test
+  void findByCodeForUpdateDefaultDelegates() {
+    CouponStore defaults =
+        org.mockito.Mockito.mock(CouponStore.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+    when(defaults.findByCode("X")).thenReturn(Optional.empty());
+    assertThat(defaults.findByCodeForUpdate("X")).isEmpty();
   }
 
   @Test
@@ -517,6 +653,141 @@ class CouponServiceTest {
     assertThatThrownBy(() -> service.applyForCart("NOPE", 1000))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("INVALID_COUPON");
+
+    Coupon exhausted =
+        new Coupon(
+            flat50().id(),
+            "FLAT50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            1000,
+            5000L,
+            1000L,
+            1000L,
+            1,
+            null,
+            1,
+            List.of(),
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "flat",
+            "t",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("FLAT50")).thenReturn(Optional.of(exhausted));
+    assertThatThrownBy(() -> service.applyForCart("FLAT50", 5000, CUST, true, true))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_BUDGET_EXHAUSTED");
+    when(store.findByCode("FLAT50")).thenReturn(Optional.of(flat50()));
+    when(store.countRedemptionsForCustomer(any(), eq(CUST))).thenReturn(999);
+    assertThatThrownBy(() -> service.applyForCart("FLAT50", 40_000, CUST, false, false))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_PER_USER_LIMIT");
+
+    Coupon segmented =
+        new Coupon(
+            flat50().id(),
+            "SEG50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            1000,
+            5000L,
+            0L,
+            0L,
+            0,
+            null,
+            10,
+            List.of(SEG),
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "seg",
+            "t",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("SEG50")).thenReturn(Optional.of(segmented));
+    when(store.countRedemptionsForCustomer(any(), eq(CUST))).thenReturn(0);
+    when(segments.isMember(SEG, CUST)).thenReturn(false);
+    assertThatThrownBy(() -> service.applyForCart("SEG50", 5000, CUST, true, true))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_SEGMENT_MISMATCH");
+    when(segments.isMember(SEG, CUST)).thenReturn(true);
+    assertThat(service.applyForCart("SEG50", 5000, CUST, true, true).discountType())
+        .isEqualTo("FLAT");
+
+    Coupon firstOnly =
+        new Coupon(
+            flat50().id(),
+            "FIRST50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            1000,
+            5000L,
+            0L,
+            0L,
+            0,
+            null,
+            10,
+            List.of(),
+            true,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "first",
+            "t",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("FIRST50")).thenReturn(Optional.of(firstOnly));
+    assertThatThrownBy(() -> service.applyForCart("FIRST50", 5000, CUST, false, true))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_FIRST_ORDER_ONLY");
+    assertThat(service.applyForCart("FIRST50", 5000, CUST, true, true).code()).isEqualTo("FIRST50");
+    assertThat(service.applyForCart("FIRST50", 5000, CUST, null, true).code()).isEqualTo("FIRST50");
+
+    Coupon rxOnly =
+        new Coupon(
+            flat50().id(),
+            "RX50",
+            CouponType.FLAT_RS,
+            null,
+            5000L,
+            1000,
+            5000L,
+            0L,
+            0L,
+            0,
+            null,
+            10,
+            List.of(),
+            false,
+            true,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2099-12-31T23:59:59Z"),
+            CouponStatus.ACTIVE,
+            "rx",
+            "t",
+            null,
+            NOW,
+            NOW);
+    when(store.findByCode("RX50")).thenReturn(Optional.of(rxOnly));
+    assertThatThrownBy(() -> service.applyForCart("RX50", 5000, CUST, true, false))
+        .extracting(ex -> ((AppException) ex).code())
+        .isEqualTo("COUPON_RX_ONLY");
+    assertThat(service.applyForCart("RX50", 5000, CUST, true, true).code()).isEqualTo("RX50");
+    assertThat(service.applyForCart("RX50", 5000, CUST, true, null).code()).isEqualTo("RX50");
+    assertThat(service.applyForCart("RX50", 5000, null, false, true).code()).isEqualTo("RX50");
   }
 
   private static Coupon namma25() {

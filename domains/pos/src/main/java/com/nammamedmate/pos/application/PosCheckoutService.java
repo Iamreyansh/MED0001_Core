@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -72,6 +73,19 @@ public class PosCheckoutService {
       BigDecimal amountPaid,
       String upiReference,
       String prescribingDoctor) {
+    return checkout(
+        principal, cartId, paymentMethod, amountPaid, upiReference, prescribingDoctor, null);
+  }
+
+  @Transactional
+  public Map<String, Object> checkout(
+      MedmatePrincipal principal,
+      UUID cartId,
+      String paymentMethod,
+      BigDecimal amountPaid,
+      String upiReference,
+      String prescribingDoctor,
+      String idempotencyKey) {
     PosCartService.requireStaff(principal);
     if (!rateLimiter.tryAcquire("pos:cart:checkout:" + principal.pharmacyId(), 30, 60)) {
       throw new AppException("RATE_LIMIT_EXCEEDED", "Too many requests", 429);
@@ -83,7 +97,38 @@ public class PosCheckoutService {
             .orElseThrow(() -> new AppException("CART_NOT_FOUND", "Cart not found", 404));
 
     Instant now = clock.instant();
+    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+      Optional<UUID> prior =
+          cartStore.findInvoiceByCheckoutIdempotency(principal.pharmacyId(), idempotencyKey);
+      if (prior.isPresent()) {
+        PosCart replay =
+            new PosCart(
+                cart.id(),
+                cart.pharmacyId(),
+                cart.staffId(),
+                cart.customerId(),
+                cart.customerName(),
+                cart.customerPhone(),
+                cart.prescribingDoctor(),
+                cart.discountType(),
+                cart.discountValue(),
+                cart.discountAmountPaise(),
+                cart.subtotalPaise(),
+                cart.gstTotalPaise(),
+                cart.grandTotalPaise(),
+                PosCartStatus.COMPLETED,
+                cart.expiresAt(),
+                prior.get(),
+                cart.appliedOfferId(),
+                cart.createdAt(),
+                now);
+        return replayCompleted(principal.pharmacyId(), replay, now);
+      }
+    }
     if (cart.status() == PosCartStatus.COMPLETED) {
+      if (idempotencyKey != null && !idempotencyKey.isBlank() && cart.invoiceId() != null) {
+        return replayCompleted(principal.pharmacyId(), cart, now);
+      }
       throw new AppException("CART_ALREADY_COMPLETED", "Cart already checked out", 409);
     }
     if (cart.status() == PosCartStatus.ABANDONED) {
@@ -129,7 +174,7 @@ public class PosCheckoutService {
     }
 
     long subtotal = items.stream().mapToLong(PosCartItem::lineTotalPaise).sum();
-    long gstTotal = items.stream().mapToLong(PosCartItem::gstAmountPaise).sum();
+    long gstTotal;
     long discount;
     if (cart.appliedOfferId() != null) {
       discount = Math.min(cart.discountAmountPaise(), subtotal);
@@ -148,6 +193,11 @@ public class PosCheckoutService {
               MoneyMath.maxDiscountPaise(subtotal));
     }
     long grand = Math.max(0L, subtotal - discount);
+    List<long[]> discountedLines = proRateDiscountedLines(items, subtotal, discount);
+    gstTotal = 0L;
+    for (long[] line : discountedLines) {
+      gstTotal += line[1];
+    }
 
     if (method == PaymentMethod.CREDIT) {
       long outstanding = khata.outstandingPaise(principal.pharmacyId(), cart.customerId());
@@ -225,18 +275,44 @@ public class PosCheckoutService {
             upiReference,
             paidPaise,
             changeDue,
-            0L,
+            Math.max(0L, subtotal - grand),
             InvoiceStatus.ACTIVE,
             pdfUrl,
             now);
     invoiceStore.insert(invoice);
 
     List<InvoiceItem> invoiceItems = new ArrayList<>();
-    for (PosCartItem item : items) {
-      invoiceItems.add(InvoiceItem.fromCartItem(Ids.newId(), invoiceId, item, now));
+    for (int i = 0; i < items.size(); i++) {
+      PosCartItem item = items.get(i);
+      long discountedLine = discountedLines.get(i)[0];
+      long lineGst = discountedLines.get(i)[1];
+      invoiceItems.add(
+          new InvoiceItem(
+              Ids.newId(),
+              invoiceId,
+              item.productId(),
+              item.productName(),
+              item.hsnCode(),
+              item.batchId(),
+              item.batchNumber(),
+              item.expiryDate(),
+              item.packSize(),
+              item.quantity(),
+              item.isLoose(),
+              item.unitPricePaise(),
+              item.gstPct(),
+              discountedLine,
+              lineGst,
+              discountedLine,
+              item.isRxOnly(),
+              now));
     }
     invoiceStore.insertItems(invoiceItems);
     cartStore.markCompleted(cartId, invoiceId, now);
+    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+      cartStore.saveCheckoutIdempotency(
+          principal.pharmacyId(), idempotencyKey, cartId, invoiceId, now);
+    }
 
     if (cart.appliedOfferId() != null) {
       if (discount > 0) {
@@ -266,7 +342,7 @@ public class PosCheckoutService {
     data.put("amount_paid", MoneyMath.paiseToRupees(paidPaise));
     data.put("change_due", MoneyMath.paiseToRupees(changeDue));
     data.put("grand_total", MoneyMath.paiseToRupees(grand));
-    data.put("gst_breakdown", gstBreakdown(items));
+    data.put("gst_breakdown", gstBreakdown(items, discountedLines));
     data.put("invoice_pdf_url", pdfUrl);
     data.put("items_count", items.size());
     data.put("customer_name", cart.customerName());
@@ -274,12 +350,65 @@ public class PosCheckoutService {
     return data;
   }
 
-  private static List<Map<String, Object>> gstBreakdown(List<PosCartItem> items) {
+  private Map<String, Object> replayCompleted(UUID pharmacyId, PosCart cart, Instant now) {
+    Invoice invoice =
+        invoiceStore
+            .findById(pharmacyId, cart.invoiceId())
+            .orElseThrow(
+                () -> new AppException("INVOICE_NOT_FOUND", "Completed cart invoice missing", 404));
+    List<InvoiceItem> invoiceItems = invoiceStore.listItems(invoice.id());
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("invoice_id", invoice.id().toString());
+    data.put("invoice_number", invoice.invoiceNumber());
+    data.put("cart_id", cart.id().toString());
+    data.put("payment_method", invoice.paymentMethod().name());
+    data.put("amount_paid", MoneyMath.paiseToRupees(invoice.amountPaidPaise()));
+    data.put("change_due", MoneyMath.paiseToRupees(invoice.changeDuePaise()));
+    data.put("grand_total", MoneyMath.paiseToRupees(invoice.grandTotalPaise()));
+    data.put("invoice_pdf_url", invoice.invoicePdfUrl());
+    data.put("items_count", invoiceItems.size());
+    data.put("customer_name", cart.customerName());
+    data.put("completed_at", invoice.createdAt().toString());
+    data.put("idempotent_replay", true);
+    return data;
+  }
+
+  /** Per line: [discountedInclusive, gst, taxable]. */
+  private static List<long[]> proRateDiscountedLines(
+      List<PosCartItem> items, long subtotal, long discount) {
+    List<long[]> out = new ArrayList<>();
+    long allocated = 0L;
+    for (int i = 0; i < items.size(); i++) {
+      PosCartItem item = items.get(i);
+      long lineDiscount;
+      if (i == items.size() - 1) {
+        lineDiscount = Math.max(0L, discount - allocated);
+      } else if (discount <= 0) {
+        lineDiscount = 0L;
+      } else {
+        lineDiscount =
+            java.math.BigDecimal.valueOf(discount)
+                .multiply(java.math.BigDecimal.valueOf(item.lineTotalPaise()))
+                .divide(java.math.BigDecimal.valueOf(subtotal), 0, java.math.RoundingMode.HALF_UP)
+                .longValueExact();
+        allocated += lineDiscount;
+      }
+      long discounted = Math.max(0L, item.lineTotalPaise() - lineDiscount);
+      long gst = MoneyMath.gstFromInclusive(discounted, item.gstPct());
+      out.add(new long[] {discounted, gst, discounted - gst});
+    }
+    return out;
+  }
+
+  private static List<Map<String, Object>> gstBreakdown(
+      List<PosCartItem> items, List<long[]> discountedLines) {
     Map<Integer, long[]> bySlab = new TreeMap<>();
-    for (PosCartItem item : items) {
+    for (int i = 0; i < items.size(); i++) {
+      PosCartItem item = items.get(i);
+      long[] priced = discountedLines.get(i);
       long[] agg = bySlab.computeIfAbsent(item.gstPct(), k -> new long[2]);
-      agg[0] += MoneyMath.taxableFromInclusive(item.lineTotalPaise(), item.gstPct());
-      agg[1] += item.gstAmountPaise();
+      agg[0] += priced[2];
+      agg[1] += priced[1];
     }
     List<Map<String, Object>> rows = new ArrayList<>();
     for (Map.Entry<Integer, long[]> e : bySlab.entrySet()) {

@@ -175,6 +175,15 @@ public class ReferralService {
       throw new AppException(
           "FIRST_ORDER_ALREADY_PLACED", "Customer has already placed their first order", 409);
     }
+    CustomerProfileRecord profile =
+        profiles
+            .findById(refereeId)
+            .orElseThrow(() -> new AppException("CUSTOMER_NOT_FOUND", "Customer not found", 404));
+    Instant signupCutoff = clock.instant().minusSeconds(30L * 60);
+    if (profile.createdAt() == null || profile.createdAt().isBefore(signupCutoff)) {
+      throw new AppException(
+          "REFERRAL_SIGNUP_ONLY", "Referral codes can only be applied during signup", 422);
+    }
 
     ReferralRecord referrer =
         referrals

@@ -220,11 +220,6 @@ public class PharmacyKycService {
       scheduleExpiryAlerts(docId, pharmacyId, expiryDate, documentType, now);
     }
 
-    // Generate signed GET URL
-    PresignedUrlService.PresignedUrl signedUrl =
-        presignedUrls.createGetUrl(fileKey, SIGNED_URL_TTL);
-    Instant urlExpiresAt = now.plus(SIGNED_URL_TTL);
-
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("document_id", docId.toString());
     data.put("document_type", documentType);
@@ -233,8 +228,9 @@ public class PharmacyKycService {
     data.put("file_size_bytes", (long) fileBytes.length);
     data.put("expiry_date", expiryDate != null ? expiryDate.toString() : null);
     data.put("uploaded_at", now.toString());
-    data.put("signed_url", signedUrl.url());
-    data.put("signed_url_expires_at", urlExpiresAt.toString());
+    data.put("signed_url", null);
+    data.put("signed_url_expires_at", null);
+    data.put("scan_status", "PENDING");
     return data;
   }
 
@@ -252,13 +248,21 @@ public class PharmacyKycService {
 
     List<String> required = requiredDocumentTypes(pharmacy.businessType());
     List<String> missing = computeMissing(docs, required);
-    boolean readyToSubmit = missing.isEmpty();
+    boolean readyToSubmit =
+        missing.isEmpty()
+            && docs.stream()
+                .filter(d -> !"REJECTED".equals(d.status()))
+                .allMatch(d -> canIssueSignedGet(d.status()));
 
     List<Map<String, Object>> docMaps = new ArrayList<>();
     for (KycDocumentRecord doc : docs) {
-      PresignedUrlService.PresignedUrl signedUrl =
-          presignedUrls.createGetUrl(doc.fileKey(), SIGNED_URL_TTL);
-      docMaps.add(docToMap(doc, signedUrl.url(), now.plus(SIGNED_URL_TTL)));
+      if (canIssueSignedGet(doc.status())) {
+        PresignedUrlService.PresignedUrl signedUrl =
+            presignedUrls.createGetUrl(doc.fileKey(), SIGNED_URL_TTL);
+        docMaps.add(docToMap(doc, signedUrl.url(), now.plus(SIGNED_URL_TTL)));
+      } else {
+        docMaps.add(docToMap(doc, null, null));
+      }
     }
 
     Map<String, Object> data = new LinkedHashMap<>();
@@ -351,6 +355,13 @@ public class PharmacyKycService {
           null,
           Map.of("missing_types", missing));
     }
+    boolean unclean =
+        docs.stream()
+            .anyMatch(d -> !"REJECTED".equals(d.status()) && !canIssueSignedGet(d.status()));
+    if (unclean) {
+      throw new AppException(
+          "DOCUMENTS_QUARANTINED", "Documents must pass malware scan before submit", 409);
+    }
 
     Instant now = clock.instant();
     // Transition UPLOADED → UNDER_REVIEW
@@ -408,6 +419,13 @@ public class PharmacyKycService {
 
     List<Map<String, Object>> docMaps = new ArrayList<>();
     for (KycDocumentRecord doc : docs) {
+      if (!canIssueSignedGet(doc.status())) {
+        Map<String, Object> docMap = docToMap(doc, null, null);
+        docMap.put("verified_by", doc.verifiedBy() != null ? doc.verifiedBy().toString() : null);
+        docMap.put("verified_at", doc.verifiedAt() != null ? doc.verifiedAt().toString() : null);
+        docMaps.add(docMap);
+        continue;
+      }
       PresignedUrlService.PresignedUrl signedUrl =
           presignedUrls.createGetUrl(doc.fileKey(), SIGNED_URL_TTL);
       // Log admin access (ponytail: logged at URL issuance; S3 GET can't callback to log)
@@ -663,8 +681,14 @@ public class PharmacyKycService {
     m.put("expiry_date", doc.expiryDate() != null ? doc.expiryDate().toString() : null);
     m.put("uploaded_at", doc.createdAt().toString());
     m.put("signed_url", signedUrl);
-    m.put("signed_url_expires_at", urlExpiresAt.toString());
+    m.put("signed_url_expires_at", urlExpiresAt == null ? null : urlExpiresAt.toString());
     return m;
+  }
+
+  static boolean canIssueSignedGet(String status) {
+    return "SCAN_CLEAN".equals(status)
+        || "UNDER_REVIEW".equals(status)
+        || "VERIFIED".equals(status);
   }
 
   /** Package-private for testability. */

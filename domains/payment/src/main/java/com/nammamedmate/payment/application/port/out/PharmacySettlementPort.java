@@ -100,6 +100,8 @@ public interface PharmacySettlementPort {
 
   void markHeld(UUID settlementId, UUID heldBy, String reason, String notes, Instant heldAt);
 
+  void markUnheld(UUID settlementId, UUID unheldBy, String notes, Instant unheldAt);
+
   void markBelowThreshold(UUID settlementId, String notes, Instant now);
 
   List<SettlementRecord> listPendingForBulk(long maxNetPaiseInclusive, int limit);

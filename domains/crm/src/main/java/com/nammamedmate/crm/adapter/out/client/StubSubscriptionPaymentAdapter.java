@@ -6,10 +6,12 @@ import com.nammamedmate.kernel.id.Ids;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/** Succeeds by default; accounts in {@link #failingAccounts} throw PAYMENT_FAILED. */
+/** Succeeds by default; accounts in {@link #failingAccounts} throw PAYMENT_FAILED. Local only. */
 @Component
+@Profile("!prod & !staging")
 public class StubSubscriptionPaymentAdapter implements SubscriptionPaymentPort {
 
   private final Set<UUID> failingAccounts = ConcurrentHashMap.newKeySet();

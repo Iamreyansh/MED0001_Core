@@ -347,6 +347,9 @@ public class JdbcRxBroadcastStore implements RxBroadcastStore {
         row.put("name", m.name());
         row.put("quantity", m.quantity());
         row.put("price_paise", m.pricePaise());
+        if (m.productId() != null) {
+          row.put("product_id", m.productId().toString());
+        }
         rows.add(row);
       }
       return objectMapper.writeValueAsString(rows);
@@ -363,11 +366,21 @@ public class JdbcRxBroadcastStore implements RxBroadcastStore {
       List<Map<String, Object>> rows = objectMapper.readValue(json, MAP_LIST);
       List<QuotedMedicine> out = new ArrayList<>();
       for (Map<String, Object> m : rows) {
+        UUID productId = null;
+        Object rawProduct = m.get("product_id");
+        if (rawProduct != null && !String.valueOf(rawProduct).isBlank()) {
+          try {
+            productId = UUID.fromString(String.valueOf(rawProduct));
+          } catch (IllegalArgumentException ignored) {
+            productId = null;
+          }
+        }
         out.add(
             new QuotedMedicine(
                 String.valueOf(m.get("name")),
                 ((Number) m.get("quantity")).intValue(),
-                ((Number) m.get("price_paise")).longValue()));
+                ((Number) m.get("price_paise")).longValue(),
+                productId));
       }
       return out;
     } catch (JsonProcessingException e) {

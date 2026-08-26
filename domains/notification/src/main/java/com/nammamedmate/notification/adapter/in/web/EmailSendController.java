@@ -144,8 +144,10 @@ public class EmailSendController {
   @Operation(summary = "Click tracking redirect")
   public ResponseEntity<Void> clickRedirect(
       @PathVariable("logId") UUID logId, @RequestParam("u") String targetUrl) {
-    email.trackClick(logId, targetUrl);
-    return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(targetUrl)).build();
+    Map<String, Object> tracked = email.trackClick(logId, targetUrl);
+    return ResponseEntity.status(HttpStatus.FOUND)
+        .location(URI.create(String.valueOf(tracked.get("redirect_url"))))
+        .build();
   }
 
   @SuppressWarnings("unchecked")

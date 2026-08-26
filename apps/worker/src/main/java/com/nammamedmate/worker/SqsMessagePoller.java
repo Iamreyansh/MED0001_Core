@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityRequest;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
@@ -90,7 +91,14 @@ public class SqsMessagePoller implements SmartLifecycle {
   }
 
   void process(Message message) {
+    sqsClient.changeMessageVisibility(
+        ChangeMessageVisibilityRequest.builder()
+            .queueUrl(queueUrl)
+            .receiptHandle(message.receiptHandle())
+            .visibilityTimeout(120)
+            .build());
     handler.handle(message.body());
+    // ack only after a successful handle — failures stay visible for retry/DLQ
     sqsClient.deleteMessage(
         DeleteMessageRequest.builder()
             .queueUrl(queueUrl)

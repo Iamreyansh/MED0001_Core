@@ -6,13 +6,11 @@ import com.nammamedmate.marketing.domain.CampaignChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.stereotype.Component;
 
 /**
- * Stub dispatch: treats all recipients as sent+delivered; pauses when cumulative spend hits budget
- * cap. ponytail: real FCM/SMS/WA/Email providers later.
+ * Local fallback when {@link
+ * com.nammamedmate.marketing.adapter.out.messaging.OutboxCampaignDispatch} is absent.
  */
-@Component
 public class StubCampaignDispatch implements CampaignDispatchPort {
 
   @Override

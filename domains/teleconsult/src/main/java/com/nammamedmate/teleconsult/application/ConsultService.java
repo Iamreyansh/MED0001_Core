@@ -339,6 +339,85 @@ public class ConsultService {
     return n;
   }
 
+  /** Assign LRU doctors to scheduled consults whose slot time has arrived (D13). */
+  @Transactional
+  public int assignDueScheduled() {
+    Instant now = clock.instant();
+    int n = 0;
+    n += assignUnassigned(consultStore.findDueForScheduledAssign(now), now);
+    n += assignUnassigned(consultStore.findQueuedNowUnassigned(), now);
+    return n;
+  }
+
+  private int assignUnassigned(List<Consult> queue, Instant now) {
+    int n = 0;
+    for (Consult existing : queue) {
+      Optional<TeleconsultDoctor> pick =
+          TeleconsultDoctorService.selectLeastRecentlyAssigned(doctorStore.listAvailable());
+      if (pick.isEmpty()) {
+        break;
+      }
+      TeleconsultDoctor assigned = pick.get();
+      Instant assignedAt = now;
+      TeleconsultDoctor updated =
+          new TeleconsultDoctor(
+              assigned.id(),
+              assigned.name(),
+              assigned.qualification(),
+              assigned.registrationNo(),
+              assigned.specialty(),
+              assigned.languagesSpoken(),
+              assigned.yearsExperience(),
+              assigned.avatarUrl(),
+              assigned.bio(),
+              assigned.internalPhoneCiphertext(),
+              assigned.available(),
+              assigned.avgRating(),
+              assigned.totalConsults(),
+              assigned.consultsToday(),
+              assignedAt,
+              assigned.createdAt(),
+              assignedAt,
+              assigned.deletedAt());
+      doctorStore.update(updated);
+      consultStore.update(
+          copyWithDoctor(existing, assigned.id(), Consult.STATUS_DOCTOR_REVIEWING, now));
+      n++;
+    }
+    return n;
+  }
+
+  private static Consult copyWithDoctor(
+      Consult existing, UUID doctorId, String status, Instant now) {
+    return new Consult(
+        existing.id(),
+        existing.customerId(),
+        doctorId,
+        existing.patientName(),
+        existing.patientPhone(),
+        existing.slotType(),
+        existing.scheduledAt(),
+        existing.symptoms(),
+        existing.medicinesNeedingRx(),
+        existing.cartId(),
+        existing.cartMode(),
+        existing.reason(),
+        status,
+        existing.callStartedAt(),
+        existing.callEndedAt(),
+        existing.durationMinutes(),
+        existing.ePrescriptionId(),
+        existing.adviceOnly(),
+        existing.clinicalNotes(),
+        existing.rating(),
+        existing.feedbackText(),
+        existing.ratedAt(),
+        existing.autoCancelledReason(),
+        existing.createdAt(),
+        now,
+        existing.deletedAt());
+  }
+
   private static Consult copyWithStatus(
       Consult existing, String status, String autoCancelledReason, Instant now) {
     return new Consult(

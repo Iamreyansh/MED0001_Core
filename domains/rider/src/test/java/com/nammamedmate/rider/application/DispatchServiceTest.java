@@ -110,6 +110,77 @@ class DispatchServiceTest {
   }
 
   @Test
+  void autoAssignOrderBranches() {
+    service.autoAssignOrder(null);
+    service = build(false);
+    service.autoAssignOrder(orderId);
+    assertThat(assignments.hasActiveForOrder(orderId)).isFalse();
+
+    service = build(true);
+    service.autoAssignOrder(orderId);
+    assertThat(assignments.findActiveByOrder(orderId).orElseThrow().riderId()).isEqualTo(riderId);
+
+    service.autoAssignOrder(orderId);
+    assertThat(assignments.findActiveByOrder(orderId)).isPresent();
+
+    UUID missing = Ids.newId();
+    service.autoAssignOrder(missing);
+
+    UUID notReady = Ids.newId();
+    orders.put(
+        new OrderDetails(
+            notReady,
+            "MED-2",
+            "PLACED",
+            null,
+            pharmacyId,
+            "Apollo",
+            "Koramangala",
+            12.93,
+            77.62,
+            "9900112233",
+            zoneId,
+            "Koramangala",
+            "Priya",
+            "9876501234",
+            "HSR",
+            12.91,
+            77.63,
+            3,
+            "UPI",
+            45000,
+            Instant.parse("2026-07-24T09:40:00Z"),
+            Instant.parse("2026-07-24T09:40:00Z"),
+            AssignmentOtps.hash("3942")));
+    service.autoAssignOrder(notReady);
+    assertThat(assignments.hasActiveForOrder(notReady)).isFalse();
+
+    UUID alreadyRider = Ids.newId();
+    orders.put(readyOrder(alreadyRider, riderId));
+    service.autoAssignOrder(alreadyRider);
+    assertThat(assignments.hasActiveForOrder(alreadyRider)).isFalse();
+
+    UUID noFleet = Ids.newId();
+    fleet.rows.clear();
+    orders.put(readyOrder(noFleet, null));
+    service.autoAssignOrder(noFleet);
+    assertThat(assignments.hasActiveForOrder(noFleet)).isFalse();
+  }
+
+  @Test
+  void assignManualMissingRiderAndReassignMissingOrder() {
+    assertThatThrownBy(() -> service.assignManual(admin(), orderId, Ids.newId()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("RIDER_NOT_FOUND");
+
+    service.assignManual(admin(), orderId, riderId);
+    orders.byId.remove(orderId);
+    assertThatThrownBy(() -> service.reassign(admin(), orderId, rider2Id, "OTHER"))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+  }
+
+  @Test
   void tryAutoReassignAfterTimeoutBranches() {
     service = build(true);
     // empty order → return

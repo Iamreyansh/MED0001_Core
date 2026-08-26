@@ -524,6 +524,9 @@ class PharmacyRxQueueServiceTest {
         Instant updatedAt) {}
 
     @Override
+    public void updateStatus(UUID id, String status, Instant updatedAt) {}
+
+    @Override
     public int markExpiredDue(Instant now, Instant updatedAt) {
       return 0;
     }

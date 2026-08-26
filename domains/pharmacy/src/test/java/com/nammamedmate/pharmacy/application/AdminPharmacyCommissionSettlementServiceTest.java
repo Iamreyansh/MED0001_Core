@@ -239,9 +239,9 @@ class AdminPharmacyCommissionSettlementServiceTest {
     assertThat(above.tcsDeductedPaise()).isEqualTo(100_000L);
 
     var below = SettlementCalculator.compute(10_000_000L, new BigDecimal("8.00"), 10_000_000L);
-    assertThat(below.tcsApplicable()).isFalse();
-    assertThat(below.tcsDeductedPaise()).isZero();
-    assertThat(below.netPaidPaise()).isEqualTo(9_200_000L);
+    assertThat(below.tcsApplicable()).isTrue();
+    assertThat(below.tcsDeductedPaise()).isEqualTo(100_000L);
+    assertThat(below.netPaidPaise()).isEqualTo(9_100_000L);
   }
 
   @Test
@@ -804,7 +804,7 @@ class AdminPharmacyCommissionSettlementServiceTest {
             NOW,
             NOW));
     assertThat(generationService.generateWeeklySettlements()).isEqualTo(1);
-    assertThat(settlements.inserted.getFirst().netPaidPaise()).isGreaterThan(1_000_000L - 80_000L);
+    assertThat(settlements.inserted.getFirst().netPaidPaise()).isGreaterThan(1_000_000L - 100_000L);
   }
 
   @Test
