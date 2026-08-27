@@ -66,9 +66,13 @@ resource "aws_elasticache_replication_group" "redis" {
   num_cache_clusters         = 2
   subnet_group_name          = aws_elasticache_subnet_group.this.name
   security_group_ids         = [aws_security_group.data.id]
+  apply_immediately          = true
   at_rest_encryption_enabled = true
+  # Existing cluster: AWS requires apply_immediately + preferred before required.
   transit_encryption_enabled = true
+  transit_encryption_mode    = "preferred"
   auth_token                 = random_password.redis.result
+  auth_token_update_strategy = "SET"
   automatic_failover_enabled = true
 }
 
