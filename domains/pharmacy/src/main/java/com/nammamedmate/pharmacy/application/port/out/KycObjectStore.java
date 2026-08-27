@@ -10,6 +10,9 @@ public interface KycObjectStore {
   /** Store bytes at the given key with specified content type. */
   void put(String key, byte[] bytes, String contentType);
 
+  /** Read stored bytes, or {@code null} when the key is missing. */
+  byte[] get(String key);
+
   /** Best-effort delete when malware is detected. */
   void delete(String key);
 }

@@ -8,8 +8,10 @@ import static org.mockito.Mockito.when;
 import com.nammamedmate.kernel.api.ApiResponse;
 import com.nammamedmate.pharmacy.adapter.in.web.AdminPharmacyProfileController;
 import com.nammamedmate.pharmacy.adapter.in.web.PharmacyProfileController;
+import com.nammamedmate.pharmacy.adapter.in.web.PharmacyPublicLogoController;
 import com.nammamedmate.pharmacy.adapter.out.notify.LoggingProfileContactNotifier;
 import com.nammamedmate.pharmacy.application.AdminPharmacyProfileService;
+import com.nammamedmate.pharmacy.application.PharmacyLogoService;
 import com.nammamedmate.pharmacy.application.PharmacyProfileService;
 import com.nammamedmate.pharmacy.application.port.out.ProfileContactNotifier;
 import com.nammamedmate.security.MedmatePrincipal;
@@ -17,6 +19,9 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 class PharmacyProfileAdapterCoverageTest {
 
@@ -33,8 +38,18 @@ class PharmacyProfileAdapterCoverageTest {
     when(service.getBankAccount(any())).thenReturn(Map.of("bank_account_id", "b"));
     when(service.verifyContact(any(), any(), any())).thenReturn(Map.of("verified", true));
 
-    PharmacyProfileController controller = new PharmacyProfileController(service);
+    PharmacyLogoService logos = mock(PharmacyLogoService.class);
+    when(logos.uploadLogo(any(), any(), any(), any(), any()))
+        .thenAnswer(
+            inv -> {
+              java.util.function.Function<String, String> urls = inv.getArgument(4);
+              urls.apply("shop.png");
+              return Map.of("logo_url", "https://api.example/shop.png");
+            });
+
+    PharmacyProfileController controller = new PharmacyProfileController(service, logos);
     MedmatePrincipal principal = mock(MedmatePrincipal.class);
+    when(principal.pharmacyId()).thenReturn(UUID.randomUUID());
 
     assertThat(controller.getProfile(principal).success()).isTrue();
     assertThat(controller.patchProfile(principal, Map.of()).success()).isTrue();
@@ -50,6 +65,31 @@ class PharmacyProfileAdapterCoverageTest {
                     new PharmacyProfileController.VerifyContactRequest("PHONE", "123456"))
                 .success())
         .isTrue();
+
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setScheme("https");
+    request.setServerName("api.example");
+    request.setServerPort(443);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    try {
+      MockMultipartFile file =
+          new MockMultipartFile("file", "shop.png", "image/png", new byte[] {1, 2, 3});
+      assertThat(controller.uploadLogo(principal, file).getStatusCode().value()).isEqualTo(201);
+      assertThat(controller.uploadLogo(principal, null).getBody().success()).isTrue();
+    } catch (java.io.IOException e) {
+      throw new AssertionError(e);
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+
+    PharmacyPublicLogoController publicLogos = new PharmacyPublicLogoController(logos);
+    assertThat(publicLogos.getLogo("../secret.png").getStatusCode().value()).isEqualTo(404);
+    UUID id = UUID.randomUUID();
+    when(logos.readPublicLogo(any(), any())).thenReturn(null);
+    assertThat(publicLogos.getLogo(id + ".png").getStatusCode().value()).isEqualTo(404);
+    when(logos.readPublicLogo(any(), any()))
+        .thenReturn(new PharmacyLogoService.PublicLogo(new byte[] {9}, "image/png"));
+    assertThat(publicLogos.getLogo(id + ".png").getBody()).containsExactly((byte) 9);
   }
 
   @Test

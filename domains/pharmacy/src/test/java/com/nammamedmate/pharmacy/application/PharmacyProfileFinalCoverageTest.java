@@ -68,7 +68,8 @@ class PharmacyProfileFinalCoverageTest {
     when(service.patchProfile(any(), any())).thenReturn(Map.of());
     when(service.patchTax(any(), any())).thenReturn(Map.of());
     when(service.verifyContact(any(), any(), any())).thenReturn(Map.of());
-    PharmacyProfileController controller = new PharmacyProfileController(service);
+    PharmacyProfileController controller =
+        new PharmacyProfileController(service, mock(PharmacyLogoService.class));
     MedmatePrincipal p = mock(MedmatePrincipal.class);
     assertThat(controller.patchProfile(p, null).success()).isTrue();
     assertThat(controller.patchTax(p, null).success()).isTrue();

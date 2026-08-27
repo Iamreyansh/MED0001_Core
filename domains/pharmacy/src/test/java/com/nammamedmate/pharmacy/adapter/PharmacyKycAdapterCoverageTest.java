@@ -168,6 +168,40 @@ class PharmacyKycAdapterCoverageTest {
     store.delete("kyc/doc.pdf");
     org.mockito.Mockito.verify(s3)
         .deleteObject(any(software.amazon.awssdk.services.s3.model.DeleteObjectRequest.class));
+
+    software.amazon.awssdk.core.ResponseBytes<
+            software.amazon.awssdk.services.s3.model.GetObjectResponse>
+        found =
+            software.amazon.awssdk.core.ResponseBytes.fromByteArray(
+                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
+                "hello".getBytes());
+    when(s3.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+        .thenReturn(found);
+    assertThat(store.get("kyc/doc.pdf")).isEqualTo("hello".getBytes());
+
+    when(s3.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+        .thenThrow(
+            software.amazon.awssdk.services.s3.model.NoSuchKeyException.builder()
+                .message("missing")
+                .build());
+    assertThat(store.get("missing")).isNull();
+
+    when(s3.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+        .thenThrow(
+            software.amazon.awssdk.services.s3.model.S3Exception.builder()
+                .statusCode(404)
+                .message("nf")
+                .build());
+    assertThat(store.get("gone")).isNull();
+
+    when(s3.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+        .thenThrow(
+            software.amazon.awssdk.services.s3.model.S3Exception.builder()
+                .statusCode(500)
+                .message("boom")
+                .build());
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.get("fail"))
+        .isInstanceOf(software.amazon.awssdk.services.s3.model.S3Exception.class);
   }
 
   @Test
@@ -175,7 +209,10 @@ class PharmacyKycAdapterCoverageTest {
     LocalKycObjectStore store = new LocalKycObjectStore();
     String key = "kyc/" + PID + "/PAN_CARD/" + DOC_ID + ".pdf";
     store.put(key, "data".getBytes(), "application/pdf");
+    assertThat(store.get(key)).isEqualTo("data".getBytes());
+    assertThat(store.get("kyc/missing.pdf")).isNull();
     store.delete(key);
+    assertThat(store.get(key)).isNull();
   }
 
   @Test
@@ -291,6 +328,24 @@ class PharmacyKycAdapterCoverageTest {
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () -> store.put("key", "data".getBytes(), "application/pdf"))
         .isInstanceOf(UncheckedIOException.class);
+  }
+
+  @Test
+  void localKycObjectStoreGetThrowsWhenUnreadable(@TempDir Path tempDir) throws Exception {
+    LocalKycObjectStore store = new LocalKycObjectStore(tempDir) {};
+    store.put("secret", "data".getBytes(), "application/pdf");
+    Path target = tempDir.resolve("secret");
+    boolean hidden = target.toFile().setReadable(false, false);
+    try {
+      if (hidden && !target.toFile().canRead()) {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.get("secret"))
+            .isInstanceOf(UncheckedIOException.class);
+      } else {
+        assertThat(store.get("secret")).isNotNull();
+      }
+    } finally {
+      target.toFile().setReadable(true, false);
+    }
   }
 
   @Test

@@ -46,6 +46,19 @@ public class LocalKycObjectStore implements KycObjectStore {
   }
 
   @Override
+  public byte[] get(String key) {
+    try {
+      Path target = base.resolve(key.replace('/', '-'));
+      if (!Files.isRegularFile(target)) {
+        return null;
+      }
+      return Files.readAllBytes(target);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to read KYC object: " + key, e);
+    }
+  }
+
+  @Override
   public void delete(String key) {
     try {
       Path target = base.resolve(key.replace('/', '-'));

@@ -3,12 +3,15 @@ package com.nammamedmate.pharmacy.adapter.in.web;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.nammamedmate.kernel.api.ApiResponse;
+import com.nammamedmate.pharmacy.application.PharmacyLogoService;
 import com.nammamedmate.pharmacy.application.PharmacyProfileService;
 import com.nammamedmate.security.MedmatePrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.io.IOException;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +19,10 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/v1/pharmacy/profile")
@@ -24,9 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class PharmacyProfileController {
 
   private final PharmacyProfileService service;
+  private final PharmacyLogoService logos;
 
-  public PharmacyProfileController(PharmacyProfileService service) {
+  public PharmacyProfileController(PharmacyProfileService service, PharmacyLogoService logos) {
     this.service = service;
+    this.logos = logos;
   }
 
   @GetMapping
@@ -41,6 +49,29 @@ public class PharmacyProfileController {
   public ApiResponse<Map<String, Object>> patchProfile(
       @AuthenticationPrincipal MedmatePrincipal principal, @RequestBody Map<String, Object> body) {
     return ApiResponse.ok(service.patchProfile(principal, body == null ? Map.of() : body));
+  }
+
+  @PostMapping(value = "/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @Operation(summary = "Upload pharmacy logo (owner)")
+  public ResponseEntity<ApiResponse<Map<String, Object>>> uploadLogo(
+      @AuthenticationPrincipal MedmatePrincipal principal,
+      @RequestParam(value = "file", required = false) MultipartFile file)
+      throws IOException {
+    byte[] bytes = file == null ? new byte[0] : file.getBytes();
+    String originalName = file == null ? null : file.getOriginalFilename();
+    String contentType = file == null ? null : file.getContentType();
+    Map<String, Object> data =
+        logos.uploadLogo(
+            principal,
+            bytes,
+            originalName,
+            contentType,
+            fileName ->
+                ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/api/v1/public/pharmacy-logos/{fileName}")
+                    .buildAndExpand(fileName)
+                    .toUriString());
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(data));
   }
 
   @PatchMapping("/tax")

@@ -38,6 +38,25 @@ public class S3KycObjectStore implements KycObjectStore {
   }
 
   @Override
+  public byte[] get(String key) {
+    try {
+      return s3.getObjectAsBytes(
+              software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
+                  .bucket(bucket)
+                  .key(key)
+                  .build())
+          .asByteArray();
+    } catch (software.amazon.awssdk.services.s3.model.NoSuchKeyException e) {
+      return null;
+    } catch (software.amazon.awssdk.services.s3.model.S3Exception e) {
+      if (e.statusCode() == 404) {
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  @Override
   public void delete(String key) {
     s3.deleteObject(
         software.amazon.awssdk.services.s3.model.DeleteObjectRequest.builder()

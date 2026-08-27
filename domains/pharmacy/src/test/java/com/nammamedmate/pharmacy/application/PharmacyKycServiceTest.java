@@ -1269,6 +1269,11 @@ class PharmacyKycServiceTest {
     }
 
     @Override
+    public byte[] get(String key) {
+      return stored.contains(key) ? new byte[] {1} : null;
+    }
+
+    @Override
     public void delete(String key) {
       deleted.add(key);
       stored.remove(key);
