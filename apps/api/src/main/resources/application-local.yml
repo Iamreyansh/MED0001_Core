@@ -19,6 +19,8 @@ logging:
     root: INFO
 
 medmate:
+  cors:
+    allow-localhost: true
   internal:
     service-token: local-internal-wallet-token
   inventory:

@@ -8,6 +8,7 @@ import com.nammamedmate.security.JwtAuthenticationFilter;
 import com.nammamedmate.security.MfaChallengeRestrictionFilter;
 import com.nammamedmate.security.PosTokenRestrictionFilter;
 import com.nammamedmate.security.Rs256JwtService;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -722,10 +723,21 @@ public class SecurityConfig {
   }
 
   @Bean
-  CorsConfigurationSource corsConfigurationSource() {
+  CorsConfigurationSource corsConfigurationSource(
+      @Value("${medmate.cors.allow-localhost:false}") boolean allowLocalhost) {
     CorsConfiguration config = new CorsConfiguration();
-    config.setAllowedOriginPatterns(
-        List.of("https://*.nammamedmate.com", "https://nammamedmate.com"));
+    List<String> origins =
+        new ArrayList<>(List.of("https://*.nammamedmate.com", "https://nammamedmate.com"));
+    if (allowLocalhost) {
+      origins.addAll(
+          List.of(
+              "http://localhost:[*]",
+              "http://127.0.0.1:[*]",
+              "http://[::1]:[*]",
+              "https://localhost:[*]",
+              "https://127.0.0.1:[*]"));
+    }
+    config.setAllowedOriginPatterns(origins);
     config.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
     config.setExposedHeaders(List.of(RequestIdFilter.HEADER));

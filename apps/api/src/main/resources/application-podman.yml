@@ -19,3 +19,8 @@ logging:
   level:
     root: INFO
     com.nammamedmate: INFO
+
+medmate:
+  cors:
+    # Credentialed browser calls from local frontends (Vite/Next/etc.). Off in staging/prod.
+    allow-localhost: true
