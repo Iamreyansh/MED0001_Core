@@ -68,9 +68,10 @@ resource "aws_elasticache_replication_group" "redis" {
   security_group_ids         = [aws_security_group.data.id]
   apply_immediately          = true
   at_rest_encryption_enabled = true
-  # Existing cluster: AWS requires apply_immediately + preferred before required.
+  # Existing cluster: AWS rejects AUTH until TLS mode is required (preferred is not enough).
+  # First apply: ROTATE (optional token). After that completes, SET makes AUTH required.
   transit_encryption_enabled = true
-  transit_encryption_mode    = "preferred"
+  transit_encryption_mode    = "required"
   auth_token                 = random_password.redis.result
   auth_token_update_strategy = "SET"
   automatic_failover_enabled = true
