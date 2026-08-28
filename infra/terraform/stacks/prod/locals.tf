@@ -1,7 +1,6 @@
 variable "image_tag" {
   type        = string
-  description = "ECR image tag for api/worker (CI sets to release-* tag)"
-  default     = "prod"
+  description = "Immutable ECR tag (semver from deploy-prod). Required — the old default 'prod' was never pushed and left ECS unable to pull."
 }
 
 locals {
