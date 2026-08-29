@@ -52,6 +52,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: production
+    env:
+      # Required by prod stack (no default). Targeted ECR apply runs before the full apply step.
+      TF_VAR_image_tag: ${{ needs.guard.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,8 +92,6 @@ jobs:
           crane copy "${STAGING_WORKER}:${FULL_SHA}" "${PROD_WORKER}:${TAG}"
           echo "Promoted ${FULL_SHA} → immutable ${TAG}"
       - name: Terraform apply prod
-        env:
-          TF_VAR_image_tag: ${{ needs.guard.outputs.tag }}
         run: |
           make tf-apply ENV=prod TF_ARGS="-auto-approve -input=false"
       - name: Rolling ECS deploy + wait stable
