@@ -43,7 +43,8 @@ class CatalogueSearchIT extends AbstractApiIT {
     jdbc.update("DELETE FROM medicine_ban_job");
     jdbc.update("DELETE FROM price_ceiling_violation");
     jdbc.update("DELETE FROM pharmacy_catalogue_mapping");
-    jdbc.update("DELETE FROM medicine_master");
+    jdbc.update(
+        "DELETE FROM medicine_master WHERE id::text NOT LIKE 'a0000001-0000-4000-8000-%'");
     jdbc.update("DELETE FROM sessions WHERE user_id IN (?, ?, ?)", OPS_ID, COMPLIANCE_ID, STAFF_ID);
     jdbc.update("DELETE FROM admin_auth_events WHERE admin_id IN (?, ?)", OPS_ID, COMPLIANCE_ID);
     jdbc.update(
@@ -193,6 +194,57 @@ class CatalogueSearchIT extends AbstractApiIT {
             Map.class);
     assertThat(pharmacySearch.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(data(pharmacySearch).get("results")).asList().isNotEmpty();
+  }
+
+  @Test
+  void seededMasterSearchFindsCrocinAndPara() {
+    ensureSeededMaster();
+    String pharmacyToken = pharmacyLogin();
+    ResponseEntity<Map> crocin =
+        rest.exchange(
+            baseUrl() + "/api/v1/pharmacy/catalogue/search?q=crocin&source=MASTER",
+            HttpMethod.GET,
+            bearer(pharmacyToken, null),
+            Map.class);
+    assertThat(crocin.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(data(crocin).get("results")).asList().isNotEmpty();
+
+    ResponseEntity<Map> para =
+        rest.exchange(
+            baseUrl() + "/api/v1/pharmacy/catalogue/search?q=para&source=MASTER",
+            HttpMethod.GET,
+            bearer(pharmacyToken, null),
+            Map.class);
+    assertThat(para.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(data(para).get("results")).asList().isNotEmpty();
+  }
+
+  private void ensureSeededMaster() {
+    Long count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM medicine_master WHERE id ="
+                + " 'a0000001-0000-4000-8000-000000000001'::uuid",
+            Long.class);
+    if (count != null && count > 0) {
+      return;
+    }
+    jdbc.update(
+        """
+        INSERT INTO medicine_master (
+          id, name, salt_composition, manufacturer, category_id, form, pack_size,
+          pack_unit, schedule, hsn_code, gst_pct, mrp_paise, is_rx_only, is_banned,
+          monthly_demand, mapped_pharmacy_count, substitutes, created_at, updated_at
+        ) VALUES
+          ('a0000001-0000-4000-8000-000000000001', 'Crocin 500mg Tablet',
+           'Paracetamol (500mg)', 'GSK', 'c0000001-0000-4000-8000-000000000004',
+           'TABLET', 15, 'TABLET', 'OTC', '30049029', 12, 3000, FALSE, FALSE,
+           0, 0, '{}', NOW(), NOW()),
+          ('a0000001-0000-4000-8000-000000000002', 'Paracetamol 500mg Tablet',
+           'Paracetamol (500mg)', 'Generic Labs',
+           'c0000001-0000-4000-8000-000000000004', 'TABLET', 10, 'TABLET', 'OTC',
+           '30049029', 12, 1800, FALSE, FALSE, 0, 0, '{}', NOW(), NOW())
+        ON CONFLICT (id) DO NOTHING
+        """);
   }
 
   private String createMedicine(String adminToken, String name, String schedule, double mrp) {

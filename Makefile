@@ -31,6 +31,7 @@ help: ## Show available targets
 
 .PHONY: deps-up
 deps-up: ## Start Postgres + Redis (Podman Compose)
+	@podman machine inspect --format '{{.State}}' 2>/dev/null | grep -qx running || podman machine start
 	$(COMPOSE) up -d
 	@echo "Waiting for Postgres..."
 	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \

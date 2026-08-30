@@ -119,6 +119,22 @@ class PurchaseGrnServiceTest {
   }
 
   @Test
+  void createDraft_usesWalkInWhenDistributorOmitted() {
+    UUID walkInId = UUID.fromString("dddddddd-0001-4000-8000-000000000001");
+    Distributor walkIn = Distributor.walkIn(walkInId, PHARMACY, NOW);
+    when(distributorStore.findActiveSystem(PHARMACY)).thenReturn(Optional.empty());
+    when(distributorStore.insertSystem(any())).thenReturn(walkIn);
+    when(grnStore.invoiceExists(PHARMACY, walkInId, "WALK-1")).thenReturn(false);
+    when(grnStore.insert(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    Map<String, Object> created = service.create(owner, null, "WALK-1", LocalDate.of(2026, 7, 22));
+    assertThat(created.get("status")).isEqualTo("DRAFT");
+    assertThat(created.get("distributor_id")).isEqualTo(walkInId.toString());
+    assertThat(created.get("distributor_name")).isEqualTo(Distributor.WALK_IN_FIRM);
+    verify(distributorStore).insertSystem(any());
+  }
+
+  @Test
   void saveAndStock_createsBatches_freeQty_andRejectsStaffAndAlreadyStocked() {
     UUID grnId = UUID.randomUUID();
     PurchaseGrn draft = draftGrn(grnId);

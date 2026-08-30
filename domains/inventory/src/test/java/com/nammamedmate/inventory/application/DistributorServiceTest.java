@@ -199,6 +199,18 @@ class DistributorServiceTest {
   }
 
   @Test
+  void deactivate_rejectsSystemWalkIn() {
+    when(store.findById(PHARMACY, DIST_A))
+        .thenReturn(Optional.of(Distributor.walkIn(DIST_A, PHARMACY, NOW)));
+    when(store.isSystem(PHARMACY, DIST_A)).thenReturn(true);
+    assertThatThrownBy(() -> service.deactivate(owner, DIST_A))
+        .isInstanceOf(AppException.class)
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("SYSTEM_DISTRIBUTOR_LOCKED");
+    verify(store, never()).deactivate(any(), any(), any());
+  }
+
+  @Test
   void setPreferred_clearsOtherDistributor() {
     when(store.findById(PHARMACY, DIST_A))
         .thenReturn(Optional.of(Distributor.minimal(DIST_A, PHARMACY, "A", true, NOW)));

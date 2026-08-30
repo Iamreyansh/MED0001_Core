@@ -39,6 +39,10 @@ class DistributorTest {
                     null)
                 .onCredit())
         .isTrue();
+    assertThat(Distributor.walkIn(id, pharmacy, now).firmName())
+        .isEqualTo(Distributor.WALK_IN_FIRM);
+    assertThat(Distributor.walkIn(id, pharmacy, now).phone())
+        .isEqualTo(Distributor.WALK_IN_PHONE);
   }
 }
 

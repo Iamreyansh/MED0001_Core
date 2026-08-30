@@ -16,7 +16,13 @@ public interface DistributorStore {
 
   Optional<Distributor> findActiveByPhone(UUID pharmacyId, String phone, UUID excludeId);
 
+  Optional<Distributor> findActiveSystem(UUID pharmacyId);
+
+  boolean isSystem(UUID pharmacyId, UUID distributorId);
+
   Distributor insert(Distributor distributor);
+
+  Distributor insertSystem(Distributor distributor);
 
   Distributor update(Distributor distributor);
 

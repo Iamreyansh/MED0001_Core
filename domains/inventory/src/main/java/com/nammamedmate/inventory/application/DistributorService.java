@@ -243,6 +243,10 @@ public class DistributorService {
             .findById(principal.pharmacyId(), id)
             .orElseThrow(
                 () -> new AppException("DISTRIBUTOR_NOT_FOUND", "Distributor not found", 404));
+    if (store.isSystem(principal.pharmacyId(), id)) {
+      throw new AppException(
+          "SYSTEM_DISTRIBUTOR_LOCKED", "Cash / Walk-in cannot be deactivated", 400);
+    }
 
     Instant now = clock.instant();
     store.deactivate(principal.pharmacyId(), id, now);

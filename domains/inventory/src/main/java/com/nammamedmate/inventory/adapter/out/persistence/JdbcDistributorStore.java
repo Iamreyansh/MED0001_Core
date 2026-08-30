@@ -67,14 +67,48 @@ public class JdbcDistributorStore implements DistributorStore {
   }
 
   @Override
+  public Optional<Distributor> findActiveSystem(UUID pharmacyId) {
+    List<Distributor> rows =
+        jdbc.query(
+            SELECT
+                + " WHERE pharmacy_id = ? AND is_system = TRUE AND deleted_at IS NULL",
+            ROW_MAPPER,
+            pharmacyId);
+    return rows.stream().findFirst();
+  }
+
+  @Override
+  public boolean isSystem(UUID pharmacyId, UUID distributorId) {
+    Boolean flag =
+        jdbc.queryForObject(
+            """
+            SELECT is_system FROM distributors
+             WHERE pharmacy_id = ? AND id = ? AND deleted_at IS NULL
+            """,
+            Boolean.class,
+            pharmacyId,
+            distributorId);
+    return Boolean.TRUE.equals(flag);
+  }
+
+  @Override
   public Distributor insert(Distributor distributor) {
+    return insert(distributor, false);
+  }
+
+  @Override
+  public Distributor insertSystem(Distributor distributor) {
+    return insert(distributor, true);
+  }
+
+  private Distributor insert(Distributor distributor, boolean system) {
     jdbc.update(
         """
         INSERT INTO distributors (
           id, pharmacy_id, firm_name, contact_name, phone, email, gstin,
           drug_licence_number, address, payment_terms_days, credit_limit_paise,
-          is_active, created_at, updated_at, deleted_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          is_active, is_system, created_at, updated_at, deleted_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
         distributor.id(),
         distributor.pharmacyId(),
@@ -88,6 +122,7 @@ public class JdbcDistributorStore implements DistributorStore {
         distributor.paymentTermsDays(),
         distributor.creditLimitPaise(),
         distributor.active(),
+        system,
         Timestamp.from(distributor.createdAt()),
         Timestamp.from(distributor.updatedAt()),
         distributor.deletedAt() == null ? null : Timestamp.from(distributor.deletedAt()));

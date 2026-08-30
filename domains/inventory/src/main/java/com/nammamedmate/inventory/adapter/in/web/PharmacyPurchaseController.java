@@ -153,7 +153,7 @@ public class PharmacyPurchaseController {
   public ApiResponse<Map<String, Object>> importCsv(
       @AuthenticationPrincipal MedmatePrincipal principal,
       @RequestPart("csv_file") MultipartFile csvFile,
-      @RequestParam("distributor_id") UUID distributorId,
+      @RequestParam(value = "distributor_id", required = false) UUID distributorId,
       @RequestParam("invoice_number") String invoiceNumber,
       @RequestParam("invoice_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate invoiceDate) {

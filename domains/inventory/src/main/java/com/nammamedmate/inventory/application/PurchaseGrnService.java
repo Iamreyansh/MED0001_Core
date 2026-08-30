@@ -39,6 +39,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -164,15 +165,15 @@ public class PurchaseGrnService {
     requirePharmacyReader(principal);
     rateLimit("pharmacy:purchases:create:" + principal.pharmacyId(), CREATE_LIMIT);
 
-    Distributor distributor = requireUsableDistributor(principal.pharmacyId(), distributorId);
-    validateInvoiceHeader(principal.pharmacyId(), distributorId, invoiceNumber, invoiceDate);
+    Distributor distributor = resolveUsableDistributor(principal.pharmacyId(), distributorId);
+    validateInvoiceHeader(principal.pharmacyId(), distributor.id(), invoiceNumber, invoiceDate);
 
     Instant now = clock.instant();
     PurchaseGrn grn =
         new PurchaseGrn(
             UUID.randomUUID(),
             principal.pharmacyId(),
-            distributorId,
+            distributor.id(),
             invoiceNumber.trim(),
             invoiceDate,
             GrnStatus.DRAFT,
@@ -555,8 +556,8 @@ public class PurchaseGrnService {
       throw new AppException("FILE_TOO_LARGE", "CSV exceeds 5MB", 400);
     }
 
-    Distributor distributor = requireUsableDistributor(principal.pharmacyId(), distributorId);
-    validateInvoiceHeader(principal.pharmacyId(), distributorId, invoiceNumber, invoiceDate);
+    Distributor distributor = resolveUsableDistributor(principal.pharmacyId(), distributorId);
+    validateInvoiceHeader(principal.pharmacyId(), distributor.id(), invoiceNumber, invoiceDate);
 
     List<String[]> rows;
     try {
@@ -572,7 +573,7 @@ public class PurchaseGrnService {
         new PurchaseGrn(
             UUID.randomUUID(),
             principal.pharmacyId(),
-            distributorId,
+            distributor.id(),
             invoiceNumber.trim(),
             invoiceDate,
             GrnStatus.DRAFT,
@@ -971,9 +972,9 @@ public class PurchaseGrnService {
     return m;
   }
 
-  private Distributor requireUsableDistributor(UUID pharmacyId, UUID distributorId) {
+  private Distributor resolveUsableDistributor(UUID pharmacyId, UUID distributorId) {
     if (distributorId == null) {
-      throw new AppException("VALIDATION_ERROR", "distributor_id is required", 400);
+      return ensureWalkInDistributor(pharmacyId);
     }
     Distributor d =
         distributorStore
@@ -987,6 +988,15 @@ public class PurchaseGrnService {
       throw new AppException("DISTRIBUTOR_INACTIVE", "Distributor is inactive", 400);
     }
     return d;
+  }
+
+  private Distributor ensureWalkInDistributor(UUID pharmacyId) {
+    Optional<Distributor> existing = distributorStore.findActiveSystem(pharmacyId);
+    if (existing.isPresent()) {
+      return existing.get();
+    }
+    Instant now = clock.instant();
+    return distributorStore.insertSystem(Distributor.walkIn(UUID.randomUUID(), pharmacyId, now));
   }
 
   private void validateInvoiceHeader(

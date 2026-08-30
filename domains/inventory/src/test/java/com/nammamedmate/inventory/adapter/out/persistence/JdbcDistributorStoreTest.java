@@ -75,6 +75,10 @@ class JdbcDistributorStoreTest {
     assertThat(store.kpi(pharmacy).distributorCount()).isEqualTo(1);
     assertThat(store.outstandingPayablePaise(pharmacy, id)).isEqualTo(1L);
     assertThat(store.lastPurchaseDate(pharmacy, id)).isEqualTo(LocalDate.of(2026, 7, 22));
+    assertThat(store.findActiveSystem(pharmacy)).isPresent();
+    assertThat(store.insertSystem(d)).isSameAs(d);
+    when(jdbc.queryForObject(anyString(), any(Class.class), any(), any())).thenReturn(Boolean.TRUE);
+    assertThat(store.isSystem(pharmacy, id)).isTrue();
   }
 
   private ResultSet mockRs() throws Exception {

@@ -94,9 +94,11 @@ class PurchaseGrnServiceGapsTest {
     service.list(owner, null, null, null, null, null, 1, 0);
     service.list(owner, null, null, null, null, null, 1, 500);
 
-    assertThatThrownBy(() -> service.create(owner, null, "I", LocalDate.of(2026, 7, 1)))
-        .extracting(e -> ((AppException) e).code())
-        .isEqualTo("VALIDATION_ERROR");
+    when(distributorStore.findActiveSystem(PHARMACY)).thenReturn(Optional.of(activeDist));
+    when(grnStore.invoiceExists(PHARMACY, DIST, "I")).thenReturn(false);
+    when(grnStore.insert(any())).thenAnswer(inv -> inv.getArgument(0));
+    assertThat(service.create(owner, null, "I", LocalDate.of(2026, 7, 1)).get("status"))
+        .isEqualTo("DRAFT");
     assertThatThrownBy(() -> service.create(owner, DIST, " ", LocalDate.of(2026, 7, 1)))
         .extracting(e -> ((AppException) e).code())
         .isEqualTo("VALIDATION_ERROR");
