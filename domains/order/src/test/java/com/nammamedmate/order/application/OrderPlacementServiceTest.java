@@ -644,6 +644,33 @@ class OrderPlacementServiceTest {
           .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))
           .toList();
     }
+
+    @Override
+    public List<Order> listByPharmacy(UUID pharmacyId, String statusFilter, int offset, int limit) {
+      return byId.values().stream()
+          .filter(o -> o.pharmacyId().equals(pharmacyId))
+          .filter(
+              o ->
+                  statusFilter == null
+                      || "ALL".equalsIgnoreCase(statusFilter)
+                      || o.status().name().equalsIgnoreCase(statusFilter))
+          .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))
+          .skip(offset)
+          .limit(limit)
+          .toList();
+    }
+
+    @Override
+    public long countByPharmacy(UUID pharmacyId, String statusFilter) {
+      return byId.values().stream()
+          .filter(o -> o.pharmacyId().equals(pharmacyId))
+          .filter(
+              o ->
+                  statusFilter == null
+                      || "ALL".equalsIgnoreCase(statusFilter)
+                      || o.status().name().equalsIgnoreCase(statusFilter))
+          .count();
+    }
   }
 
   static final class InMemoryOrderStatusEventStore implements OrderStatusEventStore {

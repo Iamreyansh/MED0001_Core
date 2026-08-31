@@ -252,4 +252,19 @@ class JdbcOrderStoreCoverageTest {
     assertThatThrownBy(() -> store.nextSequence(LocalDate.of(2026, 8, 8)))
         .isInstanceOf(IllegalStateException.class);
   }
+
+  @Test
+  void pharmacyInboxQueriesBothFilters() {
+    JdbcOrderStore store = new JdbcOrderStore(jdbc, new ObjectMapper());
+    when(jdbc.query(anyString(), any(RowMapper.class), any(), any(), any(), any()))
+        .thenReturn(List.of());
+    when(jdbc.query(anyString(), any(RowMapper.class), any(), any(), any())).thenReturn(List.of());
+    when(jdbc.queryForObject(anyString(), eq(Long.class), any(), any())).thenReturn(2L);
+    when(jdbc.queryForObject(anyString(), eq(Long.class), any())).thenReturn(null);
+    assertThat(store.listByPharmacy(id, "ACCEPTED", 0, 20)).isEmpty();
+    assertThat(store.listByPharmacy(id, "ALL", 0, 20)).isEmpty();
+    assertThat(store.listByPharmacy(id, "  ", 0, 10)).isEmpty();
+    assertThat(store.countByPharmacy(id, "ACCEPTED")).isEqualTo(2L);
+    assertThat(store.countByPharmacy(id, null)).isZero();
+  }
 }

@@ -222,10 +222,10 @@ class ScheduleDrugRegisterServiceFinalCoverageTest {
     MedmatePrincipal admin =
         new MedmatePrincipal(
             UUID.randomUUID(), AuthRole.ADMIN_COMPLIANCE, null, TokenScope.FULL, "j");
-    assertThatThrownBy(() -> service.listAdmin(admin, null, null, null, null, null, 1, 10, false))
-        .extracting(ex -> ((AppException) ex).code())
-        .isEqualTo("INVALID_SCHEDULE");
-    assertThatThrownBy(() -> service.listAdmin(admin, "  ", null, null, null, null, 1, 10, false))
+    when(store.list(any())).thenReturn(new ListPage(List.of(), 0, 0));
+    assertThat(service.listAdmin(admin, null, null, null, null, null, 1, 10, false)).isNotNull();
+    assertThat(service.listAdmin(admin, "  ", null, null, null, null, 1, 10, false)).isNotNull();
+    assertThatThrownBy(() -> service.listAdmin(admin, "H", null, null, null, null, 1, 10, false))
         .extracting(ex -> ((AppException) ex).code())
         .isEqualTo("INVALID_SCHEDULE");
     assertThatThrownBy(() -> service.createExportJob(admin, null, "H1", "2026-01-01", "2026-01-31"))

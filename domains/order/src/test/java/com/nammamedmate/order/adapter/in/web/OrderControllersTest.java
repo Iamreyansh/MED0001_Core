@@ -324,6 +324,17 @@ class OrderControllersTest {
     when(orderLifecycle.timeline(customer, orderId)).thenReturn(Map.of("events", List.of()));
     assertThat(orderController.timeline(customer, orderId).data()).containsKey("events");
 
+    when(orderLifecycle.listPharmacyInbox(eq(pharmacyPrincipal), isNull(), isNull(), isNull()))
+        .thenReturn(
+            new OrderLifecycleService.PharmacyInboxResult(
+                List.of(Map.of("order_id", orderId.toString())), PaginationMeta.of(1, 20, 1)));
+    assertThat(pharmacyOrderLifecycleController.list(pharmacyPrincipal, null, null, null).data())
+        .hasSize(1);
+    when(orderLifecycle.getPharmacyOrder(pharmacyPrincipal, orderId))
+        .thenReturn(Map.of("order_id", orderId.toString()));
+    assertThat(pharmacyOrderLifecycleController.get(pharmacyPrincipal, orderId).data())
+        .containsEntry("order_id", orderId.toString());
+
     when(orderLifecycle.accept(pharmacyPrincipal, orderId))
         .thenReturn(Map.of("status", "ACCEPTED"));
     assertThat(pharmacyOrderLifecycleController.accept(pharmacyPrincipal, orderId).data())
@@ -356,6 +367,17 @@ class OrderControllersTest {
         new PharmacyOrderLifecycleController.AssignRiderRequest(riderId));
     pharmacyOrderLifecycleController.assignRider(pharmacyPrincipal, orderId, null);
     verify(orderLifecycle).assignRider(pharmacyPrincipal, orderId, null);
+
+    when(orderLifecycle.pharmacyHandoff(pharmacyPrincipal, orderId))
+        .thenReturn(Map.of("pickup_otp", "1234"));
+    assertThat(pharmacyOrderLifecycleController.handoff(pharmacyPrincipal, orderId).data())
+        .containsEntry("pickup_otp", "1234");
+    PharmacyRiderDirectoryController riders = new PharmacyRiderDirectoryController(orderLifecycle);
+    when(orderLifecycle.listRiders(pharmacyPrincipal)).thenReturn(Map.of("riders", List.of()));
+    assertThat(riders.list(pharmacyPrincipal).data()).containsKey("riders");
+    PharmacyDashboardController dash = new PharmacyDashboardController(orderLifecycle);
+    when(orderLifecycle.dashboardSummary(pharmacyPrincipal)).thenReturn(Map.of("orders", Map.of()));
+    assertThat(dash.summary(pharmacyPrincipal).data()).containsKey("orders");
 
     when(orderLifecycle.adminForceStatus(
             eq(admin), eq(orderId), eq("OUT_FOR_DELIVERY"), any(), any()))

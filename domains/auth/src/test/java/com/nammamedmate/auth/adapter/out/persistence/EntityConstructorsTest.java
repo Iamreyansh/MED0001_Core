@@ -16,6 +16,8 @@ class EntityConstructorsTest {
     assertThat(newInstance(PharmacyStaffEntity.class)).isNotNull();
     assertThat(newInstance(PharmacyAssignmentEntity.class)).isNotNull();
     assertThat(newInstance(LoginAuditEntity.class)).isNotNull();
+    assertThat(newInstance(PharmacyStaffInviteEntity.class)).isNotNull();
+    assertThat(newInstance(PharmacyStaffPasswordResetEntity.class)).isNotNull();
   }
 
   private static Object newInstance(Class<?> type) throws Exception {

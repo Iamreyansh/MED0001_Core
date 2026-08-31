@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -448,6 +449,78 @@ public class JdbcOrderStore implements OrderStore {
         """,
         this::mapOrder,
         customerId);
+  }
+
+  @Override
+  public List<Order> listByPharmacy(UUID pharmacyId, String statusFilter, int offset, int limit) {
+    String status = pharmacyStatus(statusFilter);
+    if (status != null) {
+      return jdbc.query(
+          """
+          SELECT * FROM orders
+          WHERE pharmacy_id = ?
+            AND deleted_at IS NULL
+            AND status = ?
+          ORDER BY created_at DESC
+          OFFSET ? LIMIT ?
+          """,
+          this::mapOrder,
+          pharmacyId,
+          status,
+          offset,
+          limit);
+    }
+    return jdbc.query(
+        """
+        SELECT * FROM orders
+        WHERE pharmacy_id = ?
+          AND deleted_at IS NULL
+        ORDER BY created_at DESC
+        OFFSET ? LIMIT ?
+        """,
+        this::mapOrder,
+        pharmacyId,
+        offset,
+        limit);
+  }
+
+  @Override
+  public long countByPharmacy(UUID pharmacyId, String statusFilter) {
+    String status = pharmacyStatus(statusFilter);
+    Long total;
+    if (status != null) {
+      total =
+          jdbc.queryForObject(
+              """
+              SELECT COUNT(*) FROM orders
+              WHERE pharmacy_id = ?
+                AND deleted_at IS NULL
+                AND status = ?
+              """,
+              Long.class,
+              pharmacyId,
+              status);
+    } else {
+      total =
+          jdbc.queryForObject(
+              """
+              SELECT COUNT(*) FROM orders
+              WHERE pharmacy_id = ?
+                AND deleted_at IS NULL
+              """,
+              Long.class,
+              pharmacyId);
+    }
+    return total == null ? 0L : total;
+  }
+
+  private static String pharmacyStatus(String statusFilter) {
+    if (statusFilter == null
+        || statusFilter.isBlank()
+        || "ALL".equalsIgnoreCase(statusFilter.trim())) {
+      return null;
+    }
+    return statusFilter.trim().toUpperCase(Locale.ROOT);
   }
 
   private Order mapOrder(ResultSet rs, int rowNum) throws SQLException {

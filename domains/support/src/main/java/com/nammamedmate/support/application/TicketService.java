@@ -177,6 +177,28 @@ public class TicketService {
     return new ListResult(data, PaginationMeta.of(pr.page(), pr.limit(), total));
   }
 
+  @Transactional(readOnly = true)
+  public ListResult listPharmacy(MedmatePrincipal principal, Integer page, Integer limit) {
+    requirePrincipal(principal);
+    if (principal.role() != AuthRole.PHARMACY_OWNER
+        && principal.role() != AuthRole.PHARMACY_STAFF) {
+      throw new AppException("FORBIDDEN", "Pharmacy role required", 403);
+    }
+    if (principal.pharmacyId() == null) {
+      throw new AppException("FORBIDDEN", "Pharmacy context required", 403);
+    }
+    PageRequest pr = PageRequest.normalize(page, limit, null, "desc");
+    Instant now = clock.instant();
+    long total = tickets.countForPharmacy(principal.pharmacyId());
+    List<Map<String, Object>> items = new ArrayList<>();
+    for (Ticket t : tickets.listForPharmacy(principal.pharmacyId(), pr.offset(), pr.limit())) {
+      items.add(toListItem(t, now));
+    }
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("tickets", items);
+    return new ListResult(data, PaginationMeta.of(pr.page(), pr.limit(), total));
+  }
+
   @Transactional
   public Map<String, Object> create(MedmatePrincipal principal, CreateCommand cmd) {
     requireCreateRole(principal);

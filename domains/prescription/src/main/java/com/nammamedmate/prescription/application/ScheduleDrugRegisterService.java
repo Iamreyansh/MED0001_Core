@@ -596,11 +596,14 @@ public class ScheduleDrugRegisterService implements ScheduleRegisterWritePort {
 
   private static String requireSchedule(String schedule) {
     if (schedule == null || schedule.isBlank()) {
-      throw new AppException("INVALID_SCHEDULE", "Schedule must be H1 or X", 422);
+      return "ALL";
     }
     String s = schedule.trim().toUpperCase(Locale.ROOT);
+    if ("ALL".equals(s)) {
+      return "ALL";
+    }
     if (!"H1".equals(s) && !"X".equals(s)) {
-      throw new AppException("INVALID_SCHEDULE", "Schedule must be H1 or X", 422);
+      throw new AppException("INVALID_SCHEDULE", "Schedule must be H1, X, or ALL", 422);
     }
     return s;
   }

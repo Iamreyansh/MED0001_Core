@@ -44,6 +44,7 @@ import com.nammamedmate.order.application.port.out.OrderNoteStore;
 import com.nammamedmate.order.application.port.out.OrderStatusEventStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
 import com.nammamedmate.order.application.port.out.PharmacyCandidatePort;
+import com.nammamedmate.order.application.port.out.PickupOtpCachePort;
 import com.nammamedmate.order.application.port.out.PlatformCouponPort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.PriceCeilingPort;
@@ -54,6 +55,9 @@ import com.nammamedmate.order.application.port.out.RxBroadcastStore;
 import com.nammamedmate.order.application.port.out.WalletBalancePort;
 import com.nammamedmate.order.application.port.out.WalletPort;
 import com.nammamedmate.order.application.port.out.ZoneMembershipPort;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -243,6 +247,25 @@ public class OrderConfig {
       return new RedisDeliveryOtpCache(template);
     }
     return (orderId, otp) -> {};
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(PickupOtpCachePort.class)
+  PickupOtpCachePort pickupOtpCachePort() {
+    ConcurrentHashMap<UUID, String> values = new ConcurrentHashMap<>();
+    return new PickupOtpCachePort() {
+      @Override
+      public void store(UUID orderId, String otp) {
+        if (orderId != null && otp != null) {
+          values.put(orderId, otp);
+        }
+      }
+
+      @Override
+      public Optional<String> get(UUID orderId) {
+        return orderId == null ? Optional.empty() : Optional.ofNullable(values.get(orderId));
+      }
+    };
   }
 
   @Bean(name = "adminOrderExportExecutor")

@@ -14,7 +14,9 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 class GlobalExceptionHandlerTest {
 
@@ -135,5 +137,30 @@ class GlobalExceptionHandlerTest {
         handler.handleMethodNotSupported(
             new HttpRequestMethodNotSupportedException("POST"), nullUri);
     assertThat(nullPath.getBody().error().message()).isEqualTo("Method not allowed");
+  }
+
+  @Test
+  void mapsMissingScheduleAndGenericParam() {
+    var schedule =
+        handler.handleMissingParam(
+            new MissingServletRequestParameterException("schedule", "String"));
+    assertThat(schedule.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(schedule.getBody().error().code()).isEqualTo("INVALID_SCHEDULE");
+
+    var other =
+        handler.handleMissingParam(new MissingServletRequestParameterException("page", "Integer"));
+    assertThat(other.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(other.getBody().error().code()).isEqualTo("VALIDATION_ERROR");
+    assertThat(other.getBody().error().message()).contains("page");
+  }
+
+  @Test
+  void mapsUnmappedRouteToNotFound() {
+    var response =
+        handler.handleNotFound(
+            new NoResourceFoundException(
+                org.springframework.http.HttpMethod.GET, "/api/v1/pharmacy/staff"));
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(response.getBody().error().code()).isEqualTo("NOT_FOUND");
   }
 }

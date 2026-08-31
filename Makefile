@@ -157,7 +157,7 @@ coverage: ## Unit + integration tests + JaCoCo verification (100%)
 
 .PHONY: build
 build: ## Compile all modules
-	$(GRADLE) build -x test $(GRADLE_FLAGS)
+	$(GRADLE) build -x test -x jacocoTestReport -x jacocoTestCoverageVerification $(GRADLE_FLAGS)
 
 .PHONY: jar
 jar: ## Build API + worker boot jars

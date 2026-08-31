@@ -119,6 +119,11 @@ class JdbcSupportStoresTest {
                     0,
                     20)))
         .hasSize(1);
+    assertThat(store.listForPharmacy(UUID.randomUUID(), 0, 20)).hasSize(1);
+    when(jdbc.queryForObject(contains("pharmacy_id"), eq(Long.class), any())).thenReturn(3L);
+    assertThat(store.countForPharmacy(UUID.randomUUID())).isEqualTo(3);
+    when(jdbc.queryForObject(contains("pharmacy_id"), eq(Long.class), any())).thenReturn(null);
+    assertThat(store.countForPharmacy(UUID.randomUUID())).isZero();
     when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(1L);
     assertThat(store.count(new ListFilter(null, null, null, null, null, null, 0, 20))).isEqualTo(1);
 

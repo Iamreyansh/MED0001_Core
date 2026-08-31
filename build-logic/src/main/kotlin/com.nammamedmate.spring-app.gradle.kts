@@ -39,7 +39,7 @@ tasks.named("check") {
 }
 
 tasks.named<JacocoReport>("jacocoTestReport") {
-    dependsOn(integrationTest)
+    dependsOn(integrationTest, tasks.named("compileJava"))
     executionData.setFrom(
         fileTree(layout.buildDirectory.dir("jacoco")) {
             include("*.exec")
@@ -48,7 +48,7 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 }
 
 tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
-    dependsOn(integrationTest)
+    dependsOn(integrationTest, tasks.named("compileJava"))
     executionData.setFrom(
         fileTree(layout.buildDirectory.dir("jacoco")) {
             include("*.exec")

@@ -53,6 +53,12 @@ class OrderConfigTest {
         .isInstanceOf(com.nammamedmate.order.adapter.out.persistence.JdbcPriceCeilingAdapter.class);
     assertThat(config.cashfreePaymentPort("sec", "wh"))
         .isInstanceOf(com.nammamedmate.order.adapter.out.client.StubCashfreePaymentPort.class);
+    var pickup = config.pickupOtpCachePort();
+    java.util.UUID otpOrder = java.util.UUID.randomUUID();
+    pickup.store(otpOrder, "4242");
+    assertThat(pickup.get(otpOrder)).contains("4242");
+    pickup.store(null, "x");
+    assertThat(pickup.get(null)).isEmpty();
 
     java.util.UUID id = java.util.UUID.randomUUID();
     config.platformCouponPort().record("NAMMA25", id, id, 100, 1000);

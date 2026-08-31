@@ -41,8 +41,7 @@ class DistributorTest {
         .isTrue();
     assertThat(Distributor.walkIn(id, pharmacy, now).firmName())
         .isEqualTo(Distributor.WALK_IN_FIRM);
-    assertThat(Distributor.walkIn(id, pharmacy, now).phone())
-        .isEqualTo(Distributor.WALK_IN_PHONE);
+    assertThat(Distributor.walkIn(id, pharmacy, now).phone()).isEqualTo(Distributor.WALK_IN_PHONE);
   }
 }
 

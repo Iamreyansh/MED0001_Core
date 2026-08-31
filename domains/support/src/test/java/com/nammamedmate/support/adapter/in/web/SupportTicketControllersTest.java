@@ -115,6 +115,18 @@ class SupportTicketControllersTest {
   }
 
   @Test
+  void pharmacyListDelegates() {
+    MedmatePrincipal owner =
+        new MedmatePrincipal(
+            UUID.randomUUID(), AuthRole.PHARMACY_OWNER, UUID.randomUUID(), TokenScope.FULL, "j");
+    when(tickets.listPharmacy(owner, null, null))
+        .thenReturn(
+            new TicketService.ListResult(
+                Map.of("tickets", java.util.List.of()), PaginationMeta.of(1, 20, 0)));
+    assertThat(support.list(owner, null, null).success()).isTrue();
+  }
+
+  @Test
   void adminListAndCreate() {
     when(tickets.listAdmin(
             any(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),

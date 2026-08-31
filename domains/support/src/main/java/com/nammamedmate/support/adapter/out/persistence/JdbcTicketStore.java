@@ -183,6 +183,27 @@ public class JdbcTicketStore implements TicketStore {
   }
 
   @Override
+  public List<Ticket> listForPharmacy(UUID pharmacyId, int offset, int limit) {
+    return jdbc.query(
+        SELECT
+            + " WHERE deleted_at IS NULL AND pharmacy_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (rs, i) -> mapTicket(rs),
+        pharmacyId,
+        limit,
+        offset);
+  }
+
+  @Override
+  public long countForPharmacy(UUID pharmacyId) {
+    Long n =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM support_tickets WHERE deleted_at IS NULL AND pharmacy_id = ?",
+            Long.class,
+            pharmacyId);
+    return n == null ? 0L : n;
+  }
+
+  @Override
   public Chips chips(Instant now) {
     Long open =
         jdbc.queryForObject(

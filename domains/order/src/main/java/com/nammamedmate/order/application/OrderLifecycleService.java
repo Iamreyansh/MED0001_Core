@@ -1,5 +1,7 @@
 package com.nammamedmate.order.application;
 
+import com.nammamedmate.kernel.api.PageRequest;
+import com.nammamedmate.kernel.api.PaginationMeta;
 import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.kernel.ratelimit.RateLimiter;
 import com.nammamedmate.messaging.DomainEvent;
@@ -9,6 +11,7 @@ import com.nammamedmate.order.application.port.out.DeliveryOtpCachePort;
 import com.nammamedmate.order.application.port.out.InventoryAvailabilityPort;
 import com.nammamedmate.order.application.port.out.OrderStatusEventStore;
 import com.nammamedmate.order.application.port.out.OrderStore;
+import com.nammamedmate.order.application.port.out.PickupOtpCachePort;
 import com.nammamedmate.order.application.port.out.PrescriptionPort;
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort;
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort.RefundPlan;
@@ -17,6 +20,7 @@ import com.nammamedmate.order.application.port.out.RiderLookupPort.RiderInfo;
 import com.nammamedmate.order.domain.ActorType;
 import com.nammamedmate.order.domain.CartPricing;
 import com.nammamedmate.order.domain.Order;
+import com.nammamedmate.order.domain.OrderItemSnapshot;
 import com.nammamedmate.order.domain.OrderStateMachine;
 import com.nammamedmate.order.domain.OrderStatus;
 import com.nammamedmate.order.domain.OrderStatusEvent;
@@ -31,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -57,6 +62,16 @@ public class OrderLifecycleService {
   private InventoryAvailabilityPort inventory = new InventoryAvailabilityPort() {};
   private PrescriptionPort prescriptions = new PrescriptionPort() {};
   private DeliveryInvoicePort deliveryInvoice = new DeliveryInvoicePort() {};
+  private PickupOtpCachePort pickupOtps =
+      new PickupOtpCachePort() {
+        @Override
+        public void store(UUID orderId, String otp) {}
+
+        @Override
+        public Optional<String> get(UUID orderId) {
+          return Optional.empty();
+        }
+      };
 
   @Autowired
   public OrderLifecycleService(
@@ -117,6 +132,46 @@ public class OrderLifecycleService {
   @Autowired(required = false)
   public void setDeliveryInvoice(DeliveryInvoicePort deliveryInvoice) {
     this.deliveryInvoice = deliveryInvoice == null ? new DeliveryInvoicePort() {} : deliveryInvoice;
+  }
+
+  @Autowired(required = false)
+  public void setPickupOtps(PickupOtpCachePort pickupOtps) {
+    this.pickupOtps =
+        pickupOtps == null
+            ? new PickupOtpCachePort() {
+              @Override
+              public void store(UUID orderId, String otp) {}
+
+              @Override
+              public Optional<String> get(UUID orderId) {
+                return Optional.empty();
+              }
+            }
+            : pickupOtps;
+  }
+
+  @Transactional(readOnly = true)
+  public PharmacyInboxResult listPharmacyInbox(
+      MedmatePrincipal principal, String status, Integer page, Integer limit) {
+    requirePharmacy(principal);
+    rateLimit("order:ph-list:" + principal.pharmacyId(), 60, 60);
+    PageRequest pageReq = PageRequest.normalize(page, limit, null, "desc");
+    String filter = pharmacyStatusFilter(status);
+    long total = orders.countByPharmacy(principal.pharmacyId(), filter);
+    List<Map<String, Object>> rows =
+        orders
+            .listByPharmacy(principal.pharmacyId(), filter, pageReq.offset(), pageReq.limit())
+            .stream()
+            .map(this::pharmacyInboxRow)
+            .toList();
+    return new PharmacyInboxResult(rows, PaginationMeta.of(pageReq.page(), pageReq.limit(), total));
+  }
+
+  @Transactional(readOnly = true)
+  public Map<String, Object> getPharmacyOrder(MedmatePrincipal principal, UUID orderId) {
+    requirePharmacy(principal);
+    rateLimit("order:ph-get:" + principal.pharmacyId(), 60, 60);
+    return pharmacyOrderDetail(requirePharmacyOrder(principal.pharmacyId(), orderId));
   }
 
   @Transactional
@@ -232,6 +287,7 @@ public class OrderLifecycleService {
     Instant now = now();
     order.assignRider(riderId, now);
     orders.update(order);
+    String pickupOtp = ensurePickupOtp(order.id());
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("order_id", order.id().toString());
     data.put("rider_id", rider.id().toString());
@@ -239,7 +295,75 @@ public class OrderLifecycleService {
     data.put("rider_phone", rider.phone());
     data.put("rider_vehicle_plate", rider.vehiclePlate());
     data.put("assigned_at", now.toString());
+    data.put("pickup_otp", pickupOtp);
     return data;
+  }
+
+  @Transactional(readOnly = true)
+  public Map<String, Object> pharmacyHandoff(MedmatePrincipal principal, UUID orderId) {
+    requirePharmacy(principal);
+    rateLimit("order:ph-handoff:" + principal.pharmacyId(), 60, 60);
+    Order order = requirePharmacyOrder(principal.pharmacyId(), orderId);
+    if (order.status() != OrderStatus.READY_FOR_PICKUP
+        && order.status() != OrderStatus.OUT_FOR_DELIVERY) {
+      throw new AppException(
+          "INVALID_STATUS_TRANSITION", "Pickup OTP is available after the order is ready", 422);
+    }
+    if (order.riderId() == null) {
+      throw new AppException("VALIDATION_ERROR", "Assign a rider before handoff", 422);
+    }
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("order_id", order.id().toString());
+    data.put("order_number", order.orderNumber());
+    data.put("status", order.status().name());
+    data.put("rider_id", order.riderId().toString());
+    data.put("pickup_otp", ensurePickupOtp(order.id()));
+    return data;
+  }
+
+  @Transactional(readOnly = true)
+  public Map<String, Object> listRiders(MedmatePrincipal principal) {
+    requirePharmacy(principal);
+    rateLimit("order:ph-riders:" + principal.pharmacyId(), 30, 60);
+    List<Map<String, Object>> items = new ArrayList<>();
+    for (RiderInfo rider : riders.listActive(50)) {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("rider_id", rider.id().toString());
+      row.put("name", rider.name());
+      row.put("phone", rider.phone());
+      row.put("vehicle_plate", rider.vehiclePlate());
+      items.add(row);
+    }
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("riders", items);
+    return data;
+  }
+
+  @Transactional(readOnly = true)
+  public Map<String, Object> dashboardSummary(MedmatePrincipal principal) {
+    requirePharmacy(principal);
+    rateLimit("order:ph-dashboard:" + principal.pharmacyId(), 60, 60);
+    UUID pharmacyId = principal.pharmacyId();
+    Map<String, Object> ordersByStatus = new LinkedHashMap<>();
+    ordersByStatus.put(
+        "pending_acceptance", orders.countByPharmacy(pharmacyId, "PENDING_ACCEPTANCE"));
+    ordersByStatus.put("accepted", orders.countByPharmacy(pharmacyId, "ACCEPTED"));
+    ordersByStatus.put("packing", orders.countByPharmacy(pharmacyId, "PACKING"));
+    ordersByStatus.put("ready_for_pickup", orders.countByPharmacy(pharmacyId, "READY_FOR_PICKUP"));
+    ordersByStatus.put("out_for_delivery", orders.countByPharmacy(pharmacyId, "OUT_FOR_DELIVERY"));
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("orders", ordersByStatus);
+    return data;
+  }
+
+  private String ensurePickupOtp(UUID orderId) {
+    Optional<String> existing = pickupOtps.get(orderId);
+    if (existing.isPresent() && !existing.get().isBlank()) {
+      return existing.get();
+    }
+    String otp = String.format("%04d", random.nextInt(10_000));
+    pickupOtps.store(orderId, otp);
+    return otp;
   }
 
   /** Canonical rider delivery — invoice (D12), order.delivered outbox, side effects once. */
@@ -606,6 +730,81 @@ public class OrderLifecycleService {
         .orElse(null);
   }
 
+  private Map<String, Object> pharmacyInboxRow(Order order) {
+    Map<String, Object> row = new LinkedHashMap<>();
+    row.put("order_id", order.id().toString());
+    row.put("order_number", order.orderNumber());
+    row.put("status", order.status().name());
+    row.put("items_count", order.items().size());
+    row.put("total", CartPricing.paiseToRupees(order.totalPayablePaise()));
+    row.put("payment_method", order.paymentMethod() == null ? null : order.paymentMethod().name());
+    row.put("payment_status", order.paymentStatus() == null ? null : order.paymentStatus().name());
+    row.put("has_prescription", order.prescriptionId() != null);
+    row.put("sla_deadline", order.slaDeadline() == null ? null : order.slaDeadline().toString());
+    row.put("sla_breached", order.slaBreached());
+    row.put("created_at", order.createdAt() == null ? null : order.createdAt().toString());
+    row.put("accepted_at", order.acceptedAt() == null ? null : order.acceptedAt().toString());
+    return row;
+  }
+
+  private Map<String, Object> pharmacyOrderDetail(Order order) {
+    Map<String, Object> data = new LinkedHashMap<>(pharmacyInboxRow(order));
+    data.put("customer_id", order.customerId() == null ? null : order.customerId().toString());
+    data.put(
+        "prescription_id",
+        order.prescriptionId() == null ? null : order.prescriptionId().toString());
+    data.put("delivery_instructions", order.deliveryInstructions());
+    data.put("rider", riderView(order.riderId()));
+    data.put("items", pharmacyItemViews(order));
+    data.put("bill", pharmacyBillView(order));
+    data.put(
+        "estimated_delivery_at",
+        order.estimatedDeliveryAt() == null ? null : order.estimatedDeliveryAt().toString());
+    data.put("confirmed_at", order.confirmedAt() == null ? null : order.confirmedAt().toString());
+    return data;
+  }
+
+  private List<Map<String, Object>> pharmacyItemViews(Order order) {
+    List<Map<String, Object>> items = new ArrayList<>();
+    for (OrderItemSnapshot item : order.items()) {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("product_id", item.productId() == null ? null : item.productId().toString());
+      row.put("name", item.name());
+      row.put("quantity", item.quantity());
+      row.put("unit_price", CartPricing.paiseToRupees(item.unitPricePaise()));
+      row.put("line_total", CartPricing.paiseToRupees(item.lineTotalPaise()));
+      row.put("rx_required", item.rxRequired());
+      items.add(row);
+    }
+    return items;
+  }
+
+  private Map<String, Object> pharmacyBillView(Order order) {
+    long subtotal = order.itemTotalPaise() - order.couponDiscountPaise();
+    Map<String, Object> bill = new LinkedHashMap<>();
+    bill.put("item_total", CartPricing.paiseToRupees(order.itemTotalPaise()));
+    bill.put("coupon_discount", CartPricing.paiseToRupees(order.couponDiscountPaise()));
+    bill.put("subtotal_after_discount", CartPricing.paiseToRupees(Math.max(0, subtotal)));
+    bill.put("delivery_fee", CartPricing.paiseToRupees(order.deliveryFeePaise()));
+    bill.put("handling_fee", CartPricing.paiseToRupees(order.handlingFeePaise()));
+    bill.put("wallet_applied", CartPricing.paiseToRupees(order.walletAppliedPaise()));
+    bill.put("total_payable", CartPricing.paiseToRupees(order.totalPayablePaise()));
+    return bill;
+  }
+
+  private static String pharmacyStatusFilter(String status) {
+    if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status.trim())) {
+      return null;
+    }
+    String normalised = status.trim().toUpperCase(Locale.ROOT);
+    try {
+      OrderStatus.valueOf(normalised);
+    } catch (IllegalArgumentException ex) {
+      throw new AppException("VALIDATION_ERROR", "Invalid status", 400);
+    }
+    return normalised;
+  }
+
   private Order requirePharmacyOrder(UUID pharmacyId, UUID orderId) {
     if (orderId == null) {
       throw new AppException("VALIDATION_ERROR", "order_id is required", 400);
@@ -693,4 +892,6 @@ public class OrderLifecycleService {
   }
 
   private record StepDef(String name, OrderStatus status) {}
+
+  public record PharmacyInboxResult(List<Map<String, Object>> data, PaginationMeta meta) {}
 }

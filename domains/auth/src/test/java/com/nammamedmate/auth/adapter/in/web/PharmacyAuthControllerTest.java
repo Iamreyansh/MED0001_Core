@@ -7,11 +7,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.nammamedmate.auth.adapter.in.web.dto.CompletePharmacyInviteRequest;
+import com.nammamedmate.auth.adapter.in.web.dto.CompletePharmacyResetRequest;
+import com.nammamedmate.auth.adapter.in.web.dto.ForgotPharmacyPasswordRequest;
 import com.nammamedmate.auth.adapter.in.web.dto.PharmacyLoginRequest;
 import com.nammamedmate.auth.adapter.in.web.dto.PosPinLoginRequest;
 import com.nammamedmate.auth.adapter.in.web.dto.SwitchPharmacyRequest;
 import com.nammamedmate.auth.application.PharmacyLoginResult;
 import com.nammamedmate.auth.application.PharmacyLoginService;
+import com.nammamedmate.auth.application.PharmacyStaffService;
 import com.nammamedmate.auth.application.PosPinLoginResult;
 import com.nammamedmate.auth.application.PosPinLoginService;
 import com.nammamedmate.auth.application.SwitchPharmacyResult;
@@ -27,6 +31,7 @@ import com.nammamedmate.security.TokenScope;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -37,8 +42,9 @@ class PharmacyAuthControllerTest {
   private final PharmacyLoginService loginService = mock(PharmacyLoginService.class);
   private final SwitchPharmacyService switchService = mock(SwitchPharmacyService.class);
   private final PosPinLoginService posPinService = mock(PosPinLoginService.class);
+  private final PharmacyStaffService staffService = mock(PharmacyStaffService.class);
   private final PharmacyAuthController controller =
-      new PharmacyAuthController(loginService, switchService, posPinService);
+      new PharmacyAuthController(loginService, switchService, posPinService, staffService);
 
   @Test
   void loginMapsResultToResponse() {
@@ -208,5 +214,31 @@ class PharmacyAuthControllerTest {
     assertThat(response.data().tokenScope()).isEqualTo("pos");
     assertThat(response.data().accessTokenExpiresIn()).isEqualTo(14400L);
     assertThat(response.data().staff().name()).isEqualTo("Kavya");
+  }
+
+  @Test
+  void completeInviteDelegates() {
+    when(staffService.completeInvite("tok", "Passw0rd!")).thenReturn(Map.of("status", "ACTIVE"));
+    assertThat(
+            controller.completeInvite(new CompletePharmacyInviteRequest("tok", "Passw0rd!")).data())
+        .containsEntry("status", "ACTIVE");
+    when(staffService.completeInvite(null, null)).thenReturn(Map.of("ok", false));
+    assertThat(controller.completeInvite(null).data()).containsEntry("ok", false);
+  }
+
+  @Test
+  void forgotAndCompleteResetDelegate() {
+    when(staffService.requestPasswordReset("ada@x.com")).thenReturn(Map.of("requested", true));
+    assertThat(controller.forgotPassword(new ForgotPharmacyPasswordRequest("ada@x.com")).data())
+        .containsEntry("requested", true);
+    when(staffService.requestPasswordReset(null)).thenReturn(Map.of("requested", true));
+    assertThat(controller.forgotPassword(null).data()).containsEntry("requested", true);
+    when(staffService.completePasswordReset("tok", "Passw0rd!"))
+        .thenReturn(Map.of("status", "ACTIVE"));
+    assertThat(
+            controller.completeReset(new CompletePharmacyResetRequest("tok", "Passw0rd!")).data())
+        .containsEntry("status", "ACTIVE");
+    when(staffService.completePasswordReset(null, null)).thenReturn(Map.of("ok", false));
+    assertThat(controller.completeReset(null).data()).containsEntry("ok", false);
   }
 }

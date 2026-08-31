@@ -37,7 +37,7 @@ val jacocoExcludes =
 val ci = providers.environmentVariable("CI").map { it == "true" }.orElse(false)
 
 tasks.jacocoTestReport {
-    dependsOn(tasks.test)
+    dependsOn(tasks.test, tasks.compileJava)
     executionData.setFrom(
         fileTree(layout.buildDirectory.dir("jacoco")) {
             include("*.exec")
@@ -56,7 +56,7 @@ tasks.jacocoTestReport {
 }
 
 tasks.jacocoTestCoverageVerification {
-    dependsOn(tasks.jacocoTestReport)
+    dependsOn(tasks.jacocoTestReport, tasks.compileJava)
     executionData.setFrom(
         fileTree(layout.buildDirectory.dir("jacoco")) {
             include("*.exec")

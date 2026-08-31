@@ -100,6 +100,21 @@ class OrderLifecycleServiceTest {
     service.setDeliveryInvoice(null);
     service.setDeliveryInvoice(
         new com.nammamedmate.order.application.port.out.DeliveryInvoicePort() {});
+    service.setPickupOtps(null);
+    java.util.concurrent.ConcurrentHashMap<UUID, String> otps =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    service.setPickupOtps(
+        new com.nammamedmate.order.application.port.out.PickupOtpCachePort() {
+          @Override
+          public void store(UUID orderId, String otp) {
+            otps.put(orderId, otp);
+          }
+
+          @Override
+          public java.util.Optional<String> get(UUID orderId) {
+            return java.util.Optional.ofNullable(otps.get(orderId));
+          }
+        });
   }
 
   @Test
@@ -477,6 +492,100 @@ class OrderLifecycleServiceTest {
     assertThat(service.markSlaBreaches()).isEqualTo(0);
   }
 
+  @Test
+  void pharmacyInboxListsAndDetailsTenantOrders() {
+    Order first = pendingOrder(PaymentMethod.COD);
+    orders.insert(first);
+    Order second = pendingOrder(PaymentMethod.UPI);
+    orders.insert(second);
+    var listed = service.listPharmacyInbox(pharmacy, "ALL", 1, 20);
+    assertThat(listed.data()).hasSize(2);
+    assertThat(listed.meta().total()).isEqualTo(2);
+    var filtered = service.listPharmacyInbox(pharmacy, "pending_acceptance", null, null);
+    assertThat(filtered.data()).hasSize(2);
+    assertThat(service.listPharmacyInbox(pharmacy, null, 1, 20).data()).hasSize(2);
+    assertThat(service.listPharmacyInbox(pharmacy, "  ", 1, 20).data()).hasSize(2);
+    Map<String, Object> detail = service.getPharmacyOrder(pharmacy, first.id());
+    assertThat(detail.get("order_id")).isEqualTo(first.id().toString());
+    assertThat(detail).containsKeys("items", "bill", "rider");
+    Order sparse = sparsePharmacyOrder();
+    orders.insert(sparse);
+    Map<String, Object> sparseDetail = service.getPharmacyOrder(pharmacy, sparse.id());
+    assertThat(sparseDetail.get("customer_id")).isNull();
+    assertThat(sparseDetail.get("prescription_id")).isNotNull();
+    assertThat(sparseDetail.get("payment_method")).isNull();
+    assertThat(((Map<?, ?>) ((List<?>) sparseDetail.get("items")).getFirst()).get("product_id"))
+        .isNull();
+    assertThatThrownBy(() -> service.listPharmacyInbox(pharmacy, "NOPE", 1, 20))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    assertThatThrownBy(() -> service.listPharmacyInbox(customer, null, 1, 20))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("UNAUTHORIZED");
+    assertThatThrownBy(() -> service.getPharmacyOrder(pharmacy, UUID.randomUUID()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("ORDER_NOT_FOUND");
+  }
+
+  @Test
+  void pharmacyHandoffRidersAndDashboard() {
+    java.util.concurrent.ConcurrentHashMap<UUID, String> otps =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    service.setPickupOtps(
+        new com.nammamedmate.order.application.port.out.PickupOtpCachePort() {
+          @Override
+          public void store(UUID orderId, String otp) {
+            otps.put(orderId, otp);
+          }
+
+          @Override
+          public java.util.Optional<String> get(UUID orderId) {
+            return java.util.Optional.ofNullable(otps.get(orderId));
+          }
+        });
+    Order packing = pendingOrder(PaymentMethod.COD);
+    packing.accept(T0);
+    packing.advanceTo(OrderStatus.PACKING, T0);
+    orders.insert(packing);
+    assertThatThrownBy(() -> service.pharmacyHandoff(pharmacy, packing.id()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("INVALID_STATUS_TRANSITION");
+
+    Order ready = pendingOrder(PaymentMethod.COD);
+    ready.accept(T0);
+    ready.advanceTo(OrderStatus.READY_FOR_PICKUP, T0);
+    orders.insert(ready);
+    assertThatThrownBy(() -> service.pharmacyHandoff(pharmacy, ready.id()))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("VALIDATION_ERROR");
+    Map<String, Object> assigned = service.assignRider(pharmacy, ready.id(), RIDER);
+    assertThat(assigned.get("pickup_otp")).isNotNull();
+    Map<String, Object> handoff = service.pharmacyHandoff(pharmacy, ready.id());
+    assertThat(handoff.get("pickup_otp")).isEqualTo(assigned.get("pickup_otp"));
+    ready.advanceTo(OrderStatus.OUT_FOR_DELIVERY, T0);
+    assertThat(service.pharmacyHandoff(pharmacy, ready.id()).get("status"))
+        .isEqualTo("OUT_FOR_DELIVERY");
+    service.setPickupOtps(
+        new com.nammamedmate.order.application.port.out.PickupOtpCachePort() {
+          @Override
+          public void store(UUID orderId, String otp) {
+            otps.put(orderId, "cached");
+          }
+
+          @Override
+          public java.util.Optional<String> get(UUID orderId) {
+            return java.util.Optional.of("  ");
+          }
+        });
+    assertThat((String) service.pharmacyHandoff(pharmacy, ready.id()).get("pickup_otp"))
+        .isNotBlank()
+        .isNotEqualTo("  ");
+    service.setPickupOtps(null);
+    assertThat(service.pharmacyHandoff(pharmacy, ready.id()).get("pickup_otp")).isNotNull();
+    assertThat(service.listRiders(pharmacy).get("riders")).asList().isNotEmpty();
+    assertThat(service.dashboardSummary(pharmacy)).containsKey("orders");
+  }
+
   private Order pendingOrder(PaymentMethod method) {
     return pendingOrder(method, null);
   }
@@ -514,5 +623,46 @@ class OrderLifecycleServiceTest {
             T0);
     order.confirm(T0, T0.plusSeconds(900), method == PaymentMethod.COD ? null : "pay_1");
     return order;
+  }
+
+  private Order sparsePharmacyOrder() {
+    return new Order(
+        UUID.randomUUID(),
+        "ORD-SPARSE",
+        null,
+        PH1,
+        UUID.randomUUID(),
+        List.of(new OrderItemSnapshot(null, "X", 1, 1, 1, false)),
+        1,
+        null,
+        0,
+        0,
+        0,
+        0,
+        1,
+        null,
+        null,
+        null,
+        null,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        null,
+        OrderStatus.PENDING_ACCEPTANCE,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        T0,
+        T0,
+        null,
+        null,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 }

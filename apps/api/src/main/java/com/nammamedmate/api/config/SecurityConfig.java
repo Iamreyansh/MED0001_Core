@@ -66,6 +66,9 @@ public class SecurityConfig {
                         "/api/v1/auth/rider/verify-otp",
                         "/api/v1/auth/pharmacy/login",
                         "/api/v1/auth/pharmacy/pos-pin",
+                        "/api/v1/auth/pharmacy/complete-invite",
+                        "/api/v1/auth/pharmacy/forgot-password",
+                        "/api/v1/auth/pharmacy/complete-reset",
                         "/api/v1/auth/admin/login",
                         "/api/v1/auth/admin/complete-invite",
                         "/api/v1/auth/admin/complete-reset",
@@ -111,6 +114,19 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/pharmacy/registration-status")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers("/api/v1/pharmacy/roles", "/api/v1/pharmacy/roles/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers("/api/v1/pharmacy/staff", "/api/v1/pharmacy/staff/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/riders")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/customers")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(
+                        "/api/v1/pharmacy/notifications", "/api/v1/pharmacy/notifications/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/dashboard/**")
+                    .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/rollup/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers(HttpMethod.GET, "/api/v1/pharmacy/kyc/documents")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
@@ -528,9 +544,9 @@ public class SecurityConfig {
                     .hasRole("CUSTOMER")
                     .requestMatchers("/api/v1/orders", "/api/v1/orders/**")
                     .hasRole("CUSTOMER")
-                    .requestMatchers("/api/v1/pharmacy/orders/**")
+                    .requestMatchers("/api/v1/pharmacy/orders", "/api/v1/pharmacy/orders/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
-                    .requestMatchers("/api/v1/pharmacy/rx-quotes/**")
+                    .requestMatchers("/api/v1/pharmacy/rx-quotes", "/api/v1/pharmacy/rx-quotes/**")
                     .hasAnyRole("PHARMACY_OWNER", "PHARMACY_STAFF")
                     .requestMatchers(
                         "/api/v1/pharmacy/prescriptions", "/api/v1/pharmacy/prescriptions/**")

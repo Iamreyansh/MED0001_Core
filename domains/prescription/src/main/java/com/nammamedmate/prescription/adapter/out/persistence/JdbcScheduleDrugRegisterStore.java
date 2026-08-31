@@ -163,9 +163,9 @@ public class JdbcScheduleDrugRegisterStore implements ScheduleDrugRegisterStore 
 
   @Override
   public ListPage list(ListFilter filter) {
-    StringBuilder where = new StringBuilder(" WHERE schedule = ? ");
+    StringBuilder where = new StringBuilder();
     List<Object> args = new ArrayList<>();
-    args.add(filter.schedule());
+    appendSchedule(where, args, filter.schedule());
     appendFilters(where, args, filter);
     Long total =
         jdbc.queryForObject(
@@ -193,9 +193,9 @@ public class JdbcScheduleDrugRegisterStore implements ScheduleDrugRegisterStore 
 
   @Override
   public List<ScheduleDrugRegisterEntry> listAll(ListFilter filter) {
-    StringBuilder where = new StringBuilder(" WHERE schedule = ? ");
+    StringBuilder where = new StringBuilder();
     List<Object> args = new ArrayList<>();
-    args.add(filter.schedule());
+    appendSchedule(where, args, filter.schedule());
     appendFilters(where, args, filter);
     String sql =
         """
@@ -277,6 +277,15 @@ public class JdbcScheduleDrugRegisterStore implements ScheduleDrugRegisterStore 
             Long.class,
             pharmacyId);
     return n != null && n > 0;
+  }
+
+  private static void appendSchedule(StringBuilder where, List<Object> args, String schedule) {
+    if (schedule == null || schedule.isBlank() || "ALL".equalsIgnoreCase(schedule.trim())) {
+      where.append(" WHERE schedule IN ('H1','X') ");
+      return;
+    }
+    where.append(" WHERE schedule = ? ");
+    args.add(schedule);
   }
 
   private static void appendFilters(StringBuilder where, List<Object> args, ListFilter filter) {

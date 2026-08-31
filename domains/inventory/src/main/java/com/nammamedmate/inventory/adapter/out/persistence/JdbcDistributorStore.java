@@ -70,8 +70,7 @@ public class JdbcDistributorStore implements DistributorStore {
   public Optional<Distributor> findActiveSystem(UUID pharmacyId) {
     List<Distributor> rows =
         jdbc.query(
-            SELECT
-                + " WHERE pharmacy_id = ? AND is_system = TRUE AND deleted_at IS NULL",
+            SELECT + " WHERE pharmacy_id = ? AND is_system = TRUE AND deleted_at IS NULL",
             ROW_MAPPER,
             pharmacyId);
     return rows.stream().findFirst();

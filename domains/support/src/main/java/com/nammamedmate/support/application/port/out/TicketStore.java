@@ -46,6 +46,10 @@ public interface TicketStore {
 
   long count(ListFilter filter);
 
+  List<Ticket> listForPharmacy(UUID pharmacyId, int offset, int limit);
+
+  long countForPharmacy(UUID pharmacyId);
+
   Chips chips(Instant now);
 
   TicketMessage insertMessage(TicketMessage message);

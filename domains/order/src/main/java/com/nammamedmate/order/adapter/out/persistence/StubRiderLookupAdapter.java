@@ -1,6 +1,7 @@
 package com.nammamedmate.order.adapter.out.persistence;
 
 import com.nammamedmate.order.application.port.out.RiderLookupPort;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,5 +21,16 @@ public class StubRiderLookupAdapter implements RiderLookupPort {
             "+91-9000000000",
             "KA01XX" + shortId.substring(0, 4).toUpperCase(),
             null));
+  }
+
+  @Override
+  public List<RiderInfo> listActive(int limit) {
+    int cap = Math.max(limit, 0);
+    if (cap == 0) {
+      return List.of();
+    }
+    return findById(UUID.fromString("dddddddd-0001-4000-8000-000000000001")).stream()
+        .limit(cap)
+        .toList();
   }
 }
