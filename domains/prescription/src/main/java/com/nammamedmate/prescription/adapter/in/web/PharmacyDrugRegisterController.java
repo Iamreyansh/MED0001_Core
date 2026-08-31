@@ -28,7 +28,7 @@ public class PharmacyDrugRegisterController {
   @Operation(summary = "View own pharmacy Schedule H1/X drug register")
   public ApiResponse<Map<String, Object>> list(
       @AuthenticationPrincipal MedmatePrincipal principal,
-      @RequestParam(name = "schedule") String schedule,
+      @RequestParam(name = "schedule", required = false) String schedule,
       @RequestParam(name = "drug_name", required = false) String drugName,
       @RequestParam(name = "from_date", required = false) String fromDate,
       @RequestParam(name = "to_date", required = false) String toDate,

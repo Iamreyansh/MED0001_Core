@@ -48,4 +48,9 @@ public interface OrderStore {
 
   /** Active = non-terminal statuses, newest first. */
   List<Order> listCustomerActive(UUID customerId);
+
+  /** Pharmacy inbox: all non-deleted orders, newest first. statusFilter null/ALL = any status. */
+  List<Order> listByPharmacy(UUID pharmacyId, String statusFilter, int offset, int limit);
+
+  long countByPharmacy(UUID pharmacyId, String statusFilter);
 }

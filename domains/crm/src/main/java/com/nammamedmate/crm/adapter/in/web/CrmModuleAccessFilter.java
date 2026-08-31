@@ -1,7 +1,6 @@
 package com.nammamedmate.crm.adapter.in.web;
 
 import com.nammamedmate.crm.application.port.out.CrmPlanLookupPort;
-import com.nammamedmate.kernel.error.AppException;
 import com.nammamedmate.security.MedmatePrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -52,11 +51,29 @@ public class CrmModuleAccessFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
-    if (!planLookup.moduleAccessibleForPharmacy(principal.pharmacyId(), moduleId)) {
-      throw new AppException(
-          "MODULE_NOT_IN_PLAN", "Module " + moduleId + " is not accessible for this account", 403);
+    try {
+      if (!planLookup.moduleAccessibleForPharmacy(principal.pharmacyId(), moduleId)) {
+        writeModuleDenied(response, moduleId);
+        return;
+      }
+    } catch (RuntimeException ex) {
+      writeModuleDenied(response, moduleId);
+      return;
     }
     filterChain.doFilter(request, response);
+  }
+
+  private static void writeModuleDenied(HttpServletResponse response, String moduleId)
+      throws IOException {
+    response.setStatus(403);
+    response.setCharacterEncoding("UTF-8");
+    response.setContentType("application/json");
+    response
+        .getWriter()
+        .write(
+            "{\"success\":false,\"error\":{\"code\":\"MODULE_NOT_IN_PLAN\",\"message\":\"Module "
+                + moduleId
+                + " is not accessible for this account\"}}");
   }
 
   static String resolveModule(String uri) {

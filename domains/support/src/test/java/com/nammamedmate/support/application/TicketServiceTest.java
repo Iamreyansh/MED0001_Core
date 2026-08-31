@@ -95,6 +95,32 @@ class TicketServiceTest {
   }
 
   @Test
+  void pharmacyListsOwnTickets() {
+    UUID pharmacyId = UUID.randomUUID();
+    MedmatePrincipal owner =
+        new MedmatePrincipal(
+            UUID.randomUUID(), AuthRole.PHARMACY_OWNER, pharmacyId, TokenScope.FULL, "j");
+    service.create(
+        owner,
+        new TicketService.CreateCommand(
+            "PHARMACY", "POS jammed", "Printer error", "APP", null, pharmacyId, List.of(), null));
+    TicketService.ListResult listed = service.listPharmacy(owner, 1, 20);
+    assertThat(listed.meta().total()).isEqualTo(1);
+    assertThatThrownBy(() -> service.listPharmacy(customer, 1, 20))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("FORBIDDEN");
+    MedmatePrincipal noShop =
+        new MedmatePrincipal(
+            UUID.randomUUID(), AuthRole.PHARMACY_STAFF, null, TokenScope.FULL, "j");
+    assertThatThrownBy(() -> service.listPharmacy(noShop, 1, 20))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("FORBIDDEN");
+    assertThatThrownBy(() -> service.listPharmacy(null, 1, 20))
+        .extracting(e -> ((AppException) e).code())
+        .isEqualTo("UNAUTHORIZED");
+  }
+
+  @Test
   void ac002_orderUsesCategoryPolicyL1ThirtyMinutes() {
     Map<String, Object> created =
         service.create(
@@ -505,6 +531,23 @@ class TicketServiceTest {
     @Override
     public long count(ListFilter filter) {
       return byId.values().stream().filter(t -> match(t, filter)).count();
+    }
+
+    @Override
+    public List<Ticket> listForPharmacy(UUID pharmacyId, int offset, int limit) {
+      return byId.values().stream()
+          .filter(t -> pharmacyId != null && pharmacyId.equals(t.pharmacyId()))
+          .sorted(Comparator.comparing(Ticket::createdAt).reversed())
+          .skip(offset)
+          .limit(limit)
+          .collect(Collectors.toList());
+    }
+
+    @Override
+    public long countForPharmacy(UUID pharmacyId) {
+      return byId.values().stream()
+          .filter(t -> pharmacyId != null && pharmacyId.equals(t.pharmacyId()))
+          .count();
     }
 
     private boolean match(Ticket t, ListFilter filter) {

@@ -150,6 +150,14 @@ class JdbcScheduleDrugRegisterStoreCoverageTest {
     assertThat(page.entries()).hasSize(1);
     var emptyTotals = store.list(new ListFilter("H1", null, "  ", null, null, 0, 10));
     assertThat(emptyTotals.total()).isZero();
+    when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(0L);
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+    var allSchedules = store.list(new ListFilter("ALL", pharmacy, null, null, null, 1, 10));
+    assertThat(allSchedules.total()).isZero();
+    assertThat(store.list(new ListFilter(null, pharmacy, null, null, null, 1, 10)).total())
+        .isZero();
+    assertThat(store.list(new ListFilter("  ", pharmacy, null, null, null, 1, 10)).total())
+        .isZero();
     when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
         .thenAnswer(
             inv -> {

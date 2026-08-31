@@ -1,7 +1,6 @@
 package com.nammamedmate.crm.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -75,7 +74,7 @@ class CrmModuleAccessFilterTest {
   }
 
   @Test
-  void enforceBlocksWhenMissing() {
+  void enforceBlocksWhenMissing() throws Exception {
     UUID pharmacyId = Ids.newId();
     MedmatePrincipal owner =
         new MedmatePrincipal(
@@ -85,15 +84,29 @@ class CrmModuleAccessFilterTest {
     when(lookup.moduleAccessibleForPharmacy(pharmacyId, "mod_offers")).thenReturn(false);
 
     CrmModuleAccessFilter filter = new CrmModuleAccessFilter(lookup, true);
-    assertThatThrownBy(
-            () ->
-                filter.doFilter(
-                    new MockHttpServletRequest("GET", "/api/v1/pharmacy/offers"),
-                    new MockHttpServletResponse(),
-                    chain))
-        .isInstanceOf(AppException.class)
-        .extracting(e -> ((AppException) e).code())
-        .isEqualTo("MODULE_NOT_IN_PLAN");
+    MockHttpServletResponse res = new MockHttpServletResponse();
+    filter.doFilter(new MockHttpServletRequest("GET", "/api/v1/pharmacy/offers"), res, chain);
+    assertThat(res.getStatus()).isEqualTo(403);
+    assertThat(res.getContentAsString()).contains("MODULE_NOT_IN_PLAN");
+    verifyNoInteractions(chain);
+  }
+
+  @Test
+  void enforceLookupFailureIsPlanLockNot500() throws Exception {
+    UUID pharmacyId = Ids.newId();
+    MedmatePrincipal owner =
+        new MedmatePrincipal(
+            Ids.newId(), AuthRole.PHARMACY_OWNER, pharmacyId, TokenScope.FULL, "j");
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(owner, null));
+    when(lookup.moduleAccessibleForPharmacy(pharmacyId, "mod_offers"))
+        .thenThrow(new AppException("DB", "down", 500));
+
+    CrmModuleAccessFilter filter = new CrmModuleAccessFilter(lookup, true);
+    MockHttpServletResponse res = new MockHttpServletResponse();
+    filter.doFilter(new MockHttpServletRequest("GET", "/api/v1/pharmacy/offers"), res, chain);
+    assertThat(res.getStatus()).isEqualTo(403);
+    assertThat(res.getContentAsString()).contains("MODULE_NOT_IN_PLAN");
   }
 
   @Test

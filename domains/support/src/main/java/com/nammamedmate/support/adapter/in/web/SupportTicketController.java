@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -54,6 +55,16 @@ public class SupportTicketController {
                 req.attachments(),
                 req.priority()));
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(data));
+  }
+
+  @GetMapping
+  @Operation(summary = "List support tickets for the authenticated actor")
+  public ApiResponse<Map<String, Object>> list(
+      @AuthenticationPrincipal MedmatePrincipal principal,
+      @RequestParam(value = "page", required = false) Integer page,
+      @RequestParam(value = "limit", required = false) Integer limit) {
+    TicketService.ListResult result = tickets.listPharmacy(principal, page, limit);
+    return ApiResponse.ok(result.data(), result.meta());
   }
 
   @GetMapping("/{id}")

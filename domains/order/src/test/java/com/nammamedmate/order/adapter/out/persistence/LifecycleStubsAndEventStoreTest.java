@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nammamedmate.order.application.port.out.RefundInitiatorPort;
+import com.nammamedmate.order.application.port.out.RiderLookupPort;
 import com.nammamedmate.order.domain.ActorType;
 import com.nammamedmate.order.domain.Order;
 import com.nammamedmate.order.domain.OrderStatus;
@@ -29,6 +30,16 @@ class LifecycleStubsAndEventStoreTest {
   void stubsAndEventStore() throws Exception {
     assertThat(new StubRiderLookupAdapter().findById(null)).isEmpty();
     assertThat(new StubRiderLookupAdapter().findById(UUID.randomUUID())).isPresent();
+    assertThat(new StubRiderLookupAdapter().listActive(0)).isEmpty();
+    assertThat(new StubRiderLookupAdapter().listActive(1)).hasSize(1);
+    assertThat(
+            new RiderLookupPort() {
+              @Override
+              public java.util.Optional<RiderLookupPort.RiderInfo> findById(UUID riderId) {
+                return java.util.Optional.empty();
+              }
+            }.listActive(3))
+        .isEmpty();
 
     StubRefundInitiatorAdapter refunds = new StubRefundInitiatorAdapter();
     assertThat(refunds.initiate(null, "x", ActorType.SYSTEM, null).initiated()).isFalse();

@@ -48,6 +48,12 @@
       <Class name="com.nammamedmate.catalogue.application.port.out.PriceCeilingViolationStore$ViolationListResult"/>
       <Class name="com.nammamedmate.order.application.port.out.AdminOrderQueryPort$AdminOrderListRow"/>
       <Class name="com.nammamedmate.order.application.AdminOrderService$ListResult"/>
+      <Class name="com.nammamedmate.order.application.OrderLifecycleService$PharmacyInboxResult"/>
+      <Class name="com.nammamedmate.auth.application.PharmacyStaffService$StaffListResult"/>
+      <Class name="com.nammamedmate.pos.application.PharmacyCustomerDirectoryService$ListResult"/>
+      <Class name="com.nammamedmate.pos.adapter.in.web.PharmacyInvoiceReturnController$ReturnRequest"/>
+      <Class name="com.nammamedmate.inventory.adapter.in.web.PharmacyRtvController$RtvRequest"/>
+      <Class name="com.nammamedmate.notification.application.PharmacyInAppNotificationService$HistoryPage"/>
       <Class name="com.nammamedmate.order.application.ReorderService$HistoryResult"/>
       <Class name="com.nammamedmate.order.application.port.out.ReorderAttemptLogStore$ReorderAttemptLog"/>
       <Class name="com.nammamedmate.rider.adapter.in.web.AdminRiderLocationController$GeofenceRequest"/>

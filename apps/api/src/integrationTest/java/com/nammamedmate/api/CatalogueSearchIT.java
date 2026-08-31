@@ -43,8 +43,7 @@ class CatalogueSearchIT extends AbstractApiIT {
     jdbc.update("DELETE FROM medicine_ban_job");
     jdbc.update("DELETE FROM price_ceiling_violation");
     jdbc.update("DELETE FROM pharmacy_catalogue_mapping");
-    jdbc.update(
-        "DELETE FROM medicine_master WHERE id::text NOT LIKE 'a0000001-0000-4000-8000-%'");
+    jdbc.update("DELETE FROM medicine_master WHERE id::text NOT LIKE 'a0000001-0000-4000-8000-%'");
     jdbc.update("DELETE FROM sessions WHERE user_id IN (?, ?, ?)", OPS_ID, COMPLIANCE_ID, STAFF_ID);
     jdbc.update("DELETE FROM admin_auth_events WHERE admin_id IN (?, ?)", OPS_ID, COMPLIANCE_ID);
     jdbc.update(

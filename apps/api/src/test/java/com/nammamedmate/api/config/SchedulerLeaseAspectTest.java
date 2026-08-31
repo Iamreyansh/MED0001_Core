@@ -59,8 +59,12 @@ class SchedulerLeaseAspectTest {
   void jobSpecificTtl() {
     assertThat(SchedulerLeaseAspect.ttlFor("OutboxDispatchScheduler.dispatch()"))
         .isEqualTo(Duration.ofMinutes(2));
+    assertThat(SchedulerLeaseAspect.ttlFor("OutboxWorker.run()")).isEqualTo(Duration.ofMinutes(2));
+    assertThat(SchedulerLeaseAspect.ttlFor("dispatch()")).isEqualTo(Duration.ofMinutes(2));
     assertThat(SchedulerLeaseAspect.ttlFor("CustomerMaintenanceScheduler.anonymise()"))
         .isEqualTo(Duration.ofMinutes(30));
+    assertThat(SchedulerLeaseAspect.ttlFor("anonymise()")).isEqualTo(Duration.ofMinutes(30));
+    assertThat(SchedulerLeaseAspect.ttlFor("MaintenanceJob")).isEqualTo(Duration.ofMinutes(30));
     assertThat(SchedulerLeaseAspect.ttlFor("Other.job()")).isEqualTo(Duration.ofMinutes(10));
     assertThat(SchedulerLeaseAspect.ttlFor(null)).isEqualTo(Duration.ofMinutes(10));
   }

@@ -25,11 +25,15 @@ public class AnalyticsPlanBridgeConfig {
   @Primary
   AnalyticsPlanPort crmBackedAnalyticsPlanPort(CrmPlanLookupPort lookup) {
     return pharmacyId -> {
-      String plan = lookup.planNameForPharmacy(pharmacyId).orElse(PlanNames.FREE);
-      if (ANALYTICS_PLANS.contains(plan)) {
-        return true;
+      try {
+        String plan = lookup.planNameForPharmacy(pharmacyId).orElse(PlanNames.FREE);
+        if (ANALYTICS_PLANS.contains(plan)) {
+          return true;
+        }
+        return PlanNames.growthFeaturesEnabled(plan);
+      } catch (RuntimeException ex) {
+        return false;
       }
-      return PlanNames.growthFeaturesEnabled(plan);
     };
   }
 }

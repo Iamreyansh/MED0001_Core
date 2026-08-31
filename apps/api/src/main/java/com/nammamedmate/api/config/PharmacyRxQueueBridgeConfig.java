@@ -7,6 +7,8 @@ import com.nammamedmate.crm.domain.PlanNames;
 import com.nammamedmate.kernel.id.Ids;
 import com.nammamedmate.messaging.DomainEvent;
 import com.nammamedmate.messaging.OutboxPublisher;
+import com.nammamedmate.pos.application.PosCartService;
+import com.nammamedmate.pos.application.port.out.ProductLookupPort;
 import com.nammamedmate.prescription.application.port.out.NotificationDispatchPort;
 import com.nammamedmate.prescription.application.port.out.OrderLinesPort;
 import com.nammamedmate.prescription.application.port.out.OrderStatusPort;
@@ -29,7 +31,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Composition-root bridges for pharmacy Rx queue: CRM plan gate, order line/status JDBC, outbox
- * notifications, stub POS cart/sale until EPIC-006 dispense API is shared cleanly.
+ * notifications, and POS cart dispense via {@link PosCartDispenseAdapter}.
  */
 @Configuration
 public class PharmacyRxQueueBridgeConfig {
@@ -115,26 +117,8 @@ public class PharmacyRxQueueBridgeConfig {
 
   @Bean
   @Primary
-  PosDispensePort stubPosDispenseBridge() {
-    // ponytail: no clean cross-domain POS cart API without domain→domain dep; return UUIDs.
-    return new PosDispensePort() {
-      @Override
-      public boolean available() {
-        return true;
-      }
-
-      @Override
-      public UUID pushToBillingCart(
-          UUID pharmacyId, UUID staffId, List<ApprovedMedicine> medicines) {
-        return Ids.newId();
-      }
-
-      @Override
-      public UUID createSaleRecord(
-          UUID pharmacyId, UUID staffId, UUID orderId, List<ApprovedMedicine> medicines) {
-        return Ids.newId();
-      }
-    };
+  PosDispensePort posCartDispenseBridge(PosCartService carts, ProductLookupPort products) {
+    return new PosCartDispenseAdapter(carts, products);
   }
 
   @Bean

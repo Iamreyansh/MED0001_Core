@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -65,7 +66,13 @@ class PharmacyRxQueueBridgeConfigTest {
 
   @Test
   void posAndNotifications() {
-    PosDispensePort pos = config.stubPosDispenseBridge();
+    com.nammamedmate.pos.application.PosCartService carts =
+        mock(com.nammamedmate.pos.application.PosCartService.class);
+    com.nammamedmate.pos.application.port.out.ProductLookupPort products =
+        mock(com.nammamedmate.pos.application.port.out.ProductLookupPort.class);
+    when(carts.createCart(any(), any()))
+        .thenReturn(Map.of("cart_id", UUID.randomUUID().toString()));
+    PosDispensePort pos = config.posCartDispenseBridge(carts, products);
     assertThat(pos.available()).isTrue();
     assertThat(pos.pushToBillingCart(UUID.randomUUID(), UUID.randomUUID(), List.of())).isNotNull();
     assertThat(pos.createSaleRecord(UUID.randomUUID(), UUID.randomUUID(), null, List.of()))

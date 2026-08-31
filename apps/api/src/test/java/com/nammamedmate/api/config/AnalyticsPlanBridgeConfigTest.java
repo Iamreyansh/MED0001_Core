@@ -29,5 +29,9 @@ class AnalyticsPlanBridgeConfigTest {
     assertThat(gate.allowsPharmacyAnalytics(pharmacyId)).isTrue();
     when(lookup.planNameForPharmacy(pharmacyId)).thenReturn(Optional.of(PlanNames.ENTERPRISE));
     assertThat(gate.allowsPharmacyAnalytics(pharmacyId)).isTrue();
+    when(lookup.planNameForPharmacy(pharmacyId)).thenReturn(Optional.empty());
+    assertThat(gate.allowsPharmacyAnalytics(pharmacyId)).isFalse();
+    when(lookup.planNameForPharmacy(pharmacyId)).thenThrow(new RuntimeException("crm down"));
+    assertThat(gate.allowsPharmacyAnalytics(pharmacyId)).isFalse();
   }
 }

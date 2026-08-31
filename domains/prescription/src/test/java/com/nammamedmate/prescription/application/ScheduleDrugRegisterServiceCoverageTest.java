@@ -145,7 +145,11 @@ class ScheduleDrugRegisterServiceCoverageTest {
         new MedmatePrincipal(UUID.randomUUID(), AuthRole.CUSTOMER, null, TokenScope.FULL, "j");
     MedmatePrincipal ownerNoPharm =
         new MedmatePrincipal(STAFF, AuthRole.PHARMACY_OWNER, null, TokenScope.FULL, "j");
+    MedmatePrincipal owner =
+        new MedmatePrincipal(STAFF, AuthRole.PHARMACY_OWNER, PHARM, TokenScope.FULL, "j");
     when(store.list(any())).thenReturn(new ListPage(List.of(), 0, 0));
+    assertThat(service.listPharmacy(owner, null, null, null, null, 1, 10, false)).isNotNull();
+    assertThat(service.listPharmacy(owner, "ALL", null, null, null, 1, 10, false)).isNotNull();
     assertThat(service.listAdmin(ops, "H1", null, "alp", "2026-01-01", "2026-01-31", 0, 0, false))
         .isNotNull();
     assertThatThrownBy(
